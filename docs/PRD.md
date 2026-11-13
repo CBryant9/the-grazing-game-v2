@@ -1,9 +1,11 @@
-# The Grazing Game: Product Requirements (v1.0)
+# The Grazing Game: Product Requirements (v1.1)
 
-Status: **v1.0, ready to build.** Open questions have defaults (section 21); build those until Claudia changes them.
+Status: **v1.1, ready to build.** Section 1A lists what changed from v1.0 and overrides any older wording left elsewhere in this document. Open questions have defaults (section 21); build those until Claudia changes them.
 Tags: **[Decided]** Claudia has agreed. **[Proposed]** recommended, not yet confirmed (build it this way unless told otherwise). **[Open]** needs Claudia's answer before that part is built.
 
 Last updated: 13 November 2026
+
+> **v1.1 (13 Nov 2026).** Claudia widened the build after v1.0. Her words are in [REQUIREMENTS.md](REQUIREMENTS.md) ("Rebuild requests, second round"). The build order is in [BUILD_PLAN.md](BUILD_PLAN.md). Section 1A below is the summary, sections 5.10 to 5.16 hold the new systems, and section 21 lists the defaults still to be checked.
 
 Companion files:
 - Screen mockups: [mockups/index.html](mockups/index.html) (open in a browser; phone, PC and admin tabs).
@@ -36,6 +38,33 @@ It makes money from:
 - **A subscription** that removes ads and adds extras.
 
 An **admin back end** shows the analytics, manages ads and sponsors, connects Stripe and sets plans, moderates the community, and turns each feature on or off. **[Decided]**
+
+## 1A. What changed in v1.1 (read this first)
+
+All **[Decided]** by Claudia on 13 Nov 2026 unless marked. **Where older wording elsewhere in this document disagrees with this section, this section wins.**
+
+| Topic | v1.0 | v1.1 |
+|---|---|---|
+| The MVP | The engine reproduces the MVP | The grass and cattle formulas match the MVP. Everything around them is rebuilt to suit, MVP bugs are fixed, and prices and costs can change |
+| Districts | Five | **Four.** The Top End is removed for now and comes back later as a properly built northern game. Its figures stay in DATA.md |
+| Where the simulation runs | Fast Farm in the browser (offline), Daily Farm on the server | **On the server for both modes**, so the rules can't be read or copied. Fast Farm needs a connection to do jobs. Looking at the farm works offline (5.16) |
+| Fair leaderboards | Server replays ranked Fast Farm runs | Every farm is already run by the server, so no replay check is needed |
+| Years in Fast Farm | A start year, then a random market | **Real years** from 1997, played in order or at random, each with its real prices and real weather (5.14) |
+| Market prices | An approximate series | Real MLA data, baked in for past years and fetched daily for Daily Farm (5.14) |
+| Weather | Random seasons | Real weather from SILO for the district, past and daily (5.14) |
+| Daily Farm date | Game day per real day | The farm runs on today's real date |
+| Sale days | Weekly, 2-day delivery | The real yard's own sale timing. Stock arrive the next day in the farm's yards (5.13) |
+| Job times | Permanent fence 250 m a day, cattle walk at 3 km/h | 500 m a day, 1.5 km/h, and the rest of the table in 5.4 |
+| Workers and contractors | Later | **In the build:** farm hands, a labour pool, contractor fencing (5.11) |
+| Sheep | Not at launch | **In the build:** sheep and wool, where they are realistic (5.12) |
+| The farm's buildings | None drawn | A homestead and stock yards on every farm. Sheds, silos, extra yards and a feedlot can be built (5.13) |
+| Gates | One kind | Three kinds, and stock move along a route through gates (5.13) |
+| Supplements | Charged per head per day | Stock you hold. Lick runs down and is topped up. Feeding out is a job (5.13) |
+| Grazing plans | Fast Farm only | Both modes. In Daily Farm a hand does the moves, or the player is offered them on a plan card (5.15) |
+| Farms per account | 1 Daily, 3 Fast | **2 Daily and 2 Fast** free. 5 of each after a purchase |
+| Paying | Monthly or yearly subscription | **One-off purchases**, and paying to keep going after game over. Nothing that gives an edge in play (10.3) |
+| Minimum age | 13 | **14** to make an account. No community under 16 |
+| Cattle look | Breeds by class | Brahman style in Central Qld, British breeds in NSW and Victoria |
 
 ## 2. Decisions so far
 
@@ -78,8 +107,10 @@ An **admin back end** shows the analytics, manages ads and sponsors, connects St
 ### Non-goals for the first launch
 - App store apps (can wrap later, section 14.9).
 - Two players on the same farm.
-- Sheep and other species (cattle only to start).
-- Hiring workers and contractors to get more done in a day (planned for later, section 5.10).
+- The Top End and other northern districts (removed for now, to be built properly later).
+- Species other than cattle and sheep.
+- Playing Fast Farm with no connection (the simulation runs on the server, 5.16).
+- Freight in proportion to distance, and today's live prices from the yard nearest the player (both wanted later).
 - Direct messages between players.
 - An advertiser self-serve checkout (sponsors are added by Claudia in admin first).
 
@@ -124,9 +155,9 @@ An **admin back end** shows the analytics, manages ads and sponsors, connects St
 - **Midnight rollover:** at midnight in the farm's time zone, the day is simulated on the server. Grass grows or dies, cattle eat where they are, gain or lose weight, drink, calve, die if they must, break through tape if hungry or thirsty. Then a new day begins at first light.
 - **Sub-day accuracy:** the day's grazing is split at the times you moved cattle. A mob moved at 11:20 am grazes the old paddock until then and the new paddock after. This matters at high stock density (strip grazing, several moves a day). **[Decided]** Daily dry matter, intake and gain must be as close to reality as we can get; this is where the model gets tested hardest. Moving cattle twice a day or more is allowed if the daylight allows.
 - **Missed days:** if you don't log in, the farm keeps running with whatever you left. Cattle stay where they are. Days you miss are simulated in turn. When you come back, a catch-up summary shows what happened each day you were away. **[Open]** See 5.2.1.
-- **How many:** **[Proposed]** one Daily Farm per account at a time. **[Open]**
+- **How many:** two Daily Farms per account free, five after a purchase (5.5). **[Decided]**
 - **Time zone lock:** the farm's time zone is set when it's created (from the device). It can be changed at most once every 30 days, and a change never gives extra days. This stops people winding their clock forward to get more days.
-- **Grazing plans** (automatic rotations) are not available in Daily Farm. Each move is a job you do that day. **[Proposed]** This is what makes it a daily decision.
+- **Grazing plans** are available in Daily Farm (v1.1, section 5.15). A farm hand does the planned moves, or the player is offered them on a plan card.
 - **Buying and selling:** **[Proposed]** saleyard sales happen on a set weekday at named yards for each district (for example Roma on Tuesday). Bought cattle arrive after a realistic delay (the mockups use 2 days). An online sale option is available any day with a delay. Selling needs a muster, then the truck, which leaves the day before the sale. **[Open]**
 - **Notifications** (section 13): a morning reminder at a time you choose, plus alerts for things that need you (trough low, calving started, a mob running out of feed, cattle got out, rain).
 - **Daily history:** a diary of every day: the jobs you did, weather, grass and cattle changes, money in and out. Scroll back through days and see the map on any past day (from a stored daily snapshot).
@@ -144,7 +175,8 @@ Recommended: A plus a clear warning in the evening notification, with B added la
 ### 5.3 Fast Farm (the current game, renamed) [Decided]
 
 - Everything the MVP does, at your own pace.
-- **Up to 3 Fast Farms** going at once per account. Guests get 1 (section 8).
+- **Up to 2 Fast Farms** going at once per free account, 5 after a purchase. Guests get 1 (section 8).
+- Years are real years, in order or at random (5.14).
 - **Same daylight budget** as Daily Farm. You can't build all your fencing in one day. When you're done for the day (or out of daylight), you tap **Next day**.
 - The time controls sit along the top of the screen: **Next day**, **+1 week**, **+1 month**, **+1 year**.
 - **Skipping:** when you skip a week or more, each day still has its daylight. Jobs in progress keep going, using each day's daylight in turn, and grazing plans keep running (as in the MVP). Skips stop early for anything the MVP stops for (for example a mob with no water).
@@ -159,16 +191,20 @@ One person, a ute or quad bike, normal gear. These go into `DATA.md` with source
 | Job | Proposed time |
 |---|---|
 | Look at anything (paddocks, cattle, prices, layers) | Free |
-| Travel on the farm | Distance ÷ 25 km/h |
-| Permanent fence (barb or ringlock, with strainers) | About 250 m per working day (about 4 h per 100 m) |
-| Electric fence, 2-wire, permanent | About 1.5 km per working day (about 40 min per 100 m) |
-| Temporary tape: put out | About 1 km per hour |
-| Temporary tape: roll up | About 1.2 km per hour |
-| Gate (hang a gate in an existing fence) | 1 h |
+| Travel on the farm | Distance ÷ 25 km/h. Real driving is faster, but this suits the game's scale **[Decided]** |
+| Permanent fence, on your own | **500 m per working day [Decided]** |
+| Permanent fence, contractor team | 1-man team 500 m a day, 2-man team 1,000 m a day. Uses none of your daylight **[Decided]** (5.11) |
+| Electric fence, single wire | Fast: about 1 km per hour (posts to hit in). "Really fast if it's just one wire or tape" |
+| Temporary tape: put out or roll up | About walking pace, 3 km per hour |
+| Proper swing gate | 1 h |
+| Wire gate | 30 min, and 5 min each time stock go through it |
+| Tape gate handle | 5 min |
 | Poly pipe with a pipe layer | About 400 m per hour |
 | Trough with fittings | 3 h |
 | Move or refill a portable trough | 30 min plus travel |
-| Move a mob through a gate to the next paddock | 15 min + walking at about 3 km/h + 1 min per 100 head |
+| Move a mob | Drive out + 15 min + walking the route through gates at about **1.5 km/h [Decided]** (faster with dogs) + 1 min per 100 head. Next door is quick |
+| Lick run or feed run | Load at the shed or silo + drive + 5 min per mob |
+| Move delivered stock out of the yards | As a move, from the yards |
 | Muster a whole paddock | 30 min + about 1 h per 200 ha |
 | Feed lick or hay to a mob | 30 min + travel |
 | Wean | Muster + 30 min + 0.5 min per head |
@@ -183,17 +219,21 @@ One person, a ute or quad bike, normal gear. These go into `DATA.md` with source
 
 | | Daily Farm | Fast Farm |
 |---|---|---|
-| Guest (no account) | Not available | 1, on this device only |
-| Free account | 1 **[Proposed]** | 3 |
-| Subscriber | 1 **[Proposed]** | 3 **[Open]** more for subscribers? |
+| Guest (no account) | Not available | 1 |
+| Free account | 2 **[Decided]** | 2 **[Decided]** |
+| After a one-off purchase (10.3) | 5 **[Decided]** | 5 **[Decided]** |
+
+Two of each lets a player run "one where they start from 0 and one where they start with a lot".
 
 ### 5.6 Starting a farm (setup flow)
 
 Game-like steps with picture cards, as in the MVP (REQUIREMENTS: Setup).
 1. **Mode:** Daily Farm or Fast Farm (short explanation on each card).
-2. **District** (the five MVP districts).
+2. **District** (four: Central Queensland, Northern Tablelands NSW, Central West NSW, Western Victoria).
 3. **Farm size** (small, medium, large, realistic per district).
-4. **Enterprise:** grazing or mixed farming, then arable % and cropped % (as in the MVP).
+4. **Stock:** cattle, sheep or a mix. This sets which market classes show first. The player can still buy either later. Sheep are only offered in districts where they are realistic.
+4a. **Enterprise:** grazing or mixed farming, then arable % and cropped % (as in the MVP).
+4b. **Years (Fast Farm):** real years in order, or at random.
 5. **Start:** take over a running business, or start from scratch.
 6. **Difficulty** (sets money, overdraft and game-over level, scaled to the farm). No dollar figures shown until you take the farm.
 7. **Name your farm.**
@@ -226,10 +266,84 @@ Separate boards also show each part (profit, beef per ha, ground cover, days sur
 - Calibration tests must also cover high-density daily moves (for example 500 head on 4 ha moved daily) and check intake, residual and gain look right to a grazier.
 
 ### 5.10 Later (not now)
-- Hire workers or contractors so more gets done each day (fencing contractor, casual stockman).
+- The Top End and other northern districts, built with northern specifics.
 - Water sensors and cameras (see troughs without driving there).
-- Sheep.
-- Real weather and real market prices in Daily Farm (see open question 2).
+- A player's own location for weather, and live prices from the real yard nearest them.
+- Freight in proportion to distance.
+- Stock sharing a paddock across species, if not at launch (5.12).
+
+### 5.11 Farm hands and contractors [Decided, figures Proposed]
+
+**The labour pool.** A short list of people looking for work in the district. It changes over time and people leave. Each person has a name, a type (day-rate casual, short contract such as 3 months at a day rate, or salaried), a rate, the days they work, skill ratings (fencing, stock work, water and pipe, feeding and machinery), and a limit on how hard they can be worked before they quit. Some have a team of dogs, which makes moving stock quick. Salaried hands don't work weekends. Some long-term hands do.
+
+**What hands do.** Farm hands can do every task.
+- **Standing duties** from their own hours: grazing plan moves, the lick run, checking waters. These still happen on Daily Farm days the player misses.
+- **Helping on the player's jobs.** When the player draws a fence, the first part of the line is the hands' share for that day and uses none of the player's daylight (about 500 m of permanent fence for an average hand, more or less by skill). The line then carries on into the player's own daylight. One hand takes a day's permanent fencing from 500 m to about 800 m.
+- **The line stops when the day is used up**, with a warning that this is the full day and that moving cattle as well means doing less fence.
+
+**Contractor fencing (permanent fence only).** The fencing tool offers: yourself, a 1-man team (500 m a day) or a 2-man team (1,000 m a day). Contractors cost more and use none of the player's daylight. They keep going day after day until the run is finished. The player's hands can help them. The player can draw extra fence of their own at the same time. On the map, the contractor's fence and the player's own fence are drawn in different colours while being built.
+
+**Pay, leaving and reputation.** Wages come out on a regular pay day. If the player can't pay, or works people past their limit, they leave. The farm's reputation in the workforce drops and the choice of workers gets worse and dearer. Paying on time brings it back.
+
+**Messages.** The inbox keeps the player up to date ("John's contract has finished. Consider hiring someone else.").
+
+**Injury.** Rare, and more likely after long days or risky jobs. The person is off for a time and there is a workers comp cost. The message says what happened.
+
+**Wording.** People are described by facts (skills, days, rate). No judging words.
+
+**The worker report.** When the player opens a Daily Farm, a worker character appears with a speech bubble for each thing done while they were away ("I moved the cows from Paddock 3 to Paddock 4 as planned"). One tap for the next, or skip all. Each is also in the inbox.
+
+### 5.12 Sheep and wool [Decided, model Proposed]
+
+- Sheep are a second species through the whole game: classes (ewes, wethers, lambs, hoggets, rams), joining, lambing, marking, weaning, deaths, intake and condition, with their own real figures.
+- Wool grows with feed and is income. Shearing and crutching are jobs, done by contractors.
+- Sheep graze shorter and pick harder than cattle.
+- A cattle fence doesn't hold sheep. Sheep-proof fence costs more per metre.
+- Sheep are only offered where they are realistic: Northern Tablelands, Central West NSW and Western Victoria. **[Proposed]** Not Central Queensland.
+- Markets: lamb, mutton and store sheep from MLA. Wool uses a stand-in price for now (5.14).
+- **[Proposed]** Merino wool and prime lamb both at launch. One species per paddock at launch.
+- Before any sheep code, a benchmark table like CALIBRATION.md is drafted from published sources and agreed with Claudia (lamb growth, wool cut per head, lambing percentage, DSE per ha by district, deaths).
+
+### 5.13 The homestead, yards, buildings, gates and feed [Decided, figures Proposed]
+
+- **Every farm has a homestead and stock yards**, drawn on the map. Jobs include driving out from the homestead (or from the last job) and home at the end of the day.
+- **The saleyard is still never drawn.** It is reached through Market and is called "Saleyards".
+- **Selling:** Sell books stock onto the next sale. The Market tab shows days until the next sale.
+- **Buying:** stock arrive the next day in the farm's stock yards, which have water. The player moves them out and picks their paddock. **[Proposed]** Stock left in the yards need hay after one day.
+- **Yard work [Proposed]:** marking, weaning, preg testing, drafting and loading happen at the yards. The mob is walked to the nearest yards. More yards can be built.
+- **Gates:** a proper swing gate, a cheap wire gate, and a tape gate handle. Tape can also be dropped to let stock through. Stock move along a route through gates, so with no gate on the way there is no move until one is built.
+- **A long walk costs the day's gain.** Hours walking come off that day's grazing. Paddocks walked through are not grazed.
+- **Feed is stock on hand.** Lick, hay and pellets are bought and kept in a shed, silo or feed bin. Lick goes out as blocks or tubs and is eaten at a rate per head per day, so more stock empties it sooner. When it runs out its effect stops and "things to check" says so. A lick run or feed run is a job: load, drive, put out. What the feed does to the animal is unchanged.
+- **Buildings the player can add:** sheds, silos and feed bins (closer ones shorten feed runs), extra yards, and a feedlot. **[Proposed]** A feedlot the player builds is drawn on the map. *(v1.0 said no feedlot on the map; that was the MVP's fixed feedlot strip.)*
+
+### 5.14 Real years, markets and weather [Decided]
+
+- **Fast Farm years are real years**, from 1997 to the last full year. The player picks "in order" or "random" at setup, so regular players can't predict the market. The screen shows the real year. The score counts it as year 1, 2, 3.
+- **Each real year brings its real prices and its real weather** for the district.
+- **Prices:** Meat & Livestock Australia's public data service. It has daily indicators from mid-1996, nationally and for each yard. Past years are baked in. Daily Farm fetches the latest once a day on the server. The game's classes are worked out from the nearest real indicator, and the mapping is recorded in DATA.md. Credit line: "Reproduced courtesy of Meat & Livestock Australia Limited – www.mla.com.au". **Before launch**, Claudia emails MLA for written confirmation of commercial use.
+- **Yards behind each district:** Central Queensland: CQLX Gracemere. Northern Tablelands: Armidale. Central West NSW: Dubbo. Western Victoria: Mortlake for cattle and Hamilton for sheep.
+- **Sale days match the real yard**, including yards that sell about fortnightly. Past years use the days that yard really sold.
+- **Weather:** SILO (Queensland Government), free under an open licence with a credit line. Daily rain, temperature and evaporation for each district town, from 1889 to yesterday. Past years are baked in. Daily Farm fetches yesterday once a day on the server.
+- **How weather drives growth:** the district growth curves stay as the average year. Real rain and evaporation feed a simple soil-water tally that gives a growth factor, in place of the MVP's random season. Over many years it averages back to the district curve, so the benchmarks hold in average years. Checked against AussieGRASS and against years Claudia remembers.
+- **Wool:** a stand-in price for now. Real wool prices need a paid AWEX agreement, to be sorted before sheep go public.
+- **Leaderboard by real year:** who came out best of that year, scored on the change from where they started the year, within a district.
+
+### 5.15 Grazing plans in each mode [Decided]
+
+- **Plans are templates:** the paddocks in order, the rule, the rounds. A mob runs a template from a chosen step. If a manual move breaks the plan it pauses, and the player resumes from any step or resets it.
+- **Fast Farm:** the plan moves the stock during the day and during skips. **[Proposed]** It uses the farmer's daylight unless a hand does it.
+- **Daily Farm with a hand working that day:** the hand does the move from their own hours. The player sees it in the worker report.
+- **Daily Farm with no hand working that day:** nothing moves until the player does it. Setting up the plan says so and that a reminder will be sent. On opening, a plan card says "Your grazing plan said today you would move from Paddock 3 to Paddock 4. Would you like to do that now?" with Yes and Not yet. Not yet leaves a plan strip along the bottom with a Move button.
+- **Several moves a day are played in one sitting.** "Run today's plan" plays the day from first light to last light: the light changes, the mob grazes, moves and grazes again. The player can also skip to the next move and fit a job in between. A short run leaves daylight over.
+- **Reminders:** one at the player's chosen time (default 7 am), and one more later if they haven't played.
+- **Showing time pass:** the clock and light move during a job; a short time-lapse plays when a plan runs or the day ends; days tick by in Fast Farm skips. All of it can be skipped and turns off with "reduce motion".
+
+### 5.16 Where the simulation runs [Decided]
+
+- The simulation runs on the server for both modes. The browser holds the screens and the map drawing, and gets back numbers and the state of each square, never the formulas or data tables.
+- Fast Farm needs a connection to do jobs or skip time. Looking at the farm works offline from the last saved state. Skips run a month at a time so the map keeps moving.
+- Guests play through an anonymous session on the server.
+- The repos, the MVP and the model docs stay private. Preview sites are locked. The terms of use state who owns the game, its rules and its data.
 
 ## 6. Game screens on phone and PC
 
@@ -339,7 +453,7 @@ Claudia asked whether players without an account should have to start over. Reco
 - Under 16s get the game, cloud saves, both modes and leaderboards.
 - The **Community is hidden**: no feed, posts, comments, likes, follows, groups, public profile or activity ticker entries. Their own rows on leaderboards show username and district only (no photo, no profile link).
 - When they turn 16, the community opens automatically.
-- **[Open]** Minimum age for an account at all. Recommend 13+ for accounts (guests any age), because Australia's privacy rules for children are getting stricter. Get legal advice (section 18).
+- **[Decided]** Nobody under 14 can make an account (guests any age). Get legal advice (section 18).
 
 ## 9. Community
 
@@ -458,7 +572,26 @@ Display ad earnings vary a lot. As a rough guide, small Australian sites earn so
 
 Direct sponsors usually pay much more for a niche audience like farmers. For example, 20 rail slots at A$150 to A$500 a month would be A$3,000 to A$10,000 a month, if the audience numbers back it up. That's why the slots are built in-house and the audience report matters (section 12). Using the slots for Claudia's own business costs nothing and can start on day one.
 
-### 10.3 Subscription [Proposed, switch off until ready]
+### 10.3 One-off purchases and paying to keep going [Decided, prices Proposed, switched off until ready]
+
+This replaces the v1.0 subscription. The old wording is kept below under "v1.0 subscription (replaced)" for reference only.
+
+- **Free:** both modes, ads (when switched on), 2 Daily Farms and 2 Fast Farms.
+- **Farm pack, about A$30, one-off:** 5 of each farm, plus perks.
+- **Farm pack with no ads, about A$50, one-off:** 5 of each farm, no banners or videos, more perks. **[Proposed]** A$20 to upgrade from the first pack.
+- **Perks [Proposed]:** full diary history, extra charts, a supporter badge, early access to new districts.
+- **Nothing that gives an edge in play is for sale.**
+- **Paying to keep going.** Offered only at game over. It clears the debt and puts the farm back to modest funds, with a penalty that fits the situation. The offer shows exactly what the player keeps and gets.
+  - **[Proposed]** Stock are sold to clear the debt first. Cash is then set to the hard-difficulty starting cash for that farm.
+  - Fast Farm: A$5.
+  - Daily Farm, by how long the farm has run: about A$25 at 6 months, A$50 at 1 year, A$100 over 2 years. **[Open]** the price under 6 months (A$15 until set).
+  - **[Proposed]** A farm can be rescued more than once. Its leaderboard score stops at the game over and it shows a "continued" mark.
+- All prices in Australian dollars with GST included, set in admin and Stripe.
+- Stripe Checkout takes the payment. Webhooks record what the account owns. No Customer Portal is needed.
+- A Daily Farm shouldn't reach game over in its first 3 to 6 months of ordinary play. This is tested with the engine.
+- Check with a lawyer or accountant: refunds and clear wording under consumer law, GST, purchases by under 18s. App stores have their own rules if the game is wrapped later.
+
+#### v1.0 subscription (replaced)
 - **Free:** both modes, ads (when switched on), 1 Daily Farm, 3 Fast Farms.
 - **Pro** (name **[Open]**): no banners or videos, advanced stats and charts, full diary history (free keeps, say, the last 30 days), Pro badge, early access to new districts and features. **[Open]** More Fast Farm slots?
 - **Price to test:** A$4.99 a month or A$39 a year, GST included. Set in Stripe and admin, so it can change.
@@ -589,7 +722,8 @@ One Next.js app is the website and the game. The game page (`/play`) runs only i
 **Why PixiJS fits whichever render style is chosen:** it draws sprite sheets very fast, whether pixel art or smooth illustrated art, and handles level-of-detail switching (mob markers zoomed out, individual cattle zoomed in). It also does colour grading (dawn to dusk) and particles (rain, dust), and leaves menus to React, which is much better at them. Phaser would also draw the art well, but its menus are weak, and this game is mostly menus around one map.
 
 ### 14.3 Who runs the simulation
-- **Fast Farm:** in the browser (Web Worker). Works offline. Saves to IndexedDB and syncs to the cloud when signed in and online.
+- **v1.1: both modes run on the server (5.16).** The Daily Farm points below apply to Fast Farm too, except the midnight rollover.
+- **Fast Farm:** on the server. The browser sends each job or skip and shows what comes back. Looking works offline from the last saved state.
 - **Daily Farm:** on the server, so no one can cheat time.
   - The browser sends each job to the server. The server checks it (daylight left, money, rules), applies it and returns the new state. The browser shows the result straight away and corrects if the server disagrees.
   - Midnight rollover: a scheduled job runs every 15 minutes and simulates the day for every Daily Farm whose local midnight has just passed. As a safety net, any farm that is opened or viewed with missed days is caught up first.
@@ -603,7 +737,7 @@ One Next.js app is the website and the game. The game page (`/play`) runs only i
 
 ### 14.5 Fair leaderboards
 - Every farm's random numbers come from a seed.
-- Fast Farm ranked runs and challenges upload the seed and the full list of actions. The server replays them with the same engine. The score only counts if it matches.
+- v1.1: every farm in both modes is run by the server, so scores can't be changed from the browser and no replay check is needed. The action log is still kept for each farm, for support and for checking engine changes.
 - Daily Farms are already on the server.
 - Replays run in a background queue, and only for runs that would place on a board.
 
@@ -759,6 +893,18 @@ Supabase Postgres. Every table has `id`, `created_at`, `updated_at`. Row Level S
 
 Everything is built before launch; switches control what players see.
 
+**v1.1 build order.** Five stages. The milestones and what "done" means for each are in [BUILD_PLAN.md](BUILD_PLAN.md).
+
+| Stage | What |
+|---|---|
+| 1 | Engine and the cattle game on all screens, with real years, the new job times, homestead and yards, gates, feed as stock and sale days |
+| 2 | Farm hands, contractor fencing, then sheep and wool |
+| 3 | Accounts, the simulation on the server for both modes, Daily Farm with live weather and prices, notifications, admin shell |
+| 4 | Competition and community |
+| 5 | Ads, one-off purchases, paying to keep going, website, launch |
+
+The v1.0 stages below are kept for their acceptance tests. Read "subscription" as one-off purchases, "offline Fast Farm" as looking offline, and the replay check as not needed.
+
 **Stage 1: Engine and game on all screens**
 - Monorepo, engine ported to TypeScript with seeds, all calibration tests passing.
 - PixiJS map with the new art direction, time-of-day lighting, model-driven grass.
@@ -802,7 +948,38 @@ Everything is built before launch; switches control what players see.
 | 11 | Render style | **Decided:** S5 clear map with detail on zoom, zoomed-in detail in the S3 style. No longer open |
 | 12 | Feedlot | Kept as an option inside Herd (send a mob to a feedlot for a daily fee, as in the MVP), never drawn on the map |
 
-Original wording of the questions, for context:
+### v1.1: what is settled, and the defaults still to check
+
+**Settled in v1.1** (these replace rows 2, 3, 5, 6, 7, 9, 10 and 12 above): real weather and prices (5.14); a hand's standing duties run on missed days, otherwise nothing happens without you (5.11); job times (5.4); sale days follow the real yard with next-day delivery (5.13, 5.14); 2 Daily and 2 Fast Farms free, 5 after a purchase (5.5); minimum account age 14; grazing plans in both modes (5.15); a feedlot is something the player builds (5.13).
+
+**Defaults Claudia accepted "for now"**, to be perfected later. Each is a setting or one line in a data file.
+
+| # | Topic | Default built |
+|---|---|---|
+| 13 | Working hours | The player can work from first light to last light. A hand gives a fixed day's work by skill |
+| 14 | Electric and tape rates | Single-wire electric about 1 km an hour; tape about 3 km an hour |
+| 15 | Contractor fencing price | Materials plus a labour charge per metre, the same rate for either team. Figure to be sourced |
+| 16 | Gate costs and times | Proper gate $450 and 1 h; wire gate about $150 and 30 min, plus 5 min each use; tape handle about $20 and 5 min |
+| 17 | Walking with dogs | Up to about 2.5 km/h with a hand who has dogs |
+| 18 | Yard work | Marking, weaning, preg testing, drafting and loading happen at the yards |
+| 19 | Stock in the yards | Water in the yards; hay needed after one day |
+| 20 | Building costs and times | Sheds, silos, yards, feedlot: figures to be sourced |
+| 21 | Lick, hay and pellet figures | Product sizes, prices and intake per head to be sourced and recorded in DATA.md |
+| 22 | Plan moves in Fast Farm | Use the farmer's daylight unless a hand does them |
+| 23 | Hands | No limit on how many. Wages from award rates, to be sourced. Injuries are rare and tied to long days |
+| 24 | Sheep districts | Northern Tablelands, Central West, Western Victoria. Not Central Queensland |
+| 25 | Sheep and cattle in one paddock | Not at launch |
+| 26 | Sheep enterprises | Merino wool and prime lamb |
+| 27 | Wool price | A stand-in figure until an AWEX agreement is in place |
+| 28 | Cattle look | Brahman style in Central Queensland, British breeds elsewhere |
+| 29 | Purchases | A$30 and A$50 packs, A$20 to upgrade, perks as in 10.3 |
+| 30 | Keep going | Prices and rescue terms as in 10.3; under 6 months A$15 |
+| 31 | Reminders | 7 am by default, one more later if not played |
+| 32 | Earliest real year | 1997 |
+| 33 | Built feedlot | Drawn on the map |
+| 34 | Fences longer than a day | When building yourself, the line stops at what fits today. Contractors carry on over days |
+
+Original wording of the v1.0 questions, for context:
 
 1. **Mode names.** Working titles are "Daily Farm" and "Fast Farm". Alternatives: "Real Time" / "Quick Play", "Day by Day" / "Fast Track", "Daily" / "Seasons".
 2. **Daily Farm weather and prices.** Simulated (as now), or the real weather for that district each day (from Bureau of Meteorology or SILO data) and real cattle prices? Real weather would be a strong hook ("it rained in Roma today and my farm got it too") but needs a soil water and growth model that responds to daily rain rather than the monthly curve.
@@ -866,6 +1043,7 @@ Original wording of the questions, for context:
 
 | Version | Date | What changed |
 |---|---|---|
+| v1.1 | 13 Nov 2026 | Four districts (Top End removed for now). Simulation on the server for both modes. Real years with MLA prices and SILO weather. New job times. Farm hands and contractor fencing. Sheep and wool. Homestead, yards, buildings, gate types, feed as stock. Grazing plans in both modes with the worker report and plan card. 2 + 2 farms free. One-off purchases and paying to keep going in place of the subscription. Minimum age 14 |
 | v0.1 | 13 Nov 2026 | First draft: product, stack, costs, phases |
 | v1.0 | 13 Nov 2026 | Ready to build: defaults set for every open question, first-time experience, accessibility, sharing, errors and offline, saves, data deletion, environments, accounts Claudia sets up |
 | v0.3 | 13 Nov 2026 | Speed targets (Lighthouse 100), phone landscape layout and wide farms, no saleyard or feedlot on the map, readable render styles with level of detail, ticker on website pages only, ads in a different spot per page, separate website and game headers on PC, light and dark themes, game panels shown in mockups |

@@ -159,3 +159,103 @@ These came from planning the phone and PC rebuild. Full detail and open question
 - [ ] On PC the game header sits at the top of the game and the website header at the top of the site; they must not blend together. Community and other pages get big headings and sensible spacing.
 - [ ] Light and dark versions.
 - [ ] Map style: the "clear map with detail on zoom" (S5 in the mockups). Clean paddocks and one marker per mob when zoomed out, individual cattle and grass when zoomed in.
+
+## Rebuild requests, second round (13 Nov 2026, after the first build plan)
+
+Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or from rules above, these win, and the reversal is noted. Items marked *(details open)* still need figures or a decision; see BUILD_PLAN section 9.
+
+### How to treat the MVP
+
+- [ ] The rebuild is built "to our needs". The MVP "was a quick start", so its code and display can change, and "prices and things" can change to suit. Keep "the same data and lessons from v1".
+- [ ] "The grass, cows and all that should be as real as possible whilst maintaining good gameplay."
+
+### Markets, years and weather
+
+- [ ] Prices should be real market data for the years they stand for. *(The MVP series was approximate, written from memory. It must be replaced with real data, LESSONS 13.)*
+- [ ] Fast Farm uses real years. The player chooses to play the years in order or at random ("we might take 1997 and then do 2006 in the following year"), so regular players "can't predict what the market is going to do". The label shows the real year it represents, but it counts as year 2, year 3 and so on for their score.
+- [ ] Leaderboards also rank by real year: "who came out the best of that year", taking the starting and ending position into account, because "someone who started with a lot vs nothing is different".
+- [ ] Daily Farm: connect to real market and weather conditions for the player's chosen location if it can be done simply ("that would be cool"). Use the baked-in years until a live feed is ready. Record the wish for live data from real yards near the player, and later "today's prices".
+- [ ] Saleyards are called just "Saleyards" for now (generic name). Research the best real yard for each district, especially ones with data we can get automatically.
+- [ ] Freight in proportion to distance is not a priority.
+- [ ] The yards found for each district "work": Gracemere (Central Qld), Armidale (Northern Tablelands), Dubbo (Central West), Mortlake for cattle and Hamilton for sheep (Western Vic).
+- [ ] The Top End has no yard of its own: "find a northern equivalent somehow", possibly north Queensland or live export. *(Charters Towers is in the MLA service with current prices. Whether the district itself moves is still open.)*
+- [ ] "Just hook up to MLA and ask them later." Build on the MLA service now; the permission email comes before launch.
+- [ ] Wool: "use a stand-in for now".
+- [ ] Northern cattle are drawn Brahman style, not British cattle.
+- [ ] Where sheep aren't appropriate, don't offer them.
+
+### Jobs, time and the farm's buildings
+
+- [ ] Permanent ("proper") fence: 500 m a day on your own. *(Changed: the PRD had about 250 m a day.)*
+- [ ] Permanent fence has a contractor option in the fencing tool: a 1-man team costs more and gets double done in a day; a 2-man team more again. Time and cost depend on the option chosen. *(details open)*
+- [ ] Other fence types scale sensibly: rolling out tape and putting it on posts takes about as long as walking it; electric fence needs posts hit in, so it sits between tape and permanent.
+- [ ] Every farm has a house and yards. How long a job takes depends on "driving the cruiser out there and back".
+- [ ] Moving stock takes time by distance. The paddock next door "shouldn't take long at all". Cattle walk at about 1.5 km/h. *(Changed: the PRD had about 3 km/h.)*
+- [ ] On a day a mob has "a bit of a walk", assume they didn't eat much for weight gain. Walking through other paddocks has no effect on those paddocks.
+- [ ] Gates: consider doing gate types now so it is realistic (a cheap gate, a real gate, a pull-up tape gate). *(details open)*
+- [ ] Supplements are stock you hold. A lick block gets low and needs topping up; how fast it goes depends on the stock on it. A lick run takes time.
+- [ ] Feeding out means loading at a feed bin, shed or silo and driving out from there. Players can build sheds and silos closer to the stock, or build a feedlot and feed them there. *(Earlier rule: no feedlot drawn on the map. A feedlot the player builds on the farm is new; confirm how it shows.)*
+
+### Buying and selling
+
+- [ ] Sale days and delivery days apply in both modes. The Market tab shows days until the next sale. Clicking Sell books the stock onto the next sale.
+- [ ] Bought stock is generally delivered the following day, into the stock yards on the farm. On delivery day the player moves them out and chooses their paddock. *(Changed: the PRD default was a 2-day delivery.)*
+
+### Farm hands and the workforce
+
+- [ ] Players can hire farm hands, on a salary or a contract. The people available change over time, and people leave.
+- [ ] Workers have skills and stats that change how fast and how far jobs get: the days they work, their rate, what they improve, and "how hard you can work them before they quit". Some are good at fencing. Some have a team of dogs and make moving stock quick. Farm hands can do all tasks (fencing, moving stock, troughs, pipe).
+- [ ] With a farm hand on, one-man fencing assumes the farmer and the worker are both there, so about 800 m a day instead of 500 m.
+- [ ] Some only want short contracts (for example 3 months at a day rate). Salaried workers don't work weekends. Others on long terms might.
+- [ ] Messages keep the player up to date ("John's contract finished, consider hiring someone else").
+- [ ] Workers occasionally get hurt and go on workers comp (rare).
+- [ ] If the player can't pay them or treats them badly, their reputation in the workforce drops and the choice of workers gets worse.
+- *(Changed: the PRD listed workers and contractors as "later".)*
+
+### Sheep
+
+- [ ] Add sheep, with their own figures, and wool as income. *(Changed: the PRD had cattle only at launch.)*
+- [ ] At setup the player chooses cattle, sheep or a mix, so the markets shown aren't too busy. In play they can still buy either, "because they might change their minds".
+
+### Protecting the rules
+
+- [ ] The code and rules of both modes should be hidden from everyone: "we don't want anything to be able to copy our rules". This is to become a business. *(If Fast Farm runs on the server to achieve this, it reverses offline Fast Farm in the PRD; confirm.)*
+
+### Farms, payments and game over
+
+- [ ] Free accounts get 2 Daily Farms and 2 Fast Farms ("one where they start from 0 and one where they start with a lot"). *(Changed: the PRD had 1 Daily and 3 Fast.)*
+- [ ] One-off payments, not a subscription: about $30 for 5 of each farm plus perks; about $50 for 5 of each farm, no ads and more perks. *(Changed: the PRD had a monthly or yearly subscription.)*
+- [ ] Nothing in the game can be bought for an advantage: "they can't pay for perks in the game".
+- [ ] On game over, a player can pay to keep going. It clears the debt and puts the farm back to "small modest funds", with a penalty that fits their situation (for example they may have had to sell all their stock). The offer shows exactly what they get for the money.
+- [ ] Price to keep going: $5 on a Fast Farm. On a Daily Farm it scales with how long the farm has run: about $25 at 6 months, $50 at 1 year, $100 over 2 years. *(details open: the price under 6 months, and whether $35 is a minimum.)*
+- [ ] A Daily Farm shouldn't reach game over within the first 3 to 6 months of ordinary play. *(To be tested with the engine.)*
+
+### Grazing plans in each mode
+
+*(Changed: the PRD default was no grazing plans in Daily Farm.)*
+
+- [ ] Fast Farm: the plan moves the stock around as set, "because we assume the farmer is doing it".
+- [ ] Daily Farm with a worker: the worker does the planned moves, and it doesn't use the farmer's daylight. When the player comes in, a worker character pops up with a speech bubble, like a retro game ("like Pokemon"): "I moved the cows from here to here as planned", so they know a move already happened and may not need to do anything.
+- [ ] Daily Farm with no staff: setting up a plan says "you have no staff, so you will need to remember to move them. We will send you a notification." The player gets "Time to move your stock".
+- [ ] When they come in, a grazing plan card says: "Your grazing plan said today you would move from X to Y. Would you like to do that now?" Yes moves them. Not yet leaves a plan strip along the bottom with a quick Move button, "because they might want to have a look at the pastures first and then decide".
+- [ ] If they move stock and break the plan, they reset it themselves, or pick a template and resume from a step ("this is paddock 3 of the template", then on to 4, 5 and 6).
+- [ ] Several moves a day without staff are played in one sitting, not with several reminders: "less pressure". The card says "this was your plan, do it", and the player watches the day pass from sunrise to sunset, with the cows moving, stopping, then going again. A short run of moves leaves daylight over.
+- [ ] Reminders: one reminder at a time the player picks, then one more later if they haven't played, "so they don't miss a day". Notification settings let them change this.
+- [ ] Show time changing across the day on the map. "It would be cool to see how we could simulate that change of time across the day."
+
+### Answers given on the question list (13 Nov 2026)
+
+- [ ] **Remove the Top End for now.** "It's super hard and super large", and it is "better to build it out with specifics of northern in the future". Four districts at launch. *(Changed: the MVP and PRD v1.0 had five. The Top End figures stay in DATA.md for later.)*
+- [ ] A Daily Farm runs on today's real date.
+- [ ] Sale days match the real yard's timing, including yards that sell fortnightly: "that adds to the reality of it".
+- [ ] "Electric fencing is really fast if it's just one wire or tape."
+- [ ] Contractor fencing: a 1-man team does 500 m a day and a 2-man team 1,000 m a day, and neither takes the farmer's daylight. Any workers could be helping them. The farmer can draw their own extra fence as well, shown in a different colour from the team's.
+- [ ] Workers helping on a fence the farmer draws: the first part of the line is the workers' share and uses none of the farmer's daylight (about 500 m for a worker, more or less by their skills). Then the line continues and uses the farmer's daylight.
+- [ ] The line stops drawing when the day is used up, with a warning that this is the full day, and that to move cows as well they need to do less fence.
+- [ ] Driving on the farm is faster than 25 km/h in real life, but 25 works for the game's scale.
+- [ ] Nobody under 14 can make an account. No community under 16. *(Changed: PRD v1.0 had 13.)*
+- [ ] For everything else on the list, Claudia accepted the suggested defaults "for now": "better to get this in and then scale and adapt as we go". They are listed in PRD section 21.
+
+### Security
+
+- [ ] Claudia is "worried about this security and stuff". The rules, players' data and payments must all be safe, and she wants it explained in plain words.
