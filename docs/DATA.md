@@ -34,6 +34,8 @@ The rebuild carries the four launch districts (cq, nsw, cw, wv) in `packages/eng
 
 The grid is always 40 × 26 squares, so `HA` (ha per square) = farm ha ÷ 1,040 and `S.side` (m per square) = √(HA × 10,000).
 
+The rebuild carries the four launch districts' sizes in `packages/engine/src/data/farms.ts`, checked against the MVP by a test. The grid has no yards strip beside it.
+
 ## Seasons (`drawSeason`, redrawn each July)
 
 | Factor × normal growth | Label | Chance |
@@ -134,6 +136,13 @@ Fence and pipe costs are per metre, so a segment costs `PER_M × S.side`, and bi
 
 Water use: 10% of live weight in litres a day, × 1.3 in summer (Dec–Feb), × 0.8 in winter (Jun–Aug).
 
+Corrections from the code (milestone 1.2b):
+
+- A water hub on a square gets one gate on each side that is not the boundary or already a gate, so a hub against the boundary has fewer than 4. Sides with no fence get a gate too. The trough is only charged if the square has none.
+- A portable trough gives up the grazing area's daily need divided by the number of watered squares in the area. It warns once under 25% (1,500 L).
+- Tape under a new permanent or electric fence is lost, not rolled up. A gate hung in tape takes that segment of tape with it.
+- In the rebuild the layout rules report lengths and counts and the caller applies these costs. The energiser is charged for electric fence only (BUILD_PLAN 2.4).
+
 ## Supplements (`FEED`)
 
 | Feed | Cost | What it does |
@@ -166,11 +175,17 @@ Taking over an established farm with a herd gives 25% of the cash (the herd is t
 
 - One to two vertical and zero to one horizontal full-length fence lines (30% electric), each with a shut gate. Every paddock gets at least one gate.
 - A running farm pipes water to a trough in every paddock over 2% of the farm. It adds waters until no point is more than about 2 km from water, at about one water per 2,500 ha and at most 8 per paddock.
+- Detail from the code: the lines down the farm sit 7 or more squares in from the sides, more than 2 squares from the bore and more than 5 from each other. The line across sits 6 or more squares in and more than 2 from the bore. Each line's own gate is at least 2 squares from its ends. A paddock left without a gate gets one at a random spot in its fences. The first trough in a paddock goes at its middle, piped from the bore. Each later one goes on the square furthest from water, piped from the paddock's first trough, while that square is 2 km or more out and the paddock has fewer than min(8, ha ÷ 2,500 rounded up) waters.
+- Two of those rules never change the result (found in milestone 1.2b). The smallest paddock the fence lines can make is 36 squares, 3.5% of the farm, so the 2% rule never leaves a paddock dry. And a water can only be within 2 km of about 1,260 ha, so the count by area (one for each 2,500 ha or part of it) is always reached before the 2 km rule can stop it. Every paddock ends up with exactly min(8, ha ÷ 2,500 rounded up) waters. The limit of 8 only comes up on paddocks over 20,000 ha, which the four launch districts don't have.
+- Starting from scratch: a trough on the bore and no pipe. Half the time there is also one old permanent fence line down the farm (8 or more squares in from the sides, at least 3 from the bore) with one shut gate.
+- New in the rebuild: every farm also gets a homestead and stock yards (MODEL.md, section 5). Trees are not placed yet; they come with the map.
 - Starting herd: 35–65% of carrying capacity. Cows = AE × 0.65 ÷ 1.05 (55% PTIC, 25% with calves, 20% dry), one bull per 40 cows, weaners = AE × 0.3 ÷ 0.55, split steers and heifers. Northern places (cq, nt) start on lick.
 
 ## Sown pastures, forages and crops (`SPECIES`)
 
 `g` = growth kg DM/ha/day Jan→Dec once established. `cost` = $/ha to establish. Days are from sowing. Sow months are 1-based here.
+
+The rebuild carries the 15 species the four launch districts can plant in `packages/engine/src/data/species.ts`, and the district tables in `data/crops.ts`, checked figure for figure against the MVP by a test. Jarra digit grass is left out of the code because only the Top End could plant it. Its figures stay here.
 
 ### Perennial pastures
 
@@ -196,7 +211,7 @@ Growth curves (kg DM/ha/day, Jan→Dec):
 - lucerne: cw 45,38,30,22,10,4,3,8,25,45,55,50; nsw 38,32,25,15,6,2,1,5,18,38,45,42
 - multi: nsw 35,30,28,30,18,7,5,12,35,52,48,40; cw 25,22,25,30,20,10,8,18,40,52,40,30; wv 20,15,20,32,26,15,12,25,52,68,55,30
 
-Establishing pasture grows at 20% rising to 100% over the establishment days. Past its life it loses 15% a year (floor 55%), with DMD down to 0.1 and CP down to 8 points.
+Establishing pasture grows at 20% rising to 100% over the establishment days. Past its life it loses 15% a year (floor 55%). Its quality falls with it: DMD by 0.1 and CP by 8 points for each whole unit of strength lost, so at the 55% floor the most it loses is 0.045 DMD and 3.6 CP points. *(Corrected in milestone 1.2b. This used to read "DMD down to 0.1 and CP down to 8 points".)* Stylo's dead feed is CP 7% (5 + 2). A species with no dead-feed figure would use 6.
 
 ### Grain crops
 
@@ -206,6 +221,8 @@ Establishing pasture grows at 20% rising to 100% over the establishment days. Pa
 | wheat | Dual-purpose wheat | .78 / 24 | 60 | 100 | 150 | 200 | 3.0 | 330 | 65 | 320 | Mar–May | yes, until lock-up |
 | barley | Barley (grain) | .76 / 20 | 50 | 70 | 130 | 180 | 3.2 | 280 | 60 | 300 | May–Jun | no |
 | grsorg | Grain sorghum | .70 / 14 | 35 | 45 | 80 | 120 | 3.5 | 300 | 60 | 300 | Oct–Jan | no |
+
+Grain crop ceilings (`bmax`, kg DM/ha), missing from the table above: oats 9,000, wheat 10,000, barley 9,000, grain sorghum 12,000. A crop with none would use 9,000.
 
 ### Annual forages
 
@@ -218,7 +235,7 @@ Establishing pasture grows at 20% rising to 100% over the establishment days. Pa
 
 Crop curves: WINTER 5,5,15,30,35,30,30,45,75,85,55,15; SUMMER 90,95,70,30,8,2,0,0,10,40,70,85; BRASS 60,55,40,20,5,0,0,0,15,45,65,65.
 
-Crop stage quality: leafy until lock-up, then DMD falls by 0.1 and CP to 60% by heading, then to DMD 0.58 and CP 7% at maturity. A finished crop is DMD 0.52, CP 5%. Growth is 25% → 100% while establishing, then 30% while heading, and nothing once done.
+Crop stage quality: leafy until lock-up, then DMD falls by 0.1 and CP to 60% by heading, then to DMD 0.58 and CP 7% at maturity. A finished crop is DMD 0.52, CP 5%. Growth is 25% → 100% while establishing, then 30% while heading, and nothing once done. On top of the usual haying off, a crop loses 1.5% of its green a day while heading and 4% a day once done. An annual forage has no lock-up and starts heading at 75% of its life. Dead feed on any forage or crop is CP 5%.
 
 How well crops do by district (`CROPF`): cq 0.8, nt 0.8, nsw 0.95, cw 0.9, wv 1.1. Yield is scaled by (season factor, clamped 0.4–1.4)^0.8.
 
@@ -242,8 +259,12 @@ How well crops do by district (`CROPF`): cq 0.8, nt 0.8, nsw 0.95, cw 0.9, wv 1.
 | cw | 5–20 | 20, 40, 60, 80 |
 | wv | 0–10 | 10, 20, 35, 50 |
 
+How the arable land is laid out: it grows outwards from one square (or from the rotation blocks) as one natural patch. When there are more than 16 arable squares, 45% of farms get a second, smaller patch elsewhere holding 18% of the arable land. On a mixed farm the rotation is one square block for each crop plus one for fallow, side by side, inside the main patch. Converting applies to squares that are not already fallow or stubble.
+
 ## Stubble and fallow
 
 - Stubble after harvest: dead = clamp(old dead × 0.5 + yield t/ha × 600, 1,500–3,500) kg DM/ha. Quality DMD 0.45, CP 4%. No regrowth. It breaks down 0.4% a day and becomes fallow under 400 kg DM/ha.
 - Fallow: bare worked soil. DMD 0.42, CP 3%. No growth until sown. Any dead material lying on it breaks down 3% a day.
-- An unharvested crop becomes stubble 60 days after maturity, with the grain lost. Grain starts shedding (3% a day) 30 days after maturity.
+- An unharvested crop becomes stubble 60 days after maturity, with the grain lost. Ripe grain sheds 0.2% a day from the day after maturity, then 3% a day from 31 days after maturity. *(Corrected in milestone 1.2b: the 0.2% a day was missing.)*
+- Stubble from an unharvested crop or a finished annual forage: dead = max(800, dead + green) kg DM/ha. A finished annual becomes stubble 30 days after its life is up. Off arable land a finished planting goes back to native pasture instead.
+- Self-sown annual ryegrass comes back at 12% of a full stand (the species' `regen` figure), on the 15th of the first month of its sowing window.

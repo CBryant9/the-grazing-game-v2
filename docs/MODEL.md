@@ -254,12 +254,49 @@ The formulas above are matched to the MVP number for number. Around them:
 
 ## 4. Crops and plantings (`fieldState`, `fieldTick`, `cropGrazed`)
 
-- Perennial pasture establishes over `estab` days. Grazing before then damages the stand by up to 60% (yield too).
+- Every planting establishes over its `estab` days. Grazing before then damages the stand by up to 60% (yield too).
 - Grain-only crops (barley, grain sorghum) lose yield if grazed at any time before maturity, by up to 80%.
 - Dual-purpose crops (oats, wheat) take a small yield hit when grazed before lock-up. After lock-up, grazing eats the heads (up to 90%).
-- A warning goes out 10 days before lock-up. At maturity the game pauses and an on-map Harvest button appears. Shedding starts at +30 days, and at +60 days the crop becomes stubble.
-- Finished annuals become stubble. Annual ryegrass comes back at 12% the next sowing window, once.
+- A warning goes out 10 days before lock-up (dual-purpose crops only). At maturity the game pauses and an on-map Harvest button appears. Ripe grain left standing sheds 0.2% a day from the day after maturity and 3% a day from day +31. A notice goes out at +30 days, and at +60 days the crop becomes stubble with the grain lost.
+- Finished annuals become stubble 30 days after they finish. Annual ryegrass comes back at 12% the next sowing window, once.
 - Mixed farms start part-way through the rotation for the start month.
+
+### Detail confirmed against the code (milestone 1.2b)
+
+The rebuild's crop code is in `packages/engine/src/crops/`. Each rule below is tested against the MVP's own function.
+
+**What a planting is doing today (`fieldState`).**
+
+- Perennial pasture: growth is its curve × (20% rising to 100% over `estab` days) × stand strength × the month factor. Stand strength is 1 until its life is up, then falls 15% a year to a floor of 55%. Its top DMD falls by 0.1 and its top CP by 8 points for each whole unit of strength lost, so at the 55% floor the most it can lose is **0.045 DMD and 3.6 CP points**.
+- Oversown stylo: the native curve × 1.05, with no establishment cut. Top DMD is the district's + 0.02, top CP the district's + 4, dead CP 5 + 2 = 7, and `bmax` the district's. It thins with age like other pastures but loses no quality, and gives no thinning notice.
+- Annual forages and grain crops: growth is the curve × the district's crop factor × a stage factor × the month factor × the strength of a self-sown stand. The stage factor is 25% rising to 100% while establishing, 100% until heading, 30% while heading, and 0 once finished. A finished crop has no growth at all, so it never regrows.
+- Heading starts at the crop's `head` day. An annual forage has no lock-up, and heads at 75% of its life, rounded to a whole day (forage sorghum 150, millet 98, annual ryegrass 188, brassica 105).
+- Extra green lost each day (the `sen` figure the pasture step adds for crops): **1.5% a day while heading and 4% a day once finished**. Nothing before heading.
+- Dead CP is 5 for every forage and crop. A crop not yet sown reads DMD 0.5, CP 5, dead CP 4, `bmax` 1,000 and no growth.
+
+**Grazing damage (`cropGrazed`)**, for each square with more than 3 kg DM/ha taken. `r` is the feed taken, `rg` the green part, `g` the green there before:
+
+| When | What it costs |
+|---|---|
+| Any planting before it is established | Stand density and yield both × (1 − min(0.6, r/500)) |
+| Grain-only crop, established, before maturity | Yield × (1 − min(0.8, r/800)) |
+| Dual-purpose crop from lock-up to maturity | Yield × (1 − min(0.9, 1.3 × rg/(g + 1))) |
+| Dual-purpose crop before lock-up | Yield × (1 − 0.04 × min(1, r/1,000)) |
+| After maturity, and established pasture or forage | Nothing |
+
+Each planting gives one notice for grazing before establishment or of a grain-only crop, and one for grazing after lock-up.
+
+**Sowing.** Only in the species' sowing months, only what the district grows. Pasture can go anywhere. Forages and grain crops only go on arable land. Nothing is sown over a forage or grain crop still in the ground. Squares taken from an older planting leave it. A new pasture starts at 120 kg DM/ha green with dead feed cut to 400 at most. A new forage or crop starts at 40 green with dead cut to 150 at most. Oversown stylo keeps what is there. Yield in prospect starts at the species yield × the district's crop factor.
+
+**The end of a planting (`endField`).** On arable land the square becomes stubble with dead feed of max(800, dead + green) and no green. Off arable land it goes back to native pasture as it stands. An annual pasture with a seed bank (annual ryegrass) comes up again on the 15th of the first month of its sowing window, at least 30 days later, at 12% strength, only on squares that are native, fallow or stubble with nothing else sown. That stand keeps the feed that is there, gives no "established" notice, and leaves no seed of its own.
+
+**Harvest.** Allowed from the day of maturity until the crop is lost at +60 days. Grain crops only.
+
+**The daily step (`fieldTick`)** runs before the pasture step and gives events, not diary lines: self-sown, pasture established, pasture thinning (each year once past its life), crop established, lock-up in 10 days, harvest ready (the screen stops the clock), grain shedding, forage finished, not harvested, and a sowing window opening (on the 1st of the month, for a mixed farm or any farm with fallow or stubble). Events only come from plantings still in the ground, so a harvested crop gives none.
+
+**Starting rotation (`startCropping`).** Every rotation block starts as bare fallow. For each crop in the rotation, the code looks back from the start day for the most recent day in its sowing window, no further back than the crop lives. If that is the start day the crop is sown that day. Otherwise it was sown 10 days before that day. Feed on the block is then set by age: 40 + 6 × days while establishing, min(45% of `bmax`, 500 + 40 × days since establishment) until heading, then 1,800 green and 1,500 dead. The last block stays in fallow.
+
+**One fault in the MVP fixed here.** When the rotation blocks came to as many squares as the arable land asked for (for example Northern Tablelands at 30% arable, all cropped), the MVP marked none of the blocks arable, so the rotation sat on land that could not be cropped again. The rebuild always counts the blocks as arable.
 
 ## 5. Water, fences, mobs
 
@@ -268,6 +305,45 @@ The formulas above are matched to the MVP number for number. Around them:
 - Water reaches anything connected to the bore through pipe, troughs or hubs. A fence-line or corner hub waters the 2–4 squares that touch it.
 - Portable troughs drain by the mob's water use and stop watering when empty.
 - Breakouts: only through **temporary tape**, only when the mob gets < 85% of its feed or has no water, at most once every 21 days. Chance 3.5%/day (25% if thirsty) × min(1.5, head/20 + 0.3). One tape segment at a time. Permanent and electric fences hold.
+
+### Detail confirmed against the code (milestone 1.2b)
+
+The rebuild's code is in `packages/engine/src/farm/`. Paddock ids, grazing area ids, watered squares and the distance to water are tested against the MVP's `recompute` on hand-made and random layouts, and must be equal exactly.
+
+- **The grid** is exactly 40 × 26 squares. There is no yards strip, saleyard or feedlot on it.
+- **Edges.** Fences and gates sit on the lines between squares. The codes are the MVP's: 0 nothing, 1 permanent, 2 electric, 3 tape, 4 gate shut, 5 gate open, 6 electric knocked down, 7 tape knocked down, 9 boundary. Codes 1, 2, 3, 4 and 9 stop stock. Every code but 0 bounds a paddock.
+- **Ids.** Paddocks and grazing areas are numbered in the order their first square is met, scanning row by row from the top left. Names are "Paddock 1", "Paddock 2", and "Paddocks 1 + 2" for an area joined by open gates.
+- **Distance to water** is kept for every square: the straight-line distance, in squares, to the nearest watered square in the same grazing area, and 999 where the area has none. Multiply by the square's side for metres. Watered squares are fixed troughs, the squares a fence hub touches, and portable troughs that still hold water.
+- **Where a trough can go.** On the bore, or on any square water reaches from the bore through pipe, troughs and hubs, moving square to square. A fence hub links all the squares it touches, so pipe can carry on from its far side.
+- **A hub on a square** puts a trough there (if there is none) and turns every side of the square that is not the boundary or already a gate into an **open gate**, whether or not a fence was there. The square becomes its own small paddock, joined to its neighbours for grazing until gates are shut.
+- **A hub on a fence line or corner** needs a fence or gate at that corner, and water reaching one of the squares it touches. It waters every square that touches it: four in the open, two on the boundary, one in a farm corner.
+- **Portable troughs** hold 6,000 L. Each day the stock in the grazing area need 10% of live weight in litres (× 1.3 December to February, × 0.8 June to August), added up beast by beast. That need is shared evenly over every watered square in the area, and each portable trough gives up one share. So a portable trough that shares an area with one fixed trough drains at half the rate. Under 25% a warning goes out once, with the days left at the day's rate. At empty it stops being a watered square and the clock stops. Fixed troughs and hubs never run dry.
+- **Building a fence run** changes every edge in the run to the new type except gates and the boundary. Only edges that were not already that type count as built. Tape comes off the roll first. Fence under a new run is gone, tape included (it does not go back on the roll).
+- **Pulling down** takes out every fence and gate in the run. Tape, standing or knocked down, goes back on the roll.
+- **Gates** go only in a standing fence, never in the boundary, and start shut. A gate takes the place of one fence segment.
+- **Strays.** The MVP decided which side of a new fence each beast was on from where it was drawn. The rebuild does not. A change to the fences reports which grazing areas were split, and into which new areas, and which were joined. The cattle model shares the mob out by a seeded rule.
+- **Money is left out of these rules.** Each job reports what was built or removed (segments, metres, gates, troughs, tape off the roll and tape bought) and the caller applies the costs. The energiser is charged for electric fence only.
+
+### The homestead and stock yards (new in the rebuild, PRD 5.13)
+
+Every farm gets a homestead and a set of stock yards when it is generated. Each is one square.
+
+- The homestead is on a square that touches the boundary.
+- The yards are within two squares of the boundary, and two to five squares from the homestead (counting diagonals as one).
+- Both are at least three squares from the bore and never on a square with a trough.
+- They are drawn from their own random stream (`gen:buildings`) after the fences and water are laid, so they never change the rest of the farm for a seed.
+
+Buildings, travel from the homestead and yard work come in milestone 1.5.
+
+### The farm at the start (rebuild)
+
+Each piece of a new farm draws from its own named random stream: soil (`gen:fertility`), the bore (`gen:bore`), the run-up pasture (`gen:pasture`), fences and water (`gen:layout`), arable land (`gen:arable`) and buildings (`gen:buildings`). Seasons have their own streams already. Each piece draws its numbers in the same order as the MVP did, and is tested against the MVP given the same numbers.
+
+- **Soil fertility:** an 8 × 6 lattice of values from 0.72 to 1.25, smoothed across the farm, plus or minus 0.06 on each square, held between 0.6 and 1.35.
+- **The bore:** a random square at least 4 squares in from every boundary.
+- **The run-up:** every square starts at 700 green, 1,400 dead, leaf age 70 and rankness 0 to 0.3. The pasture step runs for the 540 days before the start with no stock. Then the last owner's uneven grazing is laid over it from a smooth random surface `h` (0 to 1): rankness × (0.1 + 0.9h), dead × (0.35 to 1), green × (0.75 to 1), leaf age × (0.5 to 1).
+- **From scratch:** a trough on the bore. Half the time there is also one old permanent fence line down the farm with one shut gate, at least 3 squares from the bore.
+- **A running farm:** as set out in DATA.md, Established farm layout.
 
 ## 6. Plans
 

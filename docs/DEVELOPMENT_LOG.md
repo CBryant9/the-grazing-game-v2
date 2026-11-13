@@ -217,6 +217,73 @@ What was left for later:
 - The engine version was not bumped here, to keep clear of the farm branch. Bump it when the two halves are joined.
 
 Things in the MVP that look odd, kept as they are, for Claudia: listed in MODEL.md, section 3, "MVP behaviour kept as it is".
+### 13 Nov 2026: milestone 1.2b, the farm
+
+The farm half of milestone 1.2 (paddocks, fences, water, crops and the layout at the start). The cattle half is milestone 1.2a, built alongside on its own branch. All in `packages/engine`:
+
+- Farm sizes and scale, the 15 species the four districts can plant, and the cropping tables (`data/farms.ts`, `data/species.ts`, `data/crops.ts`).
+- Fences and gates on the lines between squares, paddocks, grazing areas and their names (`farm/topology.ts`).
+- The bore, pipe, troughs, water hubs and portable troughs, where water reaches, the watered squares and the distance to water on every square, and how portable troughs drain (`farm/water.ts`).
+- Every change to the layout as a job that returns a new layout and a report, or a refusal with the reason: build and pull down fence, roll up tape, hang, open, shut and remove a gate, fix a knocked-down fence, lay pipe, place, move and remove a trough, both kinds of water hub, and place, move, refill and remove a portable trough (`farm/layout.ts`). Money is left out. Each job reports lengths and counts.
+- Sown pastures, forages and crops: what a planting is doing today, sowing, grazing damage, yield, harvest, stubble, self-sown regrowth and the daily crop step with its events (`crops/fields.ts`, `crops/tick.ts`).
+- Arable land as a natural patch, and the starting rotation (`crops/arable.ts`).
+- A whole farm from a seed: soil, the bore, the 540-day run-up, fences, gates and water for a from-scratch or running farm, arable land, the rotation, and the new homestead and stock yards (`farm/generate.ts`).
+
+How it was proven: the same way as the grass. The tests load the MVP in memory and call its own functions with the same inputs. For fences and water, 23 hand-made and 300 random layouts must give the same paddock and area id on every square, the same watered squares and the same distance to water, exactly. For the layout jobs, 6,000 random jobs on 40 farms are done in both and everything is compared after each one. For crops, every species at every day of its life in every month is compared, and eight mixed farms are run for 800 days each, day by day, with sowing, grazing at the wrong time, harvest and crops left standing. For the farm at the start, the MVP's random numbers are fed from a seeded stream and the engine's pieces are given the same numbers, so soil, bore, run-up pasture, fences, water, arable land and rotation come out exactly equal. Whole farms from the engine's own streams are checked by their rules on 48 farms of each start type (every paddock has a gate, water in every paddock over 2% of the farm, the 2,500 ha and 2 km water rules, arable share, one or two patches, square rotation blocks, bore position, soil range and smoothness, homestead and yards).
+
+Tested: type check, lint, format check and all tests pass. 179 new tests, 267 in all.
+
+As a check on the tests, 323 figures and rules in the new code were nudged one at a time. 288 were caught straight away. 35 were missed. 26 of those are now caught by added cases (for example a crop grazed on the very day it locks up, seed coming up on fallow and on native pasture, a harvest on the day the grain is ready, a rotation started on every day of a year, and farms as big as the Top End's so a paddock gets 8 waters). The other 9 can't change any result, so no test can catch them:
+
+- Sorting an area's paddock ids, which are already in order.
+- The extra link between the squares a fence hub touches, which are already next to each other.
+- Stand strength on the exact day a pasture reaches its life (1 either way).
+- The "before lock-up" damage rule at lock-up to the day, which the rule above it has already taken.
+- Checking that a square has no planting before seed comes up, when its land use already says so.
+- Checking that a planting is a grain crop before the shedding notice, when only grain crops have a maturity day.
+- Keeping the standing feed when the starting rotation is sown, when the next lines set the feed anyway.
+- The rule that a paddock under 2% of the farm gets no trough. The smallest paddock the fence lines can make is 3.5% of the farm.
+- The rule that waters stop being added once no point is 2 km from one. The count by area is always reached first (DATA.md, Established farm layout).
+
+Differences from the MVP, on purpose:
+
+- No yards strip, saleyard or feedlot on the grid.
+- Layout jobs carry no money. They report what was built or removed.
+- Strays are not decided from where cattle are drawn. A fence change reports which grazing areas were split and joined.
+- Diary lines and clock stops are events.
+- Every farm gets a homestead and stock yards, from their own random stream.
+- Each piece of a new farm draws from its own named stream. The MVP drew everything from one unseeded source, in one order, so an engine farm is not the farm the MVP would have made, though each piece is the same given the same numbers. The run-up's season and month factors come from the seeded seasons (`randomSeasons`), each from its own stream, where the MVP drew them in between its other numbers.
+- Trees are not placed. They are only drawn, and come with the map (1.6).
+- Plantings have their own id counter. The MVP shared one counter with cattle and stored planting ids in a 16-bit array, so a long game with many cattle could lose track of a new planting.
+
+One MVP fault fixed: rotation blocks left off the arable land when they were as big as the arable land asked for (MODEL.md, section 4).
+
+Where the docs and the MVP code disagreed in these parts (docs corrected, MODEL.md and DATA.md):
+
+- Old sown pasture loses at most 0.045 DMD and 3.6 CP points, not "down to 0.1 and 8 points".
+- Ripe grain sheds 0.2% a day from the day after maturity, as well as 3% a day from day 31.
+- The grain crop ceilings (`bmax`) were missing from DATA.md.
+- A crop loses an extra 1.5% of its green a day while heading and 4% a day once finished.
+- A portable trough gives up the area's need divided by the number of watered squares.
+- A hub on a square turns every side that is not the boundary or a gate into an open gate, fence or no fence, so it is not always 4 gates.
+- Grazing before establishment damages any planting, not only perennial pasture.
+- A finished annual becomes stubble 30 days after it finishes, and only on arable land. Off arable land a finished planting goes back to native pasture.
+- Stubble from an unharvested crop or finished annual is max(800, dead + green), which was not written down.
+- The lock-up warning is for dual-purpose crops only.
+- A from-scratch farm has one old fence line half the time. DATA.md did not say so.
+- Stylo's dead feed is CP 7%, and it thins with age without losing quality.
+
+Things in the MVP that look odd, kept as they are, for Claudia:
+
+- Tape under a new permanent or electric fence is lost, not rolled up. A gate hung in tape takes that segment of tape with it.
+- Pulling down the trough on the bore is allowed, and pipe can never be pulled up.
+- A fixed trough keeps giving water wherever it stands once it is in. Only placing or moving one checks for pipe.
+- On an 80% arable farm the second arable patch can be boxed in by the first, so the farm comes out with a little less arable land than asked for.
+- The rule that a finished crop off arable land goes back to native pasture could only come up through the MVP fault above, since crops are only sown on arable land.
+- A pasture sown over part of an older pasture takes those squares from it without a word.
+- The starting rotation can put a crop in the ground that is already ripe (sown up to its whole life plus 10 days ago). That crop can be harvested straight away but never gives its "ready to harvest" notice.
+- A crop that has not been sown yet read "ready to harvest" in the MVP's stage text. It can't happen in play. The engine reads it as not sown.
+- Some species blurbs lean towards a judgement ("Excellent for fattening", "Top-quality feed"). They are the MVP's wording, kept for now.
 
 ## Ideas raised but not built yet
 
