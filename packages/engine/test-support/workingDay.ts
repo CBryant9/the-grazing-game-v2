@@ -11,6 +11,7 @@ import type { Action, ActionDone, ActionRefusal, JobCard } from '../src/actions/
 import { applyAction } from '../src/day/act';
 import { EDGE, cloneFences, hEdge, setEdge, vEdge, type EdgeRef } from '../src/farm/topology';
 import { GRID_W } from '../src/grid';
+import type { CreateFarmOptions } from '../src/sim/create';
 import { surveyOf } from '../src/sim/derived';
 import { cloneFarm, type FarmState } from '../src/sim/state';
 import { stepDay } from '../src/sim/tick';
@@ -97,6 +98,8 @@ export interface BusyFarm {
   steerCell: number;
   emptyCell: number;
   openCell: number;
+  /** A run of electric fence with a gate in it. */
+  fenceRun: EdgeRef[];
   /** A gate, a standing tape segment, and a knocked-down electric segment. */
   gate: EdgeRef;
   tape: EdgeRef;
@@ -110,8 +113,8 @@ export interface BusyFarm {
   port: number;
 }
 
-export function busyFarm(): BusyFarm {
-  let farm = openFarm('nsw');
+export function busyFarm(over: Partial<CreateFarmOptions> = {}): BusyFarm {
+  let farm = openFarm('nsw', over);
   const [bx, by] = boreXY(farm);
   // Work in the half of the farm away from the bore's row.
   const top = by > 13 ? 2 : 16;
@@ -186,6 +189,7 @@ export function busyFarm(): BusyFarm {
     steerCell: cell(xs[1]! + 1, y0 + 1),
     emptyCell: cell(xs[3]! + 2, y0 + 1),
     openCell: cell(34, top + 2),
+    fenceRun: down(10, y0, y1),
     gate,
     tape: vEdge(y0 + 2, 22),
     downed,

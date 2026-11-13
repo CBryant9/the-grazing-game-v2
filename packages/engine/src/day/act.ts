@@ -126,6 +126,12 @@ const noDaylight = (): ActionRefusal =>
   refuse('no-daylight', 'It is last light. No more jobs can start today.');
 
 function tooFar(light: Light, travel: number, home: number): ActionRefusal {
+  if (travel <= NO_TIME && home > NO_TIME) {
+    return refuse(
+      'not-enough-daylight',
+      `There is only enough light left today to drive home. The drive home takes ${durationText(home)} and there is ${durationText(light.left)} of light left.`,
+    );
+  }
   const drive =
     home > NO_TIME
       ? `The drive out takes ${durationText(travel)} and the drive home ${durationText(home)}.`
@@ -143,6 +149,7 @@ function tooFar(light: Light, travel: number, home: number): ActionRefusal {
 /** How far a line job gets in one day. */
 interface LineDay {
   travel: number;
+  /** The drive home from where the work stopped. 0 when the drive home is free. */
   home: number;
   /** Minutes worked. */
   worked: number;
@@ -154,13 +161,6 @@ interface LineDay {
   at: MapPoint;
   /** False when there was no light to work in once the driving was allowed for. */
   started: boolean;
-}
-
-/** Every end of every piece: the places a line job could leave the player. */
-function lineEnds(pieces: readonly Piece[]): MapPoint[] {
-  const out: MapPoint[] = [];
-  for (const p of pieces) out.push(p.a, p.b);
-  return out;
 }
 
 /** The nearest point of what is left of a line to a place. */
@@ -181,9 +181,10 @@ function nearestOfLine(pieces: readonly Piece[], part0: number, from: MapPoint):
 }
 
 /**
- * Work a line for a day: drive to its nearest point from `from`, keep back
- * the drive home from its furthest end, and build pieces in order until
- * the light `left` is used up.
+ * Work a line for a day: drive to its nearest point from `from`, then
+ * build pieces in order for as long as the light `left` lasts. Where the
+ * drive home must fit inside daylight, the work stops at the last point
+ * the player can still be home from by last light.
  */
 function lineDay(
   farm: FarmState,
@@ -194,37 +195,55 @@ function lineDay(
   dayMin: number,
 ): LineDay {
   const travel = driveMinutes(farm, from, nearestOfLine(pieces, part0, from));
-  const home = homeReserve(farm, lineEnds(pieces));
-  let room = left - travel - home;
+  const homeFrom = (p: MapPoint): number => homeReserve(farm, [p]);
+  // The light there is for the work and the drive home.
+  const budget = left - travel;
   const first = pieces[0]!;
   const out: LineDay = {
     travel,
-    home,
+    home: 0,
     worked: 0,
     pieces: 0,
     part: part0,
     finished: false,
     at: pointAlong(first.a, first.b, part0),
-    started: room > NO_TIME,
+    started: false,
   };
+  out.home = homeFrom(out.at);
+  out.started = budget - out.home > NO_TIME;
   if (!out.started) return out;
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i]!;
     const whole = pieceMinutes(p.work, dayMin);
     const done = i === 0 ? part0 : 0;
-    const need = whole * (1 - done);
-    if (need <= room + NO_TIME) {
-      room -= need;
-      out.worked += need;
+    // The work so far, the work to a share `t` of this piece, and the drive home from there.
+    const usedAt = (t: number): number =>
+      out.worked + whole * (t - done) + homeFrom(pointAlong(p.a, p.b, t));
+    if (usedAt(1) <= budget + NO_TIME) {
+      out.worked += whole * (1 - done);
       out.pieces++;
       out.part = 0;
       out.at = p.b;
+      out.home = homeFrom(p.b);
       continue;
     }
-    // The day is used up part-way along this piece.
-    out.worked += room;
-    out.part = done + room / whole;
-    out.at = pointAlong(p.a, p.b, out.part);
+    // The day is used up before this piece is finished. If there is no
+    // light to start it (a gap in the line took the player further from
+    // home), the work stops where it was.
+    if (usedAt(done) > budget + NO_TIME) return out;
+    // Otherwise it stops part-way along: the furthest point the player can
+    // still get home from. Halving finds it, the same way every time.
+    let lo = done;
+    let hi = 1;
+    for (let k = 0; k < 60; k++) {
+      const mid = (lo + hi) / 2;
+      if (usedAt(mid) <= budget) lo = mid;
+      else hi = mid;
+    }
+    out.worked += whole * (lo - done);
+    out.part = lo;
+    out.at = pointAlong(p.a, p.b, lo);
+    out.home = homeFrom(out.at);
     return out;
   }
   out.finished = true;

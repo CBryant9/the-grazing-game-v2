@@ -174,7 +174,12 @@ export interface JobCard {
   /** Driving to the job, and working on it, today. */
   travelMin: number;
   workMin: number;
-  /** The light kept back for the drive home. 0 when the drive home is free. */
+  /**
+   * The drive home from where the job leaves the player. Where the drive
+   * home must fit inside daylight this much light is kept back, so what
+   * is free for other jobs is `leftAfterMin` less this. 0 when the drive
+   * home is free.
+   */
   homeMin: number;
   /** Today's light, how much was used before the job, and how much is left after it. */
   dayMin: number;
