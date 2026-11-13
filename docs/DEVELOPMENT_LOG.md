@@ -558,6 +558,15 @@ Questions for Claudia:
 - **A 366-day year** costs one more day of overheads than a 365-day year. Leave it?
 - Still open from 1.3 and 1.4b: what a band is held on, the soil, the ceiling, and starting after a dry time.
 
+After the realism check (same milestone, before the push):
+
+- **Fixed: a real year was scored on the next year's prices.** The year closed after the market had moved to the next day. With years at random, or in order after the newest year, that day is another real year. The year now closes on its own last prices and the next opens on its own first prices (`sim/tick.ts`, MODEL.md section 1A). Tested in order past 2025 and at random.
+- **Fixed: thin national price rows were used.** The 20-head rule covered yard rows only. National rows under 20 head are now passed over, in the daily figure, the yard premiums and the feeder stand-ins. The stand-in multiples moved to 1.0169 and 0.9990. The premiums are unchanged to three places.
+- **The real-year herd deaths test now holds the band** (1.5 to 3.6%) on six herds over the years with fair weather, in place of only comparing two herds with their own average year.
+- Each fix was taken out again to confirm a test fails without it.
+- More questions for Claudia, all written up in CALIBRATION.md (real years, CHECK 8 to 10) and DATA.md: how a farm's data version should work once Daily Farm fetches data every day; which quarter "today's dollars" should be; whether a farm starting in 1997 can pay its way; and how the 1 July "new season" message should read on a real-year farm, where it reports the 12 months just gone.
+- Known gap, older than this change: the lint rule that keeps the engine out of browser code covers `apps/web/components` and `packages/render`, not `apps/web/app`. Nothing in `apps/web` imports the engine today. It is closed properly in milestone 3.2, when the browser build is tested to hold no engine.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

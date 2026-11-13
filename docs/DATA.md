@@ -331,7 +331,7 @@ The sheet describes the indicators as they are now. Whether the same weights app
 | `feed` Yearling steers | Steers 280 to under 450 kg | Feeder Steer | 1 | The weight range feedlots buy. **Sourced** (the indicator as it is) |
 | `heavy` Heavy steers | Steers 450 kg and over | Heavy Steer | 1 | Grown steers to processors. **Sourced** |
 | `wheif` Weaner heifers | Heifers under 280 kg | Restocker Yearling Heifer | 1.08 | As for weaner steers. The MVP's weaner heifers over its heifers is 0.92 ÷ 0.85 = 1.08. **Tuning** |
-| `heifer` Heifers | Heifers 280 kg and over | Feeder Heifer | 1 | The match of yearling steers. **Sourced**, on the reading of the Feeder Heifer above |
+| `heifer` Heifers | Heifers 280 kg and over | Feeder Heifer | 1 | The match of yearling steers. **Proposed reading:** what the Feeder Heifer indicator covers was not found on MLA's sheet, so this rests on its name |
 | `cow` Cows | Cows | Processor Cow | 1 | **Sourced.** The game's cows include breeders. Their extra worth is the pregnancy premium and the condition adjustments, which are unchanged (Market, above) |
 | `bull` Bulls (when sold) | Bulls | Processor Cow | 0.906 | No indicator for bulls. A bull sold at the yards goes to a processor, as a cow does. The multiple is the MVP's bulls over its cows, 0.58 ÷ 0.64. **Tuning** |
 | `calf` Calves | Calves | Restocker Yearling Steer | 1.10 | No indicator for calves. The MVP's multiple. **Tuning** |
@@ -343,20 +343,20 @@ For comparison, the national indicators as a share of the Restocker Yearling Ste
 
 1. **The yard's own row** for the day is used when it has 20 head or more behind it.
 2. **Held:** with no such row that day, the yard's newest row with 20 head or more is used if it is no more than 14 days old. MLA repeats a sale's figure for seven days and then the rows stop, so this carries a yard that sells fortnightly from one sale to the next.
-3. **Otherwise the national figure times the yard's premium.** The premium is the average of yard ÷ national over every day from 1997 to 2025 on which the yard has a row with 20 head or more and the national indicator has a row.
+3. **Otherwise the national figure times the yard's premium.** The premium is the average of yard ÷ national over every day from 1997 to 2025 on which the yard and the national indicator each have a row with 20 head or more.
 4. **A yard series with under 730 such days is not used at all.** The national figure is used as it is, with no premium. This catches Mortlake's restocker steers and heifers.
-5. **The national figure** is the newest national row on or before the day. The longest break in the national rows from 1997 is 14 days (Christmas 1996). A break of more than 21 days stops with an error.
+5. **The national figure** is the newest national row on or before the day with 20 head or more behind it. A national figure usually rests on thousands of head, but around Christmas it can rest on one: restocker steers read 147 c/kg on 1 head from 29 December 2004, against 183.4 c/kg on 290 head four days before, and heavy steers read 230 c/kg on 5 head on 25 December 2024 against 324. Each national table has 13 to 80 rows under 20 head, nearly all in December and January. With those left out the longest break from 1997 is 15 days. A break of more than 21 days stops with an error. The limit is the same low one as for a yard because the national restocker heifer figure rested on 20 to 70 head through early 1997. Rows with 20 to 99 head are still used (124 to 247 a table for the restocker indicators, fewer for the rest).
 6. **A price is never negative and never from a blank row.** A row with a blank, zero or negative figure is dropped when the table is read and counted. The cattle tables have none. If one ever appears the bundle stops with an error so it gets looked at.
 
 | Figure | Value | Kind |
 |---|---|---|
-| Thin row | under 20 head | **Tuning.** A row's distance from its yard's usual premium averages 7 to 10% under 20 head and 4 to 6% over 50 |
+| Thin row, yard or national | under 20 head | **Tuning.** A yard row's distance from its yard's usual premium averages 7 to 10% under 20 head and 4 to 6% over 50 |
 | Hold | 14 days | **Tuning** |
 | Days needed to use a yard series | 730 | **Tuning** |
 | Premium years | 1997 to 2025 | Fixed, so a later pull does not move a past price |
 | Longest national break allowed | 21 days | **Tuning**, a safety limit |
 
-**The yard premiums** as worked out from the tables (pinned in `realPrices.test.ts`), with the days behind each:
+**The yard premiums** as worked out from the tables (pinned in `realPrices.test.ts`), with the days behind each: (The day counts were taken before national rows under 20 head were left out. The premiums are unchanged to three places; the day counts are a few lower.)
 
 | Indicator | Gracemere `GME` | Armidale `ARM` | Dubbo `DUB` | Mortlake `MTL` |
 |---|---|---|---|---|
@@ -381,11 +381,11 @@ So Central Queensland before October 2014 and Western Victoria before 2018 play 
 **Feeder indicators before 16 June 2003** (`FEEDER_STAND_INS`). The two feeder indicators start on 16 June 2003. Before that:
 
 ```
-feeder steer  = a × √(restocker yearling steer × heavy steer)       a = 1.0171
-feeder heifer = b × √(restocker yearling heifer × heavy steer)      b = 0.9992
+feeder steer  = a × √(restocker yearling steer × heavy steer)       a = 1.0169
+feeder heifer = b × √(restocker yearling heifer × heavy steer)      b = 0.9990
 ```
 
-All national figures for the day. `a` and `b` are the average of the real feeder figure over that mean, across every day all three have a row from 16 June 2003 to the end of 2025. They are worked out from the tables, not typed in, and pinned in a test. The yard premium is then applied as usual. **Tuning**: the form was picked because it tracks the real feeder steer indicator more closely than a multiple of restocker steers alone or of heavy steers alone. From June 2003 to 2025 the real figure over the stand-in has a standard deviation of 2.7%, against 6.0% and 6.6%. For heifers it is 3.4%, against 3.9% for a multiple of feeder steers and 7.1% for restocker heifers alone. It can't be checked against 1997 to 2003, because there is nothing to check it against.
+All national figures for the day. `a` and `b` are the average of the real feeder figure over that mean, across every day all three have a row with 20 head or more from 16 June 2003 to the end of 2025. They are worked out from the tables, not typed in, and pinned in a test. The yard premium is then applied as usual. **Tuning**: the form was picked because it tracks the real feeder steer indicator more closely than a multiple of restocker steers alone or of heavy steers alone. From June 2003 to 2025 the real figure over the stand-in has a standard deviation of 2.7%, against 6.0% and 6.6%. For heifers it is 3.4%, against 3.9% for a multiple of feeder steers and 7.1% for restocker heifers alone. It can't be checked against 1997 to 2003, because there is nothing to check it against.
 
 **Things a grazier may question (for Claudia):**
 
@@ -443,6 +443,12 @@ For each district's cattle yard the engine answers "is there a cattle sale on th
 ### The data version (milestone 1.4)
 
 Every table a district's farms read is fingerprinted together: the SILO weather, the six national and six yard cattle indicators, the yard's cattle yardings and the CPI (`districtTablePaths`). The fingerprint is 16 hex digits (`DistrictRealData.version`). As pulled: Central Queensland `81313cdc124d11e3`, Northern Tablelands `525d82ca4aa73029`, Central West `2efe5d572683f104`, Western Victoria `c45fa535fcacb5e2`. A real-year farm records its district's version and will not run on any other (MODEL.md, section 1A). **Any new pull changes the version**, even one that only adds days. See the README in `scripts/data/`.
+
+**A question for Claudia and a known limit.** As built, any change to any table a district reads gives a new version, and a farm refuses to run on another version. That keeps a farm's past fixed. It also means one pull that adds a year stops every running real-year farm until a way to move a farm across is built, and it cannot serve Daily Farm as it stands, because Daily Farm fetches new weather and prices every day (PRD 5.14). The version will need to cover only the dates a farm has already played. That is Stage 3 work (the server), and it must be designed before real-year farms are kept for long.
+
+**Today's dollars is fixed at the September quarter 2026.** That quarter was picked by the builder as the newest in the table. The game's costs are the MVP's, and no date is recorded for when they were set. If the costs are in the dollars of another time, the base quarter should move to match. For Claudia.
+
+**Sale calendar look-ahead:** `nextSaleDay` looks 120 farm days ahead and then gives up. **Tuning**, longer than any break in a yard's records since 1997.
 
 ## Saleyard classes (`BUYS`)
 

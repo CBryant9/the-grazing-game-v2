@@ -261,6 +261,10 @@ So the month and day the grass grows by are the real date's month and day. A new
 
 **The year closes when the game year ends** on a real-year farm: on the last day before the start month's 1st, 365 or 366 days after it opened. So each scored year is exactly one real year, and the year's record carries that year (`YearRecord.realYear`). The score still counts years 1, 2, 3 (`YearRecord.n`). A farm with random seasons closes its year every 365 days, as the MVP does.
 
+**A real year is scored on its own prices.** The year closes on the prices of its own last day, before the market moves to the next day. That next day can belong to any real year (years at random, or back to 1997 after the newest), and a jump in prices between two real years is in neither year's score: the year that closed is valued at its last day's prices (`worth1`), and the new year opens valued at its own first day's prices (`worth0`). With years in order before the wrap the two days are one real day apart, so the two figures differ only by a day's price move. A farm with random seasons closes its year after the market has moved, as the MVP did.
+
+**The 1 July "new season" event on a real-year farm** reports the season of the 12 months just gone, because the season factor is a rolling 365-day figure (above). It does not say what the season ahead will be. The label can also change on any other day, and no event marks that. On a farm with random seasons the event is the new season drawn for the year ahead. The screens must word the two differently. A question for Claudia (CALIBRATION.md, real years, CHECK 3).
+
 Not changed: running costs are still a 365th of the yearly figure each day, so a 366-day year costs one day more.
 
 ### The run-up
@@ -613,7 +617,7 @@ in today's dollars: every price × CPI(September quarter 2026) ÷ CPI(the real d
 - There is no random part. The real market never draws from the market stream, and has no daily wobble or class drift of its own: the real figures move by themselves.
 - The farm keeps only today's prices and which dollars they are in (`farm.market`). So today's prices can be read with no tables to hand. Moving the market to a new day needs the data bundle.
 - Inflation has one switch, `REAL_PRICE_DOLLARS`: `today` (the default) or `of-the-day`. A farm keeps the setting it started with.
-- With years at random, or in order after the newest year, the market on the first day of a game year is another real year's market, so prices step at the year's end.
+- With years at random, or in order after the newest year, the market on the first day of a game year is another real year's market, so prices step between the last day of one game year and the first of the next. The step is in neither year's score (section 1A, "A real year is scored on its own prices"), but the player's stock is worth more or less overnight.
 - Cattle only. The sheep tables are not read yet.
 
 **Sale days** (`market/saleCalendar.ts`). A real-year farm can ask whether its district yard holds a cattle sale on a farm day, of what type, and when the next one is (`saleDayOn`, `nextSaleDay`). Past years use the days the yard really sold, with a weekly stand-in for the stretches MLA has nothing for (DATA.md, "Sale calendars"). Nothing uses the calendar yet: buying and selling are still instant. Booking stock onto a sale, and delivery, are milestone 1.5.

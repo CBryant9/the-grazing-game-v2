@@ -10,19 +10,22 @@
  * is run from every real year that can be played, 1997 to 2025, on the same
  * two seeds, through `createFarm` with `years: { kind: 'real' }`.
  *
- * What is held is only what the runs show and can be defended:
+ * What is held:
  *
- *   - Over the years whose own 12 months grew average feed or better, the
- *     two herds lose within half a point of what the same two herds lose
- *     in the average year.
+ *   - The deaths benchmark, 1.5 to 3.6% a year, over the years whose own
+ *     12 months grew average feed or better, on six herds together. Two
+ *     herds are too few for it: each seed is the same herd with the same
+ *     luck in every year, so 29 years do not average the luck out (the two
+ *     Tablelands herds lose 3.7% over those years, and 3.9% in the average
+ *     year). So four more herds are run through those years.
+ *   - Over the same years, the first two herds lose within half a point of
+ *     what the same two herds lose in the average year.
  *   - A named dry year puts on less weight than a named wet year.
  *   - The same run gives the same figures again.
  *
- * The 1.5 to 3.6% deaths benchmark is not held here. Two herds are too few
- * for it: each seed is the same herd with the same luck in every year, so
- * 29 years do not average the luck out. herds.test.ts holds the benchmark
- * on 16 herds in the average year. What this adds is that real years with
- * fair weather lose what the average year loses.
+ * As in herds.test.ts, deaths are counted over the herds together, not
+ * herd by herd. That reading is PROPOSED, WAITING ON CLAUDIA
+ * (docs/CALIBRATION.md, the 1.3 entry, CHECK 4).
  *
  * A drought year with nothing done is recorded in docs/CALIBRATION.md, not
  * failed. No model figure was tuned for these runs.
@@ -41,6 +44,8 @@ import { AVERAGE_YEAR, herdRun, type HerdRun } from './calibration';
 
 const PRINT = process.env.GG_REAL_YEARS_RUN === '1';
 const SEEDS = [1, 2];
+/** More herds, run only through the years that grew average feed or better, for the deaths benchmark. */
+const MORE_SEEDS = [3, 4, 5, 6];
 const SEPTEMBER = 8;
 
 export interface RealYearHerdCase {
@@ -114,6 +119,21 @@ export function realYearHerdSuite(c: RealYearHerdCase): void {
       expect(years[0]).toBe(1997);
       expect(years.at(-1)).toBe(2025);
       expect(years.length).toBe(29);
+    });
+
+    it('loses 1.5 to 3.6% a year over the years whose own 12 months grew average feed or better, six herds together', () => {
+      const fair = rows.filter((r) => seasonOf(r) >= 0.925);
+      expect(fair.length).toBeGreaterThanOrEqual(10);
+      const more = fair.flatMap((r) =>
+        MORE_SEEDS.map((seed) => herdRun(c.district, SEPTEMBER, seed, undefined, { data }, r.year)),
+      );
+      const pct = pooledDeaths([...fair.flatMap((r) => r.runs), ...more]);
+      if (PRINT)
+        console.log(
+          `${c.name}: six herds over the ${fair.length} fair years lose ${pct.toFixed(2)}%`,
+        );
+      expect(pct).toBeGreaterThanOrEqual(1.5);
+      expect(pct).toBeLessThanOrEqual(3.6);
     });
 
     it('loses within half a point of the average year, over the years whose own 12 months grew average feed or better', () => {
