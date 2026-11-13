@@ -14,11 +14,13 @@ import type { Action } from '../actions/types';
 import { daylightFor } from '../daylight/daylight';
 import { DISTRICT_PLACES } from '../daylight/places';
 import { GRID_W } from '../grid';
+import * as engine from '../index';
 import { farmHash, saveFarm } from '../save/save';
 import { loadRealData } from '../server';
 import { homesteadPoint, lightOn } from '../sim/clock';
 import { createFarm } from '../sim/create';
 import { dateOn, pricesOf, surveyOf } from '../sim/derived';
+import type { FarmState } from '../sim/state';
 import { calibrationView, farmTotals, mobSummaries, paddockSummaries } from '../sim/summary';
 import { stepDay } from '../sim/tick';
 import { applyAction, previewAction } from './act';
@@ -239,6 +241,132 @@ describe('looking is free', () => {
 
     expect(farmHash(farm)).toBe(before);
     expect(JSON.stringify(saveFarm(farm))).toBe(saved);
+  });
+
+  it('every function the engine exports that takes a farm is known as a read or a change, and no read changes the farm', () => {
+    // A job to ask about, and what each read needs besides the farm.
+    const job: Action = { type: 'buildFence', edges: across(13, 2, 37), fence: 'permanent' };
+    type Env = { data?: ReturnType<typeof loadRealData> };
+    const READS: Record<string, (farm: FarmState, env: Env) => unknown> = {
+      infraInPlace: (f) => engine.infraInPlace(f),
+      liveYear: (f) => engine.liveYear(f),
+      netWorth: (f) => engine.netWorth(f),
+      netWorthParts: (f) => engine.netWorthParts(f),
+      newYear: (f) => engine.newYear(f),
+      stockWorth: (f) => engine.stockWorth(f, engine.pricesOf(f)),
+      tapeOwned: (f) => engine.tapeOwned(f),
+      cloneFarm: (f) => engine.cloneFarm(f),
+      dateOn: (f) => engine.dateOn(f, f.day + 3),
+      nextSaleDay: (f, env) => engine.nextSaleDay(f, env),
+      saleDayOn: (f, env) => engine.saleDayOn(f, env),
+      plantingsNow: (f, env) => engine.plantingsNow(f, env),
+      pricesOf: (f) => engine.pricesOf(f),
+      realPlanOf: (f) => engine.realPlanOf(f),
+      realSourcesOf: (f, env) => engine.realSourcesOf(f, env),
+      seasonsOf: (f, env) => engine.seasonsOf(f, env),
+      surveyOf: (f) => engine.surveyOf(f),
+      autoWeanDest: (f, env) =>
+        engine.autoWeanDest(f, engine.surveyOf(f), engine.plantingsNow(f, env), f.mobs[0]!),
+      calibrationView: (f) => engine.calibrationView(f),
+      farmTotals: (f, env) => engine.farmTotals(f, env),
+      mobSummaries: (f) => engine.mobSummaries(f),
+      paddockSummaries: (f, env) => engine.paddockSummaries(f, env),
+      farmHash: (f) => engine.farmHash(f),
+      saveFarm: (f) => engine.saveFarm(f),
+      dayMinutes: (f) => engine.dayMinutes(f),
+      homesteadPoint: (f) => engine.homesteadPoint(f),
+      lightLeft: (f) => engine.lightLeft(f),
+      lightOn: (f) => engine.lightOn(f, f.day + 30),
+      timeNow: (f) => engine.timeNow(f),
+      // Doing a job, ending the day and skipping return a new farm and leave this one alone.
+      applyAction: (f, env) => engine.applyAction(f, job, env),
+      previewAction: (f, env) => engine.previewAction(f, job, env),
+      endDay: (f, env) => engine.endDay(f, env),
+      skipDays: (f, env) => engine.skipDays(f, 3, env, { anyway: true }),
+      waterCheck: (f) => engine.waterCheck(f),
+      bookingsView: (f) => engine.bookingsView(f),
+      clockView: (f) => engine.clockView(f),
+      jobsInProgress: (f, env) => engine.jobsInProgress(f, env),
+      jobsToday: (f) => engine.jobsToday(f),
+      driveMinutes: (f) => engine.driveMinutes(f, f.clock.at, { x: 20, y: 13 }),
+      metresBetween: (f) => engine.metresBetween(f, f.clock.at, { x: 20, y: 13 }),
+    };
+    // These change the farm they are given. That is their job: the tick, and its helpers.
+    const CHANGES = [
+      'closeYear',
+      'mergeShared',
+      'newMob',
+      'spend',
+      'splitMobs',
+      'startDay',
+      'startHerd',
+      'stepDay',
+    ];
+
+    // Every exported function whose first parameter is the farm.
+    const takesFarm = Object.entries(engine)
+      .filter(
+        ([, v]) =>
+          typeof v === 'function' &&
+          /^(?:async\s+)?(?:function\b[^(]*)?\(\s*farm\b/.test(Function.prototype.toString.call(v)),
+      )
+      .map(([name]) => name)
+      .sort();
+    expect(takesFarm.length).toBeGreaterThan(40);
+    // A new one must be put in one list or the other before this passes.
+    expect(takesFarm).toEqual([...Object.keys(READS), ...CHANGES].sort());
+
+    // A farm with stock, a job in progress and a job done today, on random seasons and on real years.
+    const b = busyFarm();
+    let random = work(b.farm, {
+      type: 'buildFence',
+      edges: across(12, 2, 37),
+      fence: 'permanent',
+    }).farm;
+    random = endDay(random).farm;
+    random = work(random, { type: 'refillPortable', port: b.port }).farm;
+    const data = loadRealData();
+    let real = createFarm(
+      {
+        seed: 3,
+        district: 'cw',
+        size: 'small',
+        start: { year: 2006, month: 5 },
+        years: { kind: 'real', order: 'random' },
+        startType: 'running',
+        mixed: { arablePct: 40, croppedPct: 50 },
+        difficulty: 'easy',
+      },
+      { data },
+    );
+    real = work(
+      real,
+      { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' },
+      { data },
+    ).farm;
+    real = endDay(real, { data }).farm;
+    expect(real.mobs.length).toBeGreaterThan(0);
+
+    const worked = new Set<string>();
+    for (const [farm, env] of [
+      [random, {}],
+      [real, { data }],
+    ] as [FarmState, Env][]) {
+      const before = farmHash(farm);
+      const saved = JSON.stringify(saveFarm(farm));
+      for (const [name, look] of Object.entries(READS)) {
+        try {
+          look(farm, env);
+          worked.add(name);
+        } catch {
+          // A read that does not serve this kind of farm (the sale calendar on random seasons).
+        }
+        expect(farmHash(farm), `${name} changed the farm`).toBe(before);
+      }
+      expect(JSON.stringify(saveFarm(farm))).toBe(saved);
+    }
+    // Every read ran on at least one of the two farms.
+    expect([...worked].sort()).toEqual(Object.keys(READS).sort());
   });
 
   it('if the player only looks, it stays first light', () => {

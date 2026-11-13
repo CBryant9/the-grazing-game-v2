@@ -79,18 +79,20 @@ describe("a job's place is where its work is", () => {
     );
   });
 
-  it('a fence line: its nearest point, and the player ends where the line ends', () => {
+  it('a fence line: where the work starts, and the player ends where the line ends', () => {
     const farm = openFarm('nsw', { size: 1040 });
     const [hx, hy] = homeXY(farm);
-    // A line across the farm, 6 squares up or down from the homestead's row, passing its column.
+    // A line across the farm, 6 squares up or down from the homestead's row.
     const vy = hy < 13 ? hy + 7 : hy - 6;
     const line = across(vy, 2, 37);
     const job = work(farm, { type: 'buildFence', edges: line, fence: 'tape' });
-    // The nearest point is straight up or down from the homestead: 6.5 squares, 650 m.
-    expect(job.job.travelMin).toBeCloseTo((650 / 25000) * 60, 9);
+    // Work starts at the left end, where the line was drawn from: the drive is to there,
+    // not to the nearest point of the line (which is 650 m away, straight up or down).
+    const toStart = Math.hypot(hx + 0.5 - 2, 6.5) * 100;
+    expect(toStart).toBeGreaterThan(650);
+    expect(job.job.travelMin).toBeCloseTo((toStart / 25000) * 60, 9);
     // Built in the order drawn, left to right, so the player ends at the right-hand end.
     expect(job.farm.clock.at).toEqual({ x: 38, y: vy });
-    expect(hx).toBeGreaterThanOrEqual(2);
   });
 
   it('a mob: the nearest square of the ground it runs on, and a move ends where the mob is put', () => {
@@ -248,5 +250,102 @@ describe('home by last light', () => {
     // Both ways a job can come out were tried many times.
     expect(done).toBeGreaterThan(10);
     expect(part).toBeGreaterThan(10);
+  });
+});
+
+describe('the drive charged on a line is the drive made', () => {
+  /** Minutes to drive a number of metres at 25 km/h. */
+  const drive = (metres: number): number => (metres / 25000) * 60;
+
+  it('a line drawn from its far end is driven to at its far end', () => {
+    // 200 m squares. The same line drawn left to right and right to left.
+    const farm = openFarm('nsw', { size: 4160 });
+    const [hx, hy] = homeXY(farm);
+    const vy = hy < 13 ? hy + 7 : hy - 6;
+    const line = across(vy, 2, 37);
+    const fromLeft = work(farm, { type: 'buildFence', edges: line, fence: 'tape' });
+    const fromRight = work(farm, { type: 'buildFence', edges: [...line].reverse(), fence: 'tape' });
+    // The homestead is 6.5 squares from the line's row. Each drive is to the end the work starts at.
+    const toLeft = Math.hypot(hx + 0.5 - 2, 6.5) * 200;
+    const toRight = Math.hypot(hx + 0.5 - 38, 6.5) * 200;
+    expect(fromLeft.job.travelMin).toBeCloseTo(drive(toLeft), 9);
+    expect(fromRight.job.travelMin).toBeCloseTo(drive(toRight), 9);
+    // The two ends are 7.2 km apart, so one of the drives is much the longer.
+    expect(Math.abs(fromLeft.job.travelMin - fromRight.job.travelMin)).toBeGreaterThan(5);
+    // Each ends at its own far end.
+    expect(fromLeft.farm.clock.at).toEqual({ x: 38, y: vy });
+    expect(fromRight.farm.clock.at).toEqual({ x: 2, y: vy });
+    // The time on the clock is the drive and the tape: 7.2 km at 3 km an hour is 144 minutes.
+    expect(fromRight.job.endsAt - fromRight.job.startsAt).toBeCloseTo(drive(toRight) + 144, 9);
+  });
+
+  it('a gap between two bits of one job is driven across, and charged', () => {
+    const farm = openFarm('nsw', { size: 4160 });
+    const [hx, hy] = homeXY(farm);
+    const vy = hy < 13 ? hy + 7 : hy - 6;
+    // Two bits of tape on one row: squares 2 and 3, then squares 30 and 31.
+    const near = across(vy, 2, 3);
+    const bits = [...near, ...across(vy, 30, 31)];
+    const one = work(farm, { type: 'buildFence', edges: near, fence: 'tape' });
+    const both = work(farm, { type: 'buildFence', edges: bits, fence: 'tape' });
+    const toStart = Math.hypot(hx + 0.5 - 2, 6.5) * 200;
+    expect(one.job.travelMin).toBeCloseTo(drive(toStart), 9);
+    // From the end of the first bit (corner 4) to the start of the second (corner 30): 26 squares, 5.2 km.
+    expect(both.job.travelMin).toBeCloseTo(drive(toStart) + drive(5200), 9);
+    expect(both.job.travelMin - one.job.travelMin).toBeCloseTo(12.48, 9);
+    // 800 m of tape is 16 minutes. The clock moves by the drives and the work.
+    expect(both.job.workMin).toBeCloseTo(16, 9);
+    expect(both.farm.clock.used).toBeCloseTo(drive(toStart) + 12.48 + 16, 9);
+    expect(both.farm.clock.at).toEqual({ x: 32, y: vy });
+  });
+
+  it('with too little light to cross the gap and get home, the job stops at the gap', () => {
+    const farm = openFarm('nsw', { size: 4160 });
+    const [hx, hy] = homeXY(farm);
+    const vy = hy < 13 ? hy + 7 : hy - 6;
+    const bits = [...across(vy, 2, 3), ...across(vy, 30, 31)];
+    const toStart = drive(Math.hypot(hx + 0.5 - 2, 6.5) * 200);
+    const homeFromFirst = drive(Math.hypot(hx + 0.5 - 4, 6.5) * 200);
+    // Light for the drive out, the first bit (8 minutes) and the drive home, and 5 minutes more:
+    // not enough to drive the 12.5 minutes across.
+    const late = cloneFarm(farm);
+    late.clock.used =
+      late.clock.lastLight - late.clock.firstLight - (toStart + 8 + homeFromFirst + 5);
+    const out = work(late, { type: 'buildFence', edges: bits, fence: 'tape' });
+    expect(out.job.outcome).toBe('part');
+    expect(out.job.line!.piecesToday).toBe(2);
+    expect(out.job.travelMin).toBeCloseTo(toStart, 9);
+    expect(out.farm.clock.at).toEqual({ x: 4, y: vy });
+    // The next day the drive is from the homestead to the second bit.
+    const next = work(endDay(out.farm).farm, { type: 'continueJob', job: out.job.jobId! });
+    expect(next.job.travelMin).toBeCloseTo(drive(Math.hypot(hx + 0.5 - 30, 6.5) * 200), 9);
+    expect(next.job.outcome).toBe('done');
+  });
+
+  it('carrying a line on, the drive is to where the line had got to', () => {
+    const farm = openFarm('nsw', { size: 4160 });
+    const [hx, hy] = homeXY(farm);
+    const vy = hy < 13 ? hy + 7 : hy - 6;
+    const day1 = work(farm, { type: 'buildFence', edges: across(vy, 2, 37), fence: 'permanent' });
+    const stopped = day1.farm.clock.at;
+    expect(stopped.y).toBe(vy);
+    expect(stopped.x).toBeGreaterThan(4);
+    const day2 = work(endDay(day1.farm).farm, { type: 'continueJob', job: 1 });
+    expect(day2.job.travelMin).toBeCloseTo(drive(Math.hypot(hx + 0.5 - stopped.x, 6.5) * 200), 9);
+    // And the job card for the days still to come counts the same drive.
+    expect(day1.job.moreDays).toBeGreaterThan(10);
+  });
+
+  it('squares of pipe side by side have no drive between them, and a jump does', () => {
+    const farm = openFarm('nsw', { size: 4160 });
+    const [hx, hy] = homeXY(farm);
+    const y = hy < 13 ? hy + 6 : hy - 6;
+    const run = [5, 6, 7, 8].map((x) => cell(x, y));
+    const joined = work(farm, { type: 'layPipe', cells: run });
+    const toFirst = drive(Math.hypot(hx - 5, 6) * 200);
+    expect(joined.job.travelMin).toBeCloseTo(toFirst, 9);
+    // Two more squares 20 squares on: a 4 km drive from square 8 to square 28.
+    const jump = work(farm, { type: 'layPipe', cells: [...run, cell(28, y), cell(29, y)] });
+    expect(jump.job.travelMin).toBeCloseTo(toFirst + drive(4000), 9);
   });
 });

@@ -48,16 +48,6 @@ export const pointAlong = (a: MapPoint, b: MapPoint, t: number): MapPoint => ({
   y: a.y + (b.y - a.y) * t,
 });
 
-/** The point on the line from `a` to `b` that is nearest to `p`. */
-export function nearestOnLine(p: MapPoint, a: MapPoint, b: MapPoint): MapPoint {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const len2 = dx * dx + dy * dy;
-  if (len2 === 0) return { x: a.x, y: a.y };
-  const t = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
-  return pointAlong(a, b, t);
-}
-
 /** The square of a list whose middle is nearest a place. The first one wins a tie. */
 export function nearestSquare(cells: readonly number[], p: MapPoint): number {
   let best = cells[0]!;

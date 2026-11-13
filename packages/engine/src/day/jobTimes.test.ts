@@ -341,12 +341,23 @@ describe('stock work', () => {
     expect(wean.workMin).toBeCloseTo(32.7 + 30 + 12, 9);
   });
 
-  it('marking: the muster and 2 minutes a calf', () => {
+  it('marking: the muster and 2 minutes for every calf at foot', () => {
     const b = busyFarm(NO_TRAVEL);
-    // 6 bull calves.
+    // 12 calves go through the yards. 6 are bull calves and get marked.
     const done = work(b.farm, { type: 'markCalves', mob: b.cows });
     expect(done.events.find((e) => e.type === 'calves-marked')).toMatchObject({ count: 6 });
-    expect(done.job.workMin).toBeCloseTo(32.7 + 12, 9);
+    expect(done.job.parts).toEqual([
+      { what: 'muster', minutes: 30 + (60 * 9) / 200 },
+      { what: 'head', minutes: 24 },
+    ]);
+    expect(done.job.workMin).toBeCloseTo(32.7 + 24, 9);
+    // With the heifer calves weaned off, only the bull calves are left to count.
+    const m = b.farm.mobs.find((x) => x.id === b.cows)!;
+    m.animals = m.animals.filter((a) => a.kind !== 'calf' || a.sex === 'M');
+    expect(work(b.farm, { type: 'markCalves', mob: b.cows }).job.parts[1]).toEqual({
+      what: 'head',
+      minutes: 12,
+    });
   });
 
   it('selling: the muster, an hour, and a minute for each 10 head', () => {

@@ -9,7 +9,8 @@
  * when a job can start, how long it takes and how much of it fits today,
  * and calls `tryAction` for what the work does. The player's way in is
  * `applyAction` in ../day/act.ts. `applyInstant` here does a whole action
- * at once without the clock: it is for calibration and tests only.
+ * at once without the clock: it is for calibration and tests only, and is
+ * not part of the engine's public API.
  *
  * The rules and prices are the MVP's (buyCattle, sellAnimals, sellGroup,
  * sellClass, movePicked, moveMob, toLot, weanMob, markCalves, and the cost
@@ -143,20 +144,12 @@ const isCell = (i: unknown): i is number =>
 const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1;
 const edgeKey = (e: EdgeRef): string => e.line + e.index;
 
-/** What an action can be given in place of the farm's own sources. */
-export interface ActionEnv extends SourceEnv {
-  /**
-   * FOR CALIBRATION AND TESTS ONLY. True does the whole action at once
-   * with no farm clock: no travel, no job time, no daylight limit, nothing
-   * left in progress, and sowing and harvest done on the spot. The
-   * calibration suites and the MVP comparisons drive farms this way so
-   * their figures stay what they were before jobs took time
-   * (docs/MODEL.md, section 9). Only test support sets it. Nothing a
-   * player can reach may set it: it is not part of an action, and the
-   * server builds the `env` itself.
-   */
-  instant?: boolean;
-}
+/**
+ * What an action can be given in place of the farm's own sources. There
+ * is no switch in here for the farm clock: nothing a caller passes can
+ * turn it off.
+ */
+export type ActionEnv = SourceEnv;
 
 /** What a part of a bigger job tells the rules about the job it belongs to. */
 export interface PartOptions {
@@ -1038,6 +1031,11 @@ function run(j: Job, a: Action): Out {
       return doSow(j, a);
     case 'harvest':
       return doHarvest(j, a);
+    case 'continueJob':
+    case 'cancelJob':
+    case 'cancelBooking':
+      // These act on the working day, which this file knows nothing about.
+      return refuse('bad-request', 'Jobs in progress and bookings are worked on the farm clock.');
     default:
       return refuse('bad-request', 'That is not something that can be done on a farm.');
   }
@@ -1108,8 +1106,16 @@ export function recordAction(
 }
 
 /**
- * FOR CALIBRATION AND TESTS ONLY. Do a whole action at once, with no farm
- * clock (see `ActionEnv.instant`). The farm passed in is never changed.
+ * FOR CALIBRATION AND TESTS ONLY. Do a whole action at once with no farm
+ * clock: no drive, no job time, no daylight limit, nothing left in
+ * progress, and sowing and harvest on the spot. The calibration suites and
+ * the MVP comparisons drive farms this way so their figures stay what they
+ * were before jobs took time (docs/MODEL.md, section 9).
+ *
+ * Nothing a player can reach calls this. The engine's index does not
+ * export it, engine code is forbidden to import it by lint, and
+ * `applyAction` has no switch that leads here. Test support reaches it by
+ * importing this file directly. The farm passed in is never changed.
  */
 export function applyInstant(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
   const done = tryAction(farm, action, env);

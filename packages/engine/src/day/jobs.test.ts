@@ -19,7 +19,7 @@ import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
 import { surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
-import { applyAction, previewAction } from './act';
+import { applyAction, jobShare, previewAction } from './act';
 import { endDay } from './days';
 import { jobsInProgress } from './look';
 
@@ -640,5 +640,137 @@ describe('the job card and the job agree, for every kind of action', () => {
     // Every way a job can come out was seen, and one refusal.
     expect([...outcomes].sort()).toEqual(['booked', 'done', 'free', 'part']);
     expect(refusals).toBe(1);
+  });
+});
+
+describe('a job that runs out of light says why, and never shows all its work done', () => {
+  it('a move with 21 minutes of light left stops short, with the reason, and the mob stays', () => {
+    const b = busyFarm();
+    const late = withLightLeft(b.farm, 21);
+    const move: Action = { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } };
+    const done = work(late, move);
+    const c = done.job;
+    // 15.4 minutes of work and a short drive out: the work would fit. The
+    // drive home from where the mob is going would not.
+    expect(c.outcome).toBe('part');
+    expect(c.totalWorkMin).toBeCloseTo(15.4, 9);
+    expect(c.travelMin + c.totalWorkMin).toBeLessThan(21);
+    // So the work stops short of the whole job, and the card says so.
+    expect(c.workMin).toBeLessThan(c.totalWorkMin);
+    expect(c.doneShare).toBeCloseTo(c.workMin / c.totalWorkMin, 12);
+    expect(c.doneShare).toBeLessThan(1);
+    expect(c.usesRestOfDay).toBe(true);
+    expect(c.unfinished!.why).toBe('drive-home');
+    expect(c.unfinished!.message).toMatch(
+      /^This job takes the rest of today\. The last \d+ m of light is kept for the drive home\.$/,
+    );
+    // The light kept back is the drive home from where the job would end,
+    // which is further than from where the player is left.
+    expect(c.leftAfterMin).toBeGreaterThan(c.homeMin);
+    expect(c.spareMin).toBeCloseTo(c.leftAfterMin - c.homeMin, 12);
+    // The mob has not moved, and the event says why the job stopped.
+    const where = (f: FarmState): number =>
+      surveyOf(f).topology.areaOf[
+        (f.mobs.find((m) => m.id === b.steers)!.where as { anchor: number }).anchor
+      ]!;
+    expect(where(done.farm)).toBe(where(b.farm));
+    expect(done.events[0]).toMatchObject({
+      type: 'job-worked',
+      finished: false,
+      why: 'drive-home',
+    });
+    // The job card said all of this before the job was done.
+    expect(previewAction(late, move)).toEqual({ ok: true, card: c });
+    // It is finished the next morning.
+    const next = work(endDay(done.farm).farm, { type: 'continueJob', job: c.jobId! });
+    expect(next.job.outcome).toBe('done');
+    expect(next.job.unfinished).toBeUndefined();
+    expect(where(next.farm)).not.toBe(where(b.farm));
+  });
+
+  it('on a big farm the shortfall is minutes, not a rounding', () => {
+    // 200 m squares: the paddock the mob is going to is several minutes further from home.
+    const b = busyFarm({ size: 4160 });
+    const move: Action = { type: 'moveMob', mob: b.cows, to: { cell: b.emptyCell } };
+    const free = previewAction(b.farm, move);
+    if (!free.ok) throw new Error(free.message);
+    // Leave just enough light for the drive out, the work, and the drive home from where it starts.
+    const startHome = work(b.farm, { type: 'setSupplement', mob: b.cows, supp: 'hay' }).job.homeMin;
+    const late = withLightLeft(b.farm, free.card.travelMin + free.card.workMin + startHome + 0.5);
+    const c = work(late, move).job;
+    expect(free.card.homeMin - startHome).toBeGreaterThan(2);
+    expect(c.outcome).toBe('part');
+    expect(c.totalWorkMin - c.workMin).toBeGreaterThan(1.5);
+    expect(c.doneShare).toBeLessThan(0.95);
+    expect(c.unfinished!.why).toBe('drive-home');
+  });
+
+  it('every job that comes back part-done has work left, a share under 1 and a reason', () => {
+    const b = busyFarm({ size: 4160 });
+    const far = setUp(b.farm, { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } });
+    const jobs: { farm: FarmState; action: Action }[] = [
+      { farm: far, action: { type: 'moveMob', mob: b.steers, to: { cell: b.steerCell } } },
+      { farm: b.farm, action: { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } } },
+      { farm: b.farm, action: { type: 'moveMob', mob: b.cows, to: { cell: b.emptyCell } } },
+      { farm: b.farm, action: { type: 'wean', mob: b.cows } },
+      { farm: b.farm, action: { type: 'placeTrough', cell: b.pipedCell } },
+      { farm: b.farm, action: { type: 'movePortable', port: b.port, cell: b.openCell } },
+      { farm: b.farm, action: { type: 'buildFence', edges: across(12, 2, 37), fence: 'tape' } },
+      { farm: b.farm, action: { type: 'layPipe', cells: [cell(33, 10), cell(34, 10)] } },
+    ];
+    let parts = 0;
+    for (const { farm, action } of jobs) {
+      for (let left = 4; left <= 60; left += 0.5) {
+        const out = applyAction(withLightLeft(farm, left), action);
+        if (!out.ok) continue;
+        const c = out.job!;
+        if (c.outcome === 'done') {
+          expect(c.unfinished, action.type).toBeUndefined();
+          expect(c.doneShare).toBe(1);
+          continue;
+        }
+        parts++;
+        const note = `${action.type} with ${left} m left`;
+        expect(c.workMin, note).toBeLessThan(c.totalWorkMin);
+        expect(c.doneShare, note).toBeLessThan(1);
+        expect(c.usesRestOfDay, note).toBe(true);
+        expect(c.unfinished!.why, note).toBe('drive-home');
+        expect(c.unfinished!.message.length, note).toBeGreaterThan(20);
+        expect(out.farm.jobs.length, note).toBe(1);
+        expect(jobShare(out.farm.jobs[0]!), note).toBeCloseTo(c.doneShare, 12);
+      }
+    }
+    expect(parts).toBeGreaterThan(100);
+  });
+
+  it('with the drive home free, a part-done job says the light is used up', () => {
+    const farm = openFarm('nsw', { work: { driveHome: 'after-last-light' } });
+    const c = work(farm, { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' }).job;
+    expect(c.outcome).toBe('part');
+    expect(c.unfinished).toEqual({
+      why: 'light-used-up',
+      message: "This job takes the rest of today's light.",
+    });
+    expect(c.usesRestOfDay).toBe(true);
+    expect(c.spareMin).toBeCloseTo(0, 6);
+  });
+
+  it('a job that fits with light to spare does not use the rest of the day', () => {
+    const b = busyFarm();
+    const c = work(b.farm, { type: 'refillPortable', port: b.port }).job;
+    expect(c.outcome).toBe('done');
+    expect(c.usesRestOfDay).toBe(false);
+    expect(c.unfinished).toBeUndefined();
+    expect(c.spareMin).toBeCloseTo(c.leftAfterMin - c.homeMin, 12);
+    expect(c.spareMin).toBeGreaterThan(600);
+    // A whole day of permanent fence does: nothing more can be started after it.
+    const still = openFarm('nsw', { work: { travel: false } });
+    const day = work(still, {
+      type: 'buildFence',
+      edges: across(10, 5, 14),
+      fence: 'permanent',
+    }).job;
+    expect(day.outcome).toBe('done');
+    expect(day.usesRestOfDay).toBe(true);
   });
 });

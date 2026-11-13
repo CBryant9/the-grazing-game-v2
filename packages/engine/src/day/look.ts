@@ -126,7 +126,7 @@ export function jobsInProgress(farm: FarmState, env: ActionEnv = {}): JobView[] 
       workedMin: j.workedMin,
       travelMin: j.travelMin,
       line,
-      carryOn: previewAction(farm, { type: 'continueJob', job: j.id }, { ...env, instant: false }),
+      carryOn: previewAction(farm, { type: 'continueJob', job: j.id }, env),
     };
   });
 }

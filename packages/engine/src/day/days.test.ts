@@ -18,6 +18,7 @@ import { lightOn } from '../sim/clock';
 import { dateOn, surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
+import { previewAction } from './act';
 import { endDay, skipDays, stopsIn, waterCheck } from './days';
 import { bookingsView, clockView, jobsInProgress } from './look';
 
@@ -537,5 +538,61 @@ describe('contractors: sowing and harvest', () => {
     // A crop can't be harvested twice: a second booking for it fails on the day.
     const twice = work(booked.farm, { type: 'harvest', field: stop.fieldId });
     expect(threeDays(twice.farm).dawn).toEqual(['booking-done', 'harvested', 'booking-failed']);
+  });
+});
+
+describe('a contractor booked late in the sowing window', () => {
+  // Barley is sown in May and June in Central West. The farm starts on 1 June,
+  // and a contractor comes 3 days after the booking.
+  const onDay = (day: number): FarmState => {
+    let farm = mixedFarm();
+    for (let i = 0; i < day; i++) farm = endDay(farm).farm;
+    return farm;
+  };
+
+  it('booked on 27 June the contractor comes on 30 June, and the barley is sown', () => {
+    const farm = onDay(26);
+    expect(dateOn(farm)).toEqual({ year: 2022, month: 5, date: 27 });
+    const booked = work(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
+    expect(booked.job.dueDay).toBe(29);
+    let f = booked.farm;
+    const dawn: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const next = endDay(f);
+      f = next.farm;
+      dawn.push(...next.dawn.map((e) => e.type));
+    }
+    expect(dateOn(f)).toEqual({ year: 2022, month: 5, date: 30 });
+    expect(dawn).toEqual(['booking-done', 'sown']);
+  });
+
+  it('booked on 28 June the contractor would come on 1 July: refused then, with the last day to book', () => {
+    for (const [day, date] of [
+      [27, 28],
+      [28, 29],
+      [29, 30],
+    ] as const) {
+      const farm = onDay(day);
+      expect(dateOn(farm)).toEqual({ year: 2022, month: 5, date });
+      const before = farmHash(farm);
+      const no = turnedDown(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
+      expect(no.reason).toBe('contractor-too-late');
+      expect(no.message).toBe(
+        `A contractor takes 3 days to come, and Barley (grain) can't be sown on ${date + 3 - 30} July. The last day to book it was 27 June.`,
+      );
+      // The job card says the same, and nothing was booked.
+      expect(
+        previewAction(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) }),
+      ).toEqual(no);
+      expect(farmHash(farm)).toBe(before);
+    }
+  });
+
+  it('once the window has shut, the refusal is the usual one', () => {
+    const farm = onDay(30);
+    expect(dateOn(farm)).toEqual({ year: 2022, month: 6, date: 1 });
+    const no = turnedDown(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
+    expect(no.reason).toBe('out-of-window');
+    expect(no.message).toBe("Barley (grain) can't be sown at this time of year.");
   });
 });

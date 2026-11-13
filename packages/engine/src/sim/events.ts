@@ -177,6 +177,8 @@ export type WorkEvent =
       workMin: number;
       /** True if the job is finished. False if the rest is a job in progress. */
       finished: boolean;
+      /** For a job that is not finished: what stopped it today. */
+      why?: 'drive-home' | 'light-used-up';
       /** The share of the whole job done so far, 0 to 1. */
       doneShare: number;
     }

@@ -23,6 +23,25 @@ export interface CalendarDate {
 
 const DAY_MS = 86400000;
 
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+/** A day and its month in words, for a message: "27 June". */
+export const dayMonthText = (date: CalendarDate): string =>
+  `${date.date} ${MONTH_NAMES[date.month]}`;
+
 /** The calendar date of a farm day. Leap years are handled. */
 export function dateAt(start: FarmStart, day: number): CalendarDate {
   const d = new Date(Date.UTC(start.year, start.month, 1) + day * DAY_MS);

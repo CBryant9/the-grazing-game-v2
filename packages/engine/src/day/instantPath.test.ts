@@ -13,7 +13,9 @@ import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
 import type { FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
-import { applyAction } from './act';
+import type { ActionEnv } from '../actions/apply';
+import { applyAction, previewAction } from './act';
+import { endDay, skipDays } from './days';
 
 /*
  * The instant path: the one way to act without the farm clock. It is for
@@ -118,30 +120,70 @@ describe('acting without the clock', () => {
 
   it('jobs in progress and bookings can only be worked on the clock', () => {
     const farm = openFarm('nsw');
-    const no = applyInstantly(farm, { type: 'continueJob', job: 1 });
-    expect(no.ok).toBe(false);
-    expect(!no.ok && no.reason).toBe('no-such-job');
-    expect(applyInstantly(farm, { type: 'cancelBooking', booking: 1 })).toMatchObject({
-      ok: false,
-      reason: 'no-such-booking',
-    });
+    for (const action of [
+      { type: 'continueJob', job: 1 },
+      { type: 'cancelJob', job: 1 },
+      { type: 'cancelBooking', booking: 1 },
+    ] as const) {
+      expect(applyInstantly(farm, action)).toEqual({
+        ok: false,
+        reason: 'bad-request',
+        message: 'Jobs in progress and bookings are worked on the farm clock.',
+      });
+    }
   });
 });
 
 describe('nothing a player can reach uses it', () => {
-  it('the flag is set in one file, in test support', () => {
-    // Any file that sets `instant` to true in an env. Reading the flag is
-    // fine: setting it is what switches the clock off.
-    const setsIt = /\binstant\s*:\s*true\b/;
+  it('the public action can not be made instant: a switch passed in the env is ignored', () => {
+    const farm = openFarm('nsw');
+    const job: Action = { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' };
+    // What a server route would pass if it spread a request into the env.
+    const spread = { instant: true, clock: 'off', noClock: true } as unknown as ActionEnv;
+    const done = applyAction(farm, job, spread);
+    if (!done.ok) throw new Error(done.message);
+    // Still a day's work and a job in progress, exactly as with no env at all.
+    expect(done.job!.outcome).toBe('part');
+    expect(done.farm.jobs.length).toBe(1);
+    const plain = applyAction(farm, job);
+    expect(plain.ok && farmHash(plain.farm)).toBe(farmHash(done.farm));
+    expect(previewAction(farm, job, spread)).toEqual({ ok: true, card: done.job });
+    // The same through the engine's index, which is all a server can import.
+    const viaIndex = engine.applyAction(farm, job, spread);
+    expect(viaIndex.ok && farmHash(viaIndex.farm)).toBe(farmHash(done.farm));
+    // Next day and skips take no such switch either.
+    expect(endDay(done.farm, spread).farm.jobs.length).toBe(1);
+    expect(skipDays(done.farm, 2, spread).farm.jobs.length).toBe(1);
+  });
+
+  it('the env type has no field for it', () => {
+    // If `ActionEnv` ever gets an `instant` field again, the type check fails here.
+    // @ts-expect-error The env has no switch for the farm clock.
+    const env: ActionEnv = { instant: true };
+    expect(Object.keys(env)).toEqual(['instant']);
+    const typed: engine.ActionEnv = {};
+    expect(typed).toEqual({});
+  });
+
+  it('the instant function is named in two files: where it is defined, and test support', () => {
+    const names = /\bapplyInstant\b/;
     const found = sourceFiles().filter((path) => {
       if (path === 'packages/engine/src/day/instantPath.test.ts') return false;
-      return setsIt.test(readFileSync(join(REPO, path), 'utf8'));
+      return names.test(readFileSync(join(REPO, path), 'utf8'));
     });
-    expect(found).toEqual(['packages/engine/test-support/instant.ts']);
+    expect(found).toEqual([
+      'packages/engine/src/actions/apply.ts',
+      'packages/engine/test-support/instant.ts',
+    ]);
+  });
+
+  it('lint forbids engine and server code from importing it', () => {
+    const config = readFileSync(join(REPO, 'eslint.config.mjs'), 'utf8');
+    expect(config.match(/importNames: \['applyInstant'\]/g)!.length).toBe(2);
   });
 
   it('nothing outside the engine names the instant path at all', () => {
-    const names = /applyInstant|tryAction|\binstant\b/;
+    const names = /applyInstant|tryAction/;
     const outside = sourceFiles().filter(
       (path) =>
         !path.startsWith('packages/engine/') && names.test(readFileSync(join(REPO, path), 'utf8')),
@@ -158,22 +200,20 @@ describe('nothing a player can reach uses it', () => {
     expect(exported).not.toContain('tryAction');
     expect(exported).not.toContain('recordAction');
     expect(engine.applyAction).toBe(applyAction);
+    expect(engine.previewAction).toBe(previewAction);
   });
 
   it('engine code never imports test support', () => {
-    const offenders = sourceFiles().filter((path) => {
-      if (!path.startsWith('packages/engine/src/')) return false;
-      if (/\.(test|timed)\.ts$/.test(path)) return false;
-      return /test-support/.test(readFileSync(join(REPO, path), 'utf8'));
-    });
-    // Comments may name the folder. No import may.
-    for (const path of offenders) {
+    for (const path of sourceFiles()) {
+      if (!path.startsWith('packages/engine/src/')) continue;
+      if (/\.(test|timed)\.ts$/.test(path)) continue;
       const text = readFileSync(join(REPO, path), 'utf8');
+      // Comments may name the folder. No import may.
       expect(/from\s+['"][^'"]*test-support/.test(text), path).toBe(false);
     }
   });
 
-  it('an action can not carry the flag: it is read from the env the server builds', () => {
+  it('an action can not carry a switch either', () => {
     const farm = openFarm('nsw');
     const sneaky = {
       type: 'buildFence',
@@ -184,7 +224,6 @@ describe('nothing a player can reach uses it', () => {
     } as unknown as Action;
     const done = applyAction(farm, sneaky);
     if (!done.ok) throw new Error(done.message);
-    // Still a day's work and a job in progress.
     expect(done.job!.outcome).toBe('part');
     expect(done.farm.jobs.length).toBe(1);
   });

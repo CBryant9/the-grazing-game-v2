@@ -109,6 +109,8 @@ export type ActionRefusalReason =
   | 'no-daylight'
   /** There is light left, but not enough to get to the job and home, or for a job that has to be done in one day. */
   | 'not-enough-daylight'
+  /** A contractor would come after the sowing window has shut. */
+  | 'contractor-too-late'
   | 'no-such-job'
   | 'no-such-booking';
 
@@ -185,8 +187,26 @@ export interface JobCard {
   dayMin: number;
   usedBeforeMin: number;
   leftAfterMin: number;
+  /**
+   * Light free for other jobs after this one: what is left less the drive
+   * home (where the drive home must fit inside daylight).
+   */
+  spareMin: number;
   /** True if the whole job is done today. */
   fitsToday: boolean;
+  /**
+   * True if this job takes the rest of the day: it stops because today's
+   * light ran out, or it finishes with nothing to spare. The screen warns
+   * that this is the full day, and that doing anything else as well means
+   * doing less of this.
+   */
+  usesRestOfDay: boolean;
+  /**
+   * For a job that is not finished today: why it stopped, as a code and
+   * in plain words. `drive-home`: the rest of today's light is kept for
+   * the drive home. `light-used-up`: today's light ran out.
+   */
+  unfinished?: { why: 'drive-home' | 'light-used-up'; message: string };
   /** The work in the whole job (what is left of it, for a job in progress), at today's pace. */
   totalWorkMin: number;
   /** How the work is made up. */

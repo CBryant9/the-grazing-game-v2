@@ -31,7 +31,6 @@
  */
 
 import {
-  applyInstant,
   recordAction,
   refusedOutright,
   tryAction,
@@ -49,9 +48,13 @@ import type {
   JobPreview,
   JobWorkPart,
 } from '../actions/types';
+import { dayMonthText } from '../calendar';
+import { canSowOn } from '../crops/fields';
 import { JOB_TIMES } from '../data/jobTimes';
+import { SPECIES } from '../data/species';
 import { durationText } from '../daylight/daylight';
 import { dayMinutes, homesteadPoint, lightOn, timeNow } from '../sim/clock';
+import { cropContextOf, dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { deepCopy, type FarmState, type JobInProgress, type MapPoint } from '../sim/state';
 import {
@@ -64,7 +67,7 @@ import {
   type JobSpec,
   type Piece,
 } from './spec';
-import { driveMinutes, homeReserve, nearestOnLine, pointAlong, squaresBetween } from './travel';
+import { driveMinutes, homeReserve, pointAlong, squaresBetween } from './travel';
 
 /** Smaller than this is no time at all: it keeps rounding from starting or stopping a job. */
 export const NO_TIME = 1e-6;
@@ -162,28 +165,23 @@ interface LineDay {
   started: boolean;
 }
 
-/** The nearest point of what is left of a line to a place. */
-function nearestOfLine(pieces: readonly Piece[], part0: number, from: MapPoint): MapPoint {
-  let best = pieces[0]!.a;
-  let bestD = Infinity;
-  for (let i = 0; i < pieces.length; i++) {
-    const p = pieces[i]!;
-    const a = i === 0 ? pointAlong(p.a, p.b, part0) : p.a;
-    const q = nearestOnLine(from, a, p.b);
-    const d = squaresBetween(q, from);
-    if (d < bestD) {
-      bestD = d;
-      best = q;
-    }
-  }
-  return best;
+/**
+ * The drive from the end of one piece to the start of the next. Pieces
+ * that join have none, and nor do squares of pipe side by side: laying
+ * the pipe is what moves the player along.
+ */
+function gapDrive(farm: FarmState, from: MapPoint, to: MapPoint, pipe: boolean): number {
+  if (squaresBetween(from, to) <= (pipe ? 1 : 0) + 1e-9) return 0;
+  return driveMinutes(farm, from, to);
 }
 
 /**
- * Work a line for a day: drive to its nearest point from `from`, then
- * build pieces in order for as long as the light `left` lasts. Where the
- * drive home must fit inside daylight, the work stops at the last point
- * the player can still be home from by last light.
+ * Work a line for a day. The player drives from `from` to where the work
+ * starts: the start of the first piece, or the point the line had got to.
+ * Pieces are built in order for as long as the light `left` lasts, and a
+ * gap between two pieces is driven across. Where the drive home must fit
+ * inside daylight, the work stops at the last point the player can still
+ * be home from by last light. Every drive made is in `travel`.
  */
 function lineDay(
   farm: FarmState,
@@ -193,32 +191,32 @@ function lineDay(
   left: number,
   dayMin: number,
 ): LineDay {
-  const travel = driveMinutes(farm, from, nearestOfLine(pieces, part0, from));
   const homeFrom = (p: MapPoint): number => homeReserve(farm, [p]);
-  // The light there is for the work and the drive home.
-  const budget = left - travel;
   const first = pieces[0]!;
+  const start = pointAlong(first.a, first.b, part0);
   const out: LineDay = {
-    travel,
-    home: 0,
+    travel: driveMinutes(farm, from, start),
+    home: homeFrom(start),
     worked: 0,
     pieces: 0,
     part: part0,
     finished: false,
-    at: pointAlong(first.a, first.b, part0),
+    at: start,
     started: false,
   };
-  out.home = homeFrom(out.at);
-  out.started = budget - out.home > NO_TIME;
+  out.started = left - out.travel - out.home > NO_TIME;
   if (!out.started) return out;
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i]!;
     const whole = pieceMinutes(p.work, dayMin);
     const done = i === 0 ? part0 : 0;
-    // The work so far, the work to a share `t` of this piece, and the drive home from there.
+    const gap = i === 0 ? 0 : gapDrive(farm, pieces[i - 1]!.b, p.a, 'cell' in p.ref);
+    // Every drive and all the work so far, the drive across to this piece,
+    // the work to a share `t` of it, and the drive home from there.
     const usedAt = (t: number): number =>
-      out.worked + whole * (t - done) + homeFrom(pointAlong(p.a, p.b, t));
-    if (usedAt(1) <= budget + NO_TIME) {
+      out.travel + gap + out.worked + whole * (t - done) + homeFrom(pointAlong(p.a, p.b, t));
+    if (usedAt(1) <= left + NO_TIME) {
+      out.travel += gap;
       out.worked += whole * (1 - done);
       out.pieces++;
       out.part = 0;
@@ -226,19 +224,19 @@ function lineDay(
       out.home = homeFrom(p.b);
       continue;
     }
-    // The day is used up before this piece is finished. If there is no
-    // light to start it (a gap in the line took the player further from
-    // home), the work stops where it was.
-    if (usedAt(done) > budget + NO_TIME) return out;
+    // The day is used up before this piece is finished. If there is not
+    // the light to get to it and home again, the work stops where it was.
+    if (usedAt(done) > left + NO_TIME) return out;
     // Otherwise it stops part-way along: the furthest point the player can
     // still get home from. Halving finds it, the same way every time.
     let lo = done;
     let hi = 1;
     for (let k = 0; k < 60; k++) {
       const mid = (lo + hi) / 2;
-      if (usedAt(mid) <= budget) lo = mid;
+      if (usedAt(mid) <= left) lo = mid;
       else hi = mid;
     }
+    out.travel += gap;
     out.worked += whole * (lo - done);
     out.part = lo;
     out.at = pointAlong(p.a, p.b, lo);
@@ -269,6 +267,33 @@ function lineDaysMore(farm: FarmState, pieces: readonly Piece[], part0: number):
 // The card
 // ---------------------------------------------------------------------------
 
+/** What a card says about the rest of the day after a job. */
+type RestOfDay = Pick<JobCard, 'spareMin' | 'usesRestOfDay' | 'unfinished'>;
+
+/**
+ * The light free for other jobs after this one, whether the job takes the
+ * rest of the day, and for a job that is not finished, why it stopped.
+ * `leftAfter` is the light left after the job and `home` the drive home
+ * from where it leaves the player.
+ */
+function restOfDay(farm: FarmState, finished: boolean, leftAfter: number, home: number): RestOfDay {
+  const spare = Math.max(0, leftAfter - home);
+  const out: RestOfDay = { spareMin: spare, usesRestOfDay: !finished || spare <= NO_TIME };
+  if (!finished) {
+    const keptForHome =
+      farm.workRules.travel &&
+      farm.workRules.driveHome === 'inside-daylight' &&
+      leftAfter > NO_TIME;
+    out.unfinished = keptForHome
+      ? {
+          why: 'drive-home',
+          message: `This job takes the rest of today. The last ${durationText(leftAfter)} of light is kept for the drive home.`,
+        }
+      : { why: 'light-used-up', message: "This job takes the rest of today's light." };
+  }
+  return out;
+}
+
 /** A card for something that takes no time. */
 function freeCard(
   farm: FarmState,
@@ -288,6 +313,8 @@ function freeCard(
     dayMin: light.dayMin,
     usedBeforeMin: light.used,
     leftAfterMin: light.left,
+    spareMin: Math.max(0, light.left - homeReserve(farm, [farm.clock.at])),
+    usesRestOfDay: false,
     fitsToday: true,
     totalWorkMin: 0,
     parts: [],
@@ -338,22 +365,28 @@ function doWhole(
     at = site;
   }
   // Finished, the job leaves the player at `endAt`. Stopped part-way, it
-  // leaves them at the last place visited. The light kept back for the
-  // drive home is from wherever that is.
+  // leaves them at the last place visited. The job only finishes today if
+  // the drive home from where it ends still fits. If it does not, that
+  // drive is kept back all the same before the work is counted, so the
+  // work that goes in is always less than the whole job: a card never
+  // shows all the work done on a job that has not taken effect.
   const endAt = spec.endAt ?? at;
   const homeDone = homeReserve(farm, [endAt]);
   const homePart = homeReserve(farm, [at]);
   const finished = need <= light.left - travel - homeDone + NO_TIME;
+  const keep = finished ? homeDone : Math.max(homeDone, homePart);
+  // The drive home from where the player is left.
   const home = finished ? homeDone : homePart;
-  const room = light.left - travel - home;
-  if (room < -NO_TIME || (need > NO_TIME && room <= NO_TIME)) return tooFar(light, travel, home);
+  const room = light.left - travel - keep;
+  if (room < -NO_TIME || (need > NO_TIME && room <= NO_TIME)) return tooFar(light, travel, keep);
   if (spec.oneDay && !finished) {
     return refuse(
       'not-enough-daylight',
       `A trip to the saleyards takes ${durationText(need)}. There is ${durationText(light.left)} of light left today.`,
     );
   }
-  const worked = finished ? need : Math.min(need, Math.max(0, room));
+  const worked = finished ? need : Math.max(0, room);
+  const rest = restOfDay(farm, finished, light.left - travel - worked, home);
   const start = light.now;
   const end = start + travel + worked;
   const cost = farm.cash - trial.farm.cash;
@@ -422,11 +455,12 @@ function doWhole(
         travelMin: travel,
         workMin: worked,
         finished: false,
+        why: rest.unfinished!.why,
         doneShare,
       },
     ];
     // Later days: out from the homestead, the same round, and home again.
-    let rest = need - worked;
+    let toDo = need - worked;
     const homePt = homesteadPoint(farm);
     let out = 0;
     let p = homePt;
@@ -439,8 +473,8 @@ function doWhole(
     for (let d = 1; d <= MOST_DAYS_AHEAD; d++) {
       const dayRoom = lightOn(farm, farm.day + d).minutes - out - back;
       if (dayRoom <= NO_TIME) break;
-      rest -= dayRoom;
-      if (rest <= NO_TIME) {
+      toDo -= dayRoom;
+      if (toDo <= NO_TIME) {
         moreDays = d;
         break;
       }
@@ -459,6 +493,7 @@ function doWhole(
     dayMin: light.dayMin,
     usedBeforeMin: light.used,
     leftAfterMin: Math.max(0, light.dayMin - next.clock.used),
+    ...rest,
     fitsToday: finished,
     totalWorkMin: need,
     parts: spec.parts.map((p) => ({ what: p.what, minutes: p.minutes })),
@@ -574,20 +609,20 @@ function doLine(
     moreDays = lineDaysMore(farm, rest, day.part);
   }
   spendLight(next, day.travel + day.worked, day.at);
-  const events: FarmEvent[] = [
-    {
-      type: 'job-worked',
-      action: action.type,
-      jobId: job ? job.id : (jobId ?? null),
-      start,
-      end,
-      travelMin: day.travel,
-      workMin: day.worked,
-      finished: day.finished,
-      doneShare,
-    },
-    ...built,
-  ];
+  const restDay = restOfDay(farm, day.finished, light.left - day.travel - day.worked, day.home);
+  const worked: Extract<FarmEvent, { type: 'job-worked' }> = {
+    type: 'job-worked',
+    action: action.type,
+    jobId: job ? job.id : (jobId ?? null),
+    start,
+    end,
+    travelMin: day.travel,
+    workMin: day.worked,
+    finished: day.finished,
+    doneShare,
+  };
+  if (restDay.unfinished) worked.why = restDay.unfinished.why;
+  const events: FarmEvent[] = [worked, ...built];
   const logged: Action = job ? { type: 'continueJob', job: job.id } : action;
   recordAction(next, logged, events, { at: { start, end }, job: jobId });
   const metresLeft = (pieces.length - part0) * sideM;
@@ -602,6 +637,7 @@ function doLine(
     dayMin: light.dayMin,
     usedBeforeMin: light.used,
     leftAfterMin: Math.max(0, light.dayMin - next.clock.used),
+    ...restDay,
     fitsToday: day.finished,
     totalWorkMin: totalWork,
     parts: [{ what: lineWhat(action), minutes: totalWork } satisfies JobWorkPart],
@@ -735,15 +771,41 @@ function cancelBooking(
   return { ok: true, farm: next, events, card: freeCard(farm, action, 'free', 0) };
 }
 
-/** Book a contractor: no time from the player, done a few days on, charged then. */
-function book(farm: FarmState, action: Action, trial: ActionDone): Worked {
+/**
+ * Book a contractor: no time from the player, done a few days on, charged
+ * then. The booking is checked against the day the contractor will come:
+ * a sowing that would fall outside the species' window is refused now,
+ * with the last day it could have been booked.
+ */
+function book(farm: FarmState, action: Action, trial: ActionDone): Worked | ActionRefusal {
+  const wait = JOB_TIMES.contractorDays.value;
+  const dueDay = farm.day + wait;
+  if (action.type === 'sow') {
+    const ctx = cropContextOf(farm);
+    if (!canSowOn(ctx, action.species, dueDay)) {
+      let last: number | null = null;
+      for (let d = farm.day - 1; d >= 0 && d > farm.day - 366; d--) {
+        if (canSowOn(ctx, action.species, d) && canSowOn(ctx, action.species, d + wait)) {
+          last = d;
+          break;
+        }
+      }
+      return refuse(
+        'contractor-too-late',
+        `A contractor takes ${wait} days to come, and ${SPECIES[action.species].name} can't be sown on ${dayMonthText(dateOn(farm, dueDay))}.` +
+          (last === null
+            ? ''
+            : ` The last day to book it was ${dayMonthText(dateOn(farm, last))}.`),
+      );
+    }
+  }
   const next = workingCopy(farm);
   const quote = farm.cash - trial.farm.cash;
   const booking = {
     id: next.nextBookingId++,
     action: deepCopy(action),
     bookedDay: next.day,
-    dueDay: next.day + JOB_TIMES.contractorDays.value,
+    dueDay,
     quote,
   };
   next.bookings.push(booking);
@@ -804,21 +866,15 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
   }
 }
 
-const usesJobs = (action: Action): boolean =>
-  action?.type === 'continueJob' ||
-  action?.type === 'cancelJob' ||
-  action?.type === 'cancelBooking';
-
 /**
  * Do an action. Returns the farm after it, what happened and the job card,
  * or a refusal with the reason. The farm passed in is never changed.
  *
  * Every job takes its time off today's light. What does not fit becomes a
- * job in progress. `env.instant` (calibration and tests only) does the
- * whole action at once with no clock.
+ * job in progress. There is no way to switch the clock off from here:
+ * whatever is in `env`, the job is done on the clock.
  */
 export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
-  if (env.instant && !usesJobs(action)) return applyInstant(farm, action, env);
   const done = work(farm, action, env);
   if (!done.ok) return done;
   return { ok: true, farm: done.farm, events: done.events, job: done.card };

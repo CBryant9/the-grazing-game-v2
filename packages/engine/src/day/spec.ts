@@ -399,9 +399,9 @@ export function specFor(
       ]);
     }
     case 'markCalves': {
+      // "2 min per calf": every calf at foot goes through the yards, bull calf or heifer.
       const m = mobById(action.mob);
-      const marked = trial.events.find((e) => e.type === 'calves-marked');
-      const calves = marked && marked.type === 'calves-marked' ? marked.count : 0;
+      const calves = m.animals.filter((a) => a.kind === 'calf').length;
       return oneSite(mobPlace(before, survey, m, playerAt), [
         part('muster', musterOf(survey, m)),
         part('head', calves * T.markMinPerCalf.value),

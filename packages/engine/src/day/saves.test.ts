@@ -5,7 +5,12 @@ import type { Action } from '../actions/types';
 import { GRID_N } from '../grid';
 import { LAND } from '../pasture/state';
 import { farmHash, loadFarm, saveFarm, type SavedFarm } from '../save/save';
+import { daylightFor } from '../daylight/daylight';
+import { DISTRICT_PLACES } from '../daylight/places';
+import { loadRealData } from '../server';
 import { homesteadPoint, lightOn } from '../sim/clock';
+import { dateOn } from '../sim/derived';
+import { stepDay } from '../sim/tick';
 import { createFarm } from '../sim/create';
 import { cloneFarm, type FarmState } from '../sim/state';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
@@ -211,5 +216,56 @@ describe('saves from before the working day', () => {
     // Only a save with no clock at all is put back to first light.
     const old = format2(farm);
     expect(loadFarm(old).clock.used).toBe(0);
+  });
+
+  it("a real-year farm saved before the clock loads, gets its real date's light, and carries on", () => {
+    const data = loadRealData();
+    // In order from 2025, run past the newest year: day 400 is early February 1997 in the game.
+    let farm = createFarm(
+      {
+        seed: 9,
+        district: 'wv',
+        size: 'small',
+        start: { year: 2025, month: 0 },
+        years: { kind: 'real', order: 'in-order' },
+        startType: 'scratch',
+        difficulty: 'easy',
+      },
+      { data },
+    );
+    for (let d = 0; d < 400; d++) stepDay(farm, { data });
+    expect(dateOn(farm)).toEqual({ year: 1997, month: 1, date: 5 });
+    const unsaved = farm;
+    const old = format2(farm);
+    expect(old.seasons).toMatchObject({ kind: 'real' });
+    const loaded = loadFarm(old);
+    // The clock is the real date's, not the farm calendar's (February 2026).
+    const place = DISTRICT_PLACES.wv;
+    const real = daylightFor(place, { year: 1997, month: 1, date: 5 });
+    expect(real.firstLight).not.toBe(
+      daylightFor(place, { year: 2026, month: 1, date: 5 }).firstLight,
+    );
+    expect(loaded.clock).toEqual({
+      firstLight: real.firstLight,
+      lastLight: real.lastLight,
+      used: 0,
+      at: homesteadPoint(farm),
+    });
+    expect(loaded.jobs).toEqual([]);
+    expect(loaded.bookings).toEqual([]);
+    expect(farmHash(loaded)).toBe(farmHash(farm));
+    // It carries on: a job on the clock, the next day, and a skip, with the real data.
+    const job: Action = { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' };
+    const done = applyAction(loaded, job, { data });
+    if (!done.ok) throw new Error(done.message);
+    expect(done.job!.outcome).toBe('part');
+    farm = endDay(done.farm, { data }).farm;
+    expect(dateOn(farm)).toEqual({ year: 1997, month: 1, date: 6 });
+    const week = skipDays(farm, 'week', { data });
+    expect(week.daysRun).toBe(7);
+    expect(week.summary.jobs[0]!.doneShare.after).toBeGreaterThan(done.job!.doneShare);
+    // The same as the farm that was never saved.
+    const straight = applyAction(unsaved, job, { data });
+    expect(straight.ok && farmHash(straight.farm)).toBe(farmHash(done.farm));
   });
 });
