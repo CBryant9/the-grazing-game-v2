@@ -915,3 +915,41 @@ describe('a year in each district finishes with no NaN anywhere', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('stock held in the yards (a stand-in until yard work is built)', () => {
+  it('have water, graze only the square the yards are on, and stay apart from the paddock mob', () => {
+    let farm = openFarm('nsw');
+    const bore = farm.layout.water.bore;
+    farm = act(farm, { type: 'buyCattle', cls: 'yearSteer', qty: 80, to: { cell: bore } });
+    farm = act(farm, {
+      type: 'moveCattle',
+      picks: [{ mob: farm.mobs[0]!.id, cls: 'yearlingSteer', qty: 60 }],
+      to: 'lot',
+    });
+    const held = farm.mobs.find((m) => m.where.kind === 'lot')!;
+    held.where = { kind: 'yards' };
+    const yards = farm.buildings.yards;
+    const grazedBefore = farm.pasture.lastG.slice();
+    for (let d = 0; d < 6; d++) {
+      const r = stepDay(farm);
+      expect(r.deaths).toEqual([]);
+      expect(r.events.some((e) => e.type === 'cattle' && e.note.type === 'noWater')).toBe(false);
+    }
+    // Six days in the yards and nobody has gone thirsty.
+    expect(farm.mobs.length).toBe(2);
+    const m = farm.mobs.find((x) => x.where.kind === 'yards')!;
+    expect(m.dry).toBe(0);
+    expect(m.animals.length).toBe(60);
+    expect(m.st!.me).not.toBe(11.6);
+    // They grazed the yards square down to what cattle leave behind. The rest of the farm still has its feed.
+    expect(grazedBefore[yards]).toBeLessThan(0);
+    expect(farm.pasture.lastG[yards]).toBeGreaterThanOrEqual(0);
+    const mass = (i: number): number => farm.pasture.G[i]! + farm.pasture.D[i]!;
+    expect(mass(yards)).toBeLessThan(450);
+    expect(mass(farm.buildings.homestead)).toBeGreaterThan(2 * mass(yards));
+    expectOneMobPerArea(farm);
+    // One square is not enough for 60 steers: they are short of feed.
+    expect(m.st!.f).toBeLessThan(0.5);
+  });
+});
