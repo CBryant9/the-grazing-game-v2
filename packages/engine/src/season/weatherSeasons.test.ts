@@ -253,8 +253,42 @@ describe('the pasture run-up', () => {
     expect(runUpShare('cw', real.seasons, real.plan.start)).toBeGreaterThan(0.85);
     const { seasons } = farm('cw', 2011);
     for (let day = -RUN_UP_DAYS; day < 0; day++) {
-      expect(seasons.factorsOn(day)).toEqual(real.seasons.factorsOn(day));
+      expect(seasons.factorsOn(day).monthF).toBe(real.seasons.factorsOn(day).monthF);
     }
+  });
+
+  it('never gives a run-up day a season factor under the floor, in any district or start year', () => {
+    // The grass model hays green feed off faster under 0.8. The random
+    // seasons never let the run-up get there, and neither does this.
+    let lifted = 0;
+    for (const id of IDS) {
+      for (const year of weatherYears(loadWeatherGrowth(id))) {
+        const { seasons } = farm(id, year);
+        const real = farm(id, year, 'in-order', { runUpFloor: 0 }).seasons;
+        for (let day = -RUN_UP_DAYS; day < 0; day += 7) {
+          const s = seasons.factorsOn(day).seasonF;
+          expect(s).toBeGreaterThanOrEqual(RUN_UP_SEASON_FLOOR);
+          if (real.factorsOn(day).seasonF < 0.8) lifted++;
+        }
+      }
+    }
+    // The real weather would have gone under 0.8 on plenty of these days.
+    expect(lifted).toBeGreaterThan(100);
+  });
+
+  it('leaves the days before the run-up as the weather really was', () => {
+    const { growth, plan, seasons } = farm('cw', 2007);
+    for (let day = -RUN_UP_DAYS - 365; day < -RUN_UP_DAYS; day += 5) {
+      expect(seasons.factorsOn(day).monthF).toBe(growth.factorOn(dateAt(plan.start, day)));
+    }
+  });
+
+  it('gives the real season factor again from day 0', () => {
+    // Central West, 1 January 2007: the look back at the start is under the floor,
+    // and the label says so.
+    const { seasons } = farm('cw', 2007);
+    expect(seasons.factorsOn(-1).seasonF).toBe(RUN_UP_SEASON_FLOOR);
+    expect(seasons.factorsOn(0).seasonF).toBeLessThan(RUN_UP_SEASON_FLOOR);
   });
 
   it('refuses a floor or a run-up length that makes no sense', () => {

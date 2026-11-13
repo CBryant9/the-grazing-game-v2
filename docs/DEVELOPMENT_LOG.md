@@ -347,7 +347,7 @@ Defaults used (each one line to change):
 
 Not done, and why:
 
-- **Not wired into a game.** `generateFarm` and the daily step still take whatever source they are given. Nothing chooses the weather source for a real-year farm yet, and the dates passed to `growGrass` still come from the farm's own calendar. That is the same date in order. At random it is the same month and day in another year, which is all `growGrass` reads.
+- **Not wired into a game.** `generateFarm` and the daily step still take whatever source they are given. Nothing chooses the weather source for a real-year farm yet, and the dates passed to `growGrass` still come from the farm's own calendar. That is the same date in order, until the years run out and the game goes back to 1997. After that, and at random, it is the same month and day in another year, which is all `growGrass` reads.
 - **The engine version was not bumped** (still 0.3.0), to keep clear of the other 1.4 branches, as 1.2a did. Bump it when 1.4 is joined.
 - **The calibration suites (milestone 1.3) have not been run on real years.** They are not built yet. The run here is grass only, with no cattle.
 - **Temperature is not in the factor.** A warm winter or a cold spring grows the same as an average one.

@@ -124,14 +124,17 @@ export function weatherSeasons(options: WeatherSeasonsOptions): WeatherSeasons {
     return towardsAverage;
   };
 
-  // The factor the farm is given each day, and that day's weight, kept
-  // once worked out.
+  const inRunUp = (day: number): boolean => day < 0 && day >= -runUpDays;
+
+  // The factor the farm is given each day, kept once worked out. Days
+  // before the run-up are only ever looked back over, so they stay as the
+  // weather really was.
   const given = new Map<number, number>();
   const monthFOn = (day: number): number => {
     let f = given.get(day);
     if (f === undefined) {
       f = real(day);
-      if (day < 0) f += runUpShare() * (1 - f);
+      if (inRunUp(day)) f += runUpShare() * (1 - f);
       given.set(day, f);
     }
     return f;
@@ -149,6 +152,10 @@ export function weatherSeasons(options: WeatherSeasonsOptions): WeatherSeasons {
         average += c;
       }
       s = average > 0 ? grown / average : 1;
+      // As with the random seasons, the run-up's season factor is never
+      // under the floor, so the run-up pasture never hays off at the
+      // faster rate a poor season brings (docs/LESSONS.md, lesson 7).
+      if (inRunUp(day)) s = Math.max(runUpFloor, s);
       seasons.set(day, s);
     }
     return s;

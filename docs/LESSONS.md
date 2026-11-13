@@ -91,6 +91,7 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | W5 | The check that a year gives the same growth when run again timed out at 5 seconds, once | It re-ran all 29 years for a district while other test files were running | It re-runs three years. Same rule as RF1 |
 | W7 | Taking the floor off the scaling figures failed no test | The only test of a month too dry to scale used a made-up table that the solver gave up on first, by another route | A test now builds Emerald on a 50 mm soil, which only the floor stops. Same rule as R5 (the grass one): nudge each figure and guard in turn, and add a test for each one missed |
 | W6 | Joining the cattle and farm branch with the real data branch left two lessons numbered R5 | Each branch took the next free number on its own | Both kept, as the brief said. New lessons here are numbered W. The lead may want to renumber the data ones |
+| W8 | The dry-start protection lifted the run-up's daily growth to 85% but left the season factor alone. The realism check counted 17 of 29 Central Qld January starts where the run-up still went under 0.8 and hayed off at the faster rate | The MVP floors the run-up's season factor. The weather version only carried over the growth half of that rule. The realism check found it, not a test | The run-up's season factor is now never under 0.85, with a test over every district and start year. **Rule: when a rule is carried over from the MVP, check each thing it protected, not just the first.** |
 
 ## Process lessons
 

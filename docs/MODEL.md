@@ -186,7 +186,7 @@ seasonF(day) = Σ curve(k) × monthF(k)  ÷  Σ curve(k)      over the 365 farm 
 
 `curve(k)` is the district curve for farm day k, before any factor. So `seasonF` is the feed the weather allowed over the last 12 months of the game, as a share of what the average year gives over the same days. 0.5 means the last 12 months grew half the usual feed. It always holds one whole growing season, so it does not swing on a week's rain. `growGrass` hays green feed off faster while it is under 0.8, and crop yields use it at harvest, as before.
 
-The look back runs over the game's own days. With years in order that is the real 12 months before today. With years at random, the days before the start of a game year are the game year the farm has just played.
+The look back runs over the game's own days. With years in order that is the real 12 months before today, until the years run out and the game goes back to 1997. With years at random, the days before the start of a game year are the game year the farm has just played.
 
 The label uses the random seasons' own six labels:
 
@@ -206,7 +206,7 @@ Each edge is halfway between two of the MVP's season factors, except 0.8. That o
 - A game year is the 12 months from the farm's start month. Game year 1 starts in the real year the player picks. Each later game year is the next real year in the chosen order (`planRealYears`).
 - **In order:** each next year in turn. After the newest playable year it goes back to 1997.
 - **At random:** every playable year once, shuffled from the farm's seed, then all of them again in a new shuffle. The same year never comes up twice running. Each round of the shuffle has its own stream, `real-years:<round>`. The first year can be chosen or left to the shuffle.
-- **The real date behind a farm day** (`realDateOn`): the farm's own calendar runs straight on from its start. Each game year is moved, whole, onto its real year, keeping the month and day. Within a game year the real days run on without a break, so a growing season that crosses New Year stays in one piece. If the farm calendar has 29 February and the real year does not, 28 February is read twice. A real 29 February the farm calendar does not have is passed over. In order, the real date is always the farm calendar date.
+- **The real date behind a farm day** (`realDateOn`): the farm's own calendar runs straight on from its start. Each game year is moved, whole, onto its real year, keeping the month and day. Within a game year the real days run on without a break, so a growing season that crosses New Year stays in one piece. If the farm calendar has 29 February and the real year does not, 28 February is read twice. A real 29 February the farm calendar does not have is passed over. In order, the real date is the farm calendar date until the newest playable year has been played. After that the game goes back to 1997 and the two part: a farm that starts in 2025 reads 1 January 1997 on day 365.
 - **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025.
 - Weather and prices should both read the real date from the same plan, so they agree on the day.
 
@@ -219,7 +219,9 @@ went  = Σ curve × factor ÷ Σ curve      over the run-up days
 if went < 0.85:  t = (0.85 − went) / (1 − went),  and each run-up day gets  factor + t × (1 − factor)
 ```
 
-Each run-up day is moved the same share of the way to an average day, which brings the run-up as a whole to exactly 85% of average growth. From day 0 the factor is the real one. The season factor on the first days of play counts the lifted run-up, so it describes the pasture the farm really starts with. The floor can be set to 0 to start a farm as the weather really left it.
+Each run-up day is moved the same share of the way to an average day, which brings the run-up as a whole to exactly 85% of average growth. From day 0 the factor is the real one.
+
+The season factor on a run-up day is never under 0.85 either: `seasonF = max(0.85, the 365-day figure)`. This is the MVP's rule (its run-up season was floored, not only its months). Without it the grass would hay off at the faster rate through a dry stretch of the run-up, because the 365-day figure can sit well under 0.8 even when the 540 days as a whole reach 85%. From day 0 the season factor is the plain 365-day figure again. Its look back still counts the lifted run-up days, so it can start under 0.85 after a dry year, and the label says so. Days before the run-up are only ever looked back over and stay as the weather really was. The floor can be set to 0 to start a farm as the weather really left it.
 
 ### Rain on screen
 
