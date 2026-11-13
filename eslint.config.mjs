@@ -52,6 +52,18 @@ export default tseslint.config(
         { object: 'Date', property: 'now', message: 'The engine must not read the clock.' },
       ],
       'no-restricted-globals': ['error', 'window', 'document', 'navigator', 'localStorage'],
+      // The test support loads the MVP game. Only tests may use it.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/test-support/**'],
+              message: 'Engine code must not import test support. Only *.test.ts files may.',
+            },
+          ],
+        },
+      ],
     },
   },
 );

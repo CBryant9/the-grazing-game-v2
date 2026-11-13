@@ -4,7 +4,9 @@ Every real-world number the game runs on, copied out of `grazing-game.html` (v15
 
 ## Districts (`REGIONS`)
 
-`g` is typical native pasture growth, kg DM/ha/day, Jan to Dec. Multiply by `scale` for the district. `annual` = sum(g) × 30.4 × scale.
+`g` is typical native pasture growth, kg DM/ha/day, Jan to Dec. Multiply by `scale` for the district. `annual` = sum(g) × 30.4 × scale. `peak` = the highest month × scale.
+
+The rebuild carries the four launch districts (cq, nsw, cw, wv) in `packages/engine/src/data/districts.ts`, checked figure for figure against the MVP by a test. The Top End (nt) figures stay here for when it comes back.
 
 | Key | District (place) | Grasses | Rain pattern |
 |---|---|---|---|
@@ -43,7 +45,13 @@ The grid is always 40 × 26 squares, so `HA` (ha per square) = farm ha ÷ 1,040 
 | 1.15 | Above average | 18% |
 | 1.35 | Wet | 14% |
 
-Each month wobbles: `monthF = rainF × rand(0.65–1.35)`, clamped 0.15–1.9. The 540-day spin-up before the start uses a season of at least 0.85.
+Each month wobbles: `monthF = rainF × rand(0.65–1.35)`, clamped 0.15–1.9. It is redrawn on the 1st of every month, including the farm's first day. The season is redrawn on 1 July, but not if 1 July is the farm's first day.
+
+The 540-day spin-up before the start has its own season, drawn separately and lifted to at least 0.85. Its monthly wobble is smaller: `rainF × rand(0.7–1.3)`, clamped 0.2–1.8. The wobble starts on the first 1st of a month in the spin-up. Until then the month factor is the season factor.
+
+With these six seasons neither pair of limits is ever reached (the lowest month factor is 0.5 × 0.65 = 0.325 and the highest 1.35 × 1.35 = 1.82).
+
+In the rebuild the same chances, ranges and limits are drawn from the farm's seed (`packages/engine/src/season/randomSeasons.ts`), so a farm's seasons are repeatable. Real weather replaces them in milestone 1.4.
 
 ## Market
 
@@ -222,5 +230,5 @@ How well crops do by district (`CROPF`): cq 0.8, nt 0.8, nsw 0.95, cw 0.9, wv 1.
 ## Stubble and fallow
 
 - Stubble after harvest: dead = clamp(old dead × 0.5 + yield t/ha × 600, 1,500–3,500) kg DM/ha. Quality DMD 0.45, CP 4%. No regrowth. It breaks down 0.4% a day and becomes fallow under 400 kg DM/ha.
-- Fallow: bare worked soil. DMD 0.42, CP 3%. No growth until sown.
+- Fallow: bare worked soil. DMD 0.42, CP 3%. No growth until sown. Any dead material lying on it breaks down 3% a day.
 - An unharvested crop becomes stubble 60 days after maturity, with the grain lost. Grain starts shedding (3% a day) 30 days after maturity.

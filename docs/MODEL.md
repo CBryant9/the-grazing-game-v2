@@ -30,26 +30,35 @@ State per square:
 ### Growth (`growGrass`)
 
 ```
-pot    = district curve for today (interpolated mid-month) × scale × monthF      (or the planting's own potential)
+curve  = district curve for today (interpolated mid-month) × scale
+pot    = curve × monthF      (or the planting's own potential × the square's stand density)
 leaf   = min(1, (G+150)/(G+500) × 1.35)        phase 1: little leaf, slow growth
 ceil   = max(0, 1 − (G + 0.6·D)/(bmax × F))     phase 3: shaded by its own bulk and dead
 ageF   = 1 if A ≤ 60, else max(0.45, 1 − (A−60)/200)   old stemmy plants slow down (not for crops)
 growth = pot × F × leaf × ceil × ageF × (1 − 0.4·X)
 ```
 
+`bmax` is the district's, or the planting's own. Rankness is updated first (below), and the day's growth and senescence use the new value.
+
 Senescence (green turning dead) each day:
 
 ```
-wet  = clamp(pot / district peak, 0, 1.2);  dry = clamp(1 − wet, 0, 1) × (1.25 if season < 0.8)
+wet  = clamp(curve / district peak, 0, 1.2);  dry = clamp(1 − wet, 0, 1) × (1.25 if season < 0.8)
 sen  = G × (0.003 + 0.018·dry + frost + cropSen) × (0.45 + min(A,160)/110) × (1 + 0.5·X)
 crops: sen = G × (0.002 + 0.006·dry + stageSen)
 ```
 
 So young leaf hays off slower than old leaf, and rank grass dies back faster.
 
-Dead material: `D += min(G, sen) − D × decay`, where `decay = 0.003 + 0.009·wet` (it breaks down faster when wet). Fallow adds +0.006.
+`wet` and `dry` follow the time of year only. They use the district curve before the month factor, so a poor month slows growth but does not by itself speed up haying off. Only a season factor under 0.8 does that. Sown pastures and crops use the district's `wet`, `dry` and frost too, not their own curves. "Crops" in these rules means annual forages and grain crops. Frost applies to native and sown pasture, not to crops.
 
-Leaf age: new growth lowers the average. `A = (G_left × (A+1)) / (G_left + growth)`. Grazing removes old leaf: `A *= 1 − 0.8 × (green eaten ÷ G)`.
+Dead material: `D += min(G, sen) − D × decay`, where `decay = 0.003 + 0.009·wet` (it breaks down faster when wet).
+
+Fallow and stubble squares with nothing sown skip all of the above. Green, leaf age and rankness are set to 0 and nothing grows. What is lying there breaks down by 3% a day on fallow and 0.4% a day on stubble. Stubble under 400 kg DM/ha becomes fallow. (The code also adds 0.006 to `decay` for a planting on a square still marked fallow. Sowing always changes the land use, so this never happens in play.)
+
+Leaf age: new growth lowers the average. `A = (G_left × (A+1)) / (G_left + growth)`, or 0 if the new green total is 1 kg DM/ha or less. Grazing removes old leaf: `A *= 1 − 0.8 × (green eaten ÷ G)`.
+
+The feed figures are stored as 32-bit numbers, as in the MVP. Each day's stored value is rounded to that size and read back the next day, so the storage size is part of the model.
 
 ### Rankness (`X`)
 
@@ -57,20 +66,29 @@ Leaf age: new growth lowers the average. `A = (G_left × (A+1)) / (G_left + grow
 - +0.0015 × D/2,500 per day if D > 2,500 (thatch keeps it stale).
 - −0.004/day when total mass < 1,400.
 - Grazing knocks it down: `X *= 1 − clamp(eaten × (1 + 3·trample) / (0.45 × (G+D) + 1), 0, 0.9)`. A big mob on a small area resets rank grass fast. A light mob barely touches it.
-- Crops and fallow have no rankness.
+- Rankness is held between 0 and 1.
+- Crops, fallow and stubble have no rankness.
 
 ### Quality (`cellQuality`)
 
 ```
 green DMD = clamp(DMDmax − 0.0012·A − 0.05·X, DMDmin − 0.02, DMDmax)
 green CP  = clamp(CPmax − 0.055·A − 2·X, 4.5, CPmax)
-dead DMD  = DMDdead − 0.01·X;   dead CP = 5 − 0.5·X
+dead DMD  = DMDdead − 0.01·X;   dead CP = 5 − 0.5·X                       (native pasture)
 share green in the diet  pg = G/(G + 0.25·D + 1), × G/150 if G < 150    (cattle select green leaf)
 diet DMD = pg·greenDMD + (1−pg)·deadDMD   (same for CP)
 ME (MJ/kg DM) = 0.172 × DMD × 100 − 1.707                                (CSIRO)
 ```
 
-Crops use their stage quality. Stubble is DMD 0.45 and CP 4%; fallow is 0.42 and 3%.
+What changes by land use:
+
+| Square | Green feed | Dead feed |
+|---|---|---|
+| Native pasture | The formulas above with the district's DMDmax, DMDmin and CPmax | DMD = DMDdead − 0.01·X, CP = 5 − 0.5·X |
+| Sown pasture | The same formulas with the planting's DMD and CP as the maximums. The floor is still the district's DMDmin − 0.02 | DMD as for native. CP is the planting's own dead-feed figure, with no rankness penalty |
+| Annual forage or grain crop | The planting's stage DMD and CP, with no leaf age or rankness penalty | DMD 0.50. CP 5 (4 before it is sown) |
+| Stubble, nothing sown | None. `pg` = 0 | DMD 0.45, CP 4 |
+| Fallow, nothing sown | None. `pg` = 0 | DMD 0.42, CP 3 |
 
 ### Phase labels (`phaseOf`, per square, describing only)
 
@@ -86,17 +104,25 @@ Crops use their stage quality. Stubble is DMD 0.45 and CP 4%; fallow is 0.42 and
 
 ### Paddock summary (`padStats`)
 
+- G, D, X, ME, CP and fertility are plain averages over the paddock's squares. `age` is leaf age averaged by green feed (0 if there is next to no green).
 - maturity `mat = clamp(max(X, (age−25)/80, (1−green%)×0.7), 0, 1)`
 - height cm `= min(90, mass/70 × (0.65 + 0.9·mat))`. Leafy swards are short for their weight; rank swards are tall.
 - green leaf reaches `min(height, max(2, G/55 × (1 − 0.45·X)))` cm.
-- Paddock label (neutral):
+- Paddock label (neutral). The first that fits wins:
   - **Short** if mass < 800
   - **Green** if green > 50%
   - **Dry & rank** if X > 0.5, or height > 40 cm and green < 30%
   - **Mixed** otherwise
-- Ground cover = min(1, (G+D)/1,000). About 1,000 kg DM/ha covers the ground.
+- Ground cover = min(1, (G+D)/1,000), worked out for each square and then averaged. About 1,000 kg DM/ha covers the ground. The farm's ground cover figure (`coverPct`) leaves out cropping country: annuals, crops, fallow and stubble.
+- Rest = days since each square was last grazed, counting at most 400 for any square, averaged.
 - Carrying capacity per ha = annual growth × fertility × 0.65 × util ÷ 3,285.
-- Days of feed = (mass − 800) × ha ÷ (AE × 9 kg).
+- Days of feed = (mass − 800, not below 0) × ha ÷ (AE × 9 kg). With no stock it has no limit.
+
+In the rebuild the summary takes the cattle figures (AE, head, feed eaten) as inputs. The cattle model works them out for the grazing area and gives each paddock its share by area.
+
+### Seasons behind one interface (rebuild)
+
+The grass formulas ask one question of the season: what are the season factor and the month factor for this day. The MVP's random seasons (see DATA.md) answer it from the farm's seed until milestone 1.4 puts real weather behind the same interface. Each season and each month has its own named random stream, so any day can be asked for in any order and gets the same answer.
 
 ## 2. Where cattle graze (`dietOf`, `grazeAlloc`)
 

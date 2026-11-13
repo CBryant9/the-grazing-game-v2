@@ -137,6 +137,43 @@ Not done, and why:
 - TypeScript is held at 6.0, because the lint tooling does not support 7 yet.
 - Playwright end-to-end tests come with the game screens (1.7).
 
+### 13 Nov 2026: milestone 1.1, grass
+
+Built, all in `packages/engine`:
+
+- District figures for the four launch districts (`data/districts.ts`).
+- The pasture on each of the 1,040 squares, in the same number sizes as the MVP (`pasture/state.ts`).
+- Growth potential for a day (`pasture/potential.ts`) and the daily pasture step for native pasture, sown pasture, crops, fallow and stubble (`pasture/grow.ts`).
+- Feed quality (`pasture/quality.ts`), phase labels (`pasture/phase.ts`), and the paddock, grazing area and ground cover summaries (`pasture/summary.ts`).
+- Seasons behind one interface (`season/factors.ts`), with the MVP's random seasons drawn from the farm's seed behind it (`season/randomSeasons.ts`). Real weather takes its place in 1.4.
+- The engine version is now 0.2.0.
+
+How it was proven: the tests load the MVP script from `reference/mvp/grazing-game.html` in memory, with stand-ins for the browser, and call the MVP's own functions with the same inputs as the engine (`packages/engine/test-support/`). The MVP file is not changed. Every result is exactly equal, with no tolerance: bit for bit on the stored arrays, and the same number on every returned figure. Covered: the four districts, every month, seven season and month factors from drought to wet, 17 kinds of square at seven fertilities, sown pasture, every crop stage, fallow, stubble, one day and 400 days in a row. 80 new tests, 88 in all. As a check on the tests, 47 figures in the engine were nudged one at a time. Six were missed at first, each fixed by adding or changing a sample square, and all 47 are now caught.
+
+What was left for later:
+
+- Sown pastures and crops need a "what is it doing today" record for each planting. The crop model that makes it is milestone 1.2. For now the tests take that record from the MVP's own `fieldState`.
+- The paddock summary takes the cattle figures (AE, head, feed eaten) as inputs. The cattle model in 1.2 supplies them.
+- Random seasons can't be matched number for number, because the MVP was unseeded. The draw itself is matched exactly for the same random number. The rest is tested by its spread and limits.
+
+Where the docs and the MVP code disagreed in these parts (docs corrected, MODEL.md and DATA.md):
+
+- Fallow and stubble have their own path: no growth, 3% and 0.4% of the dead breaking down each day. The "+0.006" in the code is only for a planting on a square still marked fallow, which sowing never leaves behind.
+- Haying off follows the time of year, not the month factor. `wet` and `dry` use the district curve before the month factor.
+- Sown pastures and crops use the district's `wet`, `dry` and frost, not their own curves. Frost does not apply to crops.
+- The dead-feed quality rule in MODEL.md is for native pasture only.
+- The run-up wobble is 0.7 to 1.3 held between 0.2 and 1.8, and it starts on the first 1st of a month in the run-up.
+- The month factor is redrawn on the farm's first day. The season is not redrawn if the farm starts on 1 July.
+
+Things in the MVP that look odd, kept as they are, for Claudia:
+
+- A poor month slows growth but does not make green feed hay off any faster. Only a season under 0.8 does.
+- Sown pasture and crops hay off by the native pasture's calendar.
+- Stubble and fallow report a "green feed" quality (DMD 0.45, CP 4) though there is no green. It is never used, because the green share is 0.
+- The run-up season keeps its drawn name (say "Drought") even when the factor is lifted to 0.85. It is never shown.
+- The month limits (0.15 to 1.9, and 0.2 to 1.8) can never be reached with the six seasons.
+- Some phase wording leans towards a judgement ("best quality", "stale", "losing ground cover"). It is the MVP's wording, kept for now.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

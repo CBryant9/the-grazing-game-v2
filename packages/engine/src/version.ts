@@ -3,7 +3,7 @@
  * or its data bumps this, re-runs calibration and is logged in
  * docs/MODEL.md and docs/CALIBRATION.md.
  */
-export const ENGINE_VERSION = '0.1.0';
+export const ENGINE_VERSION = '0.2.0';
 
 /** The shape of a saved farm. Old saves are upgraded with defaults. */
 export const SAVE_FORMAT_VERSION = 1;

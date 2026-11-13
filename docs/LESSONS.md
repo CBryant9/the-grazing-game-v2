@@ -71,6 +71,7 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | R2 | Lighthouse Performance swung from 74 to 100 on the same page | Lighthouse was run on a busy PC with the server on the same machine | Judge performance on the median of several runs, and on CI, not on one local run |
 | R3 | The newest TypeScript (7) could not be used | `typescript-eslint` supports TypeScript below 6.1 | Check that tools support each other before taking the newest version. TypeScript is pinned to 6.0 |
 | R4 | A model doc and the MVP code disagreed in 15 places | The docs were written after the code | Port from the code, correct the doc in the same change (BUILD_PLAN 2.4) |
+| R5 | Grass tests that matched the MVP exactly would still have passed with six rules wrong | The sample squares never reached those thresholds (for example a paddock between 760 and 800 kg DM/ha) | A match only proves the cases the inputs reach. After porting a formula, nudge each figure in turn and check a test fails. Add a sample for each one missed |
 
 ## Process lessons
 
