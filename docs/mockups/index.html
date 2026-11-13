@@ -1,0 +1,1618 @@
+<!doctype html>
+<html lang="en-AU" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grazing Game Mockups</title>
+<script>try{var t=localStorage.getItem('gg-mock-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="dark"]{
+  --bg:#070d19;--frame:#0b1220;--panel:#111a2e;--panel2:#16213a;--line:#22304d;--text:#f3e7cf;--muted:#8f9bb5;--dim:#7f8ba8;
+  --coral:#e0675c;--coral-text:#ef8478;--btn:#c2483e;--btn-hi:#e98a80;--btn-lo:#8f3129;
+  --accent:#c6f432;--accent-ink:#111;--accent-text:#c6f432;--accent-line:#8fb21a;
+  --hud:rgba(11,18,32,.9);--input:#0b1220;--webhdr:#0a1120;--gamehdr:#15284a;--gamehdr-line:#2f4f86;
+  --ok:#7fe05a;--bad:#ff8a70;--sel:#1b2846;--shadow:rgba(0,0,0,.45);--ghost:#34425f;--track:#2a3654;--knob:#8f9bb5;
+  --s0:#c6f432;--s1:#7fe05a;--s2:#4fb3e8;--s3:#f0b43a;--s4:#e0a860;--s5:#ec6a48;--s6:#b79cff;
+  --hero-fade:10,16,32;--sky:#6fb6e6;--frame-edge:#1d2741;--frame-ring:#2d3a5c;
+}
+[data-theme="light"]{
+  --bg:#ece4d4;--frame:#f6f1e6;--panel:#fffaf0;--panel2:#f3ead8;--line:#e3d8c3;--text:#1b2438;--muted:#5a6478;--dim:#646c7e;
+  --coral:#d9574b;--coral-text:#b23d2e;--btn:#c4473b;--btn-hi:#e27a6f;--btn-lo:#8e2e25;
+  --accent:#6f9a12;--accent-ink:#0e1606;--accent-text:#4a6c00;--accent-line:#557a08;
+  --hud:rgba(255,250,240,.94);--input:#ffffff;--webhdr:#fffaf0;--gamehdr:#e6eed6;--gamehdr-line:#b5c693;
+  --ok:#2c7a1c;--bad:#b3372a;--sel:#f0e3c8;--shadow:rgba(70,50,20,.18);--ghost:#cdbf9f;--track:#d6ccb8;--knob:#ffffff;
+  --s0:#5f8a00;--s1:#2f8f22;--s2:#1f7fb8;--s3:#b07a0c;--s4:#a3602a;--s5:#c43f28;--s6:#6a4bcc;
+  --hero-fade:246,241,230;--sky:#2f7fb8;--frame-edge:#d8ccb3;--frame-ring:#c4b593;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:13px/1.45 'JetBrains Mono',ui-monospace,monospace;overflow-x:hidden}
+.px{font-family:'Silkscreen',monospace;letter-spacing:.02em;font-weight:400}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit}
+canvas{display:block}
+canvas.pix{image-rendering:pixelated}
+
+/* page chrome */
+.topnav{position:sticky;top:0;z-index:50;background:var(--webhdr);border-bottom:1px solid var(--line)}
+.topnav .in{max-width:1500px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-family:'Silkscreen';font-size:15px}
+.brand b{color:var(--coral-text);font-weight:400}
+.tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.tab{font-family:'Silkscreen';font-size:12px;padding:8px 12px;border:1px solid var(--line);background:var(--panel);border-radius:6px;min-height:40px}
+.tab.on{background:var(--btn);border-color:var(--btn-hi);color:#fff}
+.theme{font-family:'Silkscreen';font-size:12px;padding:8px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:6px;min-height:40px}
+main{max-width:1500px;margin:0 auto;padding:18px 16px 60px}
+.intro{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px 18px;margin-bottom:22px}
+.intro h1{font-family:'Silkscreen';font-weight:400;font-size:18px;margin-bottom:6px}
+.intro p{color:var(--muted);max-width:980px}
+.refs{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.refs a{display:block;width:160px;border:1px solid var(--line);border-radius:6px;overflow:hidden;font-size:10px;color:var(--muted);text-decoration:none;background:var(--frame)}
+.refs img{display:block;width:100%;height:84px;object-fit:cover}
+.refs span{display:block;padding:4px 6px}
+.sec{display:none}.sec.on{display:block}
+h2.sh{font-family:'Silkscreen';font-weight:400;font-size:16px;margin:8px 0 14px;color:var(--accent-text)}
+.gallery{display:flex;flex-wrap:wrap;gap:26px;margin-bottom:30px}
+figure.f{display:flex;flex-direction:column;gap:10px}
+figure.f figcaption{max-width:390px;color:var(--muted);font-size:12px}
+figure.f figcaption b{display:block;color:var(--text);font-family:'Silkscreen';font-size:12px;font-weight:400;margin-bottom:3px}
+figure.wide figcaption,figure.land figcaption{max-width:860px}
+.pcwrap{width:100%;margin-bottom:34px}
+.note{border:1px dashed var(--ghost);border-radius:10px;padding:14px 16px;color:var(--muted);margin-bottom:22px;background:var(--panel)}
+.note b{color:var(--text)}
+
+/* frames */
+.phone{width:390px;height:844px;border:9px solid var(--frame-edge);border-radius:46px;background:var(--frame);overflow:hidden;position:relative;box-shadow:0 0 0 2px var(--frame-ring),0 20px 50px var(--shadow);flex:none}
+.phoneL{width:844px;height:390px;border:9px solid var(--frame-edge);border-radius:46px;background:var(--frame);overflow:hidden;position:relative;box-shadow:0 0 0 2px var(--frame-ring),0 20px 50px var(--shadow);flex:none}
+.scr{position:absolute;inset:0;overflow:hidden;background:var(--frame)}
+.sbar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:11px;font-weight:700;z-index:20;color:var(--text)}
+.sbar.onmap{color:#fff;text-shadow:0 1px 2px #000}
+.notch{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:96px;height:22px;background:#000;border-radius:12px;z-index:21}
+.pc{width:1440px;height:900px;background:var(--frame);position:relative;overflow:hidden;border:1px solid var(--line);border-radius:10px;box-shadow:0 20px 50px var(--shadow)}
+
+/* shared UI */
+.btn{font-family:'Silkscreen';font-size:13px;border:2px solid #000;border-radius:4px;padding:10px 14px;min-height:44px;background:var(--panel2);color:var(--text);box-shadow:inset -2px -2px 0 rgba(0,0,0,.25),inset 2px 2px 0 rgba(255,255,255,.18),0 3px 0 #000;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn.coral{background:var(--btn);color:#fff;box-shadow:inset -2px -2px 0 var(--btn-lo),inset 2px 2px 0 var(--btn-hi),0 3px 0 #000,0 0 0 2px var(--btn-hi)}
+.btn.lime{background:var(--accent);color:var(--accent-ink);box-shadow:inset -2px -2px 0 rgba(0,0,0,.25),inset 2px 2px 0 rgba(255,255,255,.4),0 3px 0 #000}
+.btn.ghost{background:transparent;border-color:var(--ghost);box-shadow:none}
+.btn.sm{font-size:11px;min-height:34px;padding:6px 10px}
+.btn.wide{width:100%}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;color:#111;white-space:nowrap}
+.chip.g{background:#7fe05a}.chip.m{background:#f0b43a}.chip.r{background:#e0a860}.chip.s{background:#ec6a48}.chip.f{background:#c49a72}
+.badge{font-family:'Silkscreen';font-size:10px;padding:2px 7px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.badge.lime{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-line)}
+.badge.coral{background:var(--btn);color:#fff;border-color:var(--btn-lo)}
+.muted{color:var(--muted)}.dim{color:var(--dim)}.ok{color:var(--ok)}.bad{color:var(--bad)}
+.pi{display:inline-block;width:16px;height:16px;vertical-align:middle;flex:none}
+.pi svg{display:block;width:100%;height:100%}
+.av{border-radius:50%;display:grid;place-items:center;font-family:'Silkscreen';color:#111;flex:none;border:2px solid #000}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.live{display:inline-flex;align-items:center;gap:6px;font-family:'Silkscreen';font-size:10px;color:var(--accent-text)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.tog{display:inline-block;vertical-align:middle;width:40px;height:22px;border-radius:12px;background:var(--track);position:relative;flex:none;border:1px solid rgba(0,0,0,.6)}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--knob);border:1px solid rgba(0,0,0,.3)}
+.tog.on{background:var(--accent)}.tog.on::after{left:20px;background:#111}
+.iconbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);display:grid;place-items:center;position:relative;flex:none}
+.iconbtn.sm{width:36px;height:36px}
+.iconbtn b{position:absolute;top:-4px;right:-4px;background:var(--btn);color:#fff;font-size:10px;border-radius:9px;min-width:18px;height:18px;display:grid;place-items:center;border:2px solid #000}
+.seg{display:grid;grid-auto-flow:column;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;margin:8px 0}
+.seg span{font-family:'Silkscreen';font-size:11px;text-align:center;padding:9px 4px;border-radius:7px;color:var(--muted)}
+.seg span.on{background:var(--btn);color:#fff}
+.fchip{font-size:11px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);min-height:32px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fchip.on{background:var(--text);color:var(--frame);border-color:var(--text)}
+.fchip i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;color:var(--muted);font-weight:400;font-size:10px;padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:7px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr.sel td{background:var(--sel)}
+.tbl .r{text-align:right}
+.kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0;gap:10px}
+.confirm{margin-top:8px;border:1px solid var(--coral);background:rgba(224,103,92,.12);border-radius:8px;padding:9px;font-size:12px}
+.confirm .bt{display:flex;gap:8px;margin-top:8px}
+.imgtag{position:relative}
+.sponsored{background:#fdf3dc!important;color:#2a2116;border-color:#e9d7a8!important}
+.sponsored small{color:#7a6643!important}
+
+/* daylight bar */
+.daybar .track{height:12px;border-radius:3px;background:linear-gradient(90deg,#f2a25e 0%,#f7d679 14%,#a9d8f2 45%,#a9d8f2 60%,#f7d679 86%,#e0675c 100%);position:relative;border:1px solid #000}
+.daybar .used{position:absolute;left:0;top:0;bottom:0;background:rgba(11,18,32,.72)}
+.daybar .job{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(201,79,68,.95) 0 4px,rgba(201,79,68,.55) 4px 8px)}
+.daybar .marker{position:absolute;top:-4px;bottom:-4px;width:3px;background:#fff;box-shadow:0 0 0 1px #000}
+.daybar .dl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;gap:6px;white-space:nowrap}
+.daybar .dl b{color:var(--text)}
+
+/* phone game */
+.hud{position:absolute;left:8px;right:8px;top:32px;background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:8px 10px;z-index:10}
+.hud .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fname{font-family:'Silkscreen';font-size:14px}
+.sub{font-size:11px;color:var(--muted)}
+.cash{font-weight:700;font-size:13px}
+.hud .meta{display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:6px}
+.bbar{position:absolute;left:0;right:0;bottom:0;height:80px;background:var(--hud);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 6px 16px;z-index:12}
+.bbar.n4{grid-template-columns:repeat(4,1fr)}.bbar.n3{grid-template-columns:repeat(3,1fr)}
+.bbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-family:'Silkscreen';font-size:10px;background:none;border:0;min-height:54px;border-radius:10px}
+.bbar button .pi{width:20px;height:20px}
+.bbar button.on{background:var(--panel2);color:var(--accent-text)}
+.floatchip{position:absolute;left:10px;right:10px;top:178px;z-index:9;background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.floatchip .t{font-family:'Silkscreen';font-size:12px;color:var(--accent-text);display:flex;justify-content:space-between;align-items:center}
+.floatchip ul{list-style:none;margin-top:6px;display:grid;gap:5px;font-size:11px}
+.floatchip li{display:flex;gap:7px;align-items:flex-start}
+.floatchip li i{width:7px;height:7px;margin-top:5px;border-radius:2px;background:#f0b43a;flex:none}
+.panhint{position:absolute;z-index:9;display:flex;align-items:center;gap:6px;font-size:10px;font-family:'Silkscreen';color:#fff;background:rgba(11,18,32,.72);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 10px}
+.adbanner{position:absolute;left:8px;right:8px;bottom:88px;height:54px;z-index:11;border-radius:8px;background:#fff6e0;color:#2a2116;display:flex;align-items:center;gap:8px;padding:0 4px 0 4px;border:1px solid #e9d7a8;overflow:hidden}
+.adbanner .tx{flex:1;font-size:11px;line-height:1.25}
+.adbanner .tx small{display:block;font-size:9px;color:#7a6643;text-transform:uppercase;letter-spacing:.06em}
+.adbanner .x{width:30px;height:30px;border:0;background:none;color:#7a6643;font-size:16px}
+.adbanner canvas{border-radius:6px}
+.tray{position:absolute;left:0;right:0;bottom:80px;z-index:11;background:var(--hud);border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:10px 12px 12px}
+.toolrow{display:flex;gap:6px;overflow:hidden;margin-bottom:10px}
+.tool{font-family:'Silkscreen';font-size:10px;padding:0 9px;min-height:40px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);display:flex;align-items:center;white-space:nowrap}
+.tool.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-line)}
+.job h4{font-family:'Silkscreen';font-weight:400;font-size:13px}
+.grab{width:44px;height:5px;border-radius:3px;background:var(--ghost);margin:0 auto 10px}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:13;background:var(--frame);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:10px 14px 16px;box-shadow:0 -10px 30px var(--shadow)}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+.stat3 div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.stat3 b{display:block;font-size:14px}.stat3 span{font-size:10px;color:var(--muted)}
+.ptitle{display:flex;align-items:center;gap:8px}
+.ptitle h3{font-family:'Silkscreen';font-weight:400;font-size:17px}
+.sayline{font-size:12px;font-style:italic;color:var(--ok);margin:8px 0 12px}
+.prow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.prow .cl{font-size:12px}.prow .cl small{display:block;color:var(--muted);font-size:10px}
+.prow .pr{font-weight:700;text-align:right}
+.up{color:var(--ok);font-size:11px}.dn{color:var(--bad);font-size:11px}
+.expand{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin:6px 0}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stepper button{width:44px;height:40px;background:var(--panel);border:0;font-size:18px}
+.stepper span{width:56px;text-align:center;font-weight:700}
+.ahead{padding:38px 14px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:var(--frame)}
+.ahead h3{font-family:'Silkscreen';font-weight:400;font-size:16px;flex:1}
+.ticker{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11px;white-space:nowrap;overflow:hidden}
+.post{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 10px 0}
+.post .ph{display:flex;gap:9px;align-items:center;margin-bottom:8px}
+.post .nm{font-weight:700;font-size:12px}
+.post .nm small{display:block;font-weight:400;color:var(--muted);font-size:10px}
+.post ul{list-style:none;display:grid;gap:3px;font-size:12px;margin:6px 0 8px}
+.post ul li::before{content:"▪ ";color:var(--accent-text)}
+.post .acts{display:flex;gap:16px;font-size:11px;color:var(--muted);margin-top:8px}
+.post .acts span{display:inline-flex;gap:5px;align-items:center}
+.post canvas{border-radius:8px}
+.lbrow{display:grid;grid-template-columns:34px 36px 1fr auto;gap:9px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.lbrow .rk{font-family:'Silkscreen';font-size:13px;text-align:center}
+.lbrow .nm{font-size:12px;font-weight:700}.lbrow .nm small{display:block;font-weight:400;font-size:10px;color:var(--muted)}
+.lbrow .sc{text-align:right;font-weight:700}.lbrow .sc small{display:block;font-weight:400;font-size:10px;color:var(--muted)}
+.medal{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;margin:auto;color:#111;font-size:12px;border:2px solid #000}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px}
+.list{display:grid}
+.list .li{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);min-height:52px}
+.msg{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);margin:8px 10px 0;font-size:12px}
+.msg .h{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.msg .h b{flex:1}
+.msg .h small{color:var(--muted);font-size:10px}
+
+/* landscape phone */
+.lhud{position:absolute;left:0;right:0;top:0;height:46px;background:var(--hud);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 10px 0 40px;z-index:10}
+.lrail{position:absolute;right:0;top:46px;bottom:0;width:62px;background:var(--hud);border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:space-around;padding:4px 4px 10px;z-index:10}
+.lrail button{display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'Silkscreen';font-size:8px;background:none;border:0;border-radius:8px;padding:5px 0;min-height:44px;justify-content:center}
+.lrail button.on{background:var(--panel2);color:var(--accent-text)}
+.lfull{position:absolute;inset:0;background:var(--frame);z-index:15;padding:10px 46px 10px 46px;display:flex;flex-direction:column}
+.lfull .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tb{font-family:'Silkscreen';font-size:11px;padding:6px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);min-height:34px;display:inline-flex;align-items:center;white-space:nowrap}
+.tb.pri{background:var(--btn);border-color:var(--btn-hi);color:#fff}
+
+/* PC */
+.webhdr{height:60px;display:flex;align-items:center;gap:16px;padding:0 22px;border-bottom:1px solid var(--line);background:var(--webhdr)}
+.logo{font-family:'Silkscreen';font-size:16px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.logo .lm{width:30px;height:30px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;color:var(--accent-text)}
+.pcnav{display:flex;gap:4px}
+.pcnav a{text-decoration:none;font-family:'Silkscreen';font-size:12px;padding:8px 12px;border-radius:6px;color:var(--muted)}
+.pcnav a.on{color:var(--text);background:var(--panel2);border:1px solid var(--line)}
+.search{margin-left:auto;background:var(--input);border:1px solid var(--line);border-radius:8px;padding:8px 12px;width:280px;color:var(--muted)}
+.gamehdr{height:54px;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--gamehdr);border-bottom:2px solid var(--gamehdr-line);border-top:3px solid var(--accent)}
+.farmsw{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+.gbody{display:grid;grid-template-columns:180px var(--pw,440px) 1fr;height:783px}
+.rail{padding:14px 12px;display:flex;flex-direction:column;gap:12px;border-right:1px solid var(--line);background:var(--frame)}
+.spon{border-radius:12px;padding:8px 8px 12px;text-align:center;color:#26303f;border:1px solid rgba(0,0,0,.1);display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden}
+.spon canvas{border-radius:8px;margin-bottom:4px}
+.spon b{font-size:12px}
+.spon span{font-size:10.5px;color:#4b5567;line-height:1.35}
+.spon .tagad{font-size:8px;letter-spacing:.1em;color:#6b5a3a;text-transform:uppercase}
+.gpanel{border-right:1px solid var(--line);background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.ptabs{display:flex;gap:3px;padding:10px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ptab{font-family:'Silkscreen';font-size:11px;padding:7px 9px;border-radius:6px;color:var(--muted);border:1px solid transparent}
+.ptab.on{color:var(--text);background:var(--panel2);border-color:var(--line)}
+.pbody{padding:12px 14px;overflow:hidden;flex:1}
+.gmap{background:var(--frame);position:relative}
+.subtabs{display:flex;gap:4px;margin-bottom:10px}
+.toast{position:absolute;z-index:30;width:340px;background:var(--panel);border:1px solid #2f8a4a;border-radius:10px;padding:10px 12px;display:flex;gap:10px;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 24px rgba(127,224,90,.22)}
+.toast .tx{font-size:12px;line-height:1.35}
+.toast .tx small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.pagehead{padding:34px 0 18px}
+.pagehead h1{font-family:Anton;font-weight:400;font-size:64px;line-height:1;letter-spacing:.01em}
+.pagehead p{color:var(--muted);font-size:14px;margin-top:6px}
+.wrapc{max-width:1160px;margin:0 auto}
+.bars .b{display:grid;grid-template-columns:120px 1fr 48px;gap:10px;align-items:center;font-size:12px;margin:7px 0}
+.bars .b i{display:block;height:12px;border-radius:2px;background:var(--accent)}
+
+/* admin */
+.adm{display:grid;grid-template-columns:230px 1fr;height:100%}
+.anav{background:var(--webhdr);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.anav a{text-decoration:none;font-size:13px;padding:10px 12px;border-radius:8px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.anav a.on{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.amain{padding:22px 26px;overflow:hidden}
+.amain h2{font-family:'Silkscreen';font-weight:400;font-size:20px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi span{font-size:11px;color:var(--muted)}
+.kpi b{display:block;font-size:24px;margin:2px 0}
+.kpi small{font-size:11px}
+.field{display:grid;gap:5px;margin-bottom:12px}
+.field label{font-size:11px;color:var(--muted)}
+.field .in{background:var(--input);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:12px}
+
+/* render styles */
+.rsrow{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px;margin-bottom:22px}
+.rsrow h3{font-family:'Silkscreen';font-weight:400;font-size:15px;margin-bottom:8px}
+.rsgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rsgrid figure{margin:0}
+.rsgrid canvas{width:100%!important;height:auto!important;border-radius:8px;border:1px solid var(--line)}
+.rsgrid figcaption{font-size:11px;color:var(--muted);margin-top:4px}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;font-size:12px}
+.pros div{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.pros b{font-family:'Silkscreen';font-weight:400}
+.rec{border:2px solid var(--accent);background:var(--panel);border-radius:12px;padding:14px 16px;margin-bottom:22px}
+.rec h3{font-family:'Silkscreen';font-weight:400;color:var(--accent-text);font-size:15px;margin-bottom:6px}
+
+@media (max-width:700px){
+  .tabs{margin-left:0;width:100%}
+  .tab{flex:1}
+  .rsgrid,.pros{grid-template-columns:1fr}
+  figure.f figcaption{max-width:none}
+  .pagehead h1{font-size:40px}
+}
+</style>
+</head>
+<body>
+
+<header class="topnav"><div class="in">
+  <div class="brand">THE GRAZING GAME <b>MOCKUPS</b></div>
+  <nav class="tabs">
+    <button class="tab on" data-sec="phone">Phone</button>
+    <button class="tab" data-sec="land">Landscape</button>
+    <button class="tab" data-sec="pc">PC</button>
+    <button class="tab" data-sec="admin">Admin</button>
+    <button class="tab" data-sec="styles">Render styles</button>
+  </nav>
+  <button class="theme" id="themeBtn">☀ Light</button>
+</div></header>
+
+<main>
+  <section class="intro">
+    <h1>Mockups for PRD v0.3</h1>
+    <p>Layout and flow only. Placeholder art: final art will be hand-made (see docs/reference/ and the Render styles tab). All names, businesses, photos and numbers are made up for the mockup. "Daily Farm" and "Fast Farm" are working names. Game maps use the recommended style: S3 clean illustrated art with S5 level of detail (mobs become one marker when zoomed out).</p>
+    <div class="refs">
+      <a href="../reference/shipordie-hero.webp" target="_blank"><img src="../reference/shipordie-hero.webp" alt=""><span>Style: polished pixel hero</span></a>
+      <a href="../reference/shipordie-pixel-scene.png" target="_blank"><img src="../reference/shipordie-pixel-scene.png" alt=""><span>Style: detailed sprites</span></a>
+      <a href="../reference/shipordie-activity-toast.png" target="_blank"><img src="../reference/shipordie-activity-toast.png" alt=""><span>Live toast (website pages only)</span></a>
+      <a href="../reference/trustmrr-sponsor-rails.png" target="_blank"><img src="../reference/trustmrr-sponsor-rails.png" alt=""><span>Sponsor cards</span></a>
+    </div>
+  </section>
+
+  <!-- ===================================================== PHONE -->
+  <section class="sec on" id="sec-phone">
+    <h2 class="sh">Phone portrait (390 × 844)</h2>
+    <div class="gallery">
+
+      <!-- 1 setup -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="padding:44px 16px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span class="badge">Step 1 of 5</span><span class="dim" style="font-size:10px">Working names</span></div>
+          <h3 class="px" style="font-size:20px;margin:12px 0 4px">How do you want to play?</h3>
+          <p class="muted" style="font-size:11px;margin-bottom:12px">One Daily Farm and up to three Fast Farms at once.</p>
+          <div class="card" style="overflow:hidden;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)">
+            <canvas class="farm" data-w="356" data-h="118" data-o='{"seed":11,"p":2,"tint":"dawn","sky":0.3}'></canvas>
+            <div style="padding:10px 12px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><b class="px" style="font-size:15px">Daily Farm</b><span class="badge lime">1 farm</span></div>
+              <ul style="list-style:none;font-size:11px;display:grid;gap:3px;margin-top:6px" class="muted">
+                <li>▪ One game day for each real day.</li><li>▪ Each day starts at first light when you log in.</li><li>▪ Every job uses daylight. Do what fits before dark.</li><li>▪ The farm keeps running overnight.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card" style="overflow:hidden;margin-top:12px">
+            <canvas class="farm" data-w="356" data-h="96" data-o='{"seed":4,"p":2,"tint":"day","sky":0.3}'></canvas>
+            <div style="padding:10px 12px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><b class="px" style="font-size:15px">Fast Farm</b><span class="badge">up to 3 farms</span></div>
+              <ul style="list-style:none;font-size:11px;display:grid;gap:3px;margin-top:6px" class="muted">
+                <li>▪ Play at your own pace.</li><li>▪ Jobs still use daylight, then tap Next day.</li><li>▪ Skip a week, month or year with plans running.</li>
+              </ul>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;margin:14px 0 12px;flex-wrap:wrap"><span class="badge lime">Mode</span><span class="badge">District</span><span class="badge">Farm size</span><span class="badge">Start</span><span class="badge">Difficulty</span></div>
+          <button class="btn coral wide">Next: choose district</button>
+        </div>
+      </div></div>
+      <figcaption><b>1. Choose how to play</b>Mode first, as picture cards. Then district, farm size, start (scratch or take over) and difficulty.</figcaption></figure>
+
+      <!-- 2 daily first light -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <canvas class="map" data-w="372" data-h="826" data-o='{"view":{"x0":9.3,"y0":-6.55,"z":32.7},"tint":"dawn","inset":[10,640,120]}'></canvas>
+        <div data-tpl="sbar" data-a='[1]'></div>
+        <div class="hud">
+          <div class="row">
+            <div class="iconbtn"><span class="pi" data-i="house"></span></div>
+            <div style="flex:1"><div class="fname">Kooringa</div><div class="sub">Day 34 · Tue 14 Nov · Daily Farm</div></div>
+            <div class="cash">$212,400</div>
+            <div class="iconbtn"><span class="pi" data-i="bell"></span><b>3</b></div>
+          </div>
+          <div class="daybar" style="margin-top:8px"><div class="track"><div class="marker" style="left:0%"></div></div><div class="dl"><span>5:02am first light</span><b>13 h 39 m daylight left</b><span>6:41pm</span></div></div>
+          <div class="meta"><span>💧 12 mm last night</span><span>Central Qld · Roma</span><span>612 head</span></div>
+        </div>
+        <div class="floatchip">
+          <div class="t"><span>3 things to check</span><span class="dim">⌄</span></div>
+          <ul><li><i></i>Paddock 4 trough is low.</li><li><i style="background:#7fe05a"></i>Calving has started in Paddock 2.</li><li><i style="background:#ec6a48"></i>Paddock 9 mob: about 2 days of feed left.</li></ul>
+        </div>
+        <div class="panhint" style="left:140px;bottom:96px">⟷ drag to see more</div>
+        <div data-tpl="bbarGame" data-a='[-1]'></div>
+      </div></div>
+      <figcaption><b>2. Daily Farm at first light</b>The map fills the screen height. The farm is wider than the phone, so you drag left and right. The inset shows where you are. The clock stays at first light until you do something.</figcaption></figure>
+
+      <!-- 3 build -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <canvas class="map" data-w="372" data-h="826" data-o='{"view":{"x0":9.3,"y0":-6.55,"z":32.7},"tint":"dawn","draft":{"pad":6,"built":0}}'></canvas>
+        <div data-tpl="sbar" data-a='[1]'></div>
+        <div class="hud">
+          <div class="row"><div style="flex:1"><div class="fname">Kooringa</div><div class="sub">Day 34 · 5:02am</div></div><div class="cash">$212,400</div></div>
+          <div class="daybar" style="margin-top:8px"><div class="track"><div class="job" style="left:0;width:31.7%"></div><div class="marker" style="left:0%"></div></div><div class="dl"><span>5:02am</span><b>This job: 4 h 20 m, done about 9:22am</b><span>6:41pm</span></div></div>
+        </div>
+        <div class="tray">
+          <div class="grab"></div>
+          <div class="toolrow"><span class="tool">Permanent</span><span class="tool on">Electric</span><span class="tool">Tape</span><span class="tool">Gate</span><span class="tool">Pipe</span><span class="tool">Trough</span></div>
+          <div class="job">
+            <h4>650 m electric, 2 wire</h4>
+            <div class="kv"><span class="muted">Takes about</span><b>4 h 20 m</b></div>
+            <div class="kv"><span class="muted">Cost</span><b>$2,340</b></div>
+            <div class="kv"><span class="muted">Both ends on a fence</span><b class="ok">✓ ✓</b></div>
+            <div class="kv"><span class="muted">Daylight left after</span><b>9 h 19 m</b></div>
+            <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:10px"><button class="btn ghost">Cancel</button><button class="btn coral">Build it</button></div>
+          </div>
+        </div>
+        <div data-tpl="bbarGame" data-a='[0]'></div>
+      </div></div>
+      <figcaption><b>3. Building a fence</b>Electric 2 wire takes about 40 min per 100 m. The job card shows time, cost and the slice of today it uses. A job longer than the daylight left shows "Part built today, rest stays as a job in progress".</figcaption></figure>
+
+      <!-- 4 time passing -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <canvas class="map" data-w="372" data-h="826" data-o='{"view":{"x0":9.3,"y0":-6.55,"z":32.7},"tint":"day","draft":{"pad":6,"built":0.6},"ute":1}'></canvas>
+        <div data-tpl="sbar" data-a='[1]'></div>
+        <div class="hud">
+          <div class="row"><div style="flex:1"><div class="fname">Kooringa</div><div class="sub">Day 34 · 7:40am · Building fence</div></div><div class="cash">$210,060</div></div>
+          <div class="daybar" style="margin-top:8px"><div class="track"><div class="used" style="width:19.3%"></div><div class="job" style="left:19.3%;width:12.7%"></div><div class="marker" style="left:19.3%"></div></div><div class="dl"><span>5:02am</span><b>7:40am · 11 h 1 m left</b><span>6:41pm</span></div></div>
+        </div>
+        <div class="adbanner">
+          <canvas class="adimg" data-k="hills" data-w="64" data-h="46"></canvas>
+          <div class="tx"><small>Sponsored</small><b>[Your business here]</b><br>Pasture advice for graziers</div>
+          <button class="btn sm lime">Learn more</button><button class="x">×</button>
+        </div>
+        <div data-tpl="bbarGame" data-a='[-1]'></div>
+      </div></div>
+      <figcaption><b>4. Time passing as you work</b>The ute builds along the line and the marker moves. The occasional banner sits above the tool bar for 30 to 60 seconds, never over the map controls. The only ad on this screen.</figcaption></figure>
+
+      <!-- 5 paddock sheet -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <canvas class="map" data-w="372" data-h="826" data-o='{"view":{"x0":9.3,"y0":7.25,"z":32.7},"highlight":6}'></canvas>
+        <div data-tpl="sbar" data-a='[1]'></div>
+        <div class="sheet" style="height:530px;bottom:80px">
+          <div class="grab"></div>
+          <div class="ptitle"><h3>Paddock 6</h3><span class="chip g">Green</span><span class="muted" style="margin-left:auto;font-size:11px">14 ha · Water <b class="ok">✓</b></span></div>
+          <div class="stat3">
+            <div><b>1,850</b><span>kg DM/ha</span></div><div><b>12 cm</b><span>height</span></div><div><b>64%</b><span>green</span></div>
+            <div><b>9.8</b><span>ME MJ/kg</span></div><div><b>11%</b><span>CP</span></div><div><b>0.3</b><span>AE/ha (farm)</span></div>
+          </div>
+          <div style="font-size:12px;margin-bottom:8px"><b>Mob:</b> 180 steers, about 6 days of feed at this rate.</div>
+          <canvas class="sward" data-w="342" data-h="132" data-o='{"h":12,"g":9,"pct":64,"kg":1850,"dry":0.25}'></canvas>
+          <p class="sayline">"The grass is growing away from them."</p>
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:8px"><button class="btn coral">Move cattle in here</button><button class="btn ghost">Details</button></div>
+        </div>
+        <div data-tpl="bbarGame" data-a='[2]'></div>
+      </div></div>
+      <figcaption><b>5. Tap a paddock</b>Half-height sheet with the map still visible above. Quick numbers, the side-view picture, a neutral comment, one "Move cattle in here" button.</figcaption></figure>
+
+      <!-- 6 saleyard buy -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="position:absolute;inset:0;padding:38px 14px 0">
+          <div style="display:flex;align-items:center;gap:10px"><div class="iconbtn">✕</div><div style="flex:1"><div class="px" style="font-size:15px">Market</div><div class="muted" style="font-size:11px">Roma saleyard · next sale Tue 21 Nov · arrive in 2 days</div></div></div>
+          <div class="seg"><span>Prices</span><span class="on">Buy</span><span>Sell</span></div>
+          <div class="prow" style="border-bottom:0"><div class="cl">Weaner steers <small>200 to 280 kg · avg 230 kg</small></div><div class="pr">430c/kg</div><div class="up">▲6</div></div>
+          <div class="expand">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px">How many?</span><div class="stepper"><button>−</button><span>40</span><button>+</button></div></div>
+            <div class="muted" style="font-size:11px;margin-top:6px">40 × 230 kg × 430c = $39,560. Freight and fees about $2,040.</div>
+            <div class="confirm">Buy 40 weaner steers, about <b>$41,600</b> incl. freight and fees?<div class="bt"><button class="btn coral sm" style="flex:1">Confirm</button><button class="btn ghost sm" style="flex:1">Cancel</button></div></div>
+          </div>
+          <div class="prow"><div class="cl">Yearling steers <small>280 to 400 kg</small></div><div class="pr">405c/kg</div><div class="up">▲3</div></div>
+          <div class="prow"><div class="cl">Feeder steers <small>400 to 480 kg</small></div><div class="pr">382c/kg</div><div class="up">▲2</div></div>
+          <div class="prow"><div class="cl">Heifers <small>180 to 300 kg</small></div><div class="pr">362c/kg</div><div class="dn">▼4</div></div>
+          <div class="prow"><div class="cl">Cows <small>CS 3, not scanned</small></div><div class="pr">318c/kg</div><div class="up">▲1</div></div>
+          <div class="prow"><div class="cl">PTIC cows <small>scanned in calf</small></div><div class="pr">335c/kg</div><div class="up">▲5</div></div>
+          <div class="prow"><div class="cl">Bulls <small>2 to 3 years, semen tested</small></div><div class="pr">296c/kg</div><div class="muted" style="font-size:11px">no change</div></div>
+        </div>
+      </div></div>
+      <figcaption><b>6. Market: Buy</b>The saleyard is only reached through Market. Confirm and result appear right under the row you tapped.</figcaption></figure>
+
+      <!-- 7 market prices -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="position:absolute;inset:0;padding:38px 14px 0">
+          <div style="display:flex;align-items:center;gap:10px"><div class="iconbtn">✕</div><div style="flex:1"><div class="px" style="font-size:15px">Market</div><div class="muted" style="font-size:11px">Restocker prices, c/kg live weight</div></div></div>
+          <div class="seg"><span class="on">Prices</span><span>Buy</span><span>Sell</span></div>
+          <div style="display:flex;gap:6px;overflow:hidden;margin:6px 0 4px" class="mktchips" data-on="0,1,4,6"></div>
+          <svg class="mktchart" data-on="0,1,4,6" data-w="342" data-h="200" style="width:342px;height:200px"></svg>
+          <div class="muted" style="font-size:10px;margin:2px 0 6px">Last 2 years. Tap a class to show or hide it.</div>
+          <table class="tbl mkttable" data-compact="1"></table>
+        </div>
+      </div></div>
+      <figcaption><b>7. Market: Prices</b>Line chart by class (same classes as the buy list), toggles per class, and the current price with this week's and this year's change.</figcaption></figure>
+
+      <!-- 8 herd -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="position:absolute;inset:0;padding:38px 12px 0">
+          <div style="display:flex;align-items:center;gap:10px"><div class="iconbtn">✕</div><div style="flex:1"><div class="px" style="font-size:15px">Herd</div><div class="muted" style="font-size:11px">612 head in 4 mobs</div></div></div>
+          <div class="seg"><span class="on">Mobs</span><span>Stock book</span></div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Steers A</b><span class="muted">Paddock 6</span></div><div class="muted" style="font-size:11px">180 steers · avg 342 kg · CS 3.5</div><div><span class="ok">+0.9 kg/day</span> · green leafy feed</div></div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Steers B</b><span class="muted">Paddock 9</span></div><div class="muted" style="font-size:11px">150 steers · avg 318 kg · CS 3.0</div><div><span class="bad">+0.3 kg/day</span> · low ME on dry feed (7.6 MJ/kg)</div></div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Breeders</b><span class="muted">Paddock 2</span></div><div class="muted" style="font-size:11px">196 cows · 21 calves · 3 bulls · CS 3.1</div><div><span class="bad">−0.2 kg/day</span> · milking for a calf</div></div>
+          <div class="card" style="padding:10px;margin-bottom:10px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Weaners</b><span class="muted">Paddock 4</span></div><div class="muted" style="font-size:11px">40 weaner steers · avg 228 kg · CS 3.0</div><div><span class="ok">+0.5 kg/day</span> · short feed, CP 9%</div></div>
+          <div class="px" style="font-size:12px;margin-bottom:4px">Stock book (top)</div>
+          <table class="tbl"><tr><th>Tag</th><th>Class</th><th class="r">kg</th><th>CS</th><th class="r">Profit</th></tr>
+            <tr><td>A-0412</td><td>Steer</td><td class="r">368</td><td>3.5</td><td class="r ok">+$402</td></tr>
+            <tr><td>A-0388</td><td>Steer</td><td class="r">351</td><td>3.5</td><td class="r ok">+$338</td></tr>
+            <tr><td>B-0107</td><td>Steer</td><td class="r">296</td><td>2.5</td><td class="r bad">−$64</td></tr></table>
+        </div>
+      </div></div>
+      <figcaption><b>8. Herd</b>Each mob says where it is, what's in it and why it is gaining or losing. The stock book shows each animal's profit.</figcaption></figure>
+
+      <!-- 9 paddocks list -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="position:absolute;inset:0;padding:38px 12px 0">
+          <div style="display:flex;align-items:center;gap:10px"><div class="iconbtn">✕</div><div style="flex:1"><div class="px" style="font-size:15px">Paddocks</div><div class="muted" style="font-size:11px">10 paddocks · 2,080 ha</div></div></div>
+          <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap"><span class="fchip on">Sort: name</span><span class="fchip">kg DM/ha</span><span class="fchip">Water</span><span class="fchip">Rest days</span></div>
+          <div class="ppl"></div>
+        </div>
+        <div data-tpl="bbarGame" data-a='[2]'></div>
+      </div></div>
+      <figcaption><b>9. Paddocks list</b>The quick list first: name, label, area, kg DM/ha, water ✓/✗ and who's in it. Tap one for the sheet and pictures.</figcaption></figure>
+
+      <!-- 10 more menu -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <canvas class="map" data-w="372" data-h="826" data-o='{"view":{"x0":9.3,"y0":-6.55,"z":32.7}}'></canvas>
+        <div data-tpl="sbar" data-a='[1]'></div>
+        <div class="sheet" style="height:520px;bottom:80px;padding:10px 0 0">
+          <div class="grab"></div>
+          <div class="px" style="font-size:15px;padding:0 16px 6px">More</div>
+          <div class="list">
+            <div class="li"><span class="pi" data-i="plan"></span><div style="flex:1"><b>Plans</b><div class="muted" style="font-size:11px">Grazing plans and reports</div></div>›</div>
+            <div class="li"><span class="pi" data-i="grass"></span><div style="flex:1"><b>Feed</b><div class="muted" style="font-size:11px">Feed forecast, lick, hay, pellets</div></div>›</div>
+            <div class="li"><span class="pi" data-i="trophy"></span><div style="flex:1"><b>Scores</b><div class="muted" style="font-size:11px">Grazier Score 6,102</div></div>›</div>
+            <div class="li"><span class="pi" data-i="book"></span><div style="flex:1"><b>Diary</b><div class="muted" style="font-size:11px">Day by day, with a timeline</div></div>›</div>
+            <div class="li"><span class="pi" data-i="bell"></span><div style="flex:1"><b>Inbox</b><div class="muted" style="font-size:11px">Reports and reminders</div></div><span class="badge coral">3</span></div>
+            <div class="li"><span class="pi" data-i="star"></span><div style="flex:1"><b>Subscription</b><div class="muted" style="font-size:11px">Free · go ad-free with Pro</div></div>›</div>
+            <div class="li"><span class="pi" data-i="dots"></span><div style="flex:1"><b>Settings</b><div class="muted" style="font-size:11px">Notifications, units, help</div></div>›</div>
+          </div>
+        </div>
+        <div data-tpl="bbarGame" data-a='[4]'></div>
+      </div></div>
+      <figcaption><b>10. More</b>Everything that isn't Build, Herd, Paddocks or Market lives here, as a sheet over the map.</figcaption></figure>
+
+      <!-- 11 inbox -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div data-tpl="sbar"></div>
+        <div style="position:absolute;inset:0;padding:38px 0 0">
+          <div style="display:flex;align-items:center;gap:10px;padding:0 14px"><div class="iconbtn">‹</div><div style="flex:1"><div class="px" style="font-size:15px">Inbox</div><div class="muted" style="font-size:11px">Kooringa · Daily Farm</div></div></div>
+          <div class="msg"><div class="h"><span class="pi" data-i="cow" style="color:var(--bad)"></span><b>Breakout: Steers B</b><small>Day 34, 4:10am</small></div>They pushed through the tape into Paddock 7. They were hungry: Paddock 9 had less than 1,000 kg DM/ha of green feed left.<div style="margin-top:8px"><span class="btn sm coral">Move them back</span></div></div>
+          <div class="msg"><div class="h"><span class="pi" data-i="heart" style="color:var(--coral-text)"></span><b>Joining report, week 3</b><small>Day 33</small></div>About 38% of cows served so far. At CS 3.1 you would expect about 55%. Fewer getting in calf than you would expect. Cows are losing condition: milking for a calf.</div>
+          <div class="msg"><div class="h"><span class="pi" data-i="check" style="color:var(--ok)"></span><b>Preg test result</b><small>Day 12</small></div>Heifers: 41 of 46 in calf (89%). About what you'd expect for CS 3.5.</div>
+          <div class="msg"><div class="h"><span class="pi" data-i="tag" style="color:var(--accent-text)"></span><b>Sale reminder</b><small>Day 32</small></div>Roma sale Tuesday. Your 40 weaner steers arrive Thursday. Make sure Paddock 4 has water.</div>
+        </div>
+      </div></div>
+      <figcaption><b>11. Inbox</b>Reports and events always say why: breakouts give the cause, joining compares with what condition score would predict.</figcaption></figure>
+
+      <!-- 12 end of day -->
+      <figure class="f"><div class="phone"><div class="scr" style="background:linear-gradient(var(--panel2),var(--frame) 45%)">
+        <div data-tpl="sbar"></div>
+        <div style="padding:44px 16px 0">
+          <div class="muted" style="font-size:11px">Kooringa · overnight to Wed 15 Nov</div>
+          <h3 class="px" style="font-size:22px;margin:4px 0 10px">Day 34 done</h3>
+          <div class="card" style="padding:10px 12px;font-size:12px;display:grid;gap:7px">
+            <div><b>Rain 12 mm.</b> <span class="muted">Grass growing in most paddocks.</span></div>
+            <div><b>Grass:</b> Paddocks 2, 5, 6 <span class="ok">+18 to +25 kg DM/ha/day</span>. Paddock 9 <span class="bad">−40</span> (steers grazing).</div>
+            <div><b>Steers, Paddock 6:</b> <span class="ok">+0.9 kg/day</span>. Green leafy feed, ME 9.8.</div>
+            <div><b>Steers, Paddock 9:</b> <span class="bad">+0.3 kg/day</span>. Low ME on dry feed (7.6 MJ/kg).</div>
+            <div><b>Cows, Paddock 2:</b> 3 calves born. Losing a little condition: milking for a calf.</div>
+            <div><b>Deaths:</b> 0. <b>Work done:</b> 650 m electric fence, 180 steers moved.</div>
+          </div>
+          <div class="card sponsored" style="margin-top:12px;overflow:hidden;padding:0">
+            <canvas class="adimg" data-k="lick" data-w="356" data-h="120"></canvas>
+            <div style="padding:8px 12px 10px;font-size:12px"><small style="font-size:9px;letter-spacing:.08em;text-transform:uppercase">Today's sponsor</small><div><b>Mulga Creek Lick Co.</b> · Dry season supplements</div></div>
+          </div>
+          <div class="muted" style="font-size:10px;margin:8px 0 12px">Tomorrow: first light 5:01am.</div>
+          <button class="btn coral wide">Back to the farm</button>
+        </div>
+      </div></div>
+      <figcaption><b>12. End of day (Daily Farm)</b>What happened and why, then one sponsor card with a farm photo. Subscribers see the summary without the card.</figcaption></figure>
+
+      <!-- 13 year end fast farm -->
+      <figure class="f"><div class="phone"><div class="scr" style="background:linear-gradient(var(--panel2),var(--frame) 45%)">
+        <div data-tpl="sbar"></div>
+        <div style="padding:44px 16px 0">
+          <div class="muted" style="font-size:11px">Kooringa · Fast Farm 2 of 3</div>
+          <h3 class="px" style="font-size:22px;margin:4px 0 10px">Year 3 done</h3>
+          <div class="card" style="padding:12px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><b>Grazier Score</b><b style="font-size:22px">6,102</b></div>
+            <div class="bars" style="margin-top:6px">
+              <div class="b"><span>Profit</span><i style="width:72%"></i><span>1,820</span></div>
+              <div class="b"><span>Pasture</span><i style="width:65%;background:#7fe05a"></i><span>1,640</span></div>
+              <div class="b"><span>Animals</span><i style="width:58%;background:#f0b43a"></i><span>1,460</span></div>
+              <div class="b"><span>Survival</span><i style="width:47%;background:var(--sky)"></i><span>1,182</span></div>
+            </div>
+            <div class="muted" style="font-size:11px">Steers gained 118 kg/head. Deaths 2.1%. Ground cover held above 1,000 kg DM/ha in 9 of 10 paddocks.</div>
+          </div>
+          <div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative">
+            <canvas class="adimg" data-k="sunset" data-w="356" data-h="200"></canvas>
+            <div style="position:absolute;top:8px;left:8px" class="badge">Ad 0:15</div><div style="position:absolute;top:8px;right:8px" class="badge">Skip in 5</div>
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:50%;border:3px solid #fff;display:grid;place-items:center;color:#fff;background:rgba(0,0,0,.35)"><span class="pi" data-i="play" style="width:20px;height:20px"></span></div>
+          </div>
+          <div class="muted" style="font-size:10px;margin:6px 0 12px">Video between years. Subscribers skip this.</div>
+          <button class="btn coral wide">Start year 4</button>
+        </div>
+      </div></div>
+      <figcaption><b>13. Year end (Fast Farm)</b>Score breakdown, then the one video break with a farm poster frame. It's the only ad on this screen.</figcaption></figure>
+
+      <!-- 14 feed -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div style="position:absolute;top:0;left:0;right:0;bottom:80px;overflow:hidden">
+          <div class="ahead"><h3>Community</h3><div class="iconbtn"><span class="pi" data-i="bell"></span><b>2</b></div></div>
+          <div class="ticker"><span class="live"><i></i>LIVE</span><span>Tom1998 moved 4,000 head into a 4 ha paddock</span></div>
+          <div class="seg" style="margin:8px 10px 0"><span class="on">Friends' days</span><span>Everyone</span><span>Groups</span></div>
+          <div class="post">
+            <div class="ph"><div class="av" style="width:36px;height:36px;background:#f0b43a">T</div><div class="nm">Tom1998 <small>Day 34 · Central Qld · Daily Farm</small></div><span class="badge" style="margin-left:auto">2h</span></div>
+            <ul><li>Built 10 km of electric fence</li><li>Moved 2 mobs</li><li>Rain 12 mm</li></ul>
+            <canvas class="map" data-w="324" data-h="120" data-o='{"view":"whole","labels":0,"margin":0.3,"seed":21}'></canvas>
+            <div class="acts"><span>♥ 24</span><span>💬 6</span><span style="margin-left:auto">View farm</span></div>
+          </div>
+          <div class="post">
+            <div class="ph"><div class="av" style="width:36px;height:36px;background:#7fe05a">S</div><div class="nm">Sarah Mitchell <small>Real farm · Roma QLD</small></div></div>
+            <div style="font-size:12px;margin-bottom:8px">Storm rolled in over the back paddock. 30 mm in the gauge.</div>
+            <canvas class="adimg" data-k="storm" data-w="324" data-h="150" data-tag="photo"></canvas>
+            <div class="acts"><span>♥ 112</span><span>💬 19</span></div>
+          </div>
+          <div class="post sponsored">
+            <div class="ph"><div class="av" style="width:36px;height:36px;background:#2c5a3a;color:#c6f432">B</div><div class="nm">Brigalow Fencing Supplies <small>Sponsored</small></div></div>
+            <canvas class="adimg" data-k="ute" data-w="324" data-h="120"></canvas>
+          </div>
+        </div>
+        <div data-tpl="sbar"></div>
+        <div data-tpl="bbarApp" data-a='[1]'></div>
+      </div></div>
+      <figcaption><b>14. Community feed</b>Live strip at the top (the only place the ticker shows on a phone). Friends' days shows one card per friend per Daily Farm day. One sponsored post every 8 posts.</figcaption></figure>
+
+      <!-- 15 profile -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div style="position:absolute;inset:0;bottom:80px;overflow:hidden">
+          <canvas class="adimg" data-k="hills" data-w="372" data-h="118" data-tag="none"></canvas>
+          <div style="padding:0 14px;margin-top:-30px;position:relative">
+            <div style="display:flex;align-items:flex-end;gap:10px"><div class="av" style="width:72px;height:72px;font-size:24px;background:#7fe05a;border:3px solid var(--frame);box-shadow:0 0 0 2px #000">SM</div><div style="flex:1"></div><button class="btn coral sm">Follow</button></div>
+            <div style="margin-top:8px"><b style="font-size:15px">Sarah Mitchell</b> <span class="muted">@sarah_m</span></div>
+            <div class="muted" style="font-size:11px">Roma QLD · Farming 14 years</div>
+            <div style="font-size:11px;margin-top:4px">Breeding cattle · 3,200 ha (real farm: "Wattle Downs")</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px"><span class="badge">Grazing for Profit</span><span class="badge">Cert IV Agriculture</span><span class="badge">LPA accredited</span></div>
+            <div style="display:flex;gap:12px;font-size:11px;margin-top:7px;color:var(--sky)"><span>wattledowns.com.au</span><span>Instagram</span><span>Facebook</span></div>
+            <div style="display:flex;gap:5px;margin-top:7px"><span class="badge lime">#3 Central Qld</span><span class="badge">412 day streak</span></div>
+            <div class="card" style="margin-top:10px;padding:8px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px"><b class="px">Their farm today</b><span class="muted">Day 112</span></div>
+              <canvas class="map" data-w="324" data-h="112" data-o='{"view":"whole","labels":0,"margin":0.3,"seed":13}'></canvas>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px;font-size:10px;text-align:center"><div><b style="font-size:12px;display:block">640</b>head</div><div><b style="font-size:12px;display:block">2,050</b>kg DM/ha</div><div><b style="font-size:12px;display:block">0.42</b>AE/ha</div><div><b style="font-size:12px;display:block">$1.9m</b>net worth</div></div>
+            </div>
+            <div class="seg"><span class="on">Posts</span><span>Days</span><span>Stats</span></div>
+          </div>
+        </div>
+        <div data-tpl="sbar"></div>
+        <div data-tpl="bbarApp" data-a='[1]'></div>
+      </div></div>
+      <figcaption><b>15. Someone's profile</b>Who they are, what and where they farm, courses, links. "Their farm today" is a read-only snapshot of their Daily Farm. No ads on profiles on a phone.</figcaption></figure>
+
+      <!-- 16 leaderboard -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div style="position:absolute;inset:0;bottom:80px;overflow:hidden">
+          <div class="ahead"><h3>Leaderboard</h3></div>
+          <div class="seg" style="margin:8px 10px 0"><span class="on">Overall</span><span>Groups</span></div>
+          <div class="chips"><span class="fchip on">Daily Farm</span><span class="fchip">Fast Farm</span><span class="fchip">Central Qld ⌄</span><span class="fchip">Medium ⌄</span><span class="fchip">This month ⌄</span></div>
+          <div class="lbs"></div>
+          <div class="card" style="margin:10px;padding:10px;display:flex;align-items:center;gap:10px"><div class="av" style="width:36px;height:36px;background:var(--coral);color:#fff">RY</div><div style="flex:1;font-size:12px"><b>Roma Young Farmers</b><div class="muted" style="font-size:11px">12 members · you're 3rd</div></div><button class="btn sm ghost">Open</button></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:80px;background:var(--sel);border-top:1px solid var(--accent)"><div class="lbrow" style="border:0"><div class="rk">48</div><div class="av" style="width:34px;height:34px;background:#f3e7cf">C</div><div class="nm">You · claudia_b <small>Roma QLD</small></div><div class="sc">6,102<small>34 days</small></div></div></div>
+        <div data-tpl="sbar"></div>
+        <div data-tpl="bbarApp" data-a='[2]'></div>
+      </div></div>
+      <figcaption><b>16. Leaderboard</b>Filter by mode, district, size and period. Your row stays pinned. Groups tab for friend groups.</figcaption></figure>
+
+      <!-- 17 under 16 -->
+      <figure class="f"><div class="phone"><div class="scr">
+        <div style="position:absolute;inset:0;bottom:80px;overflow:hidden">
+          <div class="ahead"><h3>Leaderboard</h3></div>
+          <div class="chips"><span class="fchip on">Daily Farm</span><span class="fchip">Fast Farm</span><span class="fchip">All districts ⌄</span></div>
+          <div class="lbs" data-u16="1"></div>
+          <div class="card" style="margin:14px 10px;padding:12px;font-size:12px;display:flex;gap:10px;align-items:flex-start"><span class="pi" data-i="lock" style="width:20px;height:20px;color:#f0b43a"></span><div><b>Community opens at 16.</b><div class="muted" style="font-size:11px;margin-top:3px">Play every mode, save to the cloud, see the leaderboard. Usernames only: no photos, profiles, posts or follows until you turn 16.</div></div></div>
+        </div>
+        <div data-tpl="sbar"></div>
+        <div data-tpl="bbarApp" data-a='[1,1]'></div>
+      </div></div>
+      <figcaption><b>17. Under-16 account</b>Community tab hidden, usernames only, never in the live ticker.</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== LANDSCAPE -->
+  <section class="sec" id="sec-land">
+    <h2 class="sh">Phone landscape (844 × 390)</h2>
+    <div class="note"><b>Rule:</b> in landscape the whole farm fits across the screen, tools sit in a slim rail on the right, and every panel opens full screen with a close ✕. No ads over the map.</div>
+    <div class="gallery" style="flex-direction:column">
+
+      <figure class="f land"><div class="phoneL"><div class="scr">
+        <canvas class="map" data-w="764" data-h="326" data-o='{"view":"whole","margin":0.4}' style="position:absolute;left:0;top:46px"></canvas>
+        <div class="lhud">
+          <div class="iconbtn sm"><span class="pi" data-i="house"></span></div>
+          <div style="line-height:1.15"><div class="fname" style="font-size:12px">Kooringa ⌄</div><div class="sub" style="font-size:10px">Fast Farm · Year 3 · Mon 14 Jul</div></div>
+          <div class="daybar" style="width:150px"><div class="track"><div class="used" style="width:30%"></div><div class="marker" style="left:30%"></div></div></div>
+          <span class="tb pri">Next day ▸</span><span class="tb">+1w</span><span class="tb">+1m</span><span class="tb">+1y</span>
+          <b style="margin-left:auto;font-size:12px">$184,920</b>
+          <div class="iconbtn sm"><span class="pi" data-i="bell"></span><b>2</b></div>
+        </div>
+        <div data-tpl="lrail" data-a='[-1]'></div>
+      </div></div>
+      <figcaption><b>L1. Game in landscape</b>The whole farm fits. Slim one-row header with the farm switcher, date, daylight, time controls and cash. Tools in a rail on the right. Mobs show as one marker each at this zoom.</figcaption></figure>
+
+      <figure class="f land"><div class="phoneL"><div class="scr">
+        <div class="lfull">
+          <div class="top"><div class="iconbtn sm">✕</div><h3 class="px" style="font-size:16px">Paddock 6</h3><span class="chip g">Green</span><span class="muted" style="font-size:11px">14 ha · Water <b class="ok">✓</b> · rested 26 days before this mob</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1">
+            <div>
+              <div class="stat3" style="margin-top:0">
+                <div><b>1,850</b><span>kg DM/ha</span></div><div><b>12 cm</b><span>height</span></div><div><b>64%</b><span>green</span></div>
+                <div><b>9.8</b><span>ME MJ/kg</span></div><div><b>11%</b><span>CP</span></div><div><b>+22</b><span>kg DM/ha/day</span></div>
+              </div>
+              <canvas class="sward" data-w="350" data-h="120" data-o='{"h":12,"g":9,"pct":64,"kg":1850,"dry":0.25}'></canvas>
+            </div>
+            <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+              <div class="card" style="padding:10px"><b>Mob: Steers A</b><div class="muted" style="font-size:11px">180 steers · avg 342 kg · CS 3.5</div><div>About 6 days of feed at this rate. <span class="ok">+0.9 kg/day</span>.</div></div>
+              <p class="sayline" style="margin:0">"The grass is growing away from them."</p>
+              <div class="muted" style="font-size:11px">Then vs now: 2,600 kg DM/ha, 28 cm, 41% green when they went in on Day 31.</div>
+              <div style="margin-top:auto;display:grid;grid-template-columns:1.6fr 1fr;gap:8px"><button class="btn coral">Move cattle in here</button><button class="btn ghost">Then vs now</button></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <figcaption><b>L2. Paddock details in landscape</b>Full screen, two columns: numbers and picture on the left, mob, comment and the move button on the right.</figcaption></figure>
+
+      <figure class="f land"><div class="phoneL"><div class="scr">
+        <div class="lfull">
+          <div class="top"><div class="iconbtn sm">✕</div><h3 class="px" style="font-size:16px">Market</h3><div class="seg" style="margin:0 0 0 10px;width:260px"><span class="on">Prices</span><span>Buy</span><span>Sell</span></div><span class="muted" style="font-size:11px;margin-left:auto">Roma · next sale Tue 21 Nov</span></div>
+          <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:14px;flex:1">
+            <div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px" class="mktchips" data-on="0,1,2,6"></div>
+              <svg class="mktchart" data-on="0,1,2,6" data-w="400" data-h="200" style="width:400px;height:200px"></svg>
+            </div>
+            <div><table class="tbl mkttable" data-compact="1"></table><div style="margin-top:8px"><span class="btn sm coral">Buy</span> <span class="btn sm">Sell</span></div></div>
+          </div>
+        </div>
+      </div></div>
+      <figcaption><b>L3. Market in landscape</b>Price chart on the left, buy list on the right. Full screen.</figcaption></figure>
+
+      <figure class="f land"><div class="phoneL"><div class="scr">
+        <canvas class="map" data-w="764" data-h="326" data-o='{"view":"whole","margin":0.4,"draft":{"pad":6,"built":0}}' style="position:absolute;left:0;top:46px"></canvas>
+        <div class="lhud">
+          <div class="iconbtn sm"><span class="pi" data-i="house"></span></div>
+          <div style="line-height:1.15"><div class="fname" style="font-size:12px">Kooringa</div><div class="sub" style="font-size:10px">Daily Farm · Day 34 · 5:02am</div></div>
+          <div class="daybar" style="width:260px"><div class="track"><div class="job" style="left:0;width:31.7%"></div><div class="marker" style="left:0%"></div></div></div>
+          <b style="margin-left:auto;font-size:12px">$212,400</b>
+        </div>
+        <div style="position:absolute;left:10px;bottom:10px;z-index:11;background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;gap:6px">
+          <span class="tool">Permanent</span><span class="tool on">Electric</span><span class="tool">Tape</span><span class="tool">Gate</span><span class="tool">Pipe</span><span class="tool">Trough</span>
+        </div>
+        <div class="job" style="position:absolute;right:72px;top:56px;width:250px;z-index:11;background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:10px 12px">
+          <h4>650 m electric, 2 wire</h4>
+          <div class="kv"><span class="muted">Takes about</span><b>4 h 20 m</b></div>
+          <div class="kv"><span class="muted">Cost</span><b>$2,340</b></div>
+          <div class="daybar" style="margin:6px 0"><div class="track"><div class="job" style="left:0;width:31.7%"></div><div class="marker" style="left:0%"></div></div><div class="dl"><span>5:02am</span><b>leaves 9 h 19 m</b></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:6px;margin-top:6px"><button class="btn ghost sm">Cancel</button><button class="btn coral sm">Build it</button></div>
+        </div>
+        <div data-tpl="lrail" data-a='[0]'></div>
+      </div></div>
+      <figcaption><b>L4. Build mode in landscape</b>Tool tray bottom left, job card on the right with the daylight preview. The map stays visible in between.</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== PC -->
+  <section class="sec" id="sec-pc">
+    <h2 class="sh">PC (1440 × 900, shown scaled)</h2>
+    <div class="card" style="padding:16px 18px;margin-bottom:24px">
+      <b class="px" style="font-size:14px">Ad placement map</b>
+      <p class="muted" style="font-size:12px;margin:4px 0 10px">Each page has its ads in a different spot, so it never feels spammy. Never two ad units on one phone screen. Every slot has its own switch in Admin.</p>
+      <table class="tbl"><tr><th>Page</th><th>PC</th><th>Phone</th></tr>
+        <tr><td><b>Farm (game)</b></td><td>One rail on the left, 3 sponsor cards. Nothing on the right. No live toast.</td><td>Occasional banner above the tool bar (30 to 60 s). Nothing over the map.</td></tr>
+        <tr><td><b>End of day / year</b></td><td>Sponsor card (Daily Farm) or one video (Fast Farm between days or years)</td><td>Same, one unit only</td></tr>
+        <tr><td><b>Community</b></td><td>Sponsor cards in the right column under Following today and Top graziers, plus a sponsored post in the feed. No left rail.</td><td>Sponsored post every 8 posts</td></tr>
+        <tr><td><b>Profile</b></td><td>One sponsor card in the right column</td><td>None</td></tr>
+        <tr><td><b>Leaderboard</b></td><td>One wide sponsor banner above the table</td><td>None</td></tr>
+        <tr><td><b>Landing</b></td><td>Sponsor logo strip near the bottom</td><td>Same strip</td></tr>
+        <tr><td><b>Live toast</b></td><td>Website pages only: Community, Profile, Leaderboard, Landing</td><td>Strip at the top of Community only</td></tr>
+      </table>
+    </div>
+
+    <!-- PC game: paddocks -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:440px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Paddocks"]'></div><div class="pbody">
+          <div style="display:flex;gap:6px;margin-bottom:8px"><span class="fchip on">Sort: name ⇅</span><span class="fchip">kg DM/ha</span><span class="fchip">Water</span><span class="fchip">Rest</span></div>
+          <table class="tbl pcpads"></table>
+          <div class="card" style="padding:10px;margin-top:10px">
+            <div style="display:flex;align-items:center;gap:8px"><b class="px">Paddock 6</b><span class="chip g">Green</span><span class="muted" style="font-size:11px;margin-left:auto">Then vs now</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+              <div><canvas class="sward" data-w="196" data-h="100" data-o='{"h":28,"g":11,"pct":41,"kg":2600,"dry":0.7,"cap":"Then · Day 31"}'></canvas></div>
+              <div><canvas class="sward" data-w="196" data-h="100" data-o='{"h":12,"g":9,"pct":64,"kg":1850,"dry":0.25,"cap":"Now · Day 34"}'></canvas></div>
+            </div>
+            <p class="sayline" style="margin:6px 0">"They're picking the best bits. The grass is growing away from them."</p>
+            <span class="btn sm coral">Move cattle in here</span>
+          </div>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="818" data-h="783" data-o='{"view":"whole","margin":0.6,"highlight":6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>A. Farm on PC: Paddocks</b>Website header on top, then the separate game header (farm switcher, date, daylight, time controls, cash) on a different background. One sponsor rail on the left only. Sortable quick list, one paddock opened with then vs now pictures.</figcaption></figure>
+
+    <!-- PC market prices -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:500px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Market"]'></div><div class="pbody">
+          <div class="seg" style="margin-top:0"><span class="on">Prices</span><span>Buy</span><span>Sell</span></div>
+          <div class="muted" style="font-size:11px;margin-bottom:6px">Roma saleyard · next sale Tue 21 Nov · cattle bought arrive in 2 days. Restocker c/kg live weight.</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap" class="mktchips" data-on="0,1,2,3,4,5,6"></div>
+          <svg class="mktchart" data-on="0,1,2,3,4,5,6" data-w="470" data-h="250" style="width:470px;height:250px;margin-top:6px"></svg>
+          <table class="tbl mkttable" style="margin-top:6px"></table>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="758" data-h="783" data-o='{"view":"whole","margin":0.6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>B. Market: Prices</b>Two years of c/kg by class with a toggle per class (classes match the buy list exactly), and current prices with week and year change.</figcaption></figure>
+
+    <!-- PC market sell -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:500px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Market"]'></div><div class="pbody">
+          <div class="seg" style="margin-top:0"><span>Prices</span><span>Buy</span><span class="on">Sell</span></div>
+          <div class="muted" style="font-size:11px;margin-bottom:8px">Sell at Roma on Tue 21 Nov. Trucks leave the day before. Prices after commission, yard fees and freight.</div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px">
+            <div style="display:flex;justify-content:space-between"><b>Steers A · Paddock 6</b><span>180 head</span></div>
+            <div class="kv"><span class="muted">Avg weight · class</span><span>342 kg · yearling steers 405c</span></div>
+            <div class="kv"><span class="muted">Est. value</span><b>$1,356/head</b></div>
+            <div class="kv"><span class="muted">Bought for · profit</span><span>$1,050 · <b class="ok">+$306/head</b></span></div>
+            <div style="display:flex;gap:6px;margin-top:6px;align-items:center"><span class="muted" style="font-size:11px">Sell</span><div class="stepper"><button>−</button><span>60</span><button>+</button></div><span class="muted" style="font-size:11px">heaviest first</span></div>
+            <div class="confirm">Sell the 60 heaviest steers (avg 368 kg) at about 398c/kg? Est. <b>$86,900</b> after fees.<div class="bt"><button class="btn coral sm" style="flex:1">Confirm</button><button class="btn ghost sm" style="flex:1">Cancel</button></div></div>
+          </div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Steers B · Paddock 9</b><span>150 head</span></div><div class="kv"><span class="muted">Avg 318 kg · est. value</span><b>$1,262/head</b></div><div class="kv"><span class="muted">Profit</span><b class="ok">+$151/head</b></div></div>
+          <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Breeders · Paddock 2</b><span>196 cows, 3 bulls</span></div><div class="kv"><span class="muted">Cull cows (dry, CS 2.5)</span><b>11 head · $1,310/head</b></div></div>
+          <div class="card" style="padding:10px;font-size:12px"><div style="display:flex;justify-content:space-between"><b>Weaners · Paddock 4</b><span>40 head</span></div><div class="kv"><span class="muted">Avg 228 kg · est. value</span><b>$936/head</b></div><div class="kv"><span class="muted">Profit</span><b class="bad">−$104/head</b> <span class="muted">(bought 2 weeks ago, freight in)</span></div></div>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="758" data-h="783" data-o='{"view":"whole","margin":0.6,"highlight":6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>C. Market: Sell</b>Your mobs by class with estimated value and profit per head. Choose how many, confirm right there, see the result in place.</figcaption></figure>
+
+    <!-- PC herd -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:640px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Herd"]'></div><div class="pbody">
+          <b class="px">Mobs</b>
+          <table class="tbl" style="margin:6px 0 14px">
+            <tr><th>Mob</th><th>Paddock</th><th>Head by class</th><th class="r">Avg kg</th><th>CS</th><th class="r">kg/day</th><th>Why</th></tr>
+            <tr class="sel"><td>Steers A</td><td>Paddock 6</td><td>180 steers</td><td class="r">342</td><td>3.5</td><td class="r ok">+0.9</td><td>Green leafy feed</td></tr>
+            <tr><td>Steers B</td><td>Paddock 9</td><td>150 steers</td><td class="r">318</td><td>3.0</td><td class="r bad">+0.3</td><td>Low ME on dry feed (7.6)</td></tr>
+            <tr><td>Breeders</td><td>Paddock 2</td><td>196 cows · 21 calves · 3 bulls</td><td class="r">468</td><td>3.1</td><td class="r bad">−0.2</td><td>Milking for a calf</td></tr>
+            <tr><td>Weaners</td><td>Paddock 4</td><td>40 weaner steers</td><td class="r">228</td><td>3.0</td><td class="r ok">+0.5</td><td>Short feed, CP 9%</td></tr>
+          </table>
+          <div style="display:flex;align-items:center;gap:8px"><b class="px">Stock book</b><span class="fchip on">Steers A</span><span class="fchip">All</span><span class="muted" style="margin-left:auto;font-size:11px">Sort by profit ⇅</span></div>
+          <table class="tbl" style="margin-top:6px">
+            <tr><th>Tag</th><th>Class</th><th>Age</th><th class="r">kg</th><th>CS</th><th>PTIC</th><th class="r">Bought</th><th class="r">Value now</th><th class="r">Profit</th></tr>
+            <tr><td>A-0412</td><td>Yearling steer</td><td>18 mo</td><td class="r">368</td><td>3.5</td><td>·</td><td class="r">$1,060</td><td class="r">$1,462</td><td class="r ok">+$402</td></tr>
+            <tr><td>A-0388</td><td>Yearling steer</td><td>17 mo</td><td class="r">351</td><td>3.5</td><td>·</td><td class="r">$1,040</td><td class="r">$1,378</td><td class="r ok">+$338</td></tr>
+            <tr><td>A-0371</td><td>Yearling steer</td><td>17 mo</td><td class="r">344</td><td>3.5</td><td>·</td><td class="r">$1,050</td><td class="r">$1,351</td><td class="r ok">+$301</td></tr>
+            <tr><td>A-0455</td><td>Yearling steer</td><td>16 mo</td><td class="r">330</td><td>3.0</td><td>·</td><td class="r">$1,090</td><td class="r">$1,296</td><td class="r ok">+$206</td></tr>
+            <tr><td>B-0107</td><td>Yearling steer</td><td>16 mo</td><td class="r">296</td><td>2.5</td><td>·</td><td class="r">$1,250</td><td class="r">$1,186</td><td class="r bad">−$64</td></tr>
+            <tr><td>C-0021</td><td>Cow</td><td>6 yr</td><td class="r">472</td><td>3.0</td><td class="ok">Yes</td><td class="r">$1,900</td><td class="r">$2,150</td><td class="r ok">+$250</td></tr>
+            <tr><td>C-0048</td><td>Cow</td><td>8 yr</td><td class="r">431</td><td>2.5</td><td class="bad">Dry</td><td class="r">$1,750</td><td class="r">$1,310</td><td class="r bad">−$440</td></tr>
+            <tr><td>U-0003</td><td>Bull</td><td>4 yr</td><td class="r">812</td><td>3.5</td><td>·</td><td class="r">$6,200</td><td class="r">$5,800</td><td class="r bad">−$400</td></tr>
+          </table>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="618" data-h="783" data-o='{"view":"whole","margin":0.6,"highlight":6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>D. Herd</b>Mobs with paddock, head by class, weight, condition and daily gain, always with the reason for a loss. The stock book shows every animal's profit.</figcaption></figure>
+
+    <!-- PC feed -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:500px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Feed"]'></div><div class="pbody">
+          <b class="px">Feed forecast, rest of the year</b>
+          <svg class="feedchart" data-w="470" data-h="240" style="width:470px;height:240px;margin-top:6px"></svg>
+          <div style="display:flex;gap:12px;font-size:11px;margin:4px 0 8px" class="muted"><span><i style="display:inline-block;width:10px;height:10px;background:#7fe05a;opacity:.7"></i> Feed on offer</span><span><i style="display:inline-block;width:10px;height:2px;background:#ec6a48;vertical-align:middle"></i> Ground cover floor</span><span><i style="display:inline-block;width:10px;height:10px;background:#f0b43a"></i> Oats (crop)</span></div>
+          <div class="card" style="padding:10px;font-size:12px;margin-bottom:10px">At 612 head the herd eats about <b>165 t DM a month</b>. Feed on offer drops below the ground cover floor in <b>early October</b> if it doesn't rain. The oats in Paddock 5 add a spike from May.</div>
+          <b class="px">Supplements on hand</b>
+          <table class="tbl" style="margin-top:6px">
+            <tr><th>Item</th><th class="r">On hand</th><th>Feeding to</th><th class="r">Price</th><th></th></tr>
+            <tr><td>Dry season lick (urea)</td><td class="r">18 tubs</td><td>Steers B</td><td class="r">$62/tub</td><td><span class="btn sm">Buy</span></td></tr>
+            <tr><td>Round bales, pasture hay</td><td class="r">12 bales</td><td>·</td><td class="r">$95/bale</td><td><span class="btn sm">Buy</span></td></tr>
+            <tr><td>Weaner pellets</td><td class="r">0 t</td><td>·</td><td class="r">$540/t</td><td><span class="btn sm">Buy</span></td></tr>
+          </table>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="758" data-h="783" data-o='{"view":"whole","margin":0.6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>E. Feed</b>Feed on offer forecast for the rest of the year against a ground cover floor, with crops as spikes. Supplements on hand with buy buttons.</figcaption></figure>
+
+    <!-- PC plans -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:500px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Plans"]'></div><div class="pbody">
+          <div style="display:flex;align-items:center;gap:8px"><b class="px" style="font-size:14px">Summer rotation</b><span class="badge">Steers A</span><span class="badge lime" style="margin-left:auto">Running</span></div>
+          <div class="card" style="padding:10px;margin-top:8px;font-size:12px">
+            <b>Leg 1</b> <span class="muted">keep going in this block until…</span>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0"><span class="fchip on">Paddock 6</span>→<span class="fchip">Paddock 2</span>→<span class="fchip">Paddock 1</span>→<span class="fchip">Paddock 5 (oats)</span><span class="fchip">+ add</span></div>
+            <div class="seg" style="grid-template-columns:1fr 1fr"><span>Move every N days</span><span class="on">Move at kg DM/ha</span></div>
+            <div class="kv"><span class="muted">Move when grazed down to</span><b>1,500 kg DM/ha</b></div>
+            <div class="kv"><span class="muted">Maximum days</span><b>7</b></div>
+            <div class="kv"><span class="muted">Rounds</span><b>2</b></div>
+          </div>
+          <div class="card" style="padding:10px;margin-top:8px;font-size:12px">
+            <b>Leg 2</b> <span class="muted">then go to these ones</span>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0"><span class="fchip">Paddock 3</span>→<span class="fchip">Paddock 9</span></div>
+            <div class="seg" style="grid-template-columns:1fr 1fr"><span class="on">Move every N days</span><span>Move at kg DM/ha</span></div>
+            <div class="kv"><span class="muted">Move every</span><b>3 days</b></div><div class="kv"><span class="muted">Rounds</span><b>1</b></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px"><span class="muted">After the last leg</span><div class="seg" style="margin:0;grid-template-columns:1fr 1fr;width:200px"><span class="on">Repeat</span><span>Stay</span></div><span class="ok" style="margin-left:auto">✓ Water in every paddock</span></div>
+          <div class="card" style="padding:10px;font-size:12px">
+            <b class="px">Plan report</b>
+            <div class="kv"><span class="muted">Rounds · moves</span><span>1 of 2 · 5 moves</span></div>
+            <div class="kv"><span class="muted">Eaten</span><span>71 t DM</span></div>
+            <div class="kv"><span class="muted">Gained</span><span>+0.8 kg/day average, 4.2 t total</span></div>
+            <div class="bad" style="margin-top:4px">Didn't move on Day 29: Paddock 2 didn't get to 1,500.</div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px"><span class="btn coral sm">Save plan</span><span class="btn sm ghost">New plan</span></div>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="758" data-h="783" data-o='{"view":"whole","margin":0.6,"highlight":6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>F. Plans</b>Click paddocks in order, pick a simple rule (every N days, or at a kg DM/ha with a maximum), rounds per leg, then repeat or stay. Water checked on save. The report says when and why they didn't move.</figcaption></figure>
+
+    <!-- PC scores diary -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Farm"]'></div><div data-tpl="gamehdr"></div>
+      <div class="gbody" style="--pw:500px"><div data-tpl="rail"></div>
+        <div class="gpanel"><div data-tpl="ptabs" data-a='["Scores"]'></div><div class="pbody">
+          <div style="display:flex;align-items:baseline;justify-content:space-between"><b class="px" style="font-size:14px">Grazier Score</b><b style="font-size:28px">6,102</b></div>
+          <div class="bars">
+            <div class="b"><span>Profit</span><i style="width:72%"></i><span>1,820</span></div>
+            <div class="b"><span>Pasture</span><i style="width:65%;background:#7fe05a"></i><span>1,640</span></div>
+            <div class="b"><span>Animals</span><i style="width:58%;background:#f0b43a"></i><span>1,460</span></div>
+            <div class="b"><span>Survival</span><i style="width:47%;background:var(--sky)"></i><span>1,182</span></div>
+          </div>
+          <div class="muted" style="font-size:11px;margin-bottom:12px">Pasture = ground cover and rest. Animals = kg gained per ha, deaths, conception. Survival = days on the farm.</div>
+          <b class="px">Diary</b>
+          <div style="margin:10px 0 6px;position:relative;height:30px">
+            <div style="position:absolute;left:0;right:0;top:12px;height:6px;border-radius:3px;background:var(--track)"></div>
+            <div style="position:absolute;left:0;width:100%;top:12px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) 0 100%)"></div>
+            <div style="position:absolute;left:58%;top:4px;width:22px;height:22px;border-radius:50%;background:var(--text);border:3px solid var(--accent)"></div>
+            <div style="position:absolute;left:58%;top:-12px;font-size:10px;transform:translateX(-25%)" class="muted">Day 20</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px" class="muted"><span>Day 1</span><span>Day 34</span></div>
+          <div style="font-size:12px;margin-top:8px;display:grid;gap:6px">
+            <div class="card" style="padding:8px 10px"><b>Day 34</b> · 12 mm rain · 650 m electric fence · moved Steers A to Paddock 6 · 3 calves</div>
+            <div class="card" style="padding:8px 10px"><b>Day 33</b> · joining report week 3 · lick out to Steers B</div>
+            <div class="card" style="padding:8px 10px"><b>Day 32</b> · bought 40 weaner steers at Roma ($41,600)</div>
+            <div class="card" style="padding:8px 10px;border-color:var(--accent)"><b>Day 20</b> · selected · Paddock 3 went Dry &amp; rank · no rain 18 days</div>
+          </div>
+          <div style="margin-top:10px"><span class="btn sm">View the farm on Day 20</span></div>
+        </div></div>
+        <div class="gmap"><canvas class="map" data-w="758" data-h="783" data-o='{"view":"whole","margin":0.6}'></canvas></div>
+      </div>
+    </div>
+    <figcaption><b>G. Scores and Diary</b>Grazier Score broken into its parts, then the day-by-day diary with a timeline you can drag to see the farm on any past day.</figcaption></figure>
+
+    <!-- PC community -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Community"]'></div>
+      <div class="wrapc">
+        <div class="pagehead"><h1>Community</h1><p>What graziers did today, and what they're talking about.</p></div>
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:28px">
+          <div>
+            <div class="card" style="padding:12px;display:flex;gap:10px;align-items:center"><div class="av" style="width:38px;height:38px;background:#f3e7cf">C</div><div class="muted" style="flex:1;background:var(--input);border:1px solid var(--line);border-radius:8px;padding:10px 12px">Share a photo or a thought</div><span class="btn sm">Photo</span><span class="btn sm">Share my farm</span></div>
+            <div class="seg" style="max-width:420px;margin:14px 0"><span class="on">Friends' days</span><span>Everyone</span><span>Groups</span></div>
+            <div class="post" style="margin:0 0 12px">
+              <div class="ph"><div class="av" style="width:38px;height:38px;background:#f0b43a">T</div><div class="nm">Tom1998 <small>Day 34 · Central Qld · Daily Farm · 2h</small></div></div>
+              <div style="display:grid;grid-template-columns:1fr 330px;gap:14px;align-items:start"><ul><li>Built 10 km of electric fence</li><li>Moved 4,000 head into Paddock 12 (4 ha)</li><li>Rain 12 mm</li><li>Steers averaging +0.8 kg/day</li></ul><canvas class="map" data-w="330" data-h="130" data-o='{"view":"whole","labels":0,"margin":0.3,"seed":21}'></canvas></div>
+              <div class="acts"><span>♥ 24 likes</span><span>💬 6 comments</span><span style="margin-left:auto;color:var(--sky)">View farm</span></div>
+            </div>
+            <div class="post sponsored" style="margin:0 0 12px">
+              <div class="ph"><div class="av" style="width:38px;height:38px;background:#2c5a3a;color:#c6f432">B</div><div class="nm">Brigalow Fencing Supplies <small>Sponsored</small></div></div>
+              <div style="display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:center"><canvas class="adimg" data-k="ute" data-w="330" data-h="130"></canvas><div style="font-size:13px">Spring prices on 2-wire electric kits. Energisers, posts and tape, delivered to the Maranoa.</div></div>
+            </div>
+            <div class="post" style="margin:0">
+              <div class="ph"><div class="av" style="width:38px;height:38px;background:#7fe05a">S</div><div class="nm">Sarah Mitchell <small>Real farm · Roma QLD · 5h</small></div></div>
+              <div style="font-size:12px;margin-bottom:8px">Storm rolled in over the back paddock. 30 mm in the gauge. First decent rain since August.</div>
+              <canvas class="adimg" data-k="storm" data-w="560" data-h="200" data-tag="photo"></canvas>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card" style="padding:14px"><b class="px">Following today</b>
+              <div style="display:grid;gap:9px;margin-top:10px;font-size:12px">
+                <div style="display:flex;gap:8px;align-items:center"><div class="av" style="width:28px;height:28px;background:#f0b43a;font-size:10px">T</div><div style="flex:1">Tom1998 <div class="muted" style="font-size:10px">10 km fence · 2 moves</div></div><span class="ok">●</span></div>
+                <div style="display:flex;gap:8px;align-items:center"><div class="av" style="width:28px;height:28px;background:#7fe05a;font-size:10px">S</div><div style="flex:1">sarah_m <div class="muted" style="font-size:10px">Marked 96 calves</div></div><span class="ok">●</span></div>
+                <div style="display:flex;gap:8px;align-items:center"><div class="av" style="width:28px;height:28px;background:#e0a860;font-size:10px">D</div><div style="flex:1">DaveFromArmidale <div class="muted" style="font-size:10px">Not out yet today</div></div><span class="dim">●</span></div>
+              </div></div>
+            <div class="card" style="padding:14px"><b class="px">Top graziers this week</b>
+              <div style="display:grid;gap:8px;margin-top:10px;font-size:12px"><div style="display:flex;justify-content:space-between"><span>1 · jackaroo_jess</span><b>9,412</b></div><div style="display:flex;justify-content:space-between"><span>2 · Tom1998</span><b>9,108</b></div><div style="display:flex;justify-content:space-between"><span>3 · sarah_m</span><b>8,977</b></div><div style="display:flex;justify-content:space-between"><span>4 · pixel_priya <span class="dim">(not a farmer)</span></span><b>8,511</b></div></div></div>
+            <div data-tpl="spon" data-a='["hills","#e6f0ff","[Your business here]","Soil and pasture advice for graziers",300]'></div>
+            <div data-tpl="spon" data-a='["trough","#e9fbf1","Paddock Pro Water","Solar pumps and troughs for big country",300]'></div>
+          </div>
+        </div>
+      </div>
+      <div data-tpl="toast" data-a='["jackaroo_jess","weaned 310 calves on Day 201","1 minute ago · Emerald QLD","#c6f432"]'></div>
+    </div>
+    <figcaption><b>H. Community on PC</b>Big page heading and roomy spacing. Ads only in the right column under Following today and Top graziers, plus one sponsored post in the feed. No left rail. Live toast bottom left.</figcaption></figure>
+
+    <!-- PC leaderboard -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Leaderboard"]'></div>
+      <div class="wrapc">
+        <div class="pagehead"><h1>Leaderboard</h1><p>The best graziers in the country, by mode, district and farm size.</p></div>
+        <div class="card sponsored" style="display:flex;align-items:center;gap:16px;overflow:hidden;padding:0;margin-bottom:18px">
+          <canvas class="adimg" data-k="sunset" data-w="420" data-h="110"></canvas>
+          <div style="flex:1"><small style="font-size:9px;letter-spacing:.1em;text-transform:uppercase">Sponsored</small><div style="font-size:16px;font-weight:700">Gidgee Rural Finance</div><div style="font-size:12px">Livestock loans that get the season. This month's leaderboard sponsor.</div></div>
+          <span class="btn lime" style="margin-right:16px">Find out more</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="fchip on">Daily Farm</span><span class="fchip">Fast Farm</span><span class="fchip">All districts ⌄</span><span class="fchip">All sizes ⌄</span><span class="fchip">This month ⌄</span><span class="fchip">Overall</span><span class="fchip">Groups</span></div>
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:24px">
+          <table class="tbl" style="font-size:13px">
+            <tr><th>#</th><th>Grazier</th><th>District</th><th class="r">Score</th><th class="r">Days</th><th class="r">kg/ha sold</th><th class="r">Ground cover</th></tr>
+            <tr><td>🥇</td><td><b>jackaroo_jess</b></td><td>Emerald QLD</td><td class="r"><b>9,412</b></td><td class="r">201</td><td class="r">96</td><td class="r">94%</td></tr>
+            <tr><td>🥈</td><td><b>Tom1998</b></td><td>Roma QLD</td><td class="r"><b>9,108</b></td><td class="r">188</td><td class="r">102</td><td class="r">88%</td></tr>
+            <tr><td>🥉</td><td><b>sarah_m</b></td><td>Roma QLD</td><td class="r"><b>8,977</b></td><td class="r">412</td><td class="r">81</td><td class="r">97%</td></tr>
+            <tr><td>4</td><td><b>DaveFromArmidale</b></td><td>Armidale NSW</td><td class="r"><b>8,640</b></td><td class="r">150</td><td class="r">144</td><td class="r">91%</td></tr>
+            <tr><td>5</td><td><b>pixel_priya</b> <span class="dim">not a farmer</span></td><td>Melbourne VIC</td><td class="r"><b>8,511</b></td><td class="r">96</td><td class="r">138</td><td class="r">90%</td></tr>
+            <tr><td>6</td><td><b>Katherine_Kev</b></td><td>Katherine NT</td><td class="r"><b>8,305</b></td><td class="r">230</td><td class="r">18</td><td class="r">95%</td></tr>
+            <tr><td>7</td><td><b>hamilton_hugh</b></td><td>Hamilton VIC</td><td class="r"><b>8,190</b></td><td class="r">122</td><td class="r">176</td><td class="r">89%</td></tr>
+            <tr class="sel"><td>48</td><td><b>You · claudia_b</b></td><td>Roma QLD</td><td class="r"><b>6,102</b></td><td class="r">34</td><td class="r">61</td><td class="r">92%</td></tr>
+          </table>
+          <div class="card" style="padding:14px;align-self:start"><b class="px">Your groups</b>
+            <div style="display:grid;gap:10px;margin-top:10px;font-size:12px"><div style="display:flex;justify-content:space-between"><span>Roma Young Farmers</span><b>3rd of 12</b></div><div style="display:flex;justify-content:space-between"><span>AgriProve team</span><b>1st of 6</b></div></div>
+            <span class="btn sm wide" style="margin-top:12px">Create a group</span></div>
+        </div>
+      </div>
+      <div data-tpl="toast" data-a='["Tom1998","moved 4,000 head into a 4 ha paddock","3 minutes ago · Roma QLD","#f0b43a"]'></div>
+    </div>
+    <figcaption><b>I. Leaderboard on PC</b>Page heading, one wide sponsor banner above the table, filters, your groups on the side. Live toast bottom left.</figcaption></figure>
+
+    <!-- PC profile -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div data-tpl="web" data-a='["Community"]'></div>
+      <canvas class="adimg" data-k="hills" data-w="1440" data-h="180" data-tag="none"></canvas>
+      <div class="wrapc">
+        <div style="display:flex;align-items:flex-end;gap:20px;margin-top:-46px;position:relative">
+          <div class="av" style="width:112px;height:112px;font-size:36px;background:#7fe05a;border:4px solid var(--frame);box-shadow:0 0 0 2px #000">SM</div>
+          <div style="flex:1;padding-bottom:6px"><div style="font-size:24px;font-weight:700">Sarah Mitchell <span class="muted" style="font-size:14px;font-weight:400">@sarah_m</span></div><div class="muted">Roma QLD · Farming 14 years · Breeding cattle · 3,200 ha, "Wattle Downs"</div></div>
+          <div style="display:flex;gap:8px;padding-bottom:8px"><span class="btn coral">Follow</span><span class="btn ghost">Share profile</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:290px 1fr 360px;gap:22px;margin-top:22px">
+          <div class="card" style="padding:14px;font-size:12px;display:grid;gap:12px;align-content:start">
+            <div><b class="px">About</b><p class="muted" style="margin-top:4px">Third generation on Wattle Downs. Brahman cross breeders, rotational with big mobs since 2015.</p></div>
+            <div><b class="px">Experience</b><div style="margin-top:4px">Owner and manager, Wattle Downs · 2012 to now<br><span class="muted">Station hand, Channel Country · 2008 to 2011</span></div></div>
+            <div><b class="px">Education and courses</b><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px"><span class="badge">Grazing for Profit</span><span class="badge">Cert IV Agriculture</span><span class="badge">BeefUp Forum</span><span class="badge">LPA accredited</span></div></div>
+            <div><b class="px">Links</b><div style="color:var(--sky);margin-top:4px">wattledowns.com.au · Instagram · Facebook</div></div>
+            <div><b class="px">Badges</b><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px"><span class="badge lime">#3 Central Qld</span><span class="badge">412 day streak</span><span class="badge">Drought survivor</span></div></div>
+          </div>
+          <div>
+            <div class="seg" style="max-width:380px;margin-top:0"><span class="on">Posts</span><span>Days</span><span>Stats</span></div>
+            <div class="post" style="margin:10px 0 0"><div class="ph"><div class="av" style="width:36px;height:36px;background:#7fe05a">S</div><div class="nm">Sarah Mitchell <small>5h</small></div></div><div style="font-size:12px;margin-bottom:8px">Storm rolled in over the back paddock. 30 mm in the gauge.</div><canvas class="adimg" data-k="storm" data-w="440" data-h="190" data-tag="photo"></canvas></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card" style="padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><b class="px">Their farm today</b><span class="live"><i></i>DAY 112</span></div>
+              <canvas class="map" data-w="334" data-h="200" data-o='{"view":"whole","labels":0,"margin":0.3,"seed":13}' style="margin-top:8px;border-radius:8px"></canvas>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0;font-size:11px;text-align:center"><div class="card" style="padding:6px"><b style="display:block;font-size:14px">640</b>head</div><div class="card" style="padding:6px"><b style="display:block;font-size:14px">2,050</b>kg DM/ha</div><div class="card" style="padding:6px"><b style="display:block;font-size:14px">0.42</b>AE/ha</div><div class="card" style="padding:6px"><b style="display:block;font-size:14px">$1.9m</b>worth</div></div>
+              <span class="btn wide">View farm (read only)</span>
+            </div>
+            <div data-tpl="spon" data-a='["sunset","#fff6e0","Outback Livestock Agents","Weekly prices, Roma and Dalby",334]'></div>
+          </div>
+        </div>
+      </div>
+      <div data-tpl="toast" data-a='["Mehdi_W","built 3.2 km of fencing on Day 18","4 minutes ago · Hamilton VIC","#9ab8ff"]'></div>
+    </div>
+    <figcaption><b>J. Profile on PC</b>Cover photo, details and links on the left, posts in the middle, their Daily Farm today plus one sponsor card on the right. Live toast bottom left.</figcaption></figure>
+
+    <!-- PC landing -->
+    <figure class="f wide pcwrap"><div class="pc">
+      <div style="height:36px;display:flex;align-items:center;justify-content:center;gap:10px;border-bottom:1px solid var(--line);background:var(--panel2);font-size:12px"><span class="badge lime">SPRING CHALLENGE</span><span>Same farm, same seed. Starts 1 Dec. Free to enter. →</span></div>
+      <div style="display:flex;align-items:center;padding:16px 40px"><div class="logo"><span class="lm"><span class="pi" data-i="grass"></span></span>THE GRAZING GAME</div><div style="margin-left:auto;display:flex;gap:10px"><span class="btn ghost sm">Leaderboard</span><span class="btn ghost sm">Pricing</span><span class="btn coral">Play free</span></div></div>
+      <div style="position:relative;height:540px">
+        <canvas class="farm" data-w="1440" data-h="540" data-o='{"seed":3,"p":3,"tint":"dusk","sky":0.5}' style="position:absolute;inset:0"></canvas>
+        <div class="herofade" style="position:absolute;inset:0"></div>
+        <div style="position:absolute;left:56px;top:30px">
+          <div style="font-family:Anton;font-size:146px;line-height:.9;color:var(--text)">THE<br>GRAZING</div>
+          <div style="font-family:Anton;font-size:146px;line-height:.9;color:var(--coral-text)">GAME</div>
+          <div style="margin-top:14px;color:var(--coral-text);font-size:18px">Run a real grazing business. One day at a time.</div>
+          <div style="display:flex;gap:12px;margin-top:20px"><span class="btn coral" style="font-size:16px;padding:14px 26px">Play free</span><span class="btn ghost" style="font-size:16px;padding:14px 22px">Leaderboard</span></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:18px 40px 10px">
+        <div class="card" style="padding:14px"><b class="px" style="font-size:14px">Daily Farm</b><p class="muted" style="font-size:12px;margin-top:4px">One day a day. Check in at first light, make your moves before dark.</p></div>
+        <div class="card" style="padding:14px"><b class="px" style="font-size:14px">Fast Farm</b><p class="muted" style="font-size:12px;margin-top:4px">Run up to three farms at your own pace. Skip a season and see what your plan did.</p></div>
+        <div class="card" style="padding:14px"><b class="px" style="font-size:14px">Community</b><p class="muted" style="font-size:12px;margin-top:4px">Follow graziers, start a group with your mates, show off your real farm.</p></div>
+      </div>
+      <div style="display:flex;gap:30px;justify-content:center;align-items:center;padding:8px 40px;color:var(--muted);font-family:Silkscreen;font-size:12px"><span class="dim" style="font-size:9px;letter-spacing:.15em">OUR SPONSORS</span><span>PADDOCK PRO WATER</span><span>MULGA CREEK LICK CO.</span><span>BRIGALOW FENCING</span><span>GIDGEE RURAL FINANCE</span><span>[YOUR BUSINESS]</span></div>
+      <div data-tpl="toast" data-a='["DaveFromArmidale","sowed 60 ha of oats on Day 77","just now · Armidale NSW","#e0a860"]'></div>
+    </div>
+    <figcaption><b>K. Landing page (logged out)</b>Big title over a pixel farm at dusk, play button, three feature cards and the sponsor strip near the bottom. Live toast bottom left.</figcaption></figure>
+  </section>
+
+  <!-- ===================================================== ADMIN -->
+  <section class="sec" id="sec-admin">
+    <h2 class="sh">Admin back end (1440 × 900, shown scaled)</h2>
+
+    <figure class="f wide pcwrap"><div class="pc"><div class="adm">
+      <div data-tpl="anav" data-a='[0]'></div>
+      <div class="amain">
+        <div style="display:flex;align-items:center;gap:12px"><h2>Dashboard</h2><span class="muted" style="margin-left:auto">Last 30 days ⌄</span><span class="btn sm ghost">Export audience report</span></div>
+        <div class="kpis">
+          <div class="kpi"><span>Daily active users</span><b>1,284</b><small class="ok">▲ 12% vs last month</small></div>
+          <div class="kpi"><span>Weekly active</span><b>3,910</b><small class="ok">▲ 9%</small></div>
+          <div class="kpi"><span>Monthly active</span><b>8,640</b><small class="ok">▲ 15%</small></div>
+          <div class="kpi"><span>Avg minutes per day</span><b>11.4</b><small class="muted">per active user</small></div>
+          <div class="kpi"><span>Sign-ups this week</span><b>412</b><small class="muted">61% filled in farm profile</small></div>
+          <div class="kpi"><span>Daily Farm streaks 7+ days</span><b>936</b><small class="ok">▲ 22%</small></div>
+          <div class="kpi"><span>Paid subscribers</span><b>0</b><small class="muted">Subscriptions switched off</small></div>
+          <div class="kpi"><span>Ad views · clicks</span><b>182k · 1.9k</b><small class="muted">house and sponsor ads</small></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px">
+          <div class="card" style="padding:14px"><b>Daily active users</b><svg id="dauchart" viewBox="0 0 600 220" style="width:100%;height:220px;margin-top:8px"></svg></div>
+          <div class="card" style="padding:14px"><b>Audience mix</b> <span class="muted" style="font-size:11px">(from profiles, totals only)</span>
+            <div class="bars" style="margin-top:8px">
+              <div class="b"><span>Farmers</span><i style="width:64%"></i><span>64%</span></div><div class="b"><span>Not farmers</span><i style="width:36%;background:var(--muted)"></i><span>36%</span></div>
+              <div class="b"><span>QLD</span><i style="width:41%;background:#f0b43a"></i><span>41%</span></div><div class="b"><span>NSW</span><i style="width:28%;background:#f0b43a"></i><span>28%</span></div><div class="b"><span>VIC</span><i style="width:14%;background:#f0b43a"></i><span>14%</span></div>
+              <div class="b"><span>Breeding</span><i style="width:46%;background:var(--sky)"></i><span>46%</span></div><div class="b"><span>Trading</span><i style="width:21%;background:var(--sky)"></i><span>21%</span></div><div class="b"><span>Mixed farming</span><i style="width:24%;background:var(--sky)"></i><span>24%</span></div>
+            </div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px">
+          <div class="card" style="padding:14px;font-size:12px"><b>Moderation queue</b><div style="display:grid;gap:6px;margin-top:8px"><div>2 posts reported <span class="muted">(spam)</span></div><div>1 profile photo flagged</div><div>1 comment reported</div></div></div>
+          <div class="card" style="padding:14px;font-size:12px"><b>Sponsor slots</b><div style="font-size:24px;font-weight:700;margin:6px 0">15 / 20 sold</div><div class="muted">Shown on the Advertise page as "5/20 spots left".</div></div>
+          <div class="card" style="padding:14px;font-size:12px"><b>Game health</b><div style="display:grid;gap:6px;margin-top:8px"><div>Daily Farms active: <b>2,410</b></div><div>Fast Farms active: <b>5,880</b></div><div>Game overs this week: <b>318</b> <span class="muted">(64% ran out of money)</span></div><div>Ranked runs failing replay check: <b>3</b></div></div></div>
+        </div>
+      </div>
+    </div></div>
+    <figcaption><b>E. Admin dashboard</b>Active users, minutes, streaks, sign-ups and audience mix for the advertiser report. Totals only.</figcaption></figure>
+
+    <figure class="f wide pcwrap"><div class="pc"><div class="adm">
+      <div data-tpl="anav" data-a='[3]'></div>
+      <div class="amain" style="display:grid;grid-template-columns:1fr 420px;gap:18px;padding-right:18px">
+        <div>
+          <div style="display:flex;align-items:center;gap:12px"><h2>Ads &amp; Sponsors</h2><span style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px">All ads <span class="tog on"></span></span><span class="btn sm coral">New campaign</span></div>
+          <table class="tbl" style="margin-top:14px;font-size:12px">
+            <tr><th>Page · slot</th><th>On</th><th>Frequency / cap</th><th>Showing now</th><th class="r">Views 30d</th><th class="r">CTR</th></tr>
+            <tr><td>Farm · PC left rail (3 cards)</td><td><span class="tog on"></span></td><td>Always, wide screens</td><td>3 sponsors</td><td class="r">48,210</td><td class="r">0.9%</td></tr>
+            <tr class="sel"><td>Farm · phone banner (30 to 60 s)</td><td><span class="tog on"></span></td><td>Max once per 5 min of play</td><td>House: [Your business]</td><td class="r">61,400</td><td class="r">1.4%</td></tr>
+            <tr><td>End of day · sponsor card</td><td><span class="tog on"></span></td><td>Daily Farm, once a day</td><td>Mulga Creek Lick Co.</td><td class="r">18,900</td><td class="r">1.8%</td></tr>
+            <tr><td>Between days · video (Fast Farm)</td><td><span class="tog"></span></td><td>Every 7 game days, max 3 per hour</td><td>None</td><td class="r">0</td><td class="r">·</td></tr>
+            <tr><td>Between years · video</td><td><span class="tog on"></span></td><td>Each year end</td><td>House video</td><td class="r">3,120</td><td class="r">2.6%</td></tr>
+            <tr><td>Community · right column (2 cards)</td><td><span class="tog on"></span></td><td>Always</td><td>2 sponsors</td><td class="r">22,040</td><td class="r">1.1%</td></tr>
+            <tr><td>Community · feed post (every 8)</td><td><span class="tog on"></span></td><td>1 per 8 posts</td><td>Brigalow Fencing</td><td class="r">9,870</td><td class="r">0.7%</td></tr>
+            <tr><td>Profile · right card</td><td><span class="tog on"></span></td><td>Always</td><td>Outback Livestock Agents</td><td class="r">6,310</td><td class="r">0.8%</td></tr>
+            <tr><td>Leaderboard · wide banner</td><td><span class="tog on"></span></td><td>Always</td><td>Gidgee Rural Finance</td><td class="r">14,500</td><td class="r">1.6%</td></tr>
+            <tr><td>Landing · logo strip</td><td><span class="tog on"></span></td><td>Always</td><td>5 logos</td><td class="r">31,800</td><td class="r">0.4%</td></tr>
+            <tr><td>Google AdSense (fills empty slots)</td><td><span class="tog"></span></td><td>Off</td><td>Code not added</td><td class="r">0</td><td class="r">·</td></tr>
+          </table>
+        </div>
+        <div class="card" style="padding:16px;align-self:start">
+          <b class="px" style="font-size:14px">Edit campaign</b>
+          <div class="field" style="margin-top:12px"><label>Creative (image or video up to 30 s)</label><div class="in" style="border-style:dashed;text-align:center;padding:12px">Drop file or browse · banner-spring.jpg ✓</div></div>
+          <div class="field"><label>Headline</label><div class="in">Soil and pasture advice for graziers</div></div>
+          <div class="field"><label>Link URL</label><div class="in">https://example.com.au/?utm_source=grazinggame</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Start</label><div class="in">1 Dec 2026</div></div><div class="field"><label>End</label><div class="in">28 Feb 2027</div></div></div>
+          <div class="field"><label>Slots · who sees it</label><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="fchip on">Phone banner</span><span class="fchip on">Farm rail</span><span class="fchip on">Farmers only</span><span class="fchip on">QLD</span><span class="fchip on">NSW</span></div></div>
+          <div class="field"><label>Preview</label>
+            <div style="border-radius:8px;background:#fff6e0;border:1px solid #e9d7a8;color:#2a2116;display:flex;gap:8px;align-items:center;padding:4px;overflow:hidden"><canvas class="adimg" data-k="hills" data-w="80" data-h="54"></canvas><div style="flex:1;font-size:11px"><small style="font-size:9px;color:#7a6643;text-transform:uppercase">Sponsored</small><br><b>[Your business here]</b> · Soil and pasture advice</div></div>
+            <div class="spon" style="background:#e6f0ff;margin-top:8px"><canvas class="adimg" data-k="hills" data-w="360" data-h="110"></canvas><b>[Your business here]</b><span>Soil and pasture advice for graziers</span></div>
+          </div>
+          <div style="display:flex;gap:8px"><span class="btn sm ghost" style="flex:1">Preview on phone</span><span class="btn sm coral" style="flex:1">Save</span></div>
+        </div>
+      </div>
+    </div></div>
+    <figcaption><b>F. Ads and sponsors</b>Every slot, page by page, with its own switch, cap and stats. The campaign editor previews the banner and the card with the farm photo.</figcaption></figure>
+
+    <figure class="f wide pcwrap"><div class="pc"><div class="adm">
+      <div data-tpl="anav" data-a='[4]'></div>
+      <div class="amain" style="display:grid;grid-template-columns:1fr 430px;gap:18px;padding-right:18px">
+        <div>
+          <h2>Subscriptions &amp; switches</h2>
+          <div class="card" style="padding:16px;margin-top:14px;display:flex;gap:16px;align-items:center">
+            <div style="width:46px;height:46px;border-radius:10px;background:#635bff;display:grid;place-items:center;font-weight:700;color:#fff">S</div>
+            <div style="flex:1"><b>Stripe</b> <span class="badge">Not connected</span><div class="muted" style="font-size:12px;margin-top:3px">Connect once. Plans below sync to Stripe. Nothing is charged while subscriptions are off.</div></div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:12px">Test <span class="tog"></span> Live</div><span class="btn coral sm">Connect Stripe</span>
+          </div>
+          <table class="tbl" style="margin-top:14px">
+            <tr><th>Feature</th><th style="text-align:center">Free</th><th style="text-align:center">Pro monthly A$4.99</th><th style="text-align:center">Pro yearly A$39</th></tr>
+            <tr><td>Every mode and district</td><td style="text-align:center" class="ok">✓</td><td style="text-align:center" class="ok">✓</td><td style="text-align:center" class="ok">✓</td></tr>
+            <tr><td>No banner or video ads</td><td style="text-align:center" class="dim">·</td><td style="text-align:center" class="ok">✓</td><td style="text-align:center" class="ok">✓</td></tr>
+            <tr><td>Fast Farm slots</td><td style="text-align:center">3</td><td style="text-align:center">3</td><td style="text-align:center">3</td></tr>
+            <tr><td>Advanced stats and charts</td><td style="text-align:center" class="dim">·</td><td style="text-align:center" class="ok">✓</td><td style="text-align:center" class="ok">✓</td></tr>
+            <tr><td>Diary timeline</td><td style="text-align:center">7 days</td><td style="text-align:center">All</td><td style="text-align:center">All</td></tr>
+            <tr><td>Supporter badge</td><td style="text-align:center" class="dim">·</td><td style="text-align:center" class="ok">✓</td><td style="text-align:center" class="ok">✓</td></tr>
+          </table>
+          <p class="muted" style="font-size:11px;margin-top:8px">Ticks and prices are editable. Example values only.</p>
+        </div>
+        <div class="card" style="padding:16px;align-self:start"><b class="px" style="font-size:14px">Feature switches</b><div class="switches" style="margin-top:8px"></div></div>
+      </div>
+    </div></div>
+    <figcaption><b>G. Subscriptions and switches</b>Stripe stays off until connected and switched on. Every big feature has its own switch so it can be built now and launched later.</figcaption></figure>
+  </section>
+
+  <!-- ===================================================== RENDER STYLES -->
+  <section class="sec" id="sec-styles">
+    <h2 class="sh">Render styles: same test scene, five ways</h2>
+    <div class="note">Test scene: Paddock 7 split with a tape so <b>300 head</b> graze a strip of short green feed at high density. Paddock 3 and 9 rank and tall (dry tops, green at the base, seed heads). Paddock 2 and 6 leafy green. Paddock 5 oats in rows. Paddock 8 fallow. Troughs, bore and fences. Left: zoomed out (whole farm). Right: zoomed in (a few paddocks close).</div>
+    <div class="rec"><h3>Recommendation: S3 art with S5 level-of-detail behaviour</h3>
+      <p style="font-size:12px">Cows never blur into grass: dark outlines and drop shadows. Big mobs collapse into one marker with a head count when zoomed out, and spread into individual cows when zoomed in. Grass reads as clean fields at a distance and as clumps up close. Height must still read (docs/VISUALS.md): rank looks tall with green only at the base, short looks short, crops sit in rows, fallow is worked brown soil. The other tabs use this style.</p></div>
+    <div id="rsrows"></div>
+  </section>
+</main>
+
+<script>
+/* ============ icons ============ */
+const ICONS={
+ hammer:["XXXXXX..","XXXXXX..","..XX....","..XX....","..XX....","..XX....","..XX....","..XX...."],
+ cow:["XX......","XXX.....",".XXXXXXX",".XXXXXXX",".XXXXXX.",".X.X.X.X",".X.X.X.X","........"],
+ grass:["........","..X..X..","X.X.XX.X","XXX.X.XX",".XXXXXX.","XXXXXXXX","XXXXXXXX","........"],
+ tag:["...X....",".XXXXX..","XX.X....",".XXXX...","...X.XX.","XXXXXX..","...X....","........"],
+ dots:["........","........","........","XX.XX.XX","XX.XX.XX","........","........","........"],
+ bell:["...XX...","..XXXX..",".XXXXXX.",".XXXXXX.",".XXXXXX.","XXXXXXXX","...XX...","........"],
+ house:["...XX...","..XXXX..",".XXXXXX.","XXXXXXXX",".X....X.",".X.XX.X.",".X.XX.X.",".XXXXXX."],
+ chat:["XXXXXXX.","X.....X.","X.X.X.X.","X.....X.","XXXXXXX.","XX......","X.......","........"],
+ trophy:["XXXXXXXX","X.XXXX.X","X.XXXX.X",".XXXXXX.","..XXXX..","...XX...","..XXXX..",".XXXXXX."],
+ user:["..XXXX..","..XXXX..","..XXXX..","...XX...",".XXXXXX.","XXXXXXXX","XXXXXXXX","........"],
+ heart:[".XX.XX..","XXXXXXX.","XXXXXXX.",".XXXXX..","..XXX...","...X....","........","........"],
+ play:["X.......","XXX.....","XXXXX...","XXXXXXX.","XXXXX...","XXX.....","X.......","........"],
+ lock:["..XXX...",".X...X..",".X...X..","XXXXXXX.","XXX.XXX.","XXX.XXX.","XXXXXXX.","........"],
+ plus:["...XX...","...XX...","...XX...","XXXXXXXX","XXXXXXXX","...XX...","...XX...","...XX..."],
+ check:["........",".......X","......XX",".....XX.","X...XX..","XX.XX...",".XXX....","..X....."],
+ plan:["XX......","XX..XX..","....XX..","XX......","XX..XX..","....XX..","XX......","XX......"],
+ book:["XXXXXXX.","X.....X.","X.XXX.X.","X.....X.","X.XXX.X.","X.....X.","XXXXXXX.","........"],
+ star:["...X....","...X....","XXXXXXX.",".XXXXX..","..XXX...",".XX.XX..","X.....X.","........"]
+};
+
+/* ============ templates ============ */
+const T={
+ sbar:(onmap)=>`<div class="notch"></div><div class="sbar${onmap?' onmap':''}"><span>9:41</span><span>5G ▮▮▮</span></div>`,
+ bbarGame:(on)=>`<div class="bbar">${[['hammer','Build'],['cow','Herd'],['grass','Paddocks'],['tag','Market'],['dots','More']].map((b,i)=>`<button class="${i===on?'on':''}"><span class="pi" data-i="${b[0]}"></span>${b[1]}</button>`).join('')}</div>`,
+ bbarApp:(on,u16)=>{const b=u16?[['house','Farm'],['trophy','Leaders'],['user','Me']]:[['house','Farm'],['chat','Community'],['trophy','Leaders'],['user','Profile']];return `<div class="bbar ${u16?'n3':'n4'}">${b.map((x,i)=>`<button class="${i===on?'on':''}"><span class="pi" data-i="${x[0]}"></span>${x[1]}</button>`).join('')}</div>`},
+ lrail:(on)=>`<div class="lrail">${[['hammer','Build'],['cow','Herd'],['grass','Paddocks'],['tag','Market'],['dots','More']].map((b,i)=>`<button class="${i===on?'on':''}"><span class="pi" data-i="${b[0]}"></span>${b[1]}</button>`).join('')}</div>`,
+ web:(on)=>`<div class="webhdr"><div class="logo"><span class="lm"><span class="pi" data-i="grass"></span></span>THE GRAZING GAME</div><nav class="pcnav" style="margin-left:20px">${['Farm','Community','Leaderboard','Groups'].map(x=>`<a class="${x===on?'on':''}">${x}</a>`).join('')}</nav><div class="search">Search graziers, farms, posts</div><div class="iconbtn sm"><span class="pi" data-i="bell"></span><b>2</b></div><div class="av" style="width:38px;height:38px;background:#f3e7cf">C</div></div>`,
+ gamehdr:()=>`<div class="gamehdr"><div class="farmsw"><span class="pi" data-i="house" style="color:var(--accent-text)"></span><div style="line-height:1.2"><b class="px">Kooringa</b><div class="muted" style="font-size:10px">Fast Farm 2 of 3</div></div><span class="muted">⌄</span></div><div style="line-height:1.25"><b>Year 3 · Mon 14 Jul</b><div class="muted" style="font-size:10px">Central Qld · Roma · 2,080 ha · 612 head</div></div><div class="daybar" style="width:250px"><div class="track"><div class="used" style="width:30%"></div><div class="marker" style="left:30%"></div></div><div class="dl"><span>6:38am</span><b>9:40am · 7 h 6 m left</b><span>5:24pm</span></div></div><div style="display:flex;gap:6px;margin-left:auto"><span class="tb pri">Next day ▸</span><span class="tb">+1 week</span><span class="tb">+1 month</span><span class="tb">+1 year</span></div><div style="text-align:right"><b>$184,920</b><div class="muted" style="font-size:10px">net worth $2.41m</div></div></div>`,
+ rail:()=>`<div class="rail">${T.spon('trough','#e9fbf1','Paddock Pro Water','Solar pumps and troughs for big country',156)}${T.spon('lick','#fff6e0','Mulga Creek Lick Co.','Dry season supplements, made in Qld',156)}${T.spon('sunset','#fde9f4','Outback Livestock Agents','Weekly prices, Roma and Dalby',156)}</div>`,
+ spon:(k,bg,name,line,w)=>`<div class="spon" style="background:${bg}"><canvas class="adimg" data-k="${k}" data-w="${w||156}" data-h="${Math.round((w||156)*0.52)}"></canvas><span class="tagad">Sponsored</span><b>${name}</b><span>${line}</span></div>`,
+ ptabs:(on)=>`<div class="ptabs">${['Herd','Plans','Paddocks','Feed','Market','Scores'].map(x=>`<span class="ptab ${x===on?'on':''}">${x==='Scores'?'Scores · Diary':x}</span>`).join('')}</div>`,
+ toast:(nm,what,when,col)=>`<div class="toast" style="left:20px;bottom:20px"><div class="av" style="width:40px;height:40px;background:${col}">${nm[0]}</div><div class="tx"><b>${nm}</b> ${what}<small>${when}</small></div></div>`,
+ anav:(on)=>`<nav class="anav"><div class="logo" style="margin:0 6px 16px"><span class="lm"><span class="pi" data-i="grass"></span></span>ADMIN</div>${['▦ Dashboard','☺ Users','⚑ Moderation','▣ Ads &amp; Sponsors','$ Subscriptions','★ Challenges','⏻ Feature switches','⚙ Settings'].map((x,i)=>`<a class="${i===on?'on':''}">${x}${i===2?' <span class="badge coral" style="margin-left:auto">4</span>':''}</a>`).join('')}</nav>`
+};
+document.querySelectorAll('[data-tpl]').forEach(el=>{el.outerHTML=T[el.dataset.tpl](...JSON.parse(el.dataset.a||'[]'))});
+document.querySelectorAll('.pi[data-i]').forEach(el=>{const m=ICONS[el.dataset.i];if(!m)return;let r='';m.forEach((row,y)=>[...row].forEach((c,x)=>{if(c==='X')r+=`<rect x="${x}" y="${y}" width="1" height="1"/>`}));el.innerHTML=`<svg viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor">${r}</svg>`});
+
+/* ============ data-driven bits ============ */
+const PADINFO=[[1,'m','Mixed',220,'2,240',1,'·'],[2,'g','Green',210,'2,010',1,'Breeders 220'],[3,'r','Dry & rank',230,'4,630',1,'·'],[4,'g','Green',300,'1,180',0,'Weaners 40'],[5,'g','Green',190,'2,600',1,'· (oats)'],[6,'g','Green',14,'1,850',1,'Steers A 180'],[7,'s','Short',200,'640',1,'·'],[8,'f','Fallow',180,'0',2,'·'],[9,'r','Dry & rank',210,'3,980',1,'Steers B 150'],[10,'m','Mixed',306,'2,320',1,'·']];
+document.querySelectorAll('.pcpads').forEach(t=>{t.innerHTML='<tr><th>Paddock</th><th>Label</th><th class="r">ha</th><th class="r">kg DM/ha</th><th>Water</th><th>Mob</th></tr>'+PADINFO.map(p=>`<tr class="${p[0]===6?'sel':''}"><td>Paddock ${p[0]}</td><td><span class="chip ${p[1]}">${p[2]}</span></td><td class="r">${p[3]}</td><td class="r">${p[4]}</td><td class="${p[5]===1?'ok':p[5]===0?'bad':'dim'}">${p[5]===1?'✓':p[5]===0?'✗':'·'}</td><td>${p[6]}</td></tr>`).join('')});
+document.querySelectorAll('.ppl').forEach(d=>{d.innerHTML=PADINFO.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:12px"><b style="width:82px">Paddock ${p[0]}</b><span class="chip ${p[1]}">${p[2]}</span><span class="muted" style="font-size:10px">${p[3]} ha</span><span style="margin-left:auto;font-weight:700">${p[4]}</span><span class="${p[5]===1?'ok':p[5]===0?'bad':'dim'}" style="width:14px;text-align:center">${p[5]===1?'✓':p[5]===0?'✗':'·'}</span></div>`).join('')});
+const LB=[['jackaroo_jess','Emerald QLD',9412,201,'#c6f432'],['Tom1998','Roma QLD',9108,188,'#f0b43a'],['sarah_m','Roma QLD',8977,412,'#7fe05a'],['DaveFromArmidale','Armidale NSW',8640,150,'#e0a860'],['pixel_priya','Melbourne VIC · not a farmer',8511,96,'#9ab8ff'],['Katherine_Kev','Katherine NT',8305,230,'#ec6a48']];
+document.querySelectorAll('.lbs').forEach(d=>{const u=d.dataset.u16;d.innerHTML=LB.slice(0,u?4:6).map((r,i)=>`<div class="lbrow">${i<3?`<div class="medal" style="background:${['#f2c94c','#cfd6e0','#d9905a'][i]}">${i+1}</div>`:`<div class="rk">${i+1}</div>`}<div class="av" style="width:34px;height:34px;background:${u?'var(--track)':r[4]};color:${u?'var(--muted)':'#111'}">${u?'?':r[0][0].toUpperCase()}</div><div class="nm">${r[0]}${u?'':`<small>${r[1]}</small>`}</div><div class="sc">${r[2].toLocaleString('en-AU')}${u?'':`<small>${r[3]} days</small>`}</div></div>`).join('')});
+const SW=[['Subscriptions','Shows Pricing and upgrade buttons',0],['Daily Farm','Real-time mode for everyone',1],['Community','Feed, posts, follows (16+ only)',1],['Groups','Create a group, group leaderboards',1],['Activity ticker','Toasts on website pages, strip on phone',1],['Ads (master)','Turns every ad slot off at once',1],['Video ads','Between days and between years',1],['Banner ads','Phone banner above the tool bar',1],['AdSense','Google fills empty banner slots',0],['Sign-ups open','Off = invite-only beta',1]];
+document.querySelectorAll('.switches').forEach(d=>{d.innerHTML=SW.map((s,i)=>`<div style="display:flex;gap:10px;align-items:center;padding:8px 0;${i<SW.length-1?'border-bottom:1px solid var(--line)':''};font-size:12px"><div style="flex:1"><b>${s[0]}</b><div class="muted" style="font-size:11px">${s[1]}</div></div><span class="tog ${s[2]?'on':''}"></span></div>`).join('')});
+
+/* ============ helpers ============ */
+function rng(seed){let s=(seed*2654435761)>>>0||1;return()=>{s^=s<<13;s>>>=0;s^=s>>>17;s^=s<<5;s>>>=0;return s/4294967296}}
+const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const sh=(c,f)=>[c[0]*f,c[1]*f,c[2]*f];
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+const DPR=()=>Math.min(2,window.devicePixelRatio||1);
+function setup(cv){const W=+cv.dataset.w,H=+cv.dataset.h,d=DPR();cv.width=Math.round(W*d);cv.height=Math.round(H*d);cv.style.width=W+'px';cv.style.height=H+'px';const ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);return{W,H,ctx}}
+function pill(ctx,W,x,y,text,chip,col){
+  ctx.font='600 10px "JetBrains Mono", monospace';const tw=ctx.measureText(text).width;ctx.font='700 9px "JetBrains Mono", monospace';
+  const cw=chip?ctx.measureText(chip).width+10:0,w=tw+cw+(chip?16:12),h=18;x=Math.max(2,Math.min(W-w-2,x-w/2));
+  ctx.fillStyle='rgba(11,18,32,.86)';ctx.strokeStyle='rgba(0,0,0,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x,y,w,h,5);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#f3e7cf';ctx.font='600 10px "JetBrains Mono", monospace';ctx.fillText(text,x+6,y+12.5);
+  if(chip){const cx=x+tw+11;ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(cx,y+3,cw,12,6);ctx.fill();ctx.fillStyle='#111';ctx.font='700 9px "JetBrains Mono", monospace';ctx.fillText(chip,cx+5,y+12)}
+}
+const CHIP={leafy:['Green','#7fe05a'],shortgreen:['Green','#7fe05a'],mixed:['Mixed','#f0b43a'],rank:['Dry & rank','#e0a860'],short:['Short','#ec6a48'],crop:['Green','#7fe05a'],fallow:['Fallow','#c49a72']};
+
+/* ============ shared farm scene (40 x 26 squares) ============ */
+const K=0.7;
+const PADS0=[[1,'mixed',0,0,10,9],[2,'leafy',10,0,20,9],[3,'rank',20,0,30,9],[4,'shortgreen',30,0,40,13],[5,'crop',0,9,10,18],[6,'leafy',10,9,20,18],[7,'short',20,9,30,18],[8,'fallow',0,18,20,26],[9,'rank',20,18,30,26],[10,'mixed',30,13,40,26]];
+const SCN={};
+function scene(test){
+  const key=test?'t':'n';if(SCN[key])return SCN[key];
+  const pads=PADS0.map(a=>({n:a[0],t:a[1],x0:a[2],y0:a[3],x1:a[4],y1:a[5]}));
+  const mobs=[{p:6,n:180,kind:'steers'},{p:2,n:220,kind:'cows'},{p:9,n:150,kind:'steers'},{p:4,n:40,kind:'steers'}];
+  const tapes=[];
+  if(test){pads[6].t='shortgreen';mobs.push({p:7,n:300,kind:'steers',area:[20.3,9.35,24.75,17.7],dense:1});tapes.push([25,9,25,18])}
+  mobs.forEach((m,i)=>{const p=pads[m.p-1],a=m.area||[p.x0+.6,p.y0+.8,p.x1-.6,p.y1-.5];m.a=a;const R=rng(100+i*17);
+    const cx=(a[0]+a[2])/2,cy=(a[1]+a[3])/2,hw=(a[2]-a[0])/2,hh=(a[3]-a[1])/2;
+    m.cx=cx;m.cy=cy;m.sx=m.dense?hw:Math.min(hw,0.6+Math.sqrt(m.n)*0.2);m.sy=m.dense?hh:Math.min(hh,0.5+Math.sqrt(m.n)*0.17);
+    m.cows=[];for(let k=0;k<m.n;k++){let x,y;if(m.dense){x=a[0]+R()*(a[2]-a[0]);y=a[1]+R()*(a[3]-a[1])}else{const g=()=>(R()+R()+R()-1.5)/1.5;x=Math.max(a[0],Math.min(a[2],cx+g()*m.sx*1.3));y=Math.max(a[1],Math.min(a[3],cy+g()*m.sy*1.3))}
+      const r=R();const breed=m.kind==='cows'?(r<.45?'brahman':(r<.75?'redb':'hereford')):(r<.4?'angus':(r<.65?'hereford':'brahman'));
+      m.cows.push({x,y,breed,flip:R()<.5,calf:m.kind==='cows'&&k%6===5})}
+    m.cows.sort((u,v)=>u.y-v.y)});
+  const s={pads,mobs,tapes,troughs:[[19.3,8.5,0],[30.7,12.4,1],[20.7,17.4,0],[29.3,18.6,0],[10.7,4.5,0],[9.3,13.5,0]],bore:[20.8,8.2],house:[1.4,2.6],
+    trees:[[24.5,3.6],[27,21.6],[7.5,1.4],[37.5,20.3],[15,23.6],[33.5,5.2],[3,14.8],[26.4,13.3],[-0.8,6],[40.8,10],[-0.7,20],[40.7,24]],
+    gates:pads.filter(p=>p.y1<26).map(p=>[p.x0+Math.round((p.x1-p.x0)*0.3),p.y1])};
+  SCN[key]=s;return s;
+}
+function viewOf(o,W,H){
+  if(!o.view||o.view==='whole'){const m=o.margin??0.8;const z=Math.min(W/(40+2*m),H/((26+2*m)*K));return{z,vx0:20-W/z/2,vy0:13-H/(z*K)/2}}
+  return{z:o.view.z,vx0:o.view.x0,vy0:o.view.y0};
+}
+const HQ={leafy:.26,shortgreen:.07,mixed:.3,rank:.58,short:.04,crop:.3,fallow:0};
+const GF={leafy:1,shortgreen:1,mixed:.55,rank:.22,short:.6,crop:1,fallow:0};
+const BASE={leafy:'#5f9e3a',shortgreen:'#7fb84e',mixed:'#98a252',rank:'#cdb06c',short:'#9b7b53',crop:'#7a5a3a',fallow:'#8c6542',bush:'#55653a'};
+const FRONT={leafy:'#3f7426',shortgreen:'#5d8c35',mixed:'#6f7a39',rank:'#9a8048',short:'#735a3c',crop:'#4f8a2c',fallow:'#6b4c31'};
+const PATC={};
+function patTile(t,style){
+  const key=t+style;if(PATC[key])return PATC[key];
+  const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),R=rng(t.length*31+(style==='s4'?7:1));
+  g.fillStyle=BASE[t];g.fillRect(0,0,64,64);
+  const blob=(cols,n,rmin,rmax,a)=>{for(let i=0;i<n;i++){g.globalAlpha=a;g.fillStyle=cols[R()*cols.length|0];const x=R()*64,y=R()*64,r=rmin+R()*(rmax-rmin);for(const dx of[-64,0,64])for(const dy of[-64,0,64]){g.beginPath();g.ellipse(x+dx,y+dy,r,r*0.7,0,0,7);g.fill()}}g.globalAlpha=1};
+  const streak=(cols,n,len,a)=>{for(let i=0;i<n;i++){g.globalAlpha=a;g.strokeStyle=cols[R()*cols.length|0];g.lineWidth=1;const x=R()*64,y=R()*64;g.beginPath();g.moveTo(x,y);g.lineTo(x+(R()-.5)*2,y-len*(.5+R()));g.stroke()}g.globalAlpha=1};
+  switch(t){
+    case'leafy':blob(['#6fae45','#538f33','#78b84c'],46,2,6,.5);streak(['#86c457','#4d8a30'],60,4,.5);break;
+    case'shortgreen':blob(['#8cc35a','#6aa53f'],40,2,5,.5);blob(['#8d6e48'],10,1,2,.6);break;
+    case'mixed':blob(['#7ea345','#c2ad68','#8a9a4c'],50,2,6,.55);streak(['#d4bd7a','#6f9840'],50,4,.6);break;
+    case'rank':blob(['#b89a58','#dcc488'],40,2,6,.5);streak(['#a88f52','#e2cc8e','#8a9a4a'],120,6,.7);break;
+    case'short':blob(['#8a6c47','#ad8c60'],40,1,4,.6);blob(['#7d9a4c'],14,1,2,.8);break;
+    case'crop':blob(['#6c4f33','#86643f'],30,1,3,.5);break;
+    case'fallow':blob(['#7a5737','#9d7550'],40,1,3,.6);break;
+    case'bush':blob(['#4a5832','#66753f','#5d6b3a'],60,2,7,.6);break;
+  }
+  PATC[key]=c;return c;
+}
+
+/* ---- vector renderer: S3 clean, S4 painted, S5 level of detail ---- */
+function renderVec(cv,o){
+  const {W,H,ctx}=setup(cv);
+  const sc=scene(o.test),st=o.style||'s5';
+  const {z,vx0,vy0}=viewOf(o,W,H);
+  const X=wx=>(wx-vx0)*z,Y=wy=>(wy-vy0)*z*K;
+  const detail=st==='s5'?z>=26:true,markers=st==='s5'&&!detail;
+  // background bush
+  ctx.fillStyle=ctx.createPattern(patTile('bush',st),'repeat');ctx.fillRect(0,0,W,H);
+  // fields
+  const order=[...sc.pads].sort((a,b)=>a.y1-b.y1||a.y0-b.y0);
+  order.forEach(p=>{
+    const x=X(p.x0),y=Y(p.y0),w=(p.x1-p.x0)*z,h=(p.y1-p.y0)*z*K;
+    if(x>W||x+w<0||y>H+40||y+h<-40)return;
+    const hp=markers?HQ[p.t]*z*0.9:0;
+    if(st==='s4'){
+      const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,BASE[p.t]);g.addColorStop(1,FRONT[p.t]);ctx.fillStyle=g;ctx.fillRect(x,y,w,h);
+      const R=rng(p.n*97+3),pal={leafy:['#78b84c','#4f8a30','#98cf6a','#3e7425'],shortgreen:['#94c95f','#6aa53f','#a8d77a'],mixed:['#8aa84a','#cdb874','#6f9840','#e0cc8c'],rank:['#e2cc8e','#b39552','#c9ae69','#7f9a46','#f0dca4'],short:['#9b7b53','#7d9a4c','#b8946a'],crop:['#82d04a','#5fae36','#a3e06c'],fallow:['#7a5737','#a07a52','#634429']}[p.t];
+      const n=Math.min(9000,Math.round(w*h/(detail&&z>30?28:60)));
+      for(let i=0;i<n;i++){const sx=x+R()*w,sy=y+R()*h;if(p.t==='crop'&&((sy-y)/(z*K)*3%1)>.45)continue;const L=(HQ[p.t]*z*0.55+1.5)*(0.6+R()*.8);ctx.strokeStyle=pal[R()*pal.length|0];ctx.globalAlpha=.42;ctx.lineWidth=1+R()*Math.min(3,z*.05);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+(R()-.5)*L*.6,sy-L);ctx.stroke()}
+      ctx.globalAlpha=1;
+      if(p.t==='fallow'){ctx.strokeStyle='rgba(70,45,25,.35)';ctx.lineWidth=1;for(let ry=p.y0+.25;ry<p.y1;ry+=.3){ctx.beginPath();ctx.moveTo(x,Y(ry));ctx.lineTo(x+w,Y(ry));ctx.stroke()}}
+      return;
+    }
+    ctx.fillStyle=ctx.createPattern(patTile(p.t,st),'repeat');ctx.fillRect(x,y-hp,w,h);
+    if(hp>0.5){ctx.fillStyle=FRONT[p.t];ctx.fillRect(x,y+h-hp,w,hp);ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y-hp,w,Math.min(2,hp))}
+    if(p.t==='crop'){for(let ry=p.y0+.17;ry<p.y1;ry+=.33){ctx.strokeStyle=detail?'#4d3a26':'#77c447';ctx.lineWidth=Math.max(1,z*(detail?.04:.1));ctx.beginPath();ctx.moveTo(x,Y(ry)-hp);ctx.lineTo(x+w,Y(ry)-hp);ctx.stroke()}}
+    if(p.t==='fallow'){ctx.strokeStyle='rgba(80,52,30,.55)';ctx.lineWidth=Math.max(.8,z*.035);for(let ry=p.y0+.15;ry<p.y1;ry+=.25){ctx.beginPath();ctx.moveTo(x,Y(ry));ctx.lineTo(x+w,Y(ry));ctx.stroke()}}
+  });
+  // highlight
+  if(o.highlight){const p=sc.pads[o.highlight-1];ctx.strokeStyle='#c6f432';ctx.lineWidth=3;ctx.strokeRect(X(p.x0)+2,Y(p.y0)+2,(p.x1-p.x0)*z-4,(p.y1-p.y0)*z*K-4)}
+  // fences
+  const wire=Math.max(1,z*.045);
+  const fenceLine=(x1,y1,x2,y2)=>{ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=wire+1;ctx.beginPath();ctx.moveTo(X(x1),Y(y1)+1);ctx.lineTo(X(x2),Y(y2)+1);ctx.stroke();ctx.strokeStyle='#efe9d8';ctx.lineWidth=wire;ctx.beginPath();ctx.moveTo(X(x1),Y(y1));ctx.lineTo(X(x2),Y(y2));ctx.stroke();
+    if(z>12){const len=Math.hypot(x2-x1,y2-y1);const ph=Math.max(3,z*.16);ctx.strokeStyle='#5b3d24';ctx.lineWidth=Math.max(1.2,z*.05);for(let t=0;t<=len;t+=1){const px=X(x1+(x2-x1)*t/len),py=Y(y1+(y2-y1)*t/len);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px,py-ph);ctx.stroke()}}};
+  sc.pads.forEach(p=>{fenceLine(p.x0,p.y0,p.x1,p.y0);fenceLine(p.x0,p.y1,p.x1,p.y1);fenceLine(p.x0,p.y0,p.x0,p.y1);fenceLine(p.x1,p.y0,p.x1,p.y1)});
+  sc.gates.forEach(([gx,gy])=>{ctx.strokeStyle='#000';ctx.lineWidth=Math.max(2,z*.12)+2;ctx.beginPath();ctx.moveTo(X(gx),Y(gy));ctx.lineTo(X(gx+1),Y(gy));ctx.stroke();ctx.strokeStyle='#e8c860';ctx.lineWidth=Math.max(2,z*.12);ctx.beginPath();ctx.moveTo(X(gx),Y(gy));ctx.lineTo(X(gx+1),Y(gy));ctx.stroke()});
+  sc.tapes.forEach(([x1,y1,x2,y2])=>{ctx.setLineDash([Math.max(4,z*.25),Math.max(3,z*.15)]);ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,z*.05);ctx.beginPath();ctx.moveTo(X(x1),Y(y1));ctx.lineTo(X(x2),Y(y2));ctx.stroke();ctx.setLineDash([])});
+  // draft fence
+  let dr=null;
+  if(o.draft){const p=sc.pads[o.draft.pad-1],yy=(p.y0+p.y1)/2,xa=p.x0,xb=p.x1,xm=xa+(xb-xa)*o.draft.built;if(o.draft.built>0)fenceLine(xa,yy,xm,yy);dr={xa,xb,xm,yy,b:o.draft.built}}
+  // standing objects
+  const objs=[];const push=(y,fn)=>objs.push([y,fn]);
+  const vis=(wx,wy,m)=>{const sx=X(wx),sy=Y(wy);return sx>-m&&sx<W+m&&sy>-m&&sy<H+m*2};
+  if(detail&&st!=='s4'){
+    sc.pads.forEach(p=>{if(p.t==='fallow')return;const per={leafy:4,shortgreen:3,mixed:3.5,rank:3,short:1.2,crop:0}[p.t];
+      for(let i=p.x0;i<p.x1;i++)for(let j=p.y0;j<p.y1;j++){if(!vis(i+.5,j+.5,z*1.5))continue;const R=rng(i*73+j*131+p.n);
+        if(p.t==='crop'){for(let ry=.17;ry<1;ry+=.33)for(let rx=.12;rx<1;rx+=.25){const cx=i+rx+(R()-.5)*.05,cy=j+ry;push(cy,()=>clump(cx,cy,'crop',R))}continue}
+        const n=Math.floor(per)+(R()<per%1?1:0);for(let k=0;k<n;k++){const cx=i+.1+R()*.8,cy=j+.1+R()*.8;if(cy<=p.y0+.08||cy>=p.y1-.05||cx<=p.x0+.05||cx>=p.x1-.05)continue;push(cy,()=>clump(cx,cy,p.t,R))}}});
+  }
+  function clump(wx,wy,t,R){
+    const x=X(wx),y=Y(wy),hp=HQ[t]*z*(0.8+R()*.4),w=Math.max(3,.24*z);
+    ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(x,y,w*.6,w*.2,0,0,7);ctx.fill();
+    if(hp<2.5){ctx.fillStyle=t==='short'?'#7d9a4c':'#86c457';ctx.beginPath();ctx.ellipse(x,y-1,w*.45,Math.max(1,hp*.6),0,0,7);ctx.fill();return}
+    const gf=GF[t],n=t==='crop'?4:6,lw=Math.max(1.1,z*.032);ctx.lineCap='round';
+    const green=t==='crop'?'#7fcf45':(t==='leafy'?(R()<.5?'#5aa035':'#73b847'):'#5f9a38'),straw=R()<.5?'#d9bf74':'#c7ad6a';
+    for(let i=0;i<n;i++){const f=i/(n-1)-.5,bx=x+f*w*.7,tx=bx+f*w*.9+(R()-.5)*w*.3,ty=y-hp*(.75+R()*.3);const mx=bx+(tx-bx)*gf,my=y+(ty-y)*gf*1.1;
+      ctx.lineWidth=lw;ctx.strokeStyle=green;ctx.beginPath();ctx.moveTo(bx,y);ctx.lineTo(gf>=1?tx:mx,gf>=1?ty:my);ctx.stroke();
+      if(gf<1){ctx.strokeStyle=straw;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(tx,ty);ctx.stroke();if(t==='rank'&&R()<.5){ctx.fillStyle='#efdca4';ctx.beginPath();ctx.ellipse(tx,ty,lw*1.1,lw*1.8,0,0,7);ctx.fill()}}}
+  }
+  // trees, bore, troughs, house
+  sc.trees.forEach(([tx,ty])=>{if(vis(tx,ty,z*2))push(ty,()=>tree(X(tx),Y(ty)))});
+  function tree(x,y){const s=Math.max(8,z*1.15);ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(x+s*.25,y,s*.55,s*.18,0,0,7);ctx.fill();
+    ctx.strokeStyle='#e6e1d3';ctx.lineWidth=Math.max(1.5,s*.09);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-s*.8);ctx.moveTo(x,y-s*.5);ctx.lineTo(x-s*.25,y-s*.85);ctx.moveTo(x,y-s*.6);ctx.lineTo(x+s*.25,y-s*.95);ctx.stroke();
+    const R=rng(Math.round(x*7+y*3));for(let i=0;i<6;i++){const bx=x+(R()-.5)*s*.8,by=y-s*(.85+R()*.35),br=s*(.18+R()*.12);const g=ctx.createRadialGradient(bx-br*.3,by-br*.3,br*.1,bx,by,br);g.addColorStop(0,'#8fa866');g.addColorStop(1,'#4d6236');ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,br,0,7);ctx.fill()}}
+  push(sc.bore[1],()=>windmill(X(sc.bore[0]),Y(sc.bore[1])));
+  function windmill(x,y){const s=Math.max(14,z*1.9);ctx.strokeStyle='#8e9196';ctx.lineWidth=Math.max(1,s*.04);ctx.beginPath();ctx.moveTo(x-s*.16,y);ctx.lineTo(x,y-s);ctx.lineTo(x+s*.16,y);for(let k=1;k<4;k++){const yy=y-s*k/4,hw=s*.16*(1-k/4);ctx.moveTo(x-hw,yy);ctx.lineTo(x+hw,yy)}ctx.stroke();
+    const cy=y-s,r=s*.28;for(let a=0;a<12;a++){const an=a/12*6.283;ctx.strokeStyle=a%2?'#e2e2dc':'#b5b6b2';ctx.lineWidth=Math.max(1.5,s*.05);ctx.beginPath();ctx.moveTo(x,cy);ctx.lineTo(x+Math.cos(an)*r,cy+Math.sin(an)*r);ctx.stroke()}
+    ctx.fillStyle='#c0503d';ctx.fillRect(x+r*.7,cy-s*.05,s*.18,s*.1);
+    ctx.fillStyle='#9aa0a4';ctx.beginPath();ctx.roundRect(x-s*.55,y-s*.28,s*.3,s*.28,2);ctx.fill();ctx.strokeStyle='#6e7478';ctx.lineWidth=1;ctx.stroke()}
+  sc.troughs.forEach(([tx,ty,low])=>{if(vis(tx,ty,z))push(ty,()=>{const x=X(tx),y=Y(ty),w=Math.max(8,z*.7),h=Math.max(4,z*.3);ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(x+1,y+h*.35,w*.6,h*.45,0,0,7);ctx.fill();ctx.fillStyle='#a9aba8';ctx.strokeStyle='#4d5052';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,h/2);ctx.fill();ctx.stroke();ctx.fillStyle=low?'#8c7a4e':'#4fa3dc';ctx.beginPath();ctx.roundRect(x-w/2+2,y-h/2+1.5,(w-4)*(low?.4:1),h-3,h/2);ctx.fill()})});
+  push(sc.house[1],()=>{const x=X(sc.house[0]),y=Y(sc.house[1]),s=Math.max(14,z*2.2);ctx.fillStyle='rgba(0,0,0,.22)';ctx.fillRect(x+3,y-1,s,4);ctx.fillStyle='#ece2c8';ctx.fillRect(x,y-s*.45,s,s*.45);ctx.strokeStyle='#4a3a2a';ctx.lineWidth=1;ctx.strokeRect(x,y-s*.45,s,s*.45);ctx.fillStyle='#b84a3a';ctx.beginPath();ctx.moveTo(x-s*.06,y-s*.45);ctx.lineTo(x+s*.5,y-s*.8);ctx.lineTo(x+s*1.06,y-s*.45);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#5a8fc0';ctx.fillRect(x+s*.15,y-s*.33,s*.18,s*.14);ctx.fillRect(x+s*.67,y-s*.33,s*.18,s*.14);ctx.fillStyle='#6b4a2c';ctx.fillRect(x+s*.44,y-s*.25,s*.12,s*.25)});
+  // cattle
+  const L=Math.max(6,Math.min(42,z*.55));
+  if(!markers){sc.mobs.forEach(m=>{let cows=m.cows;if(st==='s5'){const cap=Math.min(m.n,Math.round((m.a[2]-m.a[0])*(m.a[3]-m.a[1])*2.2));cows=m.cows.filter((c,i)=>i%Math.ceil(m.n/cap)===0)}
+    cows.forEach(c=>{if(vis(c.x,c.y,L))push(c.y,()=>{st==='s4'?cowSil(ctx,X(c.x),Y(c.y),c.calf?L*.6:L,c.flip):cowVec(ctx,X(c.x),Y(c.y),c.calf?L*.6:L,c.breed,c.flip)})})})}
+  if(dr){const yy=dr.yy;for(let px=dr.xm+.35;px<dr.xb;px+=.5){const xx=px;push(yy,()=>{ctx.fillStyle='#f08a30';ctx.fillRect(X(xx)-1,Y(yy)-Math.max(4,z*.18),2.5,Math.max(4,z*.18))})}
+    if(o.ute&&dr.b>0)push(yy+.4,()=>ute(X(dr.xm)-z*.5,Y(yy+.4)))}
+  function ute(x,y){const s=Math.max(16,z*.9);ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(x+s*.5,y+1,s*.6,s*.12,0,0,7);ctx.fill();ctx.fillStyle='#f4f4ee';ctx.strokeStyle='#222';ctx.lineWidth=1.2;ctx.beginPath();ctx.roundRect(x,y-s*.42,s,s*.3,3);ctx.fill();ctx.stroke();ctx.beginPath();ctx.roundRect(x+s*.55,y-s*.66,s*.36,s*.26,3);ctx.fill();ctx.stroke();ctx.fillStyle='#6fa8d6';ctx.fillRect(x+s*.62,y-s*.6,s*.24,s*.14);ctx.fillStyle='#222';ctx.beginPath();ctx.arc(x+s*.2,y-s*.1,s*.11,0,7);ctx.arc(x+s*.8,y-s*.1,s*.11,0,7);ctx.fill()}
+  objs.sort((a,b)=>a[0]-b[0]).forEach(e=>e[1]());
+  // mob badges / markers
+  sc.mobs.forEach(m=>{const x=X(m.cx),y=Y(m.cy);if(x<-60||x>W+60||y<-60||y>H+60)return;
+    if(o.dots){ctx.fillStyle='#f3e7cf';ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill();ctx.stroke();return}
+    if(markers){const rx=m.sx*z*1.15,ry=m.sy*z*K*1.15;ctx.fillStyle='rgba(40,26,10,.24)';ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,7);ctx.fill();ctx.setLineDash([4,3]);ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1.2;ctx.stroke();ctx.setLineDash([]);badge(x,y,m.n,W>=360)}
+    else if(st==='s5')badge(x,Y(m.a[1])-6,m.n,false)});
+  function badge(x,y,n,big){const t=n+'';ctx.font=`700 ${big?12:10}px "JetBrains Mono", monospace`;const tw=ctx.measureText(t).width,w=tw+(big?34:28),h=big?24:19;x-=w/2;y-=h/2;
+    ctx.fillStyle='rgba(11,18,32,.92)';ctx.strokeStyle='#c6f432';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();ctx.stroke();
+    cowIcon(x+(big?7:6),y+h/2,big?16:13);ctx.fillStyle='#f3e7cf';ctx.fillText(t,x+(big?27:22),y+h/2+4)}
+  function cowIcon(x,y,s){ctx.fillStyle='#f3e7cf';ctx.beginPath();ctx.ellipse(x+s*.45,y,s*.38,s*.2,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(x+s*.88,y-s*.12,s*.13,s*.1,0,0,7);ctx.fill();ctx.fillRect(x+s*.15,y,s*.08,s*.3);ctx.fillRect(x+s*.65,y,s*.08,s*.3)}
+  // labels
+  if(o.labels!==0){sc.pads.forEach(p=>{const pw=(p.x1-p.x0)*z,cx=X((p.x0+p.x1)/2),cy=Y(p.y0)+5-(markers?HQ[p.t]*z*.9:0);if(cx<-40||cx>W+40||cy<-20||cy>H)return;if(pw<60)return;const c=CHIP[p.t];pill(ctx,W,cx,cy,pw<120?'P'+p.n:'Paddock '+p.n,c[0],c[1])})}
+  if(dr){const y=Y(dr.yy);ctx.setLineDash([8,6]);ctx.lineWidth=3;ctx.strokeStyle='#000';ctx.beginPath();ctx.moveTo(X(dr.xm),y+1);ctx.lineTo(X(dr.xb),y+1);ctx.stroke();ctx.strokeStyle=dr.b>0?'#f08a40':'#f3e7cf';ctx.beginPath();ctx.moveTo(X(dr.xm),y);ctx.lineTo(X(dr.xb),y);ctx.stroke();ctx.setLineDash([]);
+    if(dr.b===0){[dr.xa,dr.xb].forEach(xx=>{ctx.fillStyle='#c6f432';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.rect(X(xx)-6,y-6,12,12);ctx.fill();ctx.stroke()});pill(ctx,W,X((dr.xa+dr.xb)/2),y-30,'650 m electric',null)}
+    else pill(ctx,W,X(dr.xm),y+14,'Building fence '+Math.round(dr.b*100)+'%',null)}
+  // overview inset
+  if(o.inset){const [ix,iy,iw]=o.inset,ih=Math.round(iw*(26.8*K)/40.8);const c2=document.createElement('canvas');c2.dataset.w=iw;c2.dataset.h=ih;renderVec(c2,{view:'whole',margin:.4,labels:0,style:'s5',dots:1});
+    ctx.fillStyle='rgba(11,18,32,.85)';ctx.fillRect(ix-3,iy-3,iw+6,ih+6);ctx.drawImage(c2,ix,iy,iw,ih);
+    const v=viewOf({view:'whole',margin:.4},iw,ih),rx=ix+(vx0-v.vx0)*v.z,ry=iy+(vy0-v.vy0)*v.z*K,rw=W/z*v.z,rh=H/(z*K)*v.z*K;
+    ctx.save();ctx.beginPath();ctx.rect(ix,iy,iw,ih);ctx.clip();ctx.strokeStyle='#c6f432';ctx.lineWidth=2;ctx.strokeRect(rx,ry,rw,rh);ctx.restore()}
+  if(o.tint==='dawn'){ctx.fillStyle='rgba(255,150,70,.16)';ctx.fillRect(0,0,W,H)}
+}
+function cowVec(ctx,x,y,L,breed,flip){
+  const col={angus:'#24201e',hereford:'#8f3a1f',brahman:'#bdb7aa',redb:'#b0603a'}[breed],head={angus:'#24201e',hereford:'#efe8dc',brahman:'#a9a395',redb:'#9c5432'}[breed];
+  ctx.save();ctx.translate(x,y);if(flip)ctx.scale(-1,1);
+  ctx.fillStyle='rgba(0,0,0,.32)';ctx.beginPath();ctx.ellipse(0,1,L*.55,L*.15,0,0,7);ctx.fill();
+  const lw=Math.max(.9,L*.055);ctx.lineWidth=lw;ctx.strokeStyle='#120d0a';
+  ctx.fillStyle='#1d1612';[-.32,-.18,.16,.28].forEach(lx=>ctx.fillRect(L*lx,-L*.24,L*.08,L*.24));
+  if(breed==='brahman'||breed==='redb'){ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(L*.16,-L*.6,L*.12,L*.09,0,0,7);ctx.fill();ctx.stroke()}
+  ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(-L*.45,-L*.62,L*.8,L*.42,L*.17);ctx.fill();ctx.stroke();
+  if(breed==='hereford'){ctx.fillStyle='#efe8dc';ctx.beginPath();ctx.roundRect(-L*.2,-L*.28,L*.4,L*.08,L*.04);ctx.fill()}
+  if(breed==='angus'){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(-L*.3,-L*.6);ctx.lineTo(L*.2,-L*.6);ctx.stroke();ctx.strokeStyle='#120d0a'}
+  ctx.fillStyle=head;ctx.beginPath();ctx.roundRect(L*.3,-L*.72,L*.25,L*.24,L*.08);ctx.fill();ctx.stroke();
+  ctx.fillStyle=breed==='brahman'?'#6d675c':col;ctx.beginPath();ctx.ellipse(L*.33,breed==='brahman'?-L*.56:-L*.72,L*.06,L*.045,0,0,7);ctx.fill();
+  ctx.restore();
+}
+function cowSil(ctx,x,y,L,flip){
+  ctx.save();ctx.translate(x,y);if(flip)ctx.scale(-1,1);
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(0,1,L*.55,L*.14,0,0,7);ctx.fill();
+  ctx.fillStyle='#2a1f18';[-.32,-.18,.16,.28].forEach(lx=>ctx.fillRect(L*lx,-L*.24,L*.08,L*.24));
+  ctx.beginPath();ctx.ellipse(-L*.05,-L*.42,L*.42,L*.2,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(L*.42,-L*.55,L*.14,L*.11,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,236,190,.85)';ctx.lineWidth=Math.max(1,L*.06);ctx.beginPath();ctx.ellipse(-L*.05,-L*.42,L*.42,L*.2,0,3.5,5.9);ctx.stroke();
+  ctx.restore();
+}
+
+/* ---- pixel renderer on the same scene: S1 current, S2 hi-bit ---- */
+function renderPix(cv,o){
+  const W=+cv.dataset.w,H=+cv.dataset.h;cv.width=W;cv.height=H;cv.style.width=W+'px';cv.style.height=H+'px';cv.classList.add('pix');
+  const sc=scene(o.test),hb=o.style==='s2',aps=hb?10:12;
+  const {z,vx0,vy0}=viewOf(o,W,H);const P=z/aps,aw=Math.ceil(W/P),ah=Math.ceil(H/P);
+  const img=new ImageData(aw,ah),b=img.data,R=rng(5);
+  const set=(x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=aw||y>=ah)return;const i=(y*aw+x)*4;b[i]=c[0];b[i+1]=c[1];b[i+2]=c[2];b[i+3]=255};
+  const dark=(x,y,f)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=aw||y>=ah)return;const i=(y*aw+x)*4;b[i]*=f;b[i+1]*=f;b[i+2]*=f};
+  const AX=wx=>(wx-vx0)*aps,AY=wy=>(wy-vy0)*aps*K;
+  const nz=(c,a)=>{const n=(R()-.5)*a;return[c[0]+n,c[1]+n,c[2]+n*.7]};
+  const C={young:[150,216,70],old:[66,138,50],straw:[224,192,104],weath:[180,160,108],under:[70,88,40],litter:[170,144,88],soil:[128,94,60],fallow:[112,80,52],crop:[128,212,64],seed:[239,220,164],wire:[214,208,192],post:[104,74,46]};
+  for(let y=0;y<ah;y++)for(let x=0;x<aw;x++)set(x,y,nz([88,98,56],14));
+  sc.pads.forEach(p=>{const x0=Math.max(0,Math.floor(AX(p.x0))),x1=Math.min(aw-1,Math.ceil(AX(p.x1))),y0=Math.max(0,Math.floor(AY(p.y0))),y1=Math.min(ah-1,Math.ceil(AY(p.y1)));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){let c;switch(p.t){case'leafy':case'shortgreen':c=nz(C.under,16);break;case'mixed':c=nz(mix(C.under,C.litter,.45),16);break;case'rank':c=nz(C.litter,18);break;case'short':c=R()<.3?nz([150,118,78],10):nz(C.soil,14);break;case'crop':c=nz([98,76,50],10);if((y-y0)%3===0)c=nz([84,64,42],8);break;case'fallow':c=nz(C.fallow,12);if((y-y0)%3===0)c=nz([94,66,42],8);break}set(x,y,c)}});
+  const objs=[];const push=(y,fn)=>objs.push([y,fn]);
+  sc.pads.forEach(p=>{if(p.t==='fallow')return;const x0=Math.max(0,AX(p.x0)+2),x1=Math.min(aw,AX(p.x1)-1),y0=Math.max(0,AY(p.y0)+2),y1=Math.min(ah+12,AY(p.y1));const crop=p.t==='crop',stx=crop?2:(hb?7:4),sty=hb?5:3;let row=0;
+    for(let y=y0;y<y1;y+=sty,row++){const off=crop?0:(row%2)*(stx/2);for(let x=x0+off;x<x1;x+=stx){if(p.t==='short'&&R()<.55)continue;const tx=x+(crop?0:Math.round(R()*2-1)),ty=y+(crop?0:(R()*2|0));push(ty,()=>tuft(tx,ty,p.t))}}});
+  function tuft(x,y,t){let h,gf,g,st=C.straw,seed=false;const r=R();const m=hb?1.4:1;
+    switch(t){case'leafy':h=4+(r*3|0);gf=1;g=mix(C.young,C.old,.35+R()*.25);break;case'shortgreen':h=1+(r*2|0);gf=1;g=mix(C.young,C.old,.15);break;case'mixed':h=3+(r*4|0);gf=.55;g=mix(C.young,C.old,.5);st=mix(C.straw,C.weath,.3);break;case'rank':h=8+(r*5|0);gf=.2;g=C.old;st=mix(C.straw,C.weath,R()*.6);seed=R()<.55;break;case'short':h=1;gf=.6;g=C.old;st=C.weath;break;case'crop':h=4+(r*2|0);gf=1;g=C.crop;break}
+    h=Math.round(h*m);const bw=hb?2:1,bl=hb?[[-3,.6,-1],[-1,1,0],[1,.8,1]]:[[-1,.8,-1],[0,1,0],[1,.8,1]];
+    for(const [dx,hm,ln] of bl){const bh=Math.max(1,Math.round(h*hm)),gH=Math.max(1,Math.round(bh*gf*1.2));for(let k=0;k<bh;k++){const lx=x+dx+(k>=bh*.55&&bh>2?ln:0);let c=k<gH?g:st;c=sh(c,dx<0?.78:(dx>0?1.1:1));for(let q=0;q<bw;q++)set(lx+q,y-k,c)}if(seed&&dx===(hb?-1:0))for(let q=0;q<bw;q++)set(x+dx+q,y-bh,C.seed)}
+    if(hb){dark(x-2,y+1,.8);dark(x,y+1,.75);dark(x+2,y+1,.8)}}
+  // fences
+  sc.pads.forEach(p=>{const h=(x1,y1,x2,y2)=>{const n=Math.max(Math.abs(AX(x2)-AX(x1)),Math.abs(AY(y2)-AY(y1)));for(let i=0;i<=n;i++){const x=AX(x1)+(AX(x2)-AX(x1))*i/n,y=AY(y1)+(AY(y2)-AY(y1))*i/n;set(x,y,C.wire);if(i%5===0)push(y,()=>{set(x,y,C.post);set(x,y-1,C.post);set(x,y-2,[150,112,72])})}};h(p.x0,p.y0,p.x1,p.y0);h(p.x0,p.y1,p.x1,p.y1);h(p.x0,p.y0,p.x0,p.y1);h(p.x1,p.y0,p.x1,p.y1)});
+  sc.tapes.forEach(([x1,y1,x2,y2])=>{for(let y=AY(y1);y<AY(y2);y++)if((y|0)%3)set(AX(x1),y,[250,250,250])});
+  sc.troughs.forEach(([tx,ty,low])=>push(AY(ty),()=>{const x=AX(tx)-3,y=AY(ty);for(let i=0;i<6;i++){set(x+i,y,[150,150,146]);set(x+i,y-1,[150,150,146])}for(let i=1;i<5;i++)set(x+i,y-1,low?[120,110,74]:[80,156,214])}));
+  {const x=AX(sc.bore[0]),y=AY(sc.bore[1]),hh=Math.round(aps*1.6);push(y,()=>{for(let k=0;k<hh;k++){const s=Math.round((hh-k)/5);set(x-s,y-k,[150,150,150]);set(x+s,y-k,[110,110,110])}for(let a=0;a<12;a++){const an=a/12*6.283;for(let d=1;d<=5;d++)set(x+Math.cos(an)*d,y-hh+Math.sin(an)*d*.9,a%2?[220,220,215]:[190,190,186])}})}
+  sc.trees.forEach(([tx,ty])=>push(AY(ty),()=>{const x=AX(tx),y=AY(ty);for(let i=-4;i<=6;i++)dark(x+i,y,.72);for(let k=0;k<9;k++){set(x,y-k,[226,220,204])}const RR=rng(Math.round(tx*7+ty));for(let n=0;n<5;n++){const bx=x+(RR()*10-5|0),by=y-9-(RR()*5|0),br=2+(RR()*2|0);for(let yy=-br;yy<=br;yy++)for(let xx=-br-1;xx<=br+1;xx++)if(xx*xx/(br+1)/(br+1)+yy*yy/br/br<=1)set(bx+xx,by+yy,yy<0&&xx<0?[120,140,74]:[88,110,58])}}));
+  {const x=AX(sc.house[0]),y=AY(sc.house[1]);push(y,()=>{for(let j=0;j<6;j++)for(let i=0;i<16;i++)set(x+i,y-j,[232,220,190]);for(let k=0;k<5;k++)for(let i=-1+k;i<17-k;i++)set(x+i,y-7-k,k%2?[160,60,48]:[186,74,58])})}
+  const COW=[".....ee","bbbbbhh","bbbbbbh","bbbbbb.","l.l..l."];
+  const COWH=["..........oo","oooooooooobo","obbbbbbbbbbo","obbbbbbbbbo.","obbbbbbbbbo.",".oloo.olo...",".ol...ol...."];
+  const cc={angus:[44,38,36],hereford:[150,64,36],brahman:[212,206,192],redb:[178,104,62]};
+  sc.mobs.forEach(m=>m.cows.forEach(c=>{const x=AX(c.x),y=AY(c.y);if(x<-12||x>aw+12||y<-12||y>ah+12)return;push(y,()=>{const col=cc[c.breed];const s=hb?COWH:COW,w=s[0].length;
+    for(let i=-1;i<=w;i++)dark(x+i-w/2,y+1,hb?.55:.7);
+    s.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch==='.')return;const ix=c.flip?w-1-i:i;const col2=ch==='b'?col:ch==='h'?sh(col,.82):ch==='e'?[230,220,200]:ch==='o'?[20,14,10]:[40,32,28];set(x+ix-w/2,y-s.length+1+j,col2)}))})}));
+  objs.sort((a,b)=>a[0]-b[0]).forEach(e=>e[1]());
+  const off=document.createElement('canvas');off.width=aw;off.height=ah;off.getContext('2d').putImageData(img,0,0);
+  const ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.drawImage(off,0,0,aw*P,ah*P);
+  if(o.labels!==0)sc.pads.forEach(p=>{const pw=(p.x1-p.x0)*z;if(pw<60)return;const cx=((p.x0+p.x1)/2-vx0)*z,cy=(p.y0-vy0)*z*K+5;if(cx<-40||cx>W+40||cy<-20||cy>H)return;const c=CHIP[p.t];pill(ctx,W,cx,cy,pw<120?'P'+p.n:'Paddock '+p.n,c[0],c[1])});
+}
+function renderMap(cv){const o=JSON.parse(cv.dataset.o||'{}');(o.style==='s1'||o.style==='s2')?renderPix(cv,o):renderVec(cv,o)}
+
+/* ---- decorative pixel farm (landing hero, setup cards) ---- */
+function drawFarm(cv){
+  const o=Object.assign({seed:1,p:3,tint:'day',sky:0},JSON.parse(cv.dataset.o||'{}'));
+  const W=+cv.dataset.w,H=+cv.dataset.h;cv.width=W;cv.height=H;cv.style.width=W+'px';cv.style.height=H+'px';cv.classList.add('pix');
+  const P=o.p,aw=Math.ceil(W/P),ah=Math.ceil(H/P),img=new ImageData(aw,ah),b=img.data,R=rng(o.seed*31+7);
+  const set=(x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=aw||y>=ah)return;const i=(y*aw+x)*4;b[i]=c[0];b[i+1]=c[1];b[i+2]=c[2];b[i+3]=255};
+  const dark=(x,y,f)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=aw||y>=ah)return;const i=(y*aw+x)*4;b[i]*=f;b[i+1]*=f;b[i+2]*=f};
+  const nz=(c,a)=>{const n=(R()-.5)*a;return[c[0]+n,c[1]+n,c[2]+n*.7]};
+  for(let y=0;y<ah;y++)for(let x=0;x<aw;x++)set(x,y,nz([88,98,56],14));
+  const skyH=o.sky?Math.round(ah*o.sky):0;
+  if(skyH){const pal=[[18,22,48],[40,36,78],[86,52,104],[150,72,104],[214,110,92],[244,160,100]],bay=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+    for(let y=0;y<skyH;y++)for(let x=0;x<aw;x++){const t=y/skyH*(pal.length-1);const k=Math.min(pal.length-1,Math.floor(t+bay[y%4][x%4]/16-.5));set(x,y,pal[Math.max(0,k)])}
+    for(let i=0;i<aw/6;i++)set(R()*aw,R()*skyH*.35,[240,230,210]);
+    const sx=aw*.72|0,sy=skyH-2,sr=Math.max(5,skyH*.16|0);for(let y=-sr;y<=0;y++)for(let x=-sr;x<=sr;x++){const d=Math.hypot(x,y);if(d<=sr)set(sx+x,sy+y,d>sr-1.2?[255,190,110]:[255,214,130])}
+    for(let i=0;i<4;i++){const cx=R()*aw|0,cy=(R()*skyH*.6+skyH*.1)|0,len=(R()*30+18)|0;for(let y=0;y<3;y++){const l=len-Math.abs(y-1.5)*4;for(let x=0;x<l;x++)set(cx+x-l/2,cy+y,y<1.5?[236,150,128]:[176,96,120])}}
+    for(let x=0;x<aw;x++){const h1=Math.round(6+4*Math.sin(x*.05+o.seed)+3*Math.sin(x*.13)),h2=Math.round(3+3*Math.sin(x*.08+o.seed*2));for(let y=skyH-h1;y<skyH;y++)set(x,y,[92,68,106]);for(let y=skyH-h2;y<skyH;y++)set(x,y,[66,62,80])}}
+  const m=3,fx0=m,fy0=skyH+m,fx1=aw-m,fy1=ah-m,us=[0,.27,.51,.76,1],vs=[0,.35,.68,1],types=['mixed','leafy','rank','shortgreen','crop','leafy','short','fallow','rank','mixed'],cells=[[0,0,1,1],[1,0,2,1],[2,0,3,1],[3,0,4,2],[0,1,1,2],[1,1,2,2],[2,1,3,2],[0,2,2,3],[2,2,3,3],[3,2,4,3]];
+  const pads=cells.map((c,i)=>({t:types[i],x0:Math.round(fx0+us[c[0]]*(fx1-fx0)),x1:Math.round(fx0+us[c[2]]*(fx1-fx0)),y0:Math.round(fy0+vs[c[1]]*(fy1-fy0)),y1:Math.round(fy0+vs[c[3]]*(fy1-fy0))}));
+  const G={young:[150,216,70],old:[66,138,50],straw:[224,192,104],under:[70,88,40],litter:[170,144,88],soil:[128,94,60]};
+  pads.forEach(p=>{for(let y=p.y0;y<=p.y1;y++)for(let x=p.x0;x<=p.x1;x++){let c;switch(p.t){case'leafy':case'shortgreen':c=nz(G.under,16);break;case'mixed':c=nz(mix(G.under,G.litter,.45),16);break;case'rank':c=nz(G.litter,18);break;case'short':c=nz(G.soil,14);break;case'crop':c=nz([98,76,50],10);if((y-p.y0)%3===0)c=nz([84,64,42],8);break;case'fallow':c=nz([112,80,52],12);if((y-p.y0)%3===0)c=nz([94,66,42],8);break}set(x,y,c)}});
+  const objs=[];const push=(y,fn)=>objs.push([y,fn]);
+  pads.forEach(p=>{if(p.t==='fallow')return;let row=0;for(let y=p.y0+2;y<p.y1;y+=3,row++){const off=p.t==='crop'?0:(row%2)*2;for(let x=p.x0+2+off;x<p.x1-1;x+=(p.t==='crop'?2:4)){if(p.t==='short'&&R()<.55)continue;const tx=x,ty=y;push(ty,()=>{let h,gf,g;switch(p.t){case'leafy':h=4+(R()*3|0);gf=1;g=mix(G.young,G.old,.4);break;case'shortgreen':h=2;gf=1;g=G.young;break;case'mixed':h=4;gf=.55;g=mix(G.young,G.old,.5);break;case'rank':h=9+(R()*4|0);gf=.2;g=G.old;break;case'short':h=1;gf=.6;g=G.old;break;case'crop':h=4;gf=1;g=[128,212,64];break}for(const [dx,hm,ln] of [[-1,.8,-1],[0,1,0],[1,.8,1]]){const bh=Math.max(1,Math.round(h*hm));for(let k=0;k<bh;k++)set(tx+dx+(k>=bh*.55&&bh>2?ln:0),ty-k,sh(k<bh*gf*1.2?g:G.straw,dx<0?.78:dx>0?1.1:1))}})}}});
+  pads.forEach(p=>{for(let x=p.x0;x<=p.x1;x++){set(x,p.y0,[214,208,192]);set(x,p.y1,[214,208,192])}for(let y=p.y0;y<=p.y1;y++){set(p.x0,y,[214,208,192]);set(p.x1,y,[214,208,192])}});
+  const COW=[".....ee","bbbbbhh","bbbbbbh","bbbbbb.","l.l..l."],cols=[[150,72,42],[44,38,36],[212,206,192],[178,120,70]];
+  [[5,14],[1,9],[8,8]].forEach(([pi,n])=>{const p=pads[pi];for(let k=0;k<n;k++){const x=p.x0+4+R()*(p.x1-p.x0-10),y=p.y0+6+R()*(p.y1-p.y0-8),col=cols[R()*4|0],fl=R()<.5;push(y,()=>{for(let i=-1;i<=7;i++)dark(x+i,y+1,.7);COW.forEach((row,j)=>[...row].forEach((c,i)=>{if(c==='.')return;const ix=fl?6-i:i;set(x+ix,y-4+j,c==='b'?col:c==='h'?sh(col,.82):c==='e'?[230,220,200]:[40,32,28])}))})}});
+  for(let i=0;i<10;i++){const x=R()*aw|0,y=skyH+(R()*(ah-skyH))|0;push(y,()=>{for(let k=0;k<8;k++)set(x,y-k,[226,220,204]);for(let n=0;n<5;n++){const bx=x+(R()*10-5|0),by=y-8-(R()*5|0),br=2+(R()*2|0);for(let yy=-br;yy<=br;yy++)for(let xx=-br-1;xx<=br+1;xx++)if(xx*xx/(br+1)/(br+1)+yy*yy/br/br<=1)set(bx+xx,by+yy,yy<0&&xx<0?[120,140,74]:[88,110,58])}})}
+  objs.sort((a,b)=>a[0]-b[0]).forEach(e=>e[1]());
+  if(o.tint!=='day')for(let i=0;i<b.length;i+=4){if(o.tint==='dawn'){b[i]=b[i]*1.06+20;b[i+1]=b[i+1]*.97+6;b[i+2]=b[i+2]*.82}else{b[i]=b[i]*.86+18;b[i+1]=b[i+1]*.74+6;b[i+2]=b[i+2]*.86+26}}
+  const off=document.createElement('canvas');off.width=aw;off.height=ah;off.getContext('2d').putImageData(img,0,0);const ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.drawImage(off,0,0,aw*P,ah*P);
+}
+
+/* ---- side-view sward picture ---- */
+function drawSward(cv){
+  const o=Object.assign({h:12,g:9,pct:64,kg:1850,dry:.25},JSON.parse(cv.dataset.o||'{}'));
+  const {W,H,ctx}=setup(cv);const R=rng(Math.round(o.h*7+o.g));
+  const left=26,ground=H-16,top=8,cm=c=>ground-(c/80)*(ground-top);
+  const g=ctx.createLinearGradient(0,0,0,ground);g.addColorStop(0,'#8ec3e6');g.addColorStop(1,'#d7ecf6');ctx.fillStyle=g;ctx.fillRect(0,0,W,ground);
+  ctx.fillStyle='#6e4f33';ctx.fillRect(0,ground,W,H-ground);ctx.fillStyle='#b8995e';ctx.fillRect(left,ground-2,W-left,3+o.dry*3);
+  const nd=Math.round(8+o.dry*40);ctx.lineCap='round';
+  for(let i=0;i<nd;i++){const x=left+6+R()*(W-left-12),h=o.h*(.75+R()*.35),lean=(R()-.5)*10;ctx.strokeStyle=R()<.5?'#cdb070':'#b4975a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x,ground);ctx.quadraticCurveTo(x+lean*.3,cm(h*.6),x+lean,cm(h));ctx.stroke();if(o.dry>.5&&R()<.5){ctx.fillStyle='#ead6a0';ctx.beginPath();ctx.ellipse(x+lean,cm(h),2,4,0,0,7);ctx.fill()}}
+  for(let i=0;i<70;i++){const x=left+4+R()*(W-left-8),h=o.g*(.6+R()*.5),lean=(R()-.5)*14;ctx.strokeStyle=R()<.5?'#6fbf45':'#4f9a35';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(x,ground);ctx.quadraticCurveTo(x+lean*.2,cm(h*.5),x+lean,cm(h));ctx.stroke()}
+  ctx.fillStyle='#22304d';ctx.font='9px "JetBrains Mono", monospace';[0,20,40,60,80].forEach(c=>{const y=cm(c);ctx.fillRect(left-5,y,5,1);ctx.fillText(c,2,y+3)});ctx.fillRect(left-1,top,1,ground-top);
+  const cap=(o.cap?o.cap+' · ':'')+`${o.h} cm · green to ${o.g} cm · ${o.pct}% green · ${o.kg.toLocaleString('en-AU')} kg DM/ha`;
+  ctx.font='600 9px "JetBrains Mono", monospace';const tw=Math.min(W-left-8,ctx.measureText(cap).width+12);ctx.fillStyle='rgba(11,18,32,.84)';ctx.beginPath();ctx.roundRect(left+4,4,tw,16,4);ctx.fill();ctx.fillStyle='#f3e7cf';ctx.save();ctx.beginPath();ctx.rect(left+4,4,tw,16);ctx.clip();ctx.fillText(cap,left+10,15.5);ctx.restore();
+}
+
+/* ---- painted farm images for ads and photos (placeholder) ---- */
+function paintAd(cv){
+  const {W,H,ctx:c}=setup(cv);const k=cv.dataset.k,R=rng(k.length*13+Math.round(W));
+  const lg=(y0,y1,st)=>{const g=c.createLinearGradient(0,y0,0,y1);st.forEach(s=>g.addColorStop(s[0],s[1]));return g};
+  const hill=(base,amp,fq,ph,c1,c2)=>{c.beginPath();c.moveTo(0,H);for(let x=0;x<=W+4;x+=Math.max(2,W/60))c.lineTo(x,H*base-Math.sin(x/W*fq+ph)*H*amp-Math.sin(x/W*fq*2.3+ph*1.7)*H*amp*.4);c.lineTo(W,H);c.closePath();c.fillStyle=lg(H*(base-amp),H,[[0,c1],[1,c2]]);c.fill()};
+  const grass=(y0,cols,n,len)=>{c.lineCap='round';for(let i=0;i<n;i++){const y=y0+R()*(H-y0),x=R()*W,d=(y-y0)/(H-y0+1),l=len*(.4+R()*.8)*(.35+d);c.strokeStyle=cols[R()*cols.length|0];c.globalAlpha=.55;c.lineWidth=Math.max(.7,W/500+d*1.2);c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+(R()-.5)*l*.3,y-l*.5,x+(R()-.5)*l*.6,y-l);c.stroke()}c.globalAlpha=1};
+  const cow=(x,y,s,col,fl,outline)=>{c.save();c.translate(x,y);if(fl)c.scale(-1,1);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,0,s*.5,s*.07,0,0,7);c.fill();c.fillStyle=col;c.strokeStyle=outline||'transparent';c.lineWidth=Math.max(.8,s*.025);
+    [-.3,-.17,.15,.27].forEach(lx=>{c.beginPath();c.roundRect(s*lx,-s*.3,s*.07,s*.3,1);c.fill();if(outline)c.stroke()});
+    c.beginPath();c.ellipse(-s*.02,-s*.42,s*.4,s*.18,0,0,7);c.fill();if(outline)c.stroke();c.beginPath();c.ellipse(s*.12,-s*.58,s*.11,s*.07,0,0,7);c.fill();
+    c.beginPath();c.ellipse(s*.42,-s*.5,s*.13,s*.09,-.5,0,7);c.fill();if(outline)c.stroke();c.strokeStyle=col;c.lineWidth=Math.max(.8,s*.02);c.beginPath();c.moveTo(-s*.4,-s*.45);c.quadraticCurveTo(-s*.5,-s*.3,-s*.46,-s*.15);c.stroke();
+    c.fillStyle='rgba(255,255,255,.18)';c.beginPath();c.ellipse(-s*.05,-s*.52,s*.25,s*.05,0,0,7);c.fill();c.restore()};
+  const gum=(x,y,s,dark)=>{c.strokeStyle=dark?'#2a2030':'#e8e2d4';c.lineWidth=s*.07;c.lineCap='round';c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x-s*.05,y-s*.4,x+s*.02,y-s*.7);c.moveTo(x,y-s*.45);c.lineTo(x-s*.25,y-s*.8);c.moveTo(x+s*.01,y-s*.55);c.lineTo(x+s*.28,y-s*.86);c.stroke();
+    for(let i=0;i<9;i++){const bx=x+(R()-.5)*s*.9,by=y-s*(.78+R()*.35),br=s*(.12+R()*.1);if(dark){c.fillStyle='#24192a'}else{const g=c.createRadialGradient(bx-br*.4,by-br*.4,br*.1,bx,by,br);g.addColorStop(0,'#94ad6c');g.addColorStop(1,'#46603a');c.fillStyle=g}c.beginPath();c.arc(bx,by,br,0,7);c.fill()}};
+  const windmill=(x,y,s,col)=>{c.strokeStyle=col;c.lineWidth=Math.max(1,s*.025);c.beginPath();c.moveTo(x-s*.13,y);c.lineTo(x,y-s);c.lineTo(x+s*.13,y);for(let i=1;i<5;i++){const yy=y-s*i/5,hw=s*.13*(1-i/5);c.moveTo(x-hw,yy);c.lineTo(x+hw,yy)}c.stroke();for(let a=0;a<14;a++){const an=a/14*6.283;c.lineWidth=Math.max(1,s*.03);c.beginPath();c.moveTo(x,y-s);c.lineTo(x+Math.cos(an)*s*.25,y-s+Math.sin(an)*s*.25);c.stroke()}c.beginPath();c.moveTo(x,y-s);c.lineTo(x+s*.38,y-s*.97);c.stroke();c.fillStyle=col;c.fillRect(x+s*.3,y-s*1.04,s*.12,s*.1)};
+  const sun=(x,y,r,c1)=>{const g=c.createRadialGradient(x,y,0,x,y,r*4);g.addColorStop(0,c1);g.addColorStop(.25,'rgba(255,200,120,.45)');g.addColorStop(1,'rgba(255,180,120,0)');c.fillStyle=g;c.fillRect(0,0,W,H);c.fillStyle='#fff1c4';c.beginPath();c.arc(x,y,r,0,7);c.fill()};
+  const cloud=(x,y,s,col)=>{c.fillStyle=col;for(let i=0;i<5;i++){c.beginPath();c.ellipse(x+(i-2)*s*.35,y-(i%2)*s*.12,s*.4,s*.22,0,0,7);c.fill()}};
+  switch(k){
+    case'sunset':
+      c.fillStyle=lg(0,H*.66,[[0,'#2b2350'],[.45,'#a34d6a'],[.8,'#f08a5a'],[1,'#ffc777']]);c.fillRect(0,0,W,H);sun(W*.68,H*.62,Math.max(4,H*.08),'rgba(255,230,160,1)');
+      hill(.66,.05,5,1,'#7a4566','#4a2c4f');hill(.72,.03,8,2,'#4f2f45','#2e1d2c');c.fillStyle=lg(H*.7,H,[[0,'#5d3b2c'],[1,'#21150f']]);c.fillRect(0,H*.72,W,H*.28);
+      grass(H*.72,['#7a5236','#3a2618','#9a6a40'],Math.round(W*1.2),H*.07);windmill(W*.17,H*.74,H*.5,'#1d1220');gum(W*.88,H*.75,H*.42,true);
+      for(let i=0;i<6;i++)cow(W*(.3+i*.09),H*(.86+(i%2)*.05),H*(.13+(i%2)*.02),'#1a100c',i%2,null);
+      c.strokeStyle='#1a100c';c.lineWidth=Math.max(1,H*.008);c.beginPath();c.moveTo(0,H*.8);c.lineTo(W,H*.78);c.moveTo(0,H*.84);c.lineTo(W,H*.82);c.stroke();for(let x=0;x<W;x+=W/10){c.fillStyle='#1a100c';c.fillRect(x,H*.76,Math.max(1.5,W*.006),H*.11)}break;
+    case'ute':
+      c.fillStyle=lg(0,H*.6,[[0,'#6fb3e4'],[1,'#d8eef8']]);c.fillRect(0,0,W,H);cloud(W*.25,H*.18,H*.3,'rgba(255,255,255,.85)');cloud(W*.75,H*.12,H*.22,'rgba(255,255,255,.7)');
+      hill(.55,.05,4,2,'#8aa0a6','#6f8a8a');c.fillStyle=lg(H*.55,H,[[0,'#b9a65e'],[1,'#7f8442']]);c.fillRect(0,H*.56,W,H*.44);
+      for(let i=0;i<5;i++)gum(W*(.05+i*.13),H*.58,H*.2,false);grass(H*.58,['#cbb46a','#9a9a4a','#7a8a3a','#e0cc84'],Math.round(W*1.5),H*.1);
+      {const vx=W*.1,vy=H*.62;for(let i=0;i<9;i++){const t=i/8,x=W*.02+(W*.6)*Math.pow(t,1.6),y=H*.98-(H*.36)*t,s=H*(.3-.24*t);c.fillStyle='#5b3d24';c.fillRect(x,y-s,Math.max(1,s*.08),s)}c.strokeStyle='#f2efe4';c.lineWidth=Math.max(.8,H*.008);for(const off of[.55,.8]){c.beginPath();for(let i=0;i<=8;i++){const t=i/8,x=W*.02+(W*.6)*Math.pow(t,1.6),y=H*.98-(H*.36)*t,s=H*(.3-.24*t);i?c.lineTo(x,y-s*off):c.moveTo(x,y-s*off)}c.stroke()}}
+      {const ex=W*.06,ey=H*.66;c.fillStyle='#3d4448';c.beginPath();c.roundRect(ex,ey,H*.12,H*.1,2);c.fill();c.fillStyle='#e0473a';c.beginPath();c.arc(ex+H*.09,ey+H*.03,Math.max(1.2,H*.013),0,7);c.fill();c.fillStyle='#2a4f7a';c.fillRect(ex-H*.02,ey-H*.08,H*.16,H*.06);c.strokeStyle='#9fb8d0';c.lineWidth=.6;c.strokeRect(ex-H*.02,ey-H*.08,H*.16,H*.06)}
+      {const ux=W*.62,uy=H*.86,s=H*.5;c.fillStyle='rgba(0,0,0,.28)';c.beginPath();c.ellipse(ux+s*.6,uy,s*.7,s*.07,0,0,7);c.fill();c.fillStyle='#f6f6f0';c.strokeStyle='#30343a';c.lineWidth=Math.max(1,s*.02);c.beginPath();c.roundRect(ux,uy-s*.4,s*1.2,s*.26,s*.05);c.fill();c.stroke();c.beginPath();c.moveTo(ux+s*.62,uy-s*.4);c.lineTo(ux+s*.72,uy-s*.66);c.lineTo(ux+s*1.05,uy-s*.66);c.lineTo(ux+s*1.15,uy-s*.4);c.closePath();c.fill();c.stroke();c.fillStyle='#7fb0d8';c.beginPath();c.moveTo(ux+s*.68,uy-s*.42);c.lineTo(ux+s*.75,uy-s*.6);c.lineTo(ux+s*1.02,uy-s*.6);c.lineTo(ux+s*1.08,uy-s*.42);c.closePath();c.fill();c.fillStyle='#1d1f22';c.beginPath();c.arc(ux+s*.25,uy-s*.12,s*.11,0,7);c.arc(ux+s*.95,uy-s*.12,s*.11,0,7);c.fill();c.fillStyle='#8a8f96';c.beginPath();c.arc(ux+s*.25,uy-s*.12,s*.05,0,7);c.arc(ux+s*.95,uy-s*.12,s*.05,0,7);c.fill()}
+      break;
+    case'trough':
+      c.fillStyle=lg(0,H*.5,[[0,'#89c2e8'],[1,'#e6f1f4']]);c.fillRect(0,0,W,H);hill(.5,.04,5,1,'#a3ad8a','#8c9670');c.fillStyle=lg(H*.5,H,[[0,'#cfae78'],[1,'#a3834f']]);c.fillRect(0,H*.52,W,H*.48);
+      windmill(W*.78,H*.56,H*.48,'#7c8086');grass(H*.54,['#b8995e','#8a8a4a','#d8c08a'],Math.round(W*.8),H*.06);
+      {const tx=W*.48,ty=H*.8,tw=W*.32,th=H*.14;c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(tx,ty+th*.6,tw*.55,th*.4,0,0,7);c.fill();c.fillStyle='#b9bbb7';c.beginPath();c.ellipse(tx,ty,tw*.5,th*.5,0,0,7);c.fill();c.fillRect(tx-tw*.5,ty,tw,th*.5);c.beginPath();c.ellipse(tx,ty+th*.5,tw*.5,th*.5,0,0,3.15);c.fill();c.fillStyle=lg(ty-th*.4,ty+th*.4,[[0,'#7cc4ec'],[1,'#3c8fc6']]);c.beginPath();c.ellipse(tx,ty,tw*.44,th*.38,0,0,7);c.fill();c.fillStyle='rgba(255,255,255,.5)';c.beginPath();c.ellipse(tx-tw*.12,ty-th*.1,tw*.12,th*.06,0,0,7);c.fill()}
+      cow(W*.2,H*.88,H*.42,'#8f3a1f',0,'#1a0f0a');cow(W*.78,H*.94,H*.44,'#26211f',1,'#000');cow(W*.5,H*.7,H*.3,'#c4bfb2',1,'#3a352e');break;
+    case'lick':
+      c.fillStyle=lg(0,H*.55,[[0,'#9fd0ee'],[1,'#f2f0e2']]);c.fillRect(0,0,W,H);hill(.55,.06,3,3,'#9cb07a','#7c9a5a');c.fillStyle=lg(H*.55,H,[[0,'#8fae58'],[1,'#5f8238']]);c.fillRect(0,H*.58,W,H*.42);gum(W*.12,H*.6,H*.45,false);
+      grass(H*.6,['#a5c46a','#6f9a40','#c8d68a'],Math.round(W*1.3),H*.08);
+      {const bx=W*.36,by=H*.9,r=H*.26;c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(bx+r*.6,by+2,r*1.4,r*.2,0,0,7);c.fill();c.fillStyle=lg(by-r*2,by,[[0,'#e9c46a'],[1,'#b98a34']]);c.fillRect(bx,by-r*2,r*1.3,r*2);c.beginPath();c.ellipse(bx+r*1.3,by-r,r*.45,r,0,0,7);c.fill();c.fillStyle='#d8b057';c.beginPath();c.ellipse(bx,by-r,r*.45,r,0,0,7);c.fill();c.strokeStyle='#9a7228';c.lineWidth=Math.max(.8,r*.04);for(let i=1;i<6;i++){c.beginPath();c.ellipse(bx,by-r,r*.45*i/6,r*i/6,0,0,7);c.stroke()}}
+      {const lx=W*.66,ly=H*.92,w=H*.34,h=H*.3;c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(lx+w/2,ly,w*.7,w*.12,0,0,7);c.fill();c.fillStyle=lg(ly-h,ly,[[0,'#3f86c6'],[1,'#25588a']]);c.beginPath();c.moveTo(lx,ly-h);c.lineTo(lx+w,ly-h);c.lineTo(lx+w*.92,ly);c.lineTo(lx+w*.08,ly);c.closePath();c.fill();c.fillStyle='#f4efe0';c.fillRect(lx+w*.06,ly-h*.65,w*.88,h*.28);c.fillStyle='#25588a';c.font=`700 ${Math.max(6,h*.2)}px "JetBrains Mono"`;c.textAlign='center';c.fillText('LICK',lx+w/2,ly-h*.44);c.textAlign='left';c.fillStyle='#5aa0dc';c.beginPath();c.ellipse(lx+w/2,ly-h,w/2,w*.1,0,0,7);c.fill()}
+      break;
+    case'hills':
+      c.fillStyle=lg(0,H*.6,[[0,'#5aa7e0'],[1,'#d6edf8']]);c.fillRect(0,0,W,H);cloud(W*.2,H*.2,H*.28,'rgba(255,255,255,.9)');cloud(W*.62,H*.14,H*.2,'rgba(255,255,255,.8)');
+      hill(.5,.08,3,1,'#9cc07a','#7aa05a');hill(.62,.08,4,3,'#7fb055','#5f9040');hill(.78,.07,5,5,'#6aa43f','#4c8030');grass(H*.7,['#8fc45a','#5f9a38','#b4d97c'],Math.round(W*1.2),H*.08);
+      gum(W*.8,H*.86,H*.62,false);for(let i=0;i<5;i++)cow(W*(.18+i*.08),H*(.62+(i%2)*.02),H*.06,['#2a2420','#8f3a1f','#c4bfb2'][i%3],i%2,null);break;
+    case'storm':
+      c.fillStyle=lg(0,H*.6,[[0,'#2a3040'],[.6,'#4b5568'],[1,'#a49a8a']]);c.fillRect(0,0,W,H);for(let i=0;i<6;i++)cloud(R()*W,H*(.1+R()*.25),H*(.25+R()*.2),'rgba(40,46,60,.6)');
+      c.fillStyle='rgba(255,230,180,.35)';c.fillRect(0,H*.52,W,H*.06);hill(.58,.03,6,2,'#3d4a45','#2f3a36');c.fillStyle=lg(H*.6,H,[[0,'#4d7a3a'],[1,'#2c4a24']]);c.fillRect(0,H*.6,W,H*.4);
+      for(let i=0;i<6;i++)gum(W*(.04+i*.18)+R()*20,H*.61,H*.18,false);windmill(W*.62,H*.64,H*.36,'#c8cacc');grass(H*.62,['#6f9a48','#3f6a2c','#94b86a'],Math.round(W*1.4),H*.09);
+      c.strokeStyle='rgba(200,210,230,.35)';c.lineWidth=1;for(let i=0;i<W*.8;i++){const x=R()*W,y=R()*H*.9;c.beginPath();c.moveTo(x,y);c.lineTo(x-3,y+H*.06);c.stroke()}break;
+  }
+  if(cv.dataset.tag!=='none'){const t=cv.dataset.tag==='photo'?'placeholder photo':'placeholder image';c.font='600 8px "JetBrains Mono", monospace';const tw=c.measureText(t).width+8;if(W>90){c.fillStyle='rgba(0,0,0,.45)';c.beginPath();c.roundRect(W-tw-4,H-15,tw,12,3);c.fill();c.fillStyle='#fff';c.fillText(t,W-tw,H-6)}}
+}
+
+/* ---- charts ---- */
+const MKT=[['Weaner steers','var(--s0)',372,430],['Yearling steers','var(--s1)',350,405],['Feeder steers','var(--s2)',330,382],['Heifers','var(--s3)',318,362],['Cows','var(--s4)',280,318],['PTIC cows','var(--s5)',300,335],['Bulls','var(--s6)',270,296]];
+const MKTD=MKT.map((m,i)=>{const R=rng(40+i);let v=m[2];const d=[];for(let k=0;k<24;k++){const t=k/23;v=m[2]+(m[3]-m[2])*t+Math.sin(k*.7+i)*12+(R()-.5)*14;d.push(v)}d[23]=m[3];return d});
+function lineChart(svg,{w,h,series,ymin,ymax,xl,yt}){
+  const L=34,B=20,Tp=8,Rp=6,x=i=>L+i*(w-L-Rp)/(series[0].d.length-1),y=v=>Tp+(1-(v-ymin)/(ymax-ymin))*(h-Tp-B);
+  let s='';yt.forEach(t=>{s+=`<line x1="${L}" x2="${w-Rp}" y1="${y(t)}" y2="${y(t)}" style="stroke:var(--line)"/><text x="2" y="${y(t)+3}" style="fill:var(--muted);font-size:9px">${t}</text>`});
+  xl.forEach(([i,t])=>{s+=`<text x="${x(i)}" y="${h-5}" text-anchor="middle" style="fill:var(--muted);font-size:9px">${t}</text>`});
+  series.forEach(se=>{s+=`<path d="${se.d.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1)).join('')}" fill="none" style="stroke:${se.c}" stroke-width="2"/>`});
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=s;
+}
+document.querySelectorAll('.mktchart').forEach(svg=>{const on=svg.dataset.on.split(',').map(Number);lineChart(svg,{w:+svg.dataset.w,h:+svg.dataset.h,series:on.map(i=>({c:MKT[i][1],d:MKTD[i]})),ymin:250,ymax:460,yt:[300,350,400,450],xl:[[0,'Dec 24'],[6,'Jun 25'],[12,'Dec 25'],[18,'Jun 26'],[23,'Nov 26']]})});
+document.querySelectorAll('.mktchips').forEach(d=>{const on=d.dataset.on.split(',').map(Number);d.innerHTML=MKT.map((m,i)=>`<span class="fchip ${on.includes(i)?'on':''}" style="min-height:28px;padding:4px 8px;font-size:10px"><i style="background:${m[1]}"></i>${m[0]}</span>`).join('')});
+document.querySelectorAll('.mkttable').forEach(t=>{const cmp=t.dataset.compact;const wk=[6,3,2,-4,1,5,0];t.innerHTML=`<tr><th>Class</th><th class="r">c/kg</th><th class="r">Week</th>${cmp?'':'<th class="r">Year</th>'}</tr>`+MKT.map((m,i)=>`<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m[1]};margin-right:6px"></i>${m[0]}</td><td class="r"><b>${m[3]}</b></td><td class="r ${wk[i]>0?'ok':wk[i]<0?'bad':'muted'}">${wk[i]>0?'▲'+wk[i]:wk[i]<0?'▼'+(-wk[i]):'·'}</td>${cmp?'':(()=>{const pc=Math.round((m[3]/MKTD[i][11]-1)*100);return `<td class="r ${pc>0?'ok':pc<0?'bad':'muted'}">${pc>0?'+':''}${pc}%</td>`})()}</tr>`).join('')});
+document.querySelectorAll('.feedchart').forEach(svg=>{const w=+svg.dataset.w,h=+svg.dataset.h,L=36,B=20,Tp=8,mo=['Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'],on=[820,900,1080,1240,1300,1210,1050,900,780,690,600,560],crop=[0,0,0,0,0,0,90,150,110,40,0,0],x=i=>L+i*(w-L-8)/11,y=v=>Tp+(1-v/1500)*(h-Tp-B);
+  let s='';[0,500,1000,1500].forEach(t=>{s+=`<line x1="${L}" x2="${w-8}" y1="${y(t)}" y2="${y(t)}" style="stroke:var(--line)"/><text x="2" y="${y(t)+3}" style="fill:var(--muted);font-size:9px">${t} t</text>`});
+  s+=`<path d="M${x(0)},${y(0)}${on.map((v,i)=>'L'+x(i)+','+y(v)).join('')}L${x(11)},${y(0)}Z" fill="#7fe05a" fill-opacity=".35" stroke="#5cb83a" stroke-width="2"/>`;
+  crop.forEach((v,i)=>{if(v)s+=`<rect x="${x(i)-7}" y="${y(on[i]+v)}" width="14" height="${y(on[i])-y(on[i]+v)}" fill="#f0b43a"/>`});
+  s+=`<line x1="${L}" x2="${w-8}" y1="${y(620)}" y2="${y(620)}" stroke="#ec6a48" stroke-width="2" stroke-dasharray="6 4"/>`;
+  mo.forEach((m,i)=>{s+=`<text x="${x(i)}" y="${h-5}" text-anchor="middle" style="fill:var(--muted);font-size:9px">${m}</text>`});svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=s});
+(function(){const s=document.getElementById('dauchart');if(!s)return;const R=rng(5);let v=760,p=[];for(let i=0;i<30;i++){v+=(R()-.35)*60+(i%7===5?-80:0)+(i%7===6?90:0);p.push(v)}const x=i=>20+i*(560/29),y=val=>200-(val-500)/900*180;let g='';[600,900,1200].forEach(t=>{g+=`<line x1="20" x2="580" y1="${y(t)}" y2="${y(t)}" style="stroke:var(--line)"/><text x="0" y="${y(t)+4}" style="fill:var(--muted);font-size:10px">${t}</text>`});const d=p.map((q,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(q).toFixed(1)}`).join(' ');s.innerHTML=g+`<path d="${d} L580,200 L20,200 Z" fill="rgba(127,224,90,.15)"/><path d="${d}" fill="none" stroke="#7fe05a" stroke-width="2.5"/>`})();
+
+/* ---- render styles tab ---- */
+const STYLES=[
+ ['s1','S1 · Current pixel','What the MVP does now: 10 to 12 art pixels per square, tiny tufts everywhere, 7 px cows with no outline.','Familiar retro look. Cheap to draw.','With 300 head the cows melt into the tufts. Lots of grass turns into noise and looks blurry when zoomed out. Height reads, but only up close.'],
+ ['s2','S2 · Hi-bit pixel','Bigger, cleaner pixel art: fewer, larger tufts, cows with a dark 1 px outline and a drop shadow.','Keeps the retro feel. Cows separate from grass much better. Grass is calmer.','A 300-head mob is still a pile of overlapping sprites. Needs a lot of hand-made art (every breed, pose, growth stage). Text and shapes stay chunky on big screens.'],
+ ['s3','S3 · Clean illustrated','Smooth vector shapes, soft shadows, outlined cows with readable breeds (black Angus, red/white Hereford, grey Brahman). Grass as soft fields with clumps whose height and colour follow the model.','Sharp at any zoom and screen size. Breeds and cattle readable. Rank grass looks tall with green only at the base. Easy to theme.','Drawing every cow at farm zoom still clutters big mobs. Thousands of clumps cost more to draw (fine with WebGL).'],
+ ['s4','S4 · Soft painted','Painterly brush textures and gentle gradients. Cows as bold dark silhouettes with a light rim.','Beautiful and calm. Fields read as one surface. Silhouettes stand out against light grass.','Breeds and condition hard to see. Height reads only as stroke length. Silhouettes vanish on dark, wet or burnt country. Hard to keep the visuals exactly matching the numbers.'],
+ ['s5','S5 · Clear map + detail on zoom','Zoomed out: smooth fields textured by state, raised a little by grass height, and one marker per mob (head count, plus a soft footprint of where they are grazing). Zoomed in: individual cows and clumps in the S3 style.','Always readable. A 300-head mob is one clear badge at a distance. Labels and fences stay clean. Fast to draw on phones. Up close you still see every cow and the grass height.','Zoomed out you lose the cow-by-cow view (by design). Needs a smooth hand-over between the two zoom levels.']
+];
+document.getElementById('rsrows').innerHTML=STYLES.map(s=>`<div class="rsrow"><h3>${s[1]}</h3><p class="muted" style="font-size:12px;margin-bottom:10px">${s[2]}</p><div class="rsgrid"><figure><canvas class="map" data-w="960" data-h="600" data-o='{"style":"${s[0]}","test":1,"view":"whole","margin":0.6}'></canvas><figcaption>Zoomed out: whole farm</figcaption></figure><figure><canvas class="map" data-w="960" data-h="600" data-o='{"style":"${s[0]}","test":1,"view":{"x0":4,"y0":4.6,"z":44}}'></canvas><figcaption>Zoomed in: Paddocks 5, 6, 7 (the 300-head strip), parts of 2, 3 and 8</figcaption></figure></div><div class="pros"><div><b class="ok">For</b><br>${s[3]}</div><div><b class="bad">Against</b><br>${s[4]}</div></div></div>`).join('');
+
+/* ---- theme, tabs, fit, draw ---- */
+const themeBtn=document.getElementById('themeBtn');
+function syncTheme(){const t=document.documentElement.getAttribute('data-theme');themeBtn.textContent=t==='light'?'☾ Dark':'☀ Light'}
+themeBtn.addEventListener('click',()=>{const t=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('gg-mock-theme',t)}catch(e){}syncTheme()});
+syncTheme();
+function heroFade(){document.querySelectorAll('.herofade').forEach(el=>{el.style.background='linear-gradient(90deg,rgba(var(--hero-fade),.94) 0%,rgba(var(--hero-fade),.78) 38%,rgba(var(--hero-fade),0) 62%)'})}heroFade();
+function fit(){const w=document.querySelector('main').clientWidth-32;
+  document.querySelectorAll('.sec.on .pc').forEach(el=>el.style.zoom=Math.min(1,w/1442));
+  document.querySelectorAll('.phone').forEach(el=>el.style.zoom=Math.min(1,w/392));
+  document.querySelectorAll('.phoneL').forEach(el=>el.style.zoom=Math.min(1,w/846))}
+const drawn=new Set();
+function drawSec(sec){if(drawn.has(sec.id))return;drawn.add(sec.id);
+  sec.querySelectorAll('canvas.farm').forEach(drawFarm);sec.querySelectorAll('canvas.map').forEach(renderMap);sec.querySelectorAll('canvas.sward').forEach(drawSward);sec.querySelectorAll('canvas.adimg').forEach(paintAd)}
+function show(id){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.sec===id));document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id==='sec-'+id));fit();drawSec(document.getElementById('sec-'+id))}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.sec)));
+window.addEventListener('resize',fit);
+fit();
+(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>drawSec(document.querySelector('.sec.on')));
+</script>
+</body>
+</html>
