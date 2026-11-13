@@ -160,6 +160,18 @@ describe('the playable years', () => {
 describe('the data version', () => {
   const data = loadRealData();
 
+  it('is this, for the tables as pulled (docs/DATA.md, "The data version")', () => {
+    // A new pull, or any edit to a table, changes these. That is the point: every
+    // real-year farm started on the old tables will then refuse to run. Do not
+    // update them without the lead's say-so (scripts/data/README.md).
+    expect(Object.fromEntries(DISTRICT_IDS.map((id) => [id, data.district(id).version]))).toEqual({
+      cq: '81313cdc124d11e3',
+      nsw: '525d82ca4aa73029',
+      cw: '2efe5d572683f104',
+      wv: 'c45fa535fcacb5e2',
+    });
+  });
+
   it('is 16 hex digits, the same every time, and different for each district', () => {
     const versions = DISTRICT_IDS.map((id) => data.district(id).version);
     for (const v of versions) expect(v).toMatch(/^[0-9a-f]{16}$/);

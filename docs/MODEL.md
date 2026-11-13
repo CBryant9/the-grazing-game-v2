@@ -543,6 +543,7 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 
 ### The day, as built
 
+0. **A real-year farm checks its real data first.** With no data bundle, or one of another version, the day stops with an error before anything changes (section 1A).
 1. **Season and month factor** for the day, from the season source. On the 1st of a month the farm's ground cover is read for the year's score, before anything grows or is eaten. A new season on 1 July is reported (not on the farm's first day).
 2. **Crop events** (`fieldTick`).
 3. **Grass growth**. The feed grown is added to the year's total.
@@ -552,7 +553,7 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 7. **Running costs and interest.** Overheads are $4,000 + $0.60 a hectare a year. Animal health is the district's figure a head a year, counted on every head, calves included. Both are charged a 365th each day. Interest is worked on the balance after the day's feed bill and before the day's running costs: 9.5% a year on an overdraft, 3% a year earned on money in the bank.
 8. **Grazing plans** move mobs here. Plans are a later milestone. The place for them is `sim/plans.ts`: the cattle step already takes a mob's stops for the day.
 9. **The day counter goes up, then the market moves** to the new day. Mobs with no cattle left are dropped.
-10. **The year closes** every 365 farm days (not on a calendar date, and leap years make no difference). The year is scored and filed, and a new one opens at the farm's net worth.
+10. **The year closes.** On a farm with random seasons that is every 365 farm days (not on a calendar date, and leap years make no difference). On a real-year farm it is when the game year ends, 365 or 366 days after it opened, so each scored year is one real year (section 1A, "The calendar on a real-year farm"). The year is scored and filed, and a new one opens at the farm's net worth.
 11. **Game over** if cash is at or past the bank's limit. Otherwise, if there are cattle on pasture, the feed cattle can reach is averaged over every square of the farm: `max(0, G + D − 250)`. Under 40 kg DM/ha counts as eaten out. A warning event goes out on the first day, and after 10 days in a row the game is over. Cattle in the feedlot don't count, and the count starts again on any day the farm is not eaten out or has no cattle on pasture.
 
 Once the game is over the tick does nothing and every action is refused.
@@ -594,7 +595,28 @@ One number is drawn for each beast that is not a calf at its dam's side, from th
 
 ### The market, behind an interface
 
-The engine reads prices through a `PriceSource`: the market on day 0, a step to each new day, and today's prices (the young cattle indicator and a price for each class). Milestone 1.4 puts real MLA data behind it. Until then the source is the MVP's mechanism, matched exactly (`market/standIn.ts`): the approximate 2019 to 2025 monthly series joined mid-month to mid-month, the random walk after it, the daily wobble and the slow drift of each class. See DATA.md, Market.
+The engine reads prices through a `PriceSource`: the market on day 0, a step to each new day, and today's prices (the young cattle indicator and a price for each class). There are two sources, and a farm has one or the other for its whole life.
+
+**The stand-in market** (`market/standIn.ts`) is the MVP's mechanism, matched exactly: the approximate 2019 to 2025 monthly series joined mid-month to mid-month, the random walk after it, the daily wobble and the slow drift of each class. See DATA.md, Market. A farm with random seasons has this one.
+
+**The real market** (`market/realMarket.ts`, milestone 1.4) is for a real-year farm. On each farm day:
+
+```
+real date   = realDateOn(day)                                  (section 1A)
+figure(i)   = indicator i at the district yard on the real date (the fill-in rules, DATA.md)
+class price = figure(the class's indicator) × the class's multiple (the mapping, DATA.md)
+indicator   = figure(restocker yearling steer)
+in today's dollars: every price × CPI(September quarter 2026) ÷ CPI(the real date's quarter)
+```
+
+- The mapping from MLA's indicators to the game's classes is **proposed, for Claudia**. It, the fill-in rules, the yard premiums, the feeder stand-in before June 2003 and the CPI are all in DATA.md ("Real prices: indicators to classes" and "Inflation").
+- There is no random part. The real market never draws from the market stream, and has no daily wobble or class drift of its own: the real figures move by themselves.
+- The farm keeps only today's prices and which dollars they are in (`farm.market`). So today's prices can be read with no tables to hand. Moving the market to a new day needs the data bundle.
+- Inflation has one switch, `REAL_PRICE_DOLLARS`: `today` (the default) or `of-the-day`. A farm keeps the setting it started with.
+- With years at random, or in order after the newest year, the market on the first day of a game year is another real year's market, so prices step at the year's end.
+- Cattle only. The sheep tables are not read yet.
+
+**Sale days** (`market/saleCalendar.ts`). A real-year farm can ask whether its district yard holds a cattle sale on a farm day, of what type, and when the next one is (`saleDayOn`, `nextSaleDay`). Past years use the days the yard really sold, with a weekly stand-in for the stretches MLA has nothing for (DATA.md, "Sale calendars"). Nothing uses the calendar yet: buying and selling are still instant. Booking stock onto a sale, and delivery, are milestone 1.5.
 
 What an animal is worth is the MVP's rule and does not depend on the source: its class price, the condition adjustments, the pregnancy premium, 5% commission and $30 a head.
 
@@ -641,7 +663,7 @@ Each part draws from its own named stream, and each stream's state is saved with
 
 ### Saves and the farm hash
 
-`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
+`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. The save format is 2 from milestone 1.4: a farm's `seasons` and `market` can be a real-year farm's. A format 1 save loads as it is, because nothing was added to a farm with random seasons. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
 
 `farmHash` is 16 hex digits worked from the whole saved form, with keys in order. The same seed and the same actions always give the same hash.
 
@@ -654,6 +676,6 @@ Each part draws from its own named stream, and each stream's state is saved with
 - Selling a very small calf can net less than $0 (its value less 5% and $30), and that is what is banked. Net worth never counts a beast below $0.
 - The energiser is counted in net worth but not in the year's "spent on infrastructure" total.
 - Weaners from a mob in the feedlot are sent out to a paddock, not kept in the feedlot.
-- The year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year.
+- On a farm with random seasons the year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year. (A real-year farm closes its year when the real year ends.)
 - A harvest goes by the season the last day ran on, so a crop harvested on 1 July before the day runs is scored on the old season.
 - A hungry mob with no tape round it still uses a number from the breakouts stream each day.
