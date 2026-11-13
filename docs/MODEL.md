@@ -122,7 +122,116 @@ In the rebuild the summary takes the cattle figures (AE, head, feed eaten) as in
 
 ### Seasons behind one interface (rebuild)
 
-The grass formulas ask one question of the season: what are the season factor and the month factor for this day. The MVP's random seasons (see DATA.md) answer it from the farm's seed until milestone 1.4 puts real weather behind the same interface. Each season and each month has its own named random stream, so any day can be asked for in any order and gets the same answer.
+The grass formulas ask one question of the season: what are the season factor and the month factor for this day. Two sources answer it. The MVP's random seasons (see DATA.md) answer it from the farm's seed. Each season and each month has its own named random stream, so any day can be asked for in any order and gets the same answer. From milestone 1.4 a real-year game answers it from real weather (section 1A). `averageYear` answers 1 and 1 for every day, and is what calibration runs are judged against.
+
+## 1A. Growth from real weather (rebuild, milestone 1.4)
+
+In a real-year game the season factor and the month factor come from the district's real weather, not from random seasons. `growGrass` and every calibrated formula are unchanged. This section only supplies `seasonF`, `monthF` and the season label, behind the same interface as the random seasons. The district curves stay as the average year.
+
+Code: `packages/engine/src/season/` (`weatherTable.ts`, `weatherGrowth.ts`, `realYears.ts`, `weatherSeasons.ts`). The figures and where each came from are in [DATA.md](DATA.md) ("Growth from real weather"). The run that checks it is in [CALIBRATION.md](CALIBRATION.md).
+
+### The soil-water tally
+
+One tally for each district, one step a day, from the first day of the SILO table (1 January 1990).
+
+```
+C      = 100 mm                       water the grass can reach when the soil is full
+p      = 0.6                          the share of C the grass can take before it starts to struggle
+index(W) = min(1, W / ((1 − p) × C))  how freely the grass can draw water, 0 to 1
+
+used   = index(W yesterday) × ET0 today
+W      = clamp(W yesterday + rain today − used, 0, C)
+growth index today = index(W)         worked out after today's rain and use
+```
+
+- `rain` and `ET0` are SILO's daily rain and FAO-56 short crop evapotranspiration, both in mm. ET0 is the water a short, well-watered grass would use that day.
+- With C = 100 and p = 0.6 the index is 1 while the soil holds 40 mm or more. Below 40 mm it falls in step with the water left, and the grass takes less water out as it does.
+- Rain that would take the soil over 100 mm is lost. There is no other run-off.
+- This is the daily root-zone water balance and water stress figure of FAO-56 (its page on soil water availability, equations 82 to 84), with no crop coefficient: the pasture is treated as the reference grass.
+
+**Settling.** The starting water is not known. The tally is run twice, from an empty soil and from a full one. From the first day the two agree (to a billionth of a mm) the starting guess no longer matters, and the tally can be used. All four districts settle during 1990. A day before that is refused.
+
+### The growth factor (`monthF`)
+
+```
+scale(date) = the district's twelve scaling figures, read off for the date
+factor      = min(1.9, growth index ÷ scale(date))
+```
+
+- The twelve scaling figures are one for the middle of each month. A date between two mid-months reads a straight line between them, the same way the district curve is read (`interpMonth`). So the scaling has no step on the 1st of a month.
+- The figures are solved so that the factor, averaged over every day of a calendar month in 1997 to 2025, is exactly 1 for each of the twelve months (to 1 part in 10 billion). The district curve is therefore still the average year, month by month.
+- How they are solved: start each month at its average growth index. Each round, work out the average factor for each month and multiply that month's figure by the square root of it. Stop when every month is within the tolerance. It takes a few hundred rounds. Only +, ×, ÷ and square roots are used, so every machine gets the same figures.
+- **The scaling years are fixed at 1997 to 2025** (`SCALING_YEARS`). A later weather pull that adds 2026 does not move the factor of any past year. Changing the scaling years, or a pull that changes old SILO figures, is a model change: the scaling figures are pinned in a test so it gets noticed.
+- **The ceiling is 1.9**, the MVP's own upper limit on the month factor. The same `monthF` multiplies sown pastures and crops, so going past the MVP's limit would push them outside the range they were tuned in.
+- If a month is dry too often for its average to reach 1 under the ceiling, the build stops with an error. So does a scaling figure under 0.01.
+
+**Why monthly figures, read off smoothly.** A figure for each day of the year would have only 29 samples behind it and would need smoothing anyway, and then no calendar month would average exactly 1. One flat figure a month would jump on the 1st with no rain. Twelve mid-month figures with straight lines between give both: no step, and every calendar month averages exactly 1.
+
+The scaling figures (January to December):
+
+| District | Scaling figures |
+|---|---|
+| cq | 0.2585, 0.5606, 0.2010, 0.1786, 0.0957, 0.2080, 0.2112, 0.0902, 0.0365, 0.0447, 0.2032, 0.3139 |
+| nsw | 0.5045, 0.7034, 0.6088, 0.6620, 0.6145, 0.8126, 0.8552, 0.8077, 0.7118, 0.5727, 0.6613, 0.6682 |
+| cw | 0.1450, 0.2569, 0.2442, 0.3502, 0.4113, 0.7824, 0.7846, 0.7148, 0.5524, 0.3478, 0.2588, 0.2059 |
+| wv | 0.0919, 0.1889, 0.1420, 0.4314, 0.8279, 0.9779, 0.9998, 0.9981, 1.0097, 0.9240, 0.6253, 0.2822 |
+
+A low figure means the soil is usually dry at that time of year, so a little water is already better than usual. In Central Queensland in September the figure is 0.0365: the factor reaches the 1.9 ceiling with under 3 mm of water in the soil. The district curve is only 2 kg DM/ha a day then, so the growth involved is small.
+
+### The season factor (`seasonF`) and the label
+
+```
+seasonF(day) = Σ curve(k) × monthF(k)  ÷  Σ curve(k)      over the 365 farm days ending today
+```
+
+`curve(k)` is the district curve for farm day k, before any factor. So `seasonF` is the feed the weather allowed over the last 12 months of the game, as a share of what the average year gives over the same days. 0.5 means the last 12 months grew half the usual feed. It always holds one whole growing season, so it does not swing on a week's rain. `growGrass` hays green feed off faster while it is under 0.8, and crop yields use it at harvest, as before.
+
+The look back runs over the game's own days. With years in order that is the real 12 months before today. With years at random, the days before the start of a game year are the game year the farm has just played.
+
+The label uses the random seasons' own six labels:
+
+| seasonF | Label |
+|---|---|
+| under 0.6 | Drought |
+| 0.6 to under 0.8 | Well below average |
+| 0.8 to under 0.925 | Below average |
+| 0.925 to under 1.075 | Average |
+| 1.075 to under 1.25 | Above average |
+| 1.25 and over | Wet |
+
+Each edge is halfway between two of the MVP's season factors, except 0.8. That one is the edge `growGrass` uses, so the label changes on the same day the grass does.
+
+### Real years and the real date
+
+- A game year is the 12 months from the farm's start month. Game year 1 starts in the real year the player picks. Each later game year is the next real year in the chosen order (`planRealYears`).
+- **In order:** each next year in turn. After the newest playable year it goes back to 1997.
+- **At random:** every playable year once, shuffled from the farm's seed, then all of them again in a new shuffle. The same year never comes up twice running. Each round of the shuffle has its own stream, `real-years:<round>`. The first year can be chosen or left to the shuffle.
+- **The real date behind a farm day** (`realDateOn`): the farm's own calendar runs straight on from its start. Each game year is moved, whole, onto its real year, keeping the month and day. Within a game year the real days run on without a break, so a growing season that crosses New Year stays in one piece. If the farm calendar has 29 February and the real year does not, 28 February is read twice. A real 29 February the farm calendar does not have is passed over. In order, the real date is always the farm calendar date.
+- **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025.
+- Weather and prices should both read the real date from the same plan, so they agree on the day.
+
+### The run-up
+
+The 540 days before day 0 use the real weather straight before the start. As in the MVP, a farm does not start straight after a very dry run-up (LESSONS 7):
+
+```
+went  = Σ curve × factor ÷ Σ curve      over the run-up days
+if went < 0.85:  t = (0.85 − went) / (1 − went),  and each run-up day gets  factor + t × (1 − factor)
+```
+
+Each run-up day is moved the same share of the way to an average day, which brings the run-up as a whole to exactly 85% of average growth. From day 0 the factor is the real one. The season factor on the first days of play counts the lifted run-up, so it describes the pasture the farm really starts with. The floor can be set to 0 to start a farm as the weather really left it.
+
+### Rain on screen
+
+`rainOn(day)` is the SILO rain for the real date, in mm, straight from the table.
+
+### What it does not do
+
+- Temperature, frost and day length are not in the factor. They stay in the district curve, so a warm winter or a cold spring grows the same as an average one.
+- One soil for all four districts.
+- Rain out of season can lift growth to at most 1.9 times the curve for that time of year. Where the curve is very low (a Central Queensland spring), a wet spell still grows little.
+- No carry-over in the factor itself. A paddock's condition after a dry year is carried by the pasture state, not by the weather factor.
+- No waterlogging and no run-off from heavy rain other than the overflow.
 
 ## 2. Where cattle graze (`dietOf`, `grazeAlloc`)
 

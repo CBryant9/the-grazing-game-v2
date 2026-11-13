@@ -316,6 +316,64 @@ Questions for Claudia:
 - Are the four SILO grid points where the district's weather should be taken from (town or airport)? They came from the brief and were not checked against a map here.
 - Should the rest of the MLA pull (about 6 to 9 more hours at a polite pace) run in one go, or only the series milestone 1.4 turns out to need?
 
+### 13 Nov 2026: milestone 1.4b, growth from real weather
+
+Built, all in `packages/engine`:
+
+- `season/weatherTable.ts`: a district's daily weather as plain data, and a reader for the text of a SILO table that stops on a missing day, a blank or negative figure or a date out of order.
+- `season/weatherGrowth.ts`: the soil-water tally, the growth index, and the scaling that turns it into a growth factor averaging 1 in every calendar month of 1997 to 2025.
+- `season/realYears.ts`: the real years a game can play, a plan for playing them in order or shuffled from the farm's seed, and the real date behind each farm day.
+- `season/weatherSeasons.ts`: the second `GrowthFactorSource`. It gives the month factor, a season factor looking back 365 days, the season label, and the real rain for a day.
+- `server/weatherFiles.ts`: the one place the engine package reads a file. Server code and tests import it as `@gg/engine/server`. Lint now stops model code from importing `node:fs` or this helper.
+- `averageYear` in `season/factors.ts`: both factors 1 every day, the standard that calibration runs are judged against.
+- `growGrass` and every calibrated formula are untouched.
+
+How it was tested:
+
+- 747 tests pass: the 558 from before, and 189 new ones in `packages/engine/src/season`.
+- The month factor averages 1 for every calendar month of 1997 to 2025 in all four districts, to better than one part in a billion.
+- The real `growGrass` was run for each whole year of 1997 to 2025 in each district and for the average year, from the same starting pasture. The 29-year average is within 2.2% of the average year with no stock and within 3.8% with a steady daily take. The run, year by year, with the five driest and five wettest years by SILO rain, is in `CALIBRATION.md`.
+- Compared with the AussieGRASS shire series for the four districts (rank correlation of the years: 0.60 Central Queensland, 0.61 Northern Tablelands, 0.97 Central West, 0.56 Western Victoria).
+- 38 nudge checks: 36 caught at once, one after a test was added, one that changes nothing. Three more by lint.
+- `pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm format:check` pass.
+
+Defaults used (each one line to change):
+
+- A game year is the 12 months from the farm's start month. With years at random, the change of year falls on the farm's anniversary, so a growing season is never cut in two.
+- In order, after the newest year the game goes back to 1997.
+- At random, every year is played once before any comes round again, and the first year can be picked or drawn.
+- The pasture run-up uses the real weather before the start, lifted to 85% of average if it grew less (the MVP's rule, LESSONS 7).
+- Earliest real year 1997 (PRD section 21, row 32).
+
+Not done, and why:
+
+- **Not wired into a game.** `generateFarm` and the daily step still take whatever source they are given. Nothing chooses the weather source for a real-year farm yet, and the dates passed to `growGrass` still come from the farm's own calendar. That is the same date in order. At random it is the same month and day in another year, which is all `growGrass` reads.
+- **The engine version was not bumped** (still 0.3.0), to keep clear of the other 1.4 branches, as 1.2a did. Bump it when 1.4 is joined.
+- **The calibration suites (milestone 1.3) have not been run on real years.** They are not built yet. The run here is grass only, with no cattle.
+- **Temperature is not in the factor.** A warm winter or a cold spring grows the same as an average one.
+- **The SILO credit line has not been changed** to say that figures are worked out from the data. The wording is Claudia's call (`DATA.md`).
+- **The AussieGRASS licence is not confirmed.** The figures are used for checking only and are not in the engine.
+- **`realism-guardian` was not run.** It runs before the pull request.
+- Not looked at on a screen. There is nothing to see yet.
+
+Found on the way:
+
+- Sown pastures and crops are multiplied by the same month factor as native pasture. That is why the ceiling stays at the MVP's 1.9.
+- AussieGRASS spreads the year's growth differently from the district curves in places (Armidale: 72% from September to December, against the curve's 47%). The curves were not touched.
+- AussieGRASS has Central Queensland at about half of average in 2003, 2004 and 2020, each after very dry years. The weather factor has no memory of last year. The pasture a player carries has.
+- The merge of the cattle and farm branch with the real data branch left two lessons numbered R5.
+
+Questions for Claudia:
+
+- **The soil.** One soil of 100 mm for all four districts, picked against AussieGRASS. The comparison leans to a smaller soil for Western Victoria and a larger one for Central Queensland. Should each district have its own, and what water-holding figures would you trust for each?
+- **The ceiling.** Rain out of season can lift growth to at most 1.9 times the curve for that time of year. So a wet Central Queensland winter and spring (1998, 2022) grows little, and about a third of Central Queensland days sit at the ceiling. Is that how those years went? Raising the ceiling for native pasture only is possible, but it is a change to how the factor is used.
+- **Starting after a dry time.** Should a farm that starts on 1 January 2003 start on the pasture the 2002 season really left, or on the lifted run-up (at least 85% of average) as built?
+- **Years at random.** Is the farm's anniversary the right place to change year? And should the first year be the player's pick or a surprise?
+- **In order, after the newest year:** back to 1997, or stop?
+- **Season labels.** The six labels are the MVP's, "Drought" among them, set by the last 12 months' growth (under 60% of average is "Drought"). Are the edges right, and is "Drought" a fair word for the label?
+- **Western Victoria** varies least (year factors 0.71 to 1.25, and a season factor under 0.8 on 9% of days). Does that match the district?
+- **The dry and wet year tables** in `CALIBRATION.md`: do the years you remember look right?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

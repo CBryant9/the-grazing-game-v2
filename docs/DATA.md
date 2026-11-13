@@ -53,7 +53,7 @@ The 540-day spin-up before the start has its own season, drawn separately and li
 
 With these six seasons neither pair of limits is ever reached (the lowest month factor is 0.5 × 0.65 = 0.325 and the highest 1.35 × 1.35 = 1.82).
 
-In the rebuild the same chances, ranges and limits are drawn from the farm's seed (`packages/engine/src/season/randomSeasons.ts`), so a farm's seasons are repeatable. Real weather replaces them in milestone 1.4.
+In the rebuild the same chances, ranges and limits are drawn from the farm's seed (`packages/engine/src/season/randomSeasons.ts`), so a farm's seasons are repeatable. From milestone 1.4 a real-year game takes its factors from real weather instead ("Growth from real weather", below). The random seasons stay for the tests that match the MVP, and their labels, the 1.9 limit and the 0.85 run-up floor carry over.
 
 ## Market
 
@@ -94,7 +94,7 @@ Adjustments: cows CS < 2 × 0.85, CS ≥ 3 × 1.05; other non-bull, non-calf sto
 
 Real price and weather history, pulled once by the scripts in `scripts/data/` (see the README there) and kept in `packages/engine/data/raw/`. `manifest.json` in that folder lists every table with its source address, units, first and last date, row count and the date pulled. A test (`packages/engine/src/data/raw-data.test.ts`) checks every table against it.
 
-**Status: pulled, not wired in.** Nothing in the engine reads these tables yet. Milestone 1.4 wires them in, with the mapping from MLA indicators to the game's classes and the soil-water growth factor. From then the approximate `MKT` series above is superseded for play, and kept only as the fallback.
+**Status: weather is read, prices are not yet.** The SILO tables feed the soil-water growth factor (milestone 1.4b, "Growth from real weather" below). The engine's model code takes a table as data. Only the server-only helper `packages/engine/src/server/weatherFiles.ts` reads the files. The MLA tables are not read yet. The rest of milestone 1.4 wires them in, with the mapping from MLA indicators to the game's classes. From then the approximate `MKT` series above is superseded for play, and kept only as the fallback.
 
 These tables are server-side engine data. Browser code must never import them (rule 14).
 
@@ -198,7 +198,7 @@ To carry on: `pnpm data:mla`, or a stage at a time, for example `node scripts/da
 
 - **Source:** SILO Data Drill, Queensland Government (Long Paddock). `https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php`. It asks for an email address as the user name. The address is kept in `SILO_CONTACT_EMAIL` in the untracked `.env.local`, never in the repo.
 - **Credit line, with its change notice:** "Climate data: SILO, Queensland Government (© State of Queensland), CC BY 4.0, built from Bureau of Meteorology observations. The data has been reformatted." Use the two sentences together. The same wording is in `manifest.json`.
-- **Licence:** Creative Commons Attribution 4.0 International. SILO's access page says users may copy, change and pass on the data if they credit SILO as the source and say whether the data was changed. **Ours was changed in form only:** one file per district, six of SILO's variables, the source-code columns counted and then dropped. The values are as served. Once milestone 1.4 works a soil-water figure out of it, the change notice needs to say so.
+- **Licence:** Creative Commons Attribution 4.0 International. SILO's access page says users may copy, change and pass on the data if they credit SILO as the source and say whether the data was changed. **The tables were changed in form only:** one file per district, six of SILO's variables, the source-code columns counted and then dropped. The values are as served. From milestone 1.4b the game works a soil-water figure out of them, so the change notice needs to say so (see "SILO change notice" below).
 - **Pulled:** 13 Nov 2026, four requests, one per district. 1 Jan 1990 to 12 Nov 2026, 13,465 days each, no gaps.
 - **What a row is:** one day at one point on SILO's 0.05 degree grid. Data Drill values are worked out from the weather stations around the point, so they are not one station's record.
 
@@ -228,6 +228,43 @@ The variable codes were checked on SILO's climate variables page on 13 Nov 2026.
 - **A few radiation days are long-term averages** (source code 75): 20 days at Hamilton, 9 at Dubbo, 2 at Armidale, none at Emerald, all between 1996 and 2013. Most radiation days are SILO's satellite estimate (code 42).
 - Rain, minimum temperature, and maximum temperature on every other day, are interpolated from that day's observations (code 25).
 - The count of each source code for each variable is in `manifest.json` under `sourceCodes`.
+
+### Growth from real weather (milestone 1.4b)
+
+The figures behind the soil-water growth factor (`packages/engine/src/season/`). The formulas are in MODEL.md, section 1A. "Tuning" means the figure was chosen for this game and has no outside source. Every tuning figure is on the list for Claudia.
+
+| Figure | Value | Where it came from | In code |
+|---|---|---|---|
+| Evaporation used | SILO `et0` column, mm a day | SILO's FAO-56 short crop evapotranspiration (variable F). By its definition it is the water use of a short, well-watered grass, so no pan factor is needed. SILO's Class A pan column (`evap`) is not used | `weatherTable.ts` |
+| Share of soil water the grass takes before it struggles (`p`) | 0.6 | **Sourced.** FAO Irrigation and Drainage Paper 56, table 22, "Grazing Pasture" (both rotated and extensive grazing): depletion fraction 0.60. Read 13 Nov 2026 at `https://www.fao.org/4/X0490E/x0490e0e.htm` | `SOIL_WATER.easyShare` |
+| The water stress rule | index = 1 above (1 − p) × C, then falls in step with the water left | **Sourced.** FAO-56, same page: total available water (equation 82), readily available water = p × total (83), and the stress figure Ks = (total − depletion) ÷ (total − readily available) once depletion passes the readily available water (84). Equation 84 is a picture on the FAO page, so its form was checked against a search result that quotes it from Rallo and others 2014 (the paper itself was not read) | `waterIndex` |
+| Water over field capacity is lost the same day | yes | **Sourced.** FAO-56, same page: water above field capacity "is assumed to be lost the same day by deep percolation" | `soilWaterDay` |
+| Soil water capacity (`C`) | 100 mm | **Tuning, inside a sourced range.** FAO-56 gives 0.13 to 0.18 m of available water per metre of loam (table 19, read at `https://www.fao.org/4/X0490E/x0490e0c.htm`) and 0.5 to 1.5 m of roots for grazed pasture (table 22). That is 65 to 270 mm. 50, 75, 100, 150, 200 and 250 mm were tried against the AussieGRASS shire series. 100 mm follows it clearly better than 150 mm in Western Victoria and about the same in the other three districts (the table is in CALIBRATION.md). The same soil is used for all four districts | `SOIL_WATER.capacityMm` |
+| Crop coefficient | none (the same as 1) | **Tuning.** The pasture is treated as FAO-56's reference grass, to keep the tally simple | |
+| FAO-56's daily adjustment of `p` for the day's demand | not used | **Tuning.** FAO-56 gives p = table value + 0.04 × (5 − ETc). Left out to keep the tally simple | |
+| Ceiling on the growth factor | 1.9 | **Tuning, carried over.** The MVP's own upper limit on the month factor (Seasons, above). The same factor multiplies sown pastures and crops, which were tuned with it no higher than this | `WEATHER_FACTOR_CEILING` |
+| Scaling years | 1997 to 2025 | The playable years in the table as pulled (PRD 5.14, section 21 row 32). Fixed so a later pull does not move past years | `SCALING_YEARS` |
+| How fine the scaling is | twelve mid-month figures, straight lines between | **Tuning.** The same shape as the district curve. See MODEL.md 1A for why | `solveScaling` |
+| Lowest scaling figure allowed | 0.01 | **Tuning, a safety limit.** Under it a month is so nearly always dry that the factor would read the last millimetre of water. The lowest real figure is 0.0365 (Central Queensland, September) | `SCALING_FLOOR` |
+| Season factor look back | 365 farm days, each day weighted by the district curve | **Tuning.** A whole year, so every part of the growing season is counted once | `SEASON_WINDOW_DAYS` |
+| Season label edges | 0.6, 0.8, 0.925, 1.075, 1.25 | **Tuning.** Halfway between the MVP's six season factors, except 0.8, the edge under which `growGrass` hays green feed off faster | `SEASON_LABEL_EDGES` |
+| Run-up floor | 0.85 | **Carried over** from the MVP (Seasons, above; LESSONS 7) | `RUN_UP_SEASON_FLOOR` |
+| Days of table needed before a playable year | 905 | The 540-day run-up plus the 365-day look back | `weatherYears` |
+| Earliest real year | 1997 | PRD section 21, row 32 | `FIRST_REAL_YEAR` |
+
+The scaling figures themselves are worked out from the SILO tables, not typed in. They are listed in MODEL.md 1A and pinned in `weatherGrowth.test.ts`.
+
+**SILO change notice.** The game now works a soil-water tally and a growth factor out of SILO's rain and evapotranspiration. The credit line in `manifest.json` still says only that the data was reformatted. A line such as "Soil water and pasture growth figures are worked out from this data by The Grazing Game" needs adding wherever the credit is shown. The wording is Claudia's call.
+
+**Rain on screen** is SILO's `rain` for the real date, as served.
+
+### AussieGRASS (comparison only, not used by the game)
+
+- **Source:** AussieGRASS time series for shires, Queensland Government (Long Paddock). One text file a shire, a row a month from January 1890, with rain, temperature, evaporation, pasture growth (kg/ha), standing dry matter, utilisation and cover. Address pattern: `https://data.longpaddock.qld.gov.au/TimeSeriesGraphs/lga/<STATE>/<Shire>_<STATE>.txt`. The files are reached from the "Time Series Graphs" tab of `https://www.longpaddock.qld.gov.au/aussiegrass/`.
+- **Read:** 13 Nov 2026, in a browser, for Central Highlands Regional (Qld), Armidale Regional Council (NSW), Dubbo Regional Council (NSW) and Southern Grampians Shire (Vic). Rows ran to October 2026. The pasture growth column was added up by calendar year for 1997 to 2025. The yearly totals are in CALIBRATION.md. The files themselves are not kept in the repo.
+- **What it is:** a shire-wide average from the AussieGRASS model. The file also carries standing feed, feed eaten and utilisation, so stocking is in that model. It is not a point and not a potential. Its level can't be compared with the district curve. Its ups and downs from year to year can.
+- **Licence:** the Long Paddock pages carry a Creative Commons Attribution 4.0 badge. The page does not say in words that the badge covers the AussieGRASS files. **Not confirmed.** The figures are used here for checking only and are not shipped.
+- The FAO-56 pages above, and the search result for the Rallo paper (`https://iris.unipa.it/retrieve/e3ad8916-c841-da0e-e053-3705fe0a2b96/Rallo%202014%20JIDE-FAO56%20SWD%20Olive.pdf`, 13 Nov 2026), are the only other outside sources used.
 
 ## Saleyard classes (`BUYS`)
 

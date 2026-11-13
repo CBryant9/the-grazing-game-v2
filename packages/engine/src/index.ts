@@ -41,6 +41,7 @@ export type {
   PaddockSummaryInputs,
 } from './pasture/summary';
 
+export { averageYear } from './season/factors';
 export type { GrowthFactorSource, GrowthFactors } from './season/factors';
 export {
   PLAY_WOBBLE,
@@ -53,6 +54,38 @@ export {
   randomSeasons,
 } from './season/randomSeasons';
 export type { MonthWobble, RandomSeasonsOptions, SeasonOutlook } from './season/randomSeasons';
+// Milestone 1.4: real years and growth from real weather. The weather
+// tables themselves are read by server code only (`@gg/engine/server`).
+export {
+  dateOfSerial,
+  daySerial,
+  isoDate,
+  parseWeatherTable,
+  tableDays,
+  tableIndex,
+  tableLast,
+} from './season/weatherTable';
+export type { WeatherTable } from './season/weatherTable';
+export {
+  SCALING_YEARS,
+  SOIL_WATER,
+  WEATHER_FACTOR_CEILING,
+  buildWeatherGrowth,
+  soilWaterDay,
+  soilWaterTally,
+  waterIndex,
+} from './season/weatherGrowth';
+export type { SoilWater, SoilWaterTally, WeatherGrowth } from './season/weatherGrowth';
+export { FIRST_REAL_YEAR, isLeapYear, planRealYears, playableYears } from './season/realYears';
+export type { RealYearPlan, RealYearPlanOptions, YearOrder } from './season/realYears';
+export {
+  SEASON_LABEL_EDGES,
+  SEASON_WINDOW_DAYS,
+  seasonLabel,
+  weatherSeasons,
+  weatherYears,
+} from './season/weatherSeasons';
+export type { WeatherSeasons, WeatherSeasonsOptions } from './season/weatherSeasons';
 
 export {
   CALF_RATION_SHARE,

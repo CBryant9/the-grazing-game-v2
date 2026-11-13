@@ -61,6 +61,33 @@ export default tseslint.config(
               group: ['**/test-support/**'],
               message: 'Engine code must not import test support. Only *.test.ts files may.',
             },
+            {
+              regex: '^(node:.*|fs|fs/promises|path|url)$',
+              message:
+                'Engine model code must not read files. It takes its data as input. File reading lives in packages/engine/src/server only.',
+            },
+            {
+              group: ['**/server/**'],
+              message: 'Engine model code must not import the server-only file readers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The one place the engine package may read files: the server-only helpers.
+    files: ['packages/engine/src/server/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/test-support/**'],
+              message: 'Engine code must not import test support. Only *.test.ts files may.',
+            },
           ],
         },
       ],
