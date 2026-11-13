@@ -172,8 +172,8 @@ describe('the side-view pasture picture', () => {
   });
 
   it('rank grass of the same weight is drawn taller than leafy grass, because the view says it is taller', () => {
-    const leafy = swardPlan({ ...SWARD, massKgHa: 2500, heightCm: 26, rank: 5 });
-    const rank = swardPlan({ ...SWARD, massKgHa: 2500, heightCm: 48, rank: 70 });
+    const leafy = swardPlan({ ...SWARD, massKgHa: 2500, heightCm: 26, seedHeads: 0 });
+    const rank = swardPlan({ ...SWARD, massKgHa: 2500, heightCm: 48, seedHeads: 7 });
     expect(rank.dryCm).toBeGreaterThan(leafy.dryCm);
   });
 
@@ -184,9 +184,10 @@ describe('the side-view pasture picture', () => {
     expect(green.greenLeaves).toBeGreaterThan(green.dryStems * 3);
   });
 
-  it('seed heads show past rankness 30, and not at 30', () => {
-    expect(swardPlan({ ...SWARD, rank: 31 }).seedHeads).toBe(true);
-    expect(swardPlan({ ...SWARD, rank: 30 }).seedHeads).toBe(false);
+  it('seed heads show only where the view says they do', () => {
+    // The threshold is on the server. The picture holds none.
+    expect(swardPlan({ ...SWARD, seedHeads: 1 }).seedHeads).toBe(true);
+    expect(swardPlan({ ...SWARD, seedHeads: 0 }).seedHeads).toBe(false);
   });
 
   it('the litter layer thickens with the dead feed, up to 3,000 kg DM/ha', () => {

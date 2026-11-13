@@ -108,7 +108,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'leafCm',
     'greenPct',
     'coverPct',
-    'rank',
+    'seedHeads',
     'leafAge',
   ],
   'view.paddocks[].parts[]': ['kind', 'ha', 'planting', 'sward'],
@@ -120,7 +120,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'leafCm',
     'greenPct',
     'coverPct',
-    'rank',
+    'seedHeads',
     'leafAge',
   ],
   'view.areas[]': ['id', 'name', 'ha', 'labelCell', 'paddocks', 'hasWater'],
@@ -459,10 +459,20 @@ describe('the farm view says what the model says', () => {
       expect(['green', 'mixed', 'rank', 'short']).toContain(p.label);
       expect(p.water).toBe(s.water);
       expect(p.mobs).toEqual(s.mobs);
-      expect(p.sward.massKgHa).toBe(Math.round(s.mass));
-      expect(p.sward.heightCm).toBeCloseTo(s.height, 1);
-      expect(p.sward.leafCm).toBeCloseTo(s.leafH, 1);
+      // The side-view figures are the paddock sheet's, rounded no finer
+      // than the sheet shows: kg to the nearest 10, whole cm, whole %.
+      expect(p.sward.massKgHa).toBe(Math.round(s.mass / 10) * 10);
+      expect(p.sward.greenKgHa).toBe(Math.round(s.g / 10) * 10);
+      expect(p.sward.deadKgHa).toBe(Math.round(s.d / 10) * 10);
+      expect(p.sward.heightCm).toBe(Math.round(s.height));
+      expect(p.sward.leafCm).toBe(Math.round(s.leafH));
       expect(p.sward.greenPct).toBe(Math.round(s.green * 100));
+      expect(p.sward.seedHeads).toBe(
+        s.x > 0.3 ? Math.max(1, Math.round(Math.min(1, s.x) * 10)) : 0,
+      );
+      expect(Number.isInteger(p.sward.leafAge)).toBe(true);
+      expect(p.sward.leafAge).toBeGreaterThanOrEqual(0);
+      expect(p.sward.leafAge).toBeLessThanOrEqual(10);
       // Every square in the paddock points back at it.
       expect(view.squares.paddock[p.labelCell]).toBe(p.id);
     }

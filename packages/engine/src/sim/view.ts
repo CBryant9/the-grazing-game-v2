@@ -73,20 +73,27 @@ const EDGE_TO_VIEW: Record<number, number> = {
   [EDGE.boundary]: VIEW_FENCE.boundary,
 };
 
+/** In the side-view picture seed heads show past this rankness (the MVP's drawSward; docs/VISUALS.md). */
+export const VIEW_SWARD_SEED_HEADS_RANKNESS = 0.3;
+
 const round1 = (v: number): number => Math.round(v * 10) / 10;
+const nearest10 = (v: number): number => Math.round(v / 10) * 10;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 function swardOf(s: PaddockSummary): FarmViewSward {
+  // Rounded to what a paddock sheet shows. Finer figures would let the
+  // height and leaf-reach rules be worked back out of the view.
   return {
-    massKgHa: Math.round(s.mass),
-    greenKgHa: Math.round(s.g),
-    deadKgHa: Math.round(s.d),
-    heightCm: round1(s.height),
-    leafCm: round1(s.leafH),
+    massKgHa: nearest10(s.mass),
+    greenKgHa: nearest10(s.g),
+    deadKgHa: nearest10(s.d),
+    heightCm: Math.round(s.height),
+    leafCm: Math.round(s.leafH),
     greenPct: Math.round(s.green * 100),
     coverPct: Math.round(s.cover * 100),
-    rank: Math.round(clamp(s.x, 0, 1) * 100),
-    leafAge: Math.round(clamp(s.age / VIEW_OLD_LEAF_DAYS, 0, 1) * 100),
+    seedHeads:
+      s.x > VIEW_SWARD_SEED_HEADS_RANKNESS ? Math.max(1, Math.round(clamp(s.x, 0, 1) * 10)) : 0,
+    leafAge: Math.round(clamp(s.age / VIEW_OLD_LEAF_DAYS, 0, 1) * 10),
   };
 }
 

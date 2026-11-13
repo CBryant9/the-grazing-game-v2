@@ -9,7 +9,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 2,
-    "bytes": 40658
+    "bytes": 40656
   },
   {
     "name": "cq-large-running",
@@ -21,7 +21,7 @@
     "calves": 265,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 43947
+    "bytes": 43944
   },
   {
     "name": "nsw-small-running",
@@ -33,7 +33,7 @@
     "calves": 13,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 42895
+    "bytes": 42897
   },
   {
     "name": "nsw-large-scratch",
@@ -45,7 +45,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 41243
+    "bytes": 41244
   },
   {
     "name": "cw-small-scratch",
@@ -57,7 +57,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 40091
+    "bytes": 40090
   },
   {
     "name": "cw-large-running",
@@ -81,7 +81,7 @@
     "calves": 8,
     "mobs": 2,
     "paddocks": 4,
-    "bytes": 42842
+    "bytes": 42844
   },
   {
     "name": "wv-large-scratch",
@@ -93,7 +93,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 41478
+    "bytes": 41477
   },
   {
     "name": "cw-mixed-crops",
@@ -105,7 +105,7 @@
     "calves": 110,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 43522
+    "bytes": 43538
   },
   {
     "name": "cq-dry-season",
@@ -117,7 +117,7 @@
     "calves": 238,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 40639
+    "bytes": 40645
   },
   {
     "name": "wv-green-season",
@@ -129,7 +129,7 @@
     "calves": 34,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 42615
+    "bytes": 42616
   },
   {
     "name": "nsw-tape-cells",
@@ -141,7 +141,7 @@
     "calves": 0,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 42325
+    "bytes": 42333
   },
   {
     "name": "cq-4000-head",
@@ -153,6 +153,6 @@
     "calves": 268,
     "mobs": 3,
     "paddocks": 3,
-    "bytes": 43208
+    "bytes": 43205
   }
 ]

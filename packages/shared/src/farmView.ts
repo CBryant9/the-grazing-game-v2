@@ -17,7 +17,7 @@ import type { DistrictId, PaddockLabelId } from './index';
  * The version of the view's shape. It goes up whenever a field is added,
  * removed or changes meaning, so a browser holding an old map can tell.
  */
-export const FARM_VIEW_VERSION = 1;
+export const FARM_VIEW_VERSION = 2;
 
 /** Every farm is this many squares, whatever its size in hectares. */
 export const FARM_GRID_W = 40;
@@ -157,23 +157,29 @@ export interface FarmViewBuilding {
   cell: number;
 }
 
-/** A pasture in profile: the figures the side-view picture is drawn from. */
+/**
+ * A pasture in profile: the figures the side-view picture is drawn from.
+ *
+ * They are rounded to what a paddock sheet shows and no finer, so one
+ * figure can't be worked back from the others.
+ */
 export interface FarmViewSward {
-  /** Standing feed, kg DM/ha. */
+  /** Standing feed, kg DM/ha, to the nearest 10. */
   massKgHa: number;
+  /** Green feed and dead feed, kg DM/ha, each to the nearest 10. */
   greenKgHa: number;
   deadKgHa: number;
-  /** Standing height, cm. */
+  /** Standing height, whole cm. */
   heightCm: number;
-  /** How high the green leaf reaches, cm. */
+  /** How high the green leaf reaches, whole cm. */
   leafCm: number;
-  /** Green share of the feed, %. */
+  /** Green share of the feed, whole %. */
   greenPct: number;
-  /** Ground cover, %. */
+  /** Ground cover, whole %. */
   coverPct: number;
-  /** How far the plants have run up to seed and gone stale, 0 to 100. */
-  rank: number;
-  /** How old the green leaf looks, 0 (young) to 100 (old). */
+  /** The share of the dry stems that carry a seed head, in tenths. 0 where no seed heads show. */
+  seedHeads: number;
+  /** How old the green leaf looks, 0 (young) to 10 (old). */
   leafAge: number;
 }
 
@@ -225,7 +231,7 @@ export type ViewPlantingStage = 'est' | 'ok' | 'none' | 'veg' | 'lock' | 'head' 
 
 export interface FarmViewPlanting {
   id: number;
-  /** Its short name, for a label: "Oats". */
+  /** Its short name, for a label: "oats". The screen sets the capital. */
   name: string;
   kind: ViewPlantingKind;
   stage: ViewPlantingStage;

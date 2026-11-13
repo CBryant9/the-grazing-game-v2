@@ -540,9 +540,18 @@ Questions for Claudia:
 - **Grass taller than cattle.** Rank grass at 90 cm is drawn about twice a cow's height, as the MVP and the mockups did, so height reads. Too much?
 - **Cattle colours.** Black cows, dark brown heifers, red steers with white faces, grey bulls and brown calves in the south. Pale grey cows, cream heifers, red steers, dark grey bulls and fawn calves in Central Queensland. Right for each class?
 - **The pale rim round cattle.** It is what keeps a black cow readable on dark ground. Does it look right to you, or too much like a sticker?
-- **Labels.** They hang under the paddock's top fence. On a small paddock the name is cut to its number and a coloured dot. Is the number alone clear enough?
+- **Labels.** They hang under the paddock's top fence. On a small paddock the label is the name in full and a coloured dot, and a paddock too narrow for that gets no label. (The first build cut the name to its number, which REQUIREMENTS rules out.)
 - **Trees.** Do you want them back as decoration, or only once the model has shade?
 - **A knocked-down fence** is a steady red line with a "!" marker, not flashing. Is steady enough to catch the eye?
+
+After the realism check (same milestone, before the push):
+
+- **Fixed: the side-view figures gave formulas away.** The paddock's side-view figures were sent to the kg and the tenth of a cm, with raw rankness and leaf age. The check worked the height and leaf-reach rules back out of one test farm exactly. They are now rounded to what a paddock sheet shows (kg to the nearest 10, whole cm, whole %), leaf age is in ten steps, and rankness is replaced by a seed-head share worked out on the server. The view's version is now 2.
+- **Fixed: green at the base and seed heads were not drawn zoomed out.** The front of a raised square now shows a green band under a straw band, and a square with seed heads carries pale flecks. Tested.
+- **Fixed: the short paddock label was a bare number.** It is now the name in full and a dot, or no label on a very narrow paddock.
+- **Recorded in VISUALS.md:** the builder's decisions that were not marked as such, and a list of what the map does not do yet (the fence tool's map side, clicking a knocked-down fence, the farmer, the phone hint, night contrast, speed on a phone).
+- **For Claudia:** the "Short" label is the same colour as danger.
+- **Joined to the real-years line:** the view now reports the real date and the light for that date on a real-year farm.
 
 ## Ideas raised but not built yet
 

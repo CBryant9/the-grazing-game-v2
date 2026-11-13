@@ -30,8 +30,8 @@ export const SWARD: FarmViewSward = {
   leafCm: 12,
   greenPct: 60,
   coverPct: 100,
-  rank: 10,
-  leafAge: 30,
+  seedHeads: 0,
+  leafAge: 3,
 };
 
 /** One square's pasture, in the view's own units. */

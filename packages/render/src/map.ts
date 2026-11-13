@@ -53,7 +53,15 @@ import {
 import { placeCattle, placementKey, type MobPlacement } from './cattle';
 import { shade } from './colour';
 import { columnsSpanned, fenceRuns, outlineOf, type FenceRun } from './fences';
-import { allLooks, sameLook, squareTufts, type SquareLook, type Tuft } from './grass';
+import {
+  allLooks,
+  farFrontBands,
+  farSeedFlecks,
+  sameLook,
+  squareTufts,
+  type SquareLook,
+  type Tuft,
+} from './grass';
 import {
   GRID_H,
   GRID_N,
@@ -236,6 +244,11 @@ interface Wash {
   canvas: HTMLCanvasElement;
   dirty: boolean;
 }
+
+/** A paddock at least this wide on screen gets its two-line label. Narrower, its name and a dot. */
+const PADDOCK_LABEL_FULL_PX = 130;
+/** A paddock narrower than this on screen gets no label. Its name in full does not fit. */
+const PADDOCK_LABEL_MIN_PX = 96;
 
 interface PadLabel {
   root: Container;
@@ -846,12 +859,23 @@ class PixiFarmMap implements FarmMap {
           for (let k = 0; k < 3; k++)
             g.rect(c, top + (K * (k + 0.2)) / 3, 1.02, K * 0.07).fill(line);
         }
-        // The front of a raised square shows where it stands taller than the one in front of it.
+        if (farSeedFlecks(look)) {
+          // Seed heads read from a distance as pale flecks across the square.
+          // Each square scatters its three a little differently, the same way
+          // every time, so a paddock does not read as a grid of dots.
+          for (let k = 0; k < 3; k++) {
+            const dx = ((i * 37 + k * 17) % 11) / 11;
+            const dy = ((i * 53 + k * 29) % 13) / 13;
+            g.rect(c + 0.08 + 0.3 * k + 0.16 * dx, top + K * (0.12 + 0.62 * dy), 0.1, K * 0.1).fill(
+              look.seed,
+            );
+          }
+        }
+        // The front of a raised square shows where it stands taller than the
+        // one in front of it: green from the ground up, dry feed above.
         const next = r + 1 < GRID_H ? looks[i + GRID_W]!.raise : 0;
-        if (look.raise > next + 0.004) {
-          g.rect(c, (r + 1) * K - look.raise, 1.02, look.raise - next).fill(
-            shade(look.field, 0.68),
-          );
+        for (const band of farFrontBands(look, next)) {
+          g.rect(c, (r + 1) * K - band.to, 1.02, band.to - band.from).fill(band.colour);
         }
       }
     }
@@ -1296,11 +1320,11 @@ class PixiFarmMap implements FarmMap {
       under.y = top.height / 2 + under.height / 2 + 1;
       const full = new Container();
       full.addChild(top, under);
-      // Where the full name does not fit: the paddock's number and the label's colour.
+      // Where the two lines do not fit: the paddock's name in full ("Paddock 1",
+      // never "P1" or a bare number) and the label's colour. Narrower than
+      // that, no label is drawn: a tap still opens the paddock.
       const dot = new Graphics().circle(5, 5, 5).fill(colour);
-      const small = this.pill([this.text(p.name.replace(/^\D+/, ''), 11, ui.labelText), dot], {
-        pad: 5,
-      });
+      const small = this.pill([this.text(p.name, 11, ui.labelText), dot], { pad: 5 });
       const root = new Container();
       root.addChild(full, small);
       this.labelLayer.addChild(root);
@@ -1383,11 +1407,11 @@ class PixiFarmMap implements FarmMap {
     const showLabels = this.layers.labels;
     for (const l of this.padLabels) {
       const widthPx = l.columns * cam.zoom;
-      const show = showLabels && widthPx >= 44;
+      const show = showLabels && widthPx >= PADDOCK_LABEL_MIN_PX;
       l.root.visible = show;
       if (!show) continue;
       const s = worldToScreen(cam, vp, l.wx, l.wy);
-      const fits = widthPx >= 130;
+      const fits = widthPx >= PADDOCK_LABEL_FULL_PX;
       l.full.visible = fits;
       l.small.visible = !fits;
       // The bore must stay easy to find: a label that would sit over the

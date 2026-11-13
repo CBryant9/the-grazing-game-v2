@@ -160,6 +160,44 @@ export function squareLook(view: FarmView, i: number): SquareLook {
   };
 }
 
+/** One band of colour on the front of a raised square, by height above the ground in world units. */
+export interface FarBand {
+  from: number;
+  to: number;
+  colour: number;
+}
+
+/** How dark the front of a raised square is beside its top. */
+export const FAR_FRONT_SHADE = 0.68;
+
+/**
+ * The front of a raised square on the zoomed-out map: what shows above the
+ * square in front of it, which stands `next` high.
+ *
+ * It is the sward in profile. Green shows from the ground up as far as the
+ * green reaches, and dry feed above that. So rank grass with green at its
+ * base shows a green band under a straw one, from a distance too.
+ */
+export function farFrontBands(look: SquareLook, next: number): FarBand[] {
+  if (look.raise <= next + 0.004) return [];
+  const thin = look.cover * 0.85;
+  const face = (c: number): number => shade(mix(look.ground, c, thin), FAR_FRONT_SHADE);
+  const greenTop = Math.min(look.raise, look.greenReach * look.raise);
+  const bands: FarBand[] = [];
+  if (greenTop > next + 0.004) bands.push({ from: next, to: greenTop, colour: face(look.leaf) });
+  const dryFrom = Math.max(next, greenTop);
+  if (look.raise > dryFrom + 0.004) {
+    bands.push({ from: dryFrom, to: look.raise, colour: face(look.straw) });
+  }
+  return bands;
+}
+
+/**
+ * True where the zoomed-out map flecks a square with seed heads. Crops
+ * already read as rows, and turn gold when they head.
+ */
+export const farSeedFlecks = (look: SquareLook): boolean => look.seed >= 0 && look.kind !== 'crop';
+
 /** Every square's look. */
 export function allLooks(view: FarmView): SquareLook[] {
   const out = new Array<SquareLook>(GRID_N);

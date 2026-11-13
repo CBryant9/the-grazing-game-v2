@@ -2,8 +2,8 @@
  * The side-view picture of a pasture (the MVP's drawSward, docs/VISUALS.md).
  *
  * A 0 to 80 cm frame with a cm scale, sky, soil and a litter layer. Dry
- * stems stand behind, tall and leaning, with seed heads when the pasture is
- * rank. Green leaf is drawn in front, from the base. Everything comes from
+ * stems stand behind, tall and leaning, with seed heads where the view says
+ * they show. Green leaf is drawn in front, from the base. Everything comes from
  * the view's figures for the paddock, so the picture says what the paddock
  * sheet says.
  *
@@ -62,9 +62,9 @@ export function swardPlan(s: FarmViewSward): SwardPlan {
     greenCm: s.leafCm,
     dryStems: Math.round(stems * (1 - green) * 1.1),
     greenLeaves: Math.round(stems * green * 1.6) + (s.greenKgHa > 80 ? 4 : 0),
-    seedHeads: s.rank > 30,
+    seedHeads: s.seedHeads > 0,
     litter: cover > 0.05 ? Math.min(1, s.deadKgHa / 3000) : 0,
-    leafAge: Math.min(1, Math.max(0, s.leafAge / 100)),
+    leafAge: Math.min(1, Math.max(0, s.leafAge / 10)),
   };
 }
 
@@ -120,7 +120,7 @@ export function drawSward(
     x.moveTo(sx, ground);
     x.quadraticCurveTo(sx + lean * 0.2, cm(tall * 0.6), sx + lean, cm(tall));
     x.stroke();
-    if (plan.seedHeads && r() < sward.rank / 100) {
+    if (plan.seedHeads && r() < sward.seedHeads / 10) {
       x.fillStyle = '#ead6a0';
       x.beginPath();
       x.ellipse(sx + lean, cm(tall) - 3, 2, 4.5, lean * 0.03, 0, Math.PI * 2);

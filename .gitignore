@@ -49,3 +49,6 @@ next-env.d.ts
 # Claude Code local settings and worktrees (machine-specific, never commit)
 .claude/settings.local.json
 .claude/worktrees/
+
+# written by next dev; the project does not use it
+apps/web/AGENTS.md

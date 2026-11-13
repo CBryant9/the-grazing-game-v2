@@ -7,6 +7,8 @@ import {
   STUBBLE_HEIGHT,
   TUFTS_PER_SQUARE,
   TUFT_MAX_HEIGHT,
+  farFrontBands,
+  farSeedFlecks,
   squareLook,
   squareTufts,
   tuftHeight,
@@ -326,5 +328,54 @@ describe('the ground picture', () => {
     // About six pixels in a hundred.
     expect(clods).toBeGreaterThan(100);
     expect(clods).toBeLessThan(400);
+  });
+});
+
+describe('the zoomed-out map shows the sward in profile on the front of a raised square', () => {
+  it('rank grass with green at its base shows a green band under a straw band', () => {
+    const l = look({ ...RANK, heightCm: 60, green: 6 });
+    const bands = farFrontBands(l, 0);
+    expect(bands).toHaveLength(2);
+    // Green from the ground up, as far as the green reaches.
+    expect(bands[0]!.from).toBe(0);
+    expect(bands[0]!.to).toBeCloseTo(l.greenReach * l.raise, 10);
+    expect(greener(bands[0]!.colour)).toBe(true);
+    // Dry feed above it, to the top.
+    expect(bands[1]!.from).toBeCloseTo(bands[0]!.to, 10);
+    expect(bands[1]!.to).toBe(l.raise);
+    expect(strawish(bands[1]!.colour)).toBe(true);
+  });
+
+  it('a leafy sward is green to the top, and an all-dry one is straw to the ground', () => {
+    const leafy = farFrontBands(look({ ...LEAFY, green: 20 }), 0);
+    expect(leafy).toHaveLength(1);
+    expect(greener(leafy[0]!.colour)).toBe(true);
+    const dry = farFrontBands(look({ ...RANK, green: 0 }), 0);
+    expect(dry).toHaveLength(1);
+    expect(strawish(dry[0]!.colour)).toBe(true);
+  });
+
+  it('only shows what stands above the square in front', () => {
+    const l = look({ ...RANK, heightCm: 60, green: 6 });
+    // A square in front as tall as this one hides the whole front.
+    expect(farFrontBands(l, l.raise)).toEqual([]);
+    // One that stands above the green band leaves only dry feed showing.
+    const over = l.greenReach * l.raise + 0.01;
+    const bands = farFrontBands(l, over);
+    expect(bands).toHaveLength(1);
+    expect(bands[0]!.from).toBe(over);
+    expect(strawish(bands[0]!.colour)).toBe(true);
+  });
+
+  it('flecks a pasture square that carries seed heads, and no other', () => {
+    expect(farSeedFlecks(look({ ...RANK, seedHeads: 1 }))).toBe(true);
+    expect(farSeedFlecks(look({ ...RANK, seedHeads: 0 }))).toBe(false);
+    // A heading crop turns gold and keeps its rows. It gets no flecks.
+    expect(
+      farSeedFlecks(
+        look({ land: VIEW_LAND.crop, heightCm: 60, green: 6, cover: 10, seedHeads: 1 }),
+      ),
+    ).toBe(false);
+    expect(farSeedFlecks(look(STUBBLE))).toBe(false);
   });
 });
