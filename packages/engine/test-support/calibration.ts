@@ -66,6 +66,8 @@ export interface SteerCase {
   district: DistrictId;
   /** The month the run starts in, 0 for January. */
   month: number;
+  /** The year the run starts in. 2021 if left out. */
+  year?: number;
   supp: Supplement;
   /** The benchmark, kg a head a year. */
   lo: number;
@@ -94,7 +96,7 @@ export function steerRun(c: SteerCase, seed: number, seasons?: GrowthFactorSourc
     seed,
     district: c.district,
     size: STEER_BLOCK_HA,
-    start: { year: 2021, month: c.month },
+    start: { year: c.year ?? 2021, month: c.month },
     startType: 'scratch',
     difficulty: 'medium',
     money: { cash: 5e6, overdraft: -5e6, broke: -1e7 },
