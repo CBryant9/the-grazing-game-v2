@@ -234,3 +234,22 @@ describe('the market over time, against the MVP', () => {
     for (const k of CLASS_IDS) expect(Math.abs(m.drift[k])).toBeLessThanOrEqual(0.2);
   });
 });
+
+describe('the limits, exactly', () => {
+  it('each class stops at exactly 20% above or below its usual multiple', () => {
+    for (const sign of [1, -1]) {
+      // Every normal draw is large: +7.4 or -7.4. A step moves a class by about 5%.
+      const v = sign > 0 ? 1e-9 : 0.5;
+      let k = 0;
+      const rng = rngFrom(() => (k++ % 2 === 0 ? 1e-12 : v));
+      const start = { year: 2022, month: 0 };
+      const m = standInMarket.open(start, rng);
+      for (let d = 1; d <= 30; d++) standInMarket.step(m, start, d, rng);
+      for (const id of CLASS_IDS) expect(m.drift[id], id).toBe(sign * 0.2);
+      // Prices follow: 20% over, or under, the indicator times the class multiple.
+      const prices = standInMarket.prices(m);
+      expect(prices.classes.cow).toBe(m.indicator * 0.64 * (1 + sign * 0.2));
+      expect(prices.indicator).toBe(m.indicator);
+    }
+  });
+});

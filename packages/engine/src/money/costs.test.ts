@@ -117,6 +117,23 @@ describe('the money a farm starts with', () => {
     expect(carryingCapacityAE('cw', 100) * 0.5 * 950).toBeLessThan(20000);
   });
 
+  it('the cash base is the MVP figure across a sweep of farm sizes, on both sides of each $10,000 step', () => {
+    const steps = new Set<number>();
+    for (const id of DISTRICT_IDS) {
+      for (let ha = 100; ha <= 20000; ha += 37) {
+        const base = cashBase(id, ha);
+        expect(base, `${id} ${ha}`).toBe(mvp.cashBase(id, ha));
+        expect(base % 10000).toBe(0);
+        steps.add(base);
+        expect(startMoney(id, ha, 'hard', true), `${id} ${ha}`).toEqual(
+          mvp.diffMoney(id, ha, 'hard', true),
+        );
+      }
+    }
+    // The sweep crossed a lot of steps, so a figure a little out would land on the wrong side of one.
+    expect(steps.size).toBeGreaterThan(100);
+  });
+
   it('cash, overdraft and the bank limit are the MVP diffMoney for every choice', () => {
     expect(DIFFICULTY).toEqual(
       Object.fromEntries(

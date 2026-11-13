@@ -103,6 +103,15 @@ Breeding:
 
 The MVP faults fixed in this milestone (the feedlot has water, a cow whose calf dies is dried off, weaning dries off a dam in another mob) change results a little from the MVP in those cases only. They have not been through the whole-farm suites yet. Re-run them in 1.3.
 
+### 13 Nov 2026, rebuild milestone 1.2c (the whole farm): engine 0.4.0
+
+No grass or cattle formula changed. The whole farm (the daily tick, costs, the market stand-in and the starting herd) was matched to the MVP's own `stepDay` day by day: breeding herds for 380 days in each of the four districts, steers for 150 days in each, a mixed farm for 300 days. Every animal, every pasture square, cash and the year's totals are equal exactly, so the MVP's whole-farm figures above still stand for the rebuild. The whole-farm benchmark suites (steer gains, deaths, the Central West tune) are milestone 1.3 and were not run here.
+
+- **Speed: 2.1 to 3.0 ms a simulated day with 4,300 to 4,900 head** (plus 400 to 900 calves) in three mobs on a large Central Queensland farm, on its own on the build PC. Target under 5 ms. Passes. With the whole test suite running beside it the same test reads about 15 ms, so run it on its own (`pnpm exec vitest run packages/engine/src/sim/speed.test.ts`).
+- **No water:** every animal in a mob with no water dies on the fourth day, in all four districts, as a whole-farm test (cows, calves, steers and bulls). Passes.
+- **Rule checks that sit beside the benchmarks:** breakouts only through tape and only when hungry or thirsty; one mob to a grazing area after any fence or gate change; a year in each district ends with every figure a finite number.
+- The rebuild's differences from the MVP in this part (tape and energiser costs, net worth, a fence through a mob) change money and mob membership, not growth, intake, gain, breeding or deaths.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

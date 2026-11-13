@@ -258,7 +258,7 @@ No accounts are created, terms accepted or passwords entered by the builder. Eve
 | 5.3 | PostHog (Free) | Project key and host |
 | 5.4 | Domain name | The site address |
 | Before launch | Vercel Pro and Supabase Pro | Vercel Hobby can't be used commercially |
-| Before launch | An email to MLA (insights@mla.com.au) | Written confirmation of commercial use. A draft will be supplied |
+| Before launch | An email to MLA's market information team (contact on their statistics page) | Written confirmation of commercial use. A draft will be supplied |
 | Before sheep go public | An AWEX agreement | Real wool prices |
 | Optional | Apple sign-in | Needs a paid Apple Developer account. Built, left off |
 

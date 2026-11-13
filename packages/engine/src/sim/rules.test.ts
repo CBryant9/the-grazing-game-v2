@@ -39,6 +39,9 @@ import {
 
 vi.setConfig({ testTimeout: 600_000 });
 
+/** A mob that gets under 85% of the pasture it wants is hungry. Written out here, not read from the engine. */
+const HUNGRY_UNDER = 0.85;
+
 const count = (farm: FarmState, code: number): number => {
   let n = 0;
   for (const v of farm.layout.fences.hE) if (v === code) n++;
@@ -195,7 +198,7 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
         expect(getEdge(farm.layout.fences, e.edge)).toBe(EDGE.tapeDown);
         const m = farm.mobs.find((x) => x.id === e.mob) ?? hungry.get(e.mob)!;
         // It was short of feed or out of water: a reason, never for nothing.
-        expect(m.st!.f < BREAKOUT_FEED_SHARE || m.dry > 0).toBe(true);
+        expect(m.st!.f < HUNGRY_UNDER || m.dry > 0).toBe(true);
         expect(e.reason).toBe(m.dry > 0 ? 'thirsty' : 'hungry');
         if (last.has(e.mob)) expect(r.day - last.get(e.mob)!).toBeGreaterThanOrEqual(21);
         last.set(e.mob, r.day);
@@ -214,7 +217,7 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
     let hungryDays = 0;
     for (let d = 0; d < 150 && farm.mobs.length; d++) {
       const r = stepDay(farm, { rng: { breakouts: fixedRng(0) } });
-      if (farm.mobs[0] && farm.mobs[0].st!.f < BREAKOUT_FEED_SHARE) hungryDays++;
+      if (farm.mobs[0] && farm.mobs[0].st!.f < HUNGRY_UNDER) hungryDays++;
       expect(r.events.some((e) => e.type === 'breakout')).toBe(false);
       expect(farm.mobs[0]?.lastBreak ?? null).toBeNull();
     }
@@ -243,7 +246,7 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
     const stream = farm.rng.breakouts.join();
     for (let d = 0; d < 300; d++) {
       const r = stepDay(farm);
-      expect(farm.mobs[0]!.st!.f).toBeGreaterThanOrEqual(BREAKOUT_FEED_SHARE);
+      expect(farm.mobs[0]!.st!.f).toBeGreaterThanOrEqual(HUNGRY_UNDER);
       expect(r.events.some((e) => e.type === 'breakout')).toBe(false);
     }
     expect(count(farm, EDGE.tapeDown)).toBe(0);
@@ -289,7 +292,7 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
       const r = stepDay(farm, { rng: { breakouts: fixedRng(0) } });
       const f = farm.mobs[0]!.st!.f;
       const broke = r.events.some((e) => e.type === 'breakout');
-      expect(broke).toBe(f < BREAKOUT_FEED_SHARE);
+      expect(broke).toBe(f < HUNGRY_UNDER);
       seen = broke;
     }
     expect(seen).toBe(true);
@@ -316,7 +319,7 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
           farm.pasture.G.fill(0);
           farm.pasture.D.fill(200);
           stepDay(farm, { rng: { breakouts: fixedRng(1) } });
-          expect(farm.mobs[0]!.st!.f).toBeLessThan(BREAKOUT_FEED_SHARE);
+          expect(farm.mobs[0]!.st!.f).toBeLessThan(HUNGRY_UNDER);
           expect(farm.mobs[0]!.dry).toBe(0);
         } else {
           farm = openFarm('nsw');
@@ -381,10 +384,12 @@ describe('breakouts: only through tape, only when hungry or thirsty', () => {
     for (let d = 0; d < 60; d++) {
       const r = stepDay(farm, { rng: { breakouts: fixedRng(0) } });
       // Hungry every day, and the draw would always let them out.
-      expect(farm.mobs[0]!.st!.f).toBeLessThan(BREAKOUT_FEED_SHARE);
+      expect(farm.mobs[0]!.st!.f).toBeLessThan(HUNGRY_UNDER);
       if (r.events.some((e) => e.type === 'breakout')) days.push(r.day);
     }
-    expect(days).toEqual([0, BREAKOUT_COOLDOWN_DAYS]);
+    expect(days).toEqual([0, 21]);
+    expect(BREAKOUT_COOLDOWN_DAYS).toBe(21);
+    expect(BREAKOUT_FEED_SHARE).toBe(0.85);
     expect(farm.mobs[0]!.animals.length).toBeGreaterThan(70);
     expect(count(farm, EDGE.tapeDown)).toBe(2);
     expect(count(farm, EDGE.tape)).toBe(2);

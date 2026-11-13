@@ -81,6 +81,14 @@ describe('paddock summaries, against the MVP padStats on a whole farm', () => {
     );
     run.days(10);
     compare('with a gate open');
+    // On to spring, when the wheat is locked up and its feed quality changes every day.
+    run.days(95);
+    compare('with a crop between lock-up and heading');
+    const changing = run.farm.crops.fields.filter((x) => {
+      const t = run.farm.day - x.sown;
+      return x.sp === 'wheat' && t > 100 && t < 150;
+    });
+    expect(changing.length).toBe(1);
     const views = paddockSummaries(run.farm);
     const joined = views.filter((p) => p.area.startsWith('Paddocks '));
     expect(joined.length).toBe(2);
@@ -210,6 +218,27 @@ describe('mob summaries and farm totals', () => {
     expect(t.indicator).toBe(farm.market.indicator);
     const f = seasonsOf(farm).factorsOn(199);
     expect(t.season).toEqual({ label: f.label, factor: f.seasonF });
+  });
+
+  it('the season shown is the one the last day ran on', () => {
+    const seasons = {
+      factorsOn: (day: number) =>
+        day < farm.day
+          ? { seasonF: 0.5, monthF: 0.5, label: 'Drought' }
+          : { seasonF: 1.35, monthF: 1.35, label: 'Wet' },
+    };
+    expect(farmTotals(farm, { seasons }).season).toEqual({ label: 'Drought', factor: 0.5 });
+    // On a farm's first day there is no day before, so it is the day-0 season.
+    const fresh = createFarm({
+      seed: 21,
+      district: 'cq',
+      size: 'small',
+      start: { year: 2023, month: 9 },
+      startType: 'scratch',
+      difficulty: 'medium',
+    });
+    const f0 = seasonsOf(fresh).factorsOn(0);
+    expect(farmTotals(fresh).season).toEqual({ label: f0.label, factor: f0.seasonF });
   });
 
   it('what a calibration run reads: head, live weight, waters, the year and the preg tests', () => {

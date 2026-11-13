@@ -22,6 +22,7 @@ import { createFarm } from '../sim/create';
 import { seasonsOf, surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmMob, type FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
+import { applyAction } from './apply';
 import type { Action } from './types';
 
 /*
@@ -401,6 +402,27 @@ describe('harvest', () => {
     let y = 0;
     for (const i of f.cells) y += farm.crops.yieldT[i]!;
     expect(e.tha).toBe((y / f.cells.length) * Math.pow(Math.min(1.4, Math.max(0.4, seasonF)), 0.8));
+  });
+
+  it('goes by the season the last day ran on, not the one that starts today', () => {
+    const { farm, field } = ready();
+    const f = farm.crops.fields.find((x) => x.id === field)!;
+    let y = 0;
+    for (const i of f.cells) y += farm.crops.yieldT[i]!;
+    const average = y / f.cells.length;
+    // A drought up to yesterday, a wet season from today.
+    const seasons = {
+      factorsOn: (day: number) =>
+        day < farm.day
+          ? { seasonF: 0.5, monthF: 0.5, label: 'Drought' }
+          : { seasonF: 1.35, monthF: 1.35, label: 'Wet' },
+    };
+    const out = applyAction(farm, { type: 'harvest', field }, { seasons });
+    if (!out.ok) throw new Error(out.message);
+    const e = out.events[0]!;
+    if (e.type !== 'harvested') throw new Error('expected a harvest');
+    expect(e.tha).toBe(average * Math.pow(0.5, 0.8));
+    expect(e.tha).not.toBe(average * Math.pow(1.35, 0.8));
   });
 
   it('is refused for a crop that is not ready, a pasture, no crop at all, and at the bank limit', () => {

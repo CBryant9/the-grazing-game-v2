@@ -109,6 +109,21 @@ describe('a fence through a mob shares it out by area', () => {
     }
   });
 
+  it('strays of a Central Qld mob that was taken off the lick stay off it', () => {
+    const farm = openFarm('cq', { seed: 3 });
+    let f = act(farm, {
+      type: 'buyCattle',
+      cls: 'yearSteer',
+      qty: 200,
+      to: { cell: farm.layout.water.bore },
+    });
+    expect(f.mobs[0]!.supp).toBe('lick');
+    f = act(f, { type: 'setSupplement', mob: f.mobs[0]!.id, supp: 'none' });
+    const { vx } = lineFor(f);
+    const out = act(f, { type: 'buildFence', edges: downFarm(vx), fence: 'permanent' });
+    expect(out.mobs.map((m) => m.supp)).toEqual(['none', 'none']);
+  });
+
   it('a calf stays with its dam', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const farm = stocked(seed, 'cowCalf', 60);

@@ -524,3 +524,110 @@ describe('moving cattle', () => {
     expect(back.events.map((x) => x.type)).toEqual(['mob-moved']);
   });
 });
+
+describe('who goes first when a group is sold', () => {
+  function mixed(): FarmState {
+    let farm = openFarm('nsw');
+    const bore = farm.layout.water.bore;
+    farm = act(farm, { type: 'buyCattle', cls: 'dryCow', qty: 8, to: { cell: bore } });
+    farm = act(farm, { type: 'buyCattle', cls: 'weanerHeifer', qty: 8, to: { cell: bore } });
+    farm = act(farm, { type: 'buyCattle', cls: 'joinHeifer', qty: 6, to: { cell: bore } });
+    farm = act(farm, { type: 'buyCattle', cls: 'bull', qty: 5, to: { cell: bore } });
+    return farm;
+  }
+
+  it('cows in the same condition: the oldest goes first', () => {
+    const farm = mixed();
+    const cows = everyone(farm).filter((a) => a.kind === 'cow');
+    // Three cows in the same, lowest, condition and of different ages.
+    const [a, b, c] = cows;
+    for (const x of [a!, b!, c!]) x.cond = 2.1;
+    a!.age = 1700;
+    b!.age = 2300;
+    c!.age = 2000;
+    const m = farm.mobs[0]!.id;
+    const one = act(farm, { type: 'sellGroup', mob: m, group: 'cowE', qty: 1 });
+    expect(everyone(one).some((x) => x.id === b!.id)).toBe(false);
+    expect(everyone(one).filter((x) => x.kind === 'cow').length).toBe(7);
+    const two = act(farm, { type: 'sellGroup', mob: m, group: 'cowE', qty: 2 });
+    expect(everyone(two).some((x) => x.id === b!.id || x.id === c!.id)).toBe(false);
+    expect(everyone(two).some((x) => x.id === a!.id)).toBe(true);
+    // The same order when cows are sold as a market class.
+    const cls = act(farm, { type: 'sellClass', cls: 'cow', qty: 2 });
+    expect(everyone(cls).some((x) => x.id === b!.id || x.id === c!.id)).toBe(false);
+  });
+
+  it('heifers, empty or in calf: the heaviest go first', () => {
+    const farm = mixed();
+    const m = farm.mobs[0]!.id;
+    const heifers = everyone(farm)
+      .filter((a) => a.kind === 'heifer')
+      .sort((x, y) => y.wt - x.wt);
+    expect(heifers.length).toBe(14);
+    const out = act(farm, { type: 'sellGroup', mob: m, group: 'heifer', qty: 4 });
+    const left = new Set(everyone(out).map((a) => a.id));
+    for (const h of heifers.slice(0, 4)) expect(left.has(h.id)).toBe(false);
+    for (const h of heifers.slice(4)) expect(left.has(h.id)).toBe(true);
+    // Five of the lighter ones in calf: they are their own group, heaviest first again.
+    const inCalf = heifers.slice(6, 11);
+    for (const h of inCalf) h.preg = 60;
+    const ptic = act(farm, { type: 'sellGroup', mob: m, group: 'heiferP', qty: 2 });
+    const now = new Set(everyone(ptic).map((a) => a.id));
+    expect(now.has(inCalf[0]!.id) || now.has(inCalf[1]!.id)).toBe(false);
+    for (const h of inCalf.slice(2)) expect(now.has(h.id)).toBe(true);
+    expect(everyone(ptic).length).toBe(everyone(farm).length - 2);
+  });
+
+  it('bulls: the lowest condition go first, whatever they weigh', () => {
+    const farm = mixed();
+    const bulls = everyone(farm).filter((a) => a.kind === 'bull');
+    // The two in the lowest condition are also the two lightest.
+    const conds = [3.5, 3.1, 3.4, 3.05, 3.3];
+    const weights = [800, 700, 810, 720, 760];
+    bulls.forEach((b, k) => {
+      b.cond = conds[k]!;
+      b.wt = weights[k]!;
+    });
+    const out = act(farm, { type: 'sellClass', cls: 'bull', qty: 2 });
+    const left = everyone(out)
+      .filter((a) => a.kind === 'bull')
+      .map((a) => a.id);
+    expect(left).toEqual([bulls[0]!.id, bulls[2]!.id, bulls[4]!.id]);
+    const grouped = act(farm, { type: 'sellGroup', mob: farm.mobs[0]!.id, group: 'bull', qty: 2 });
+    expect(
+      everyone(grouped)
+        .filter((a) => a.kind === 'bull')
+        .map((a) => a.id),
+    ).toEqual(left);
+  });
+});
+
+describe('requests with parts missing', () => {
+  it('are refused with a reason, never an error', () => {
+    let farm = openFarm('nsw');
+    farm = act(farm, { type: 'buyCattle', cls: 'bull', qty: 1, to: { cell: 3 } });
+    const mob = farm.mobs[0]!.id;
+    const hash = farmHash(farm);
+    const bad = [
+      { type: 'buyCattle', cls: 'bull', qty: 1 },
+      { type: 'buyCattle', cls: 'bull', qty: 1, to: null },
+      { type: 'buyCattle', cls: 'bull', qty: 1, to: 'lot' },
+      { type: 'buyCattle', cls: 'bull', qty: 1, to: {} },
+      { type: 'moveCattle', picks: [null], to: 'lot' },
+      { type: 'moveCattle', picks: ['bull'], to: 'lot' },
+      { type: 'moveCattle', picks: [{ mob, cls: 'bull', qty: 1 }] },
+      { type: 'moveCattle', picks: [{ mob, cls: 'bull', qty: 1 }], to: 'yards' },
+      { type: 'moveMob', mob },
+      { type: 'moveMob', mob, to: null },
+      { type: 'sellAnimals' },
+      { type: 'sellAnimals', ids: 'all' },
+      {},
+    ] as unknown as Action[];
+    for (const action of bad) {
+      const out = applyAction(farm, action);
+      expect(out.ok, JSON.stringify(action)).toBe(false);
+      if (!out.ok) expect(out.reason, JSON.stringify(action)).toBe('bad-request');
+    }
+    expect(farmHash(farm)).toBe(hash);
+  });
+});

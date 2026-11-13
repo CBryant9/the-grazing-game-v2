@@ -16,6 +16,8 @@ One simulated day runs in this order (`stepDay`):
 10. End-of-year score
 11. Game-over checks
 
+The rebuild's tick follows this order exactly. The detail of each step as built, and what the whole farm adds around the formulas, is in section 8.
+
 ## 1. Pasture, per square
 
 State per square:
@@ -321,7 +323,7 @@ The rebuild's code is in `packages/engine/src/farm/`. Paddock ids, grazing area 
 - **Building a fence run** changes every edge in the run to the new type except gates and the boundary. Only edges that were not already that type count as built. Tape comes off the roll first. Fence under a new run is gone, tape included (it does not go back on the roll).
 - **Pulling down** takes out every fence and gate in the run. Tape, standing or knocked down, goes back on the roll.
 - **Gates** go only in a standing fence, never in the boundary, and start shut. A gate takes the place of one fence segment.
-- **Strays.** The MVP decided which side of a new fence each beast was on from where it was drawn. The rebuild does not. A change to the fences reports which grazing areas were split, and into which new areas, and which were joined. The cattle model shares the mob out by a seeded rule.
+- **Strays.** The MVP decided which side of a new fence each beast was on from where it was drawn. The rebuild does not. A change to the fences reports which grazing areas were split, and into which new areas, and which were joined. The mob is shared out by a seeded rule (section 8, "A fence through a mob").
 - **Money is left out of these rules.** Each job reports what was built or removed (segments, metres, gates, troughs, tape off the roll and tape bought) and the caller applies the costs. The energiser is charged for electric fence only.
 
 ### The homestead and stock yards (new in the rebuild, PRD 5.13)
@@ -363,4 +365,133 @@ After the last leg the plan either repeats or stays. Moves skip a paddock with n
 - cover points = min(500, cover% × 7) − (40 − cover) × 25 if cover < 40%
 - deaths cost 60 points each
 
-Net worth = cash + 80% of infrastructure spend + net sale value of stock.
+Utilisation over 60% never scores below 0. Cover is the average of the readings taken on the 1st of each month, or today's cover if the year has none yet. The total is rounded to a whole number.
+
+Net worth = cash + 80% of infrastructure spend + net sale value of stock. The rebuild counts infrastructure differently from the MVP: see section 8, "Net worth".
+
+## 8. The whole farm (rebuild, milestone 1.2c)
+
+The code is in `packages/engine/src`: `sim/` (the farm's state, making a farm, the daily tick, mobs, summaries), `market/`, `money/`, `actions/` and `save/`. The tick, the market, the costs and the starting herd are tested against the MVP's own `stepDay`, day by day, on whole farms.
+
+### The farm in one object
+
+`FarmState` holds everything a farm is, as plain data and typed arrays: the seed, district, start date and day; cash, the overdraft and the bank's limit; the pasture, crops, fences and water; the homestead and yards; every mob with its cattle; the id counters; the market; the saved state of each random stream; the year's totals and the years finished; the ledger of infrastructure spending; the inbox; the days-eaten-out count; whether the game is over; and every action taken, in order. Paddocks, grazing areas, watered squares and the distance to water are worked out from it when needed and never stored.
+
+A mob is in one of three places: on pasture (it holds one square of its grazing area, its "anchor"), in the feedlot, or in the stock yards.
+
+### The day, as built
+
+1. **Season and month factor** for the day, from the season source. On the 1st of a month the farm's ground cover is read for the year's score, before anything grows or is eaten. A new season on 1 July is reported (not on the farm's first day).
+2. **Crop events** (`fieldTick`).
+3. **Grass growth**. The feed grown is added to the year's total.
+4. **Each mob in turn.** If its drop is due for weaning (a calf has reached 280 days with its dam on the farm), every calf of 90 days or more is weaned. The weaners go to another grazing area with water: an empty one first, then the one with the best feed (highest average ME). They become a new mob, named "Weaners" and its number, on the supplement of the mob they came from. With no other area with water they stay where they are. Then the mob has its day. A mob made today by weaning goes on the end of the list and has its day too. The day's feed bill comes off cash mob by mob.
+5. **Deaths are settled** (a cow whose calf died is dried off).
+6. **Portable troughs drain.** If one runs dry, the watered squares are worked out again. Then **breakouts** (below). Then **mobs that share ground join** (below).
+7. **Running costs and interest.** Overheads are $4,000 + $0.60 a hectare a year. Animal health is the district's figure a head a year, counted on every head, calves included. Both are charged a 365th each day. Interest is worked on the balance after the day's feed bill and before the day's running costs: 9.5% a year on an overdraft, 3% a year earned on money in the bank.
+8. **Grazing plans** move mobs here. Plans are a later milestone. The place for them is `sim/plans.ts`: the cattle step already takes a mob's stops for the day.
+9. **The day counter goes up, then the market moves** to the new day. Mobs with no cattle left are dropped.
+10. **The year closes** every 365 farm days (not on a calendar date, and leap years make no difference). The year is scored and filed, and a new one opens at the farm's net worth.
+11. **Game over** if cash is at or past the bank's limit. Otherwise, if there are cattle on pasture, the feed cattle can reach is averaged over every square of the farm: `max(0, G + D − 250)`. Under 40 kg DM/ha counts as eaten out. A warning event goes out on the first day, and after 10 days in a row the game is over. Cattle in the feedlot don't count, and the count starts again on any day the farm is not eaten out or has no cattle on pasture.
+
+Once the game is over the tick does nothing and every action is refused.
+
+### Events, not diary lines
+
+The tick changes the farm and returns a `DayResult`: the day, and every event in the order it happened. Nothing stops a clock or opens a dialog. The screens decide the wording and what stops a skip. The events are: a new season; crop events (established, lock-up soon, harvest ready, shedding, finished, a sowing window); stock grazing a planting at a time that costs stand or grain; the cattle notes for each mob (no water, short of feed, losing weight with the reasons, joining, preg test and the rest); a drop weaned and where it went; births; deaths by mob and cause; a portable trough low or empty; a breakout with its reason; mobs joining; the year's end with its score; the farm eaten out; and game over with the reason. The result also lists every animal that died, with its cause, and every calf born.
+
+Events are also kept on the farm as the inbox (the last 120), as data.
+
+### Breakouts
+
+Exactly the MVP's rule. For each mob on pasture that has had a day:
+
+- It must be hungry or thirsty: it got under 85% of the pasture it wanted, or it has no water.
+- It must be 21 days or more since it last pushed through tape.
+- A number is drawn. The mob breaks out if the number is no more than its chance: 3.5% a day when hungry, 25% when thirsty, times `min(1.5, head ÷ 20 + 0.3)`. Head counts calves.
+- One segment of **temporary tape** on the edge of its grazing area is picked at random and knocked down. With no tape round the area nothing happens. Permanent and electric fences hold.
+
+The areas used are the ones from before the day's breakouts, so two mobs breaking out the same day each go by the fences as they stood. The number is drawn before the tape is looked for, so a hungry mob with no tape round it still uses one number from the breakouts stream. The mob's "last breakout" day is only set when tape goes down.
+
+### One mob to a grazing area
+
+Mobs that share a grazing area join, and so do mobs in the feedlot, and mobs in the yards. The biggest mob (by head, calves included) keeps its name, its number and its own figures (days without water, joining record, notes). With two the same size, the one earlier in the farm's list keeps them. The others' cattle are added to the end of its list. If it had no supplement and another had one, it takes that one. This runs after every action that moves cattle or changes a fence or gate, and each day after the troughs and breakouts.
+
+A new mob takes the supplement of the mob it came from. With none to take (or one set to "none") it starts on the district's usual one: a lick in Central Queensland, nothing elsewhere. This is the MVP's rule.
+
+### A fence through a mob (the rebuild's own rule)
+
+When a new fence, a shut gate or a repaired fence divides a grazing area that holds a mob, the engine can't ask where the cattle are standing: it draws nothing. Instead:
+
+- Each beast goes to one of the new areas with a **chance in proportion to that area's hectares**.
+- A **calf stays with its dam** when she is in the same mob. A calf with no dam in the mob is shared out like any other beast.
+- The part that lands in the area holding the mob's old square keeps the mob: its name, number and figures. If none lands there, the part in the first of the new areas keeps it.
+- Every other part becomes a new mob named "<name> strays", with the same supplement, the same days without water and the same last-breakout day. It stands on its area's first water point, or the middle of the area if it has none.
+- If the whole mob lands on one side it stays one mob, on that side.
+
+One number is drawn for each beast that is not a calf at its dam's side, from the `strays` stream. A mob in the feedlot, and a mob whose area the fence did not divide, are not touched and draw nothing.
+
+### The market, behind an interface
+
+The engine reads prices through a `PriceSource`: the market on day 0, a step to each new day, and today's prices (the young cattle indicator and a price for each class). Milestone 1.4 puts real MLA data behind it. Until then the source is the MVP's mechanism, matched exactly (`market/standIn.ts`): the approximate 2019 to 2025 monthly series joined mid-month to mid-month, the random walk after it, the daily wobble and the slow drift of each class. See DATA.md, Market.
+
+What an animal is worth is the MVP's rule and does not depend on the source: its class price, the condition adjustments, the pregnancy premium, 5% commission and $30 a head.
+
+### Money
+
+Costs are the MVP's (DATA.md, Infrastructure and running costs). Each layout job reports lengths and counts, and the action applies the price. The MVP's cost faults are fixed:
+
+- The **energiser** is bought once, with the first electric fence. Permanent fence and tape never buy one. (The MVP also charged it on the first tape.) A farm that comes with electric fence comes with an energiser.
+- **Tape**: new tape is paid for by the metre. Rolling tape up costs $10. Running out tape that was on the roll costs $10. All-new tape pays no fee. (The MVP charged the $10 on every tape job.)
+- The bank is asked (`spend`) wherever the MVP asked: buying cattle, building, sowing, harvest costs, repairs, moving and refilling troughs. If the cost would take the account past the overdraft limit the action is refused and nothing changes. Feed, running costs, interest, marking and the $10 to roll tape up come straight off the account, as in the MVP, and can take it past the limit.
+
+### Net worth (the rebuild's rule)
+
+Net worth = cash + the cattle at net sale value (a beast never counts below $0) + **80% of what has been spent on infrastructure that is still in place**.
+
+The farm keeps a ledger of that spending, item by item: each fence segment and gate, pipe, each trough and water hub, each portable trough, the energiser, and each sown pasture. When something is pulled out, its entry goes and net worth falls. What counts:
+
+- Fence, gates, pipe, troughs and hubs the player built: what was paid. A gate takes the place of one fence segment, so that segment's entry goes.
+- Tape: every segment the farm owns, standing, knocked down or on the roll, at the price of new tape. Tape lost under a new fence or a gate is gone.
+- A portable trough: $555 of its $600 (the first fill of water is not infrastructure). Selling it back takes it off.
+- A sown perennial pasture: half its establishment cost, for the squares still in that planting. Sowing over it takes those squares off.
+- The energiser: $900, once bought.
+- **Fences, gates, troughs and pipe that came with the farm count for nothing**, because nothing was spent on them.
+
+The MVP counted the improvements a farm came with at full price, and never took anything off when it was removed.
+
+### Actions
+
+Everything a player does is an action: a plain record that `applyAction(farm, action)` checks and carries out. It never changes the farm it is given. It returns the farm after the action with the events, or a refusal with a reason code and a plain message and nothing changed. So a server can check every action before it saves. Every action done is added to the farm's action log with its day.
+
+The actions: buy cattle straight into an area or a mob (an instant buy for tests and calibration; sale days and delivery to the yards come later); sell animals, a group from a mob, or a market class across the farm; move a whole mob or part of one by class and number, into an area or the feedlot; set a supplement; wean; mark calves; build and pull down fence; roll up tape; hang, open, shut and remove a gate; fix a knocked-down fence; lay pipe; place, move and remove a trough; both kinds of water hub; place, move, refill and sell a portable trough; sow; harvest.
+
+Moving cattle onto ground with no water, or onto a crop that is not ready to graze, is allowed. The events say so as data (`no-water`, `crop-risks`), and the screen asks first.
+
+Rules that were screen code in the MVP are actions here: buying a sowing, removing troughs, hubs and portable troughs, and changing a supplement.
+
+### Stock yards (a stand-in)
+
+Deliveries to the yards and yard work are milestone 1.5. Until then no action puts a mob in the yards. So the engine can carry such a mob, the tick gives it water and lets it graze only the square the yards stand on. This is a placeholder, not a rule Claudia has set.
+
+### Random streams
+
+Each part draws from its own named stream, and each stream's state is saved with the farm: `cattle:breeding`, `cattle:deaths`, `breakouts`, `strays`, `market` and `buying` (the cattle that turn up when a class is bought). The starting herd has its own stream (`gen:herd`), and the seasons and the farm's layout have theirs already. A draw in one never moves another.
+
+### Saves and the farm hash
+
+`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
+
+`farmHash` is 16 hex digits worked from the whole saved form, with keys in order. The same seed and the same actions always give the same hash.
+
+### MVP behaviour kept as it is, for Claudia to rule on
+
+- A new mob in Central Queensland made from a mob that was taken off the lick goes back on the lick (weaners, and cattle moved out by class and number).
+- Cattle moved out of a mob by class and number become a new mob with its own counters, so their days without water start again at 0. Moving the whole mob keeps the count.
+- When mobs join, the bigger mob's joining record carries on and the smaller mob's is dropped.
+- Animal health is charged on calves at the same rate as on adults.
+- Selling a very small calf can net less than $0 (its value less 5% and $30), and that is what is banked. Net worth never counts a beast below $0.
+- The energiser is counted in net worth but not in the year's "spent on infrastructure" total.
+- Weaners from a mob in the feedlot are sent out to a paddock, not kept in the feedlot.
+- The year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year.
+- A harvest goes by the season the last day ran on, so a crop harvested on 1 July before the day runs is scored on the old season.
+- A hungry mob with no tape round it still uses a number from the breakouts stream each day.

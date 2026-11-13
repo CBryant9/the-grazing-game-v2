@@ -285,6 +285,85 @@ Things in the MVP that look odd, kept as they are, for Claudia:
 - A crop that has not been sown yet read "ready to harvest" in the MVP's stage text. It can't happen in play. The engine reads it as not sown.
 - Some species blurbs lean towards a judgement ("Excellent for fattening", "Top-quality feed"). They are the MVP's wording, kept for now.
 
+### 13 Nov 2026: milestone 1.2c, the whole farm
+
+The third part of milestone 1.2: the farm as one object, the daily tick, the market, money, the actions and saves. Branch `m1.2c-whole-farm`, cut from `m1.2-cattle-and-farm` (the cattle and farm halves joined). The engine version is now 0.4.0.
+
+Built, all in `packages/engine/src`:
+
+- **The farm's state** (`sim/state.ts`): one object that can be saved. Pasture, crops, fences, water, buildings, mobs (each on pasture, in the feedlot or in the yards), id counters, the market, the saved state of each random stream, the year's totals and past years, the ledger of infrastructure spending, the inbox as data, the days-eaten-out count, game over, and the action log.
+- **Making a farm** (`sim/create.ts`): district, size, start month and year, from scratch or running, mixed farming, difficulty. Money by the MVP's rules. A running farm gets its herd by the MVP's rules, from its own random stream.
+- **The daily tick** (`sim/tick.ts`): the MVP's `stepDay`, in its order. It returns every event as data and never stops a clock.
+- **Mobs** (`sim/mobs.ts`): one mob to a grazing area, where weaners go, and the seeded rule for a fence through a mob.
+- **The market** (`market/`): what an animal is worth, and the MVP's price mechanism as a stand-in behind a `PriceSource` interface.
+- **Money** (`money/`): every cost, the money a farm starts with, net worth by the rebuild's rule, and the yearly score.
+- **Actions** (`actions/`): 29 actions, each checked and carried out by `applyAction`, which never changes the farm it is given.
+- **Saves and the farm hash** (`save/`).
+- **Summaries** (`sim/summary.ts`): each mob, each paddock with its stock, the whole farm, and what a calibration run reads.
+
+How it was proven:
+
+- **Whole farms against the MVP, day by day.** The engine makes a farm and the MVP is given the same one. Each day the MVP's own `stepDay` runs, then the engine's. After every day the pasture arrays, plantings, fences and water, every mob and every animal, cash, the year's totals, the market and the game-over counters must be equal exactly, with no tolerance. Each side must also have drawn the same count of random numbers from each stream. The MVP's draws are sent to the matching engine stream by which part of the MVP asked (its functions are wrapped in memory to mark their draws; the file on disk is never changed).
+  - A running farm with its breeding herd in each of the four districts for 380 days: calving, joining, preg tests, weaning into another paddock, deaths, the new season on 1 July, and the year's end with its score and net worth. Central Queensland on its lick, the others without.
+  - Breeding herds for 150 days on the other supplement (Central Queensland off the lick, Western Victoria on it).
+  - Steers in each district (Central Queensland twice, on the lick and off it) for 150 days: bought in two lots, some sold, a week in the feedlot, pipe and a trough, a portable trough behind a box of tape in a dry paddock, most of the mob moved in by class and number, breakouts through the tape, the trough running low and dry and refilled once, then the mob left without water and dead on day 4.
+  - A mixed Central West farm for 300 days with steers on the crops: grazing damage, three harvests and a sowing.
+  - The market on its own for six years from 2024, into the random walk after 2025.
+  - Game over at the bank's limit, and after 10 days eaten out, on the same day in both.
+  - The starting herd on 12 farms, every cost and money figure, every valuing rule, and every paddock summary figure, each against the MVP's own function.
+- **The rules as tests:** no water kills everything on day 4; breakouts only through tape and only when hungry or thirsty, one segment at a time, with the 21-day wait and the MVP's odds on both sides of each threshold; one mob to an area after 150 random fence and gate jobs in each district; fallow only after a crop and no growth on a finished crop over two years on mixed farms; the overdraft held to the cent on every job the bank is asked about; game over at the limit and at 10 days; the same seed and actions giving the same hash at every step; a year in each district with no figure that is not a finite number.
+- **Saves:** a farm saved, sent through JSON, loaded and carried on every 3 days is the same farm, by its hash, as one that ran straight through for 200 days, in each district.
+
+Where the rebuild differs from the MVP on purpose, the comparison either keeps off that path or checks the difference and brings the MVP into line: a cow dried off when her calf dies; net worth (the MVP's sum is given the engine's infrastructure figure, so the year's score can still be compared); the price of tape (checked: the MVP charged $910 more, then its cash is set level); and a fence through a mob (never done in a comparison run; tested on its own).
+
+What could not be compared with the MVP exactly, and why:
+
+- **Seasons.** The MVP drew them in between its other numbers from one unseeded source. In the comparison it is fed the engine's own season numbers, so both run the same seasons. The draw itself was matched in milestone 1.1.
+- **A fence through a mob**, and gates shut on a mob. The MVP went by where cattle were drawn.
+- **Net worth with infrastructure**, and so the profit part of a year's score when anything has been built or removed. The rebuild's rule is different on purpose.
+- **Tape costs and the energiser.** Different on purpose.
+- **Grazing plans.** A later milestone. No comparison run has a plan.
+- **Picking cattle by class and number.** In the MVP that sort was screen code. The engine's order (heaviest steers first, lowest-condition cows first) is tested on its own. The move that follows is compared.
+- **Tag numbers after a new planting or portable trough.** The MVP shares one counter. Those runs compare everything but the next tag number.
+
+Tested: type check, lint, format check and all tests pass. 226 new tests, 706 in all.
+
+As a check on the tests, 330 figures and rules in the new code were nudged one at a time (every cost, every market figure, the score, the breakout odds and limits, the herd rules, each ledger entry, each sort order, each line that moves money). 303 were caught straight away, 17 of them only by the whole-farm comparison with the MVP. 27 were missed. 24 of those are now caught by added tests: a sweep of farm sizes across each $10,000 step of the cash base; a class's drift at exactly 20%; tape knocked down on a line down the farm; a beast worth less than $0; a mob that got 85.5% and one that got 84.5% of its feed; the 21-day wait written as 21; tape beside electric fence; the new season on 1 July and not on the first day; the tick's events in the inbox; strays of a mob taken off the lick; herds on farms too small for 10 cows; the market stream after it opens past 2025; tape run over a fence the player built; a run that takes in fence the farm came with; cows of the same condition, heifers and bulls sold in the right order; a harvest and a farm summary on the day the season changes; a paddock summary while a crop's quality is changing; and the action log's own copy. The other 3 can't change any result, so no test can catch them:
+
+- Utilisation of exactly 60% scores 1,000 on either side of the step.
+- Empty mobs are dropped twice at the end of the day (once when mobs join, once after). The MVP did the same.
+- Clearing a calf's dam when the dam is sold: her calf is always sold with her.
+
+Two lessons came out of it (LESSONS W10 and W11): a test that reads the engine's own figure can't catch a change to it, and a made-up herd must not let two orders agree by accident.
+
+Speed: 2.1 to 3.0 ms a simulated day with 4,300 to 4,900 head (plus calves) in three mobs on a large Central Queensland farm, run on its own. The target is under 5 ms. With the whole test suite running beside it the same test reads about 15 ms, so the test prints the figure and checks only a loose limit (LESSONS W6).
+
+MVP faults fixed here, each with tests (BUILD_PLAN 2.4): the energiser is charged for electric fence only, once; the $10 tape fee is for rolling up and for running out tape from the roll, never on all-new tape; net worth counts only what was spent on infrastructure still in place, and falls when it is removed; sowing, removing troughs, hubs and portable troughs, and changing a supplement are engine actions; a fence through a mob uses a seeded rule.
+
+The two chores in the same change: the lint rule that keeps the engine out of browser code now also stops relative paths into the engine's `src` and `data` (checked: it fires on `../../engine/src/...` from the renderer and on `../../../packages/engine/...` from the web components). The contact address in BUILD_PLAN section 8 is replaced with words.
+
+Where the docs and the MVP code disagreed in these parts (docs corrected, MODEL.md and DATA.md):
+
+- A fence or pipe segment's price is rounded to a whole dollar before it is multiplied.
+- Bulls are priced by the head whenever they are bought, not only in the starting herd.
+- Buying has freight: $30 a head and $100 for each cow and calf unit. DATA.md had no buying costs.
+- The MVP charged the $10 tape fee on every tape job and an energiser on the first tape. DATA.md described the rule Claudia asked for, which the rebuild now follows.
+- Net worth in the MVP counted the farm's starting improvements at full price, half the cost of sown pasture, and $555 of a portable trough. Only "80% of infrastructure spend" was written down.
+- Animal health is charged on calves too. Interest is worked before the day's running costs come off.
+- The year closes every 365 farm days. The ground cover in the score is read on the 1st of each month.
+- The price series holds its first value before 2019, and each month of the random walk is rounded to a whole c/kg.
+- The starting herd has floors (10 cows, 1 bull, 4 weaners) that were not written down.
+
+Things in the MVP that look odd, kept as they are, for Claudia: listed in MODEL.md, section 8, "MVP behaviour kept as it is".
+
+What is not done:
+
+- **The stock yards are a stand-in.** A mob can be recorded as in the yards, and the tick gives it water and the yards' own square to graze, but no action puts a mob there. Deliveries and yard work are milestone 1.5.
+- **Grazing plans.** The tick has the place for them and nothing else.
+- **The market is still the approximate series.** Real prices are milestone 1.4.
+- **Calibration.** The whole-farm benchmarks (steer gains, deaths, the Central West tune) are milestone 1.3. Nothing here changed a formula.
+- The `realism-guardian` agent was not run by the builder of this part. It is for the reviewer before the pull request.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

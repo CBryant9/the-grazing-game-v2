@@ -36,6 +36,14 @@ export default tseslint.config(
               group: ['@gg/engine', '@gg/engine/*'],
               message: 'The engine must not be imported into browser code (CLAUDE.md, rule 14).',
             },
+            {
+              // A relative path that reaches into the engine's code or its
+              // data tables, such as '../../engine/src/index' or
+              // '../../../packages/engine/data/costs'.
+              regex: '(^|/)engine/(src|data)(/|$)',
+              message:
+                'The engine must not be imported into browser code, by package name or by path (CLAUDE.md, rule 14).',
+            },
           ],
         },
       ],

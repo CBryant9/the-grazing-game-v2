@@ -229,6 +229,9 @@ function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   if (!isCount(a.qty) || a.qty > MAX_BUY) {
     return refuse('bad-request', `Buy between 1 and ${MAX_BUY} head at a time.`);
   }
+  if (!a.to || typeof a.to !== 'object') {
+    return refuse('bad-request', 'Say which paddock or mob the cattle are going to.');
+  }
   const s = j.survey;
   let m: FarmMob | undefined;
   let where: MobWhere | null = null;
@@ -406,6 +409,9 @@ function moveCattle(j: Job, a: Extract<Action, { type: 'moveCattle' }>): Out {
   const s = j.survey;
   const picked: Animal[] = [];
   for (const p of a.picks) {
+    if (!p || typeof p !== 'object') {
+      return refuse('bad-request', 'Pick a class and how many to move.');
+    }
     const m = j.mob(p.mob);
     if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
     if (!Object.hasOwn(CLASS_LABELS, p.cls) || !isCount(p.qty)) {

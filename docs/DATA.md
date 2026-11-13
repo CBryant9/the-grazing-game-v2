@@ -73,6 +73,14 @@ In the rebuild the same chances, ranges and limits are drawn from the farm's see
 
 After 2025 it continues as a random walk pulling toward 430 c/kg (6% a month), ±20 c/kg noise, a 5% chance of a ±60 shock, clamped 180–760. A daily wobble (`S.noise`) and a per-class drift of ±20% sit on top.
 
+**The rebuild keeps this series as a stand-in, behind an interface (milestone 1.2c).** It is still the approximate series above, not real data. It lives in `packages/engine/src/market/standIn.ts` behind the engine's `PriceSource` interface, so milestone 1.4 can put real MLA prices in its place without touching the rest of the engine. Detail from the code, matched to the MVP exactly:
+
+- The indicator for a day joins the monthly values mid-month to mid-month. Before January 2019 it holds the first value (280).
+- Each month of the random walk is the last value + 6% of the gap to 430 + noise (normal, 20 c/kg) + a shock in 5% of months (normal, 60 c/kg), held between 180 and 760 and rounded to a whole c/kg. Months are drawn as they are first needed and kept with the farm.
+- The daily wobble: yesterday's × 0.97 + a normal draw × 0.006, as a share of the indicator.
+- Each class's drift: yesterday's × 0.985 + a normal draw × 0.007, held within ±20% of its usual multiple.
+- The last 31 days of class prices are kept for the market chart.
+
 Class multipliers on the indicator (`MCLS`):
 
 | Class | Who | × |
@@ -87,6 +95,14 @@ Class multipliers on the indicator (`MCLS`):
 | calf | calves | 1.10 |
 
 Adjustments: cows CS < 2 × 0.85, CS ≥ 3 × 1.05; other non-bull, non-calf stock at CS < 2 × 0.86. Pregnant females (≥ 50 days) add $320 × (indicator ÷ 400). Selling costs 5% commission plus $30/head. Bulls bought for the starting herd are valued at $5,500 × (indicator ÷ 400).
+
+Corrections from the code (milestone 1.2c):
+
+- **Bulls are priced by the head whenever they are bought**, not only in the starting herd: $5,500 × (indicator ÷ 400) each, whatever they weigh. When a bull is sold it is priced by weight like any other beast (the bull class, 0.58 × the indicator).
+- **Buying has freight**, which this table left out: $30 a head, plus $100 for each cow and calf unit. The calf at foot carries no freight of its own. Every other class is bought at its sale value (weight × its class price, with the condition and pregnancy adjustments) plus the freight.
+- The starting herd is valued at the day-0 market with no freight.
+- A calf at foot is sold with its mother, at the calf class price for its weight.
+- The saleyard list's quick estimate for a class uses the middle of its weight range at CS 3 (150 days in calf for PTIC cows; a 110 kg calf and the $100 for cow and calf units), plus $30 a head.
 
 ## Saleyard classes (`BUYS`)
 
@@ -143,6 +159,18 @@ Corrections from the code (milestone 1.2b):
 - Tape under a new permanent or electric fence is lost, not rolled up. A gate hung in tape takes that segment of tape with it.
 - In the rebuild the layout rules report lengths and counts and the caller applies these costs. The energiser is charged for electric fence only (BUILD_PLAN 2.4).
 
+Corrections from the code (milestone 1.2c):
+
+- **A segment's price is rounded to a whole dollar**: `round(price a metre × the side of a square)`, then times the segments. On the 260 ha default farm (50 m squares) that is $350 permanent, $180 electric, $45 tape and $240 pipe a segment.
+- **Tape in the rebuild:** new tape at 90c a metre and nothing more. $10 to roll a run up. $10 to run out tape that was on the roll, whatever the length, plus the price of any new tape needed to finish the run. The MVP charged the $10 on every tape job, new tape included, and bought an energiser with the first tape. Both are fixed (BUILD_PLAN 2.4).
+- **The energiser** ($900) is bought once, with the first electric fence. A farm that comes with electric fence comes with one.
+- Pulling down permanent or electric fence, and taking out a gate, trough or water hub, cost nothing and give nothing back. A portable trough sells back for $300.
+- Marking, the $10 to roll up tape, supplements and the feedlot, overheads and interest come straight off the account. Everything else is refused if it would take the account past the overdraft limit.
+- Animal health is charged on every head, calves included, a 365th of the yearly figure each day. Overheads are charged the same way.
+- Interest is worked each day on the balance after the day's feed bill and before the day's overheads and health.
+- **What counts as infrastructure in net worth (the rebuild's rule):** what was paid for fence, gates, pipe, troughs and hubs still in place; the tape the farm owns at the price of new tape; $555 of a portable trough's $600 (not its first fill of water); the $900 energiser; and half the establishment cost of a sown perennial pasture still in the ground. Net worth counts 80% of that. Improvements that came with the farm count for nothing. See MODEL.md, section 8.
+- Sowing a forage or grain crop, and harvest costs, go to the year's cropping costs. Sowing a perennial pasture goes to the year's infrastructure total in full.
+
 ## Supplements (`FEED`)
 
 | Feed | Cost | What it does |
@@ -171,6 +199,8 @@ From the code (milestone 1.2a):
 
 Taking over an established farm with a herd gives 25% of the cash (the herd is the capital). The defaults without setup are $50,000 cash, -$80,000 overdraft and game over at -$100,000. The game also ends after 10 days of the whole farm under 40 kg DM/ha available with cattle on it.
 
+Detail from the code (milestone 1.2c): the cash base is rounded to the nearest $10,000 before the $50,000 floor is applied, and each of the three figures is rounded to the nearest $1,000. "Available" is the feed above the 250 kg DM/ha cattle leave behind, averaged over every square of the farm. Cattle in the feedlot don't count as on the farm for this. The bank takes the farm when cash is at or below its limit. In the rebuild a farm's money always comes from the difficulty (or is given outright for a test), so the $50,000 defaults are not used.
+
 ## Established farm layout
 
 - One to two vertical and zero to one horizontal full-length fence lines (30% electric), each with a shut gate. Every paddock gets at least one gate.
@@ -180,6 +210,7 @@ Taking over an established farm with a herd gives 25% of the cash (the herd is t
 - Starting from scratch: a trough on the bore and no pipe. Half the time there is also one old permanent fence line down the farm (8 or more squares in from the sides, at least 3 from the bore) with one shut gate.
 - New in the rebuild: every farm also gets a homestead and stock yards (MODEL.md, section 5). Trees are not placed yet; they come with the map.
 - Starting herd: 35–65% of carrying capacity. Cows = AE × 0.65 ÷ 1.05 (55% PTIC, 25% with calves, 20% dry), one bull per 40 cows, weaners = AE × 0.3 ÷ 0.55, split steers and heifers. Northern places (cq, nt) start on lick.
+- Detail from the code (milestone 1.2c): at least 10 cows, 1 bull and 4 weaners, however small the farm. Bulls are the cows ÷ 40, rounded up. The dry cows are what is left after the PTIC cows and the cows with calves are rounded. The cows and bulls go in the biggest grazing area with water and the weaners in the next biggest, as two mobs. With water in only one area they run as one mob. In the rebuild the herd is drawn from its own random stream (`gen:herd`), and every new mob in Central Queensland starts on a lick unless it takes another supplement from the mob it came from.
 
 ## Sown pastures, forages and crops (`SPECIES`)
 

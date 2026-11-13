@@ -7,6 +7,7 @@ import {
   farCorner,
   openFarm,
   refused,
+  twoPaddockFarm,
 } from '../../test-support/wholeFarm';
 import { cloneFences, EDGE, getEdge, hEdge, setEdge, vEdge, type EdgeRef } from '../farm/topology';
 import { vertexId } from '../farm/water';
@@ -612,6 +613,12 @@ describe('the action log and the inbox', () => {
       { type: 'buyCattle', cls: 'weanerSteer', qty: 3, to: { cell: 9 } },
     ];
     farm = act(farm, jobs[0]!);
+    // The log holds its own copy: changing the request afterwards changes nothing on the farm.
+    const asked = (jobs[0] as { edges: EdgeRef[] }).edges;
+    const kept = asked.slice();
+    asked.length = 0;
+    expect((farm.actionLog[0]!.action as { edges: EdgeRef[] }).edges).toEqual(kept);
+    asked.push(...kept);
     refused(farm, { type: 'placeGate', edge: hEdge(13, 20) });
     expect(applyAction(farm, { type: 'dance' } as unknown as Action)).toMatchObject({
       ok: false,
@@ -660,5 +667,41 @@ describe('the action log and the inbox', () => {
     for (const [action, reason] of bad) {
       expect(refused(farm, action).reason, JSON.stringify(action)).toBe(reason);
     }
+  });
+});
+
+describe('one fence over another', () => {
+  it('tape run over a fence the player built: the fence is gone and so is its worth', () => {
+    let farm = openFarm('nsw');
+    farm = act(farm, { type: 'buildFence', edges: run(farm, 4), fence: 'permanent' });
+    expect(infraInPlace(farm)).toBe(4 * 350);
+    const taped = act(farm, { type: 'buildFence', edges: run(farm, 4), fence: 'tape' });
+    expect(count(taped, EDGE.permanent)).toBe(0);
+    expect(taped.ledger.edges).toEqual({});
+    expect(infraInPlace(taped)).toBe(4 * 45);
+    // Electric over the tape: the tape is gone, the electric fence and its energiser count.
+    const wired = act(taped, { type: 'buildFence', edges: run(farm, 4), fence: 'electric' });
+    expect(tapeOwned(wired)).toBe(0);
+    expect(infraInPlace(wired)).toBe(4 * 180 + 900);
+  });
+
+  it('a run that takes in fence the farm came with counts only the new segments', () => {
+    const farm = twoPaddockFarm('nsw');
+    // Three segments of the old fence line, and two new ones running off it.
+    const index = farm.layout.fences.vE.indexOf(EDGE.permanent);
+    const vx = index % (GRID_W + 1);
+    const y = Math.floor(index / (GRID_W + 1));
+    const old = [0, 1, 2].map((k) => vEdge(y + k, vx));
+    for (const e of old) expect(getEdge(farm.layout.fences, e)).toBe(EDGE.permanent);
+    const fresh = [hEdge(y + 1, vx), hEdge(y + 1, vx + 1)];
+    const out = actWith(farm, {
+      type: 'buildFence',
+      edges: [...old, ...fresh],
+      fence: 'permanent',
+    });
+    expect(farm.cash - out.farm.cash).toBe(2 * 350);
+    expect(Object.keys(out.farm.ledger.edges).length).toBe(2);
+    expect(infraInPlace(out.farm)).toBe(2 * 350);
+    expect(out.events[0]).toMatchObject({ detail: { segments: 2 } });
   });
 });

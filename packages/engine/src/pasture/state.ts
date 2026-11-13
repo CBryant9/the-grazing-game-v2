@@ -43,7 +43,10 @@ export interface PastureState {
   graz: Float32Array;
   /** The farm day each square was last grazed. -99999 means never. */
   lastG: Int32Array;
-  /** Grass grown today, kg DM/ha. Rewritten by each daily step; not part of a save. */
+  /**
+   * Grass grown on the last day run, kg DM/ha. Rewritten by each daily step.
+   * It is saved with the farm, so a paddock sheet reads the same after a reload.
+   */
   grown: Float32Array;
 }
 

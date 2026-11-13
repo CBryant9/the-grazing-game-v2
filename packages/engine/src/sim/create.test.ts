@@ -10,6 +10,7 @@ import { aeOf, classOf } from '../cattle/animal';
 import { FARM_SIZES } from '../data/farms';
 import { generateFarm } from '../farm/generate';
 import { buyPrice } from '../market/prices';
+import { standInMarket } from '../market/standIn';
 import { carryingCapacityAE, startMoney } from '../money/costs';
 import { netWorth } from '../money/worth';
 import { rngStream } from '../rng';
@@ -57,6 +58,46 @@ describe('the starting herd, against the MVP', () => {
       expect(loaded.counts.map).toBeGreaterThan(farm.animalIds.next - 1);
       expect(farm.mobs.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('the starting herd on very small farms, against the MVP', () => {
+  it('never fewer than 10 cows, 1 bull and 4 weaners', () => {
+    let atCowFloor = 0;
+    let atWeanerFloor = 0;
+    for (const [seed, ha] of [
+      [1, 10],
+      [2, 14],
+      [3, 18],
+      [4, 25],
+      [5, 40],
+      [6, 60],
+    ] as const) {
+      const farm = createFarm(options({ seed, district: 'wv', size: ha }));
+      const bare = cloneFarm(farm);
+      bare.mobs = [];
+      bare.animalIds.next = 1;
+      bare.nextMobId = 1;
+      putWholeFarm(loaded, bare);
+      mvpStartHerd(loaded, seed);
+      expect(farmDifferences(farm, loaded.mvp, { skipYear: ['worth0'] }), `${ha} ha`).toEqual([]);
+      const h = (farm.inbox[0]!.event as FarmStarted).herd!;
+      const all = farm.mobs.flatMap((m) => m.animals);
+      expect(all.filter((a) => a.kind === 'cow').length).toBe(h.cows);
+      expect(h.cows).toBeGreaterThanOrEqual(10);
+      expect(h.weaners).toBeGreaterThanOrEqual(4);
+      expect(h.bulls).toBe(1);
+      if (Math.round((h.ae * 0.65) / 1.05) < 10) {
+        atCowFloor++;
+        expect(h.cows).toBe(10);
+      }
+      if (Math.round((h.ae * 0.3) / 0.55) < 4) {
+        atWeanerFloor++;
+        expect(h.weaners).toBe(4);
+      }
+    }
+    expect(atCowFloor).toBeGreaterThan(1);
+    expect(atWeanerFloor).toBeGreaterThan(0);
   });
 });
 
@@ -269,6 +310,22 @@ describe('createFarm', () => {
     expect(withElectric).toBeGreaterThan(0);
     expect(withElectric).toBeLessThan(12);
     expect(createFarm(options({ startType: 'scratch' })).energiser).toBe(false);
+  });
+
+  it('a market that drew numbers to open saves its stream where the opening left it', () => {
+    // From 2026 the price series has run out, so the market draws its first months as it opens.
+    const start = { year: 2027, month: 3 };
+    const farm = createFarm(options({ start, startType: 'scratch' }));
+    expect(farm.market.ext.length).toBeGreaterThan(10);
+    const replay = rngStream(42, 'market');
+    const opened = standInMarket.open(start, replay);
+    expect(farm.market).toEqual(opened);
+    expect(farm.rng.market).toEqual(replay.state());
+    expect(farm.rng.market).not.toEqual(rngStream(42, 'market').state());
+    // Before 2026 nothing is drawn.
+    const early = createFarm(options({ startType: 'scratch' }));
+    expect(early.market.ext).toEqual([]);
+    expect(early.rng.market).toEqual(rngStream(42, 'market').state());
   });
 
   it('tells the player what the farm came with, as the first inbox message', () => {
