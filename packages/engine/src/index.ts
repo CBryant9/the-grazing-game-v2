@@ -324,3 +324,139 @@ export {
 export type { CropEvent } from './crops/tick';
 export { blobGrow, genArable, startCropping } from './crops/arable';
 export type { ArableLand } from './crops/arable';
+
+// Milestone 1.2c: the whole farm (state, the daily tick, money, actions, saves).
+export {
+  COSTS,
+  COST_PER_M,
+  COW_CALF_FREIGHT,
+  DIFFICULTY,
+  HEAD_FEE,
+  HERD_CASH_SHARE,
+  INFRA_WORTH_SHARE,
+  INTEREST,
+  OVERHEADS,
+  PASTURE_ASSET_SHARE,
+  PORTABLE_RESALE_SHARE,
+  SELL_COMMISSION,
+  carryingCapacityAE,
+  cashBase,
+  overheadsPerYear,
+  segmentCost,
+  startMoney,
+} from './money/costs';
+export type { Difficulty, PerMetreItem, StartMoney } from './money/costs';
+export {
+  SCORE,
+  closeYear,
+  infraInPlace,
+  liveYear,
+  netWorth,
+  netWorthParts,
+  newYear,
+  scoreYear,
+  spend,
+  stockWorth,
+  tapeOwned,
+} from './money/worth';
+
+export {
+  BULL_PRICE,
+  PREG_PREMIUM,
+  bullPrice,
+  buyPrice,
+  centsPerKg,
+  estimateBuy,
+  netSaleValue,
+  saleValue,
+} from './market/prices';
+export type { PriceSource, Priced, Prices } from './market/prices';
+export {
+  CLASS_MULTIPLIERS,
+  STAND_IN_DAILY,
+  STAND_IN_FIRST_YEAR,
+  STAND_IN_SERIES,
+  STAND_IN_WALK,
+  standInMarket,
+} from './market/standIn';
+export type { StandInMarket } from './market/standIn';
+
+export { INBOX_LIMIT, PLAY_STREAMS, PRICE_HISTORY_DAYS, cloneFarm, emptyLedger } from './sim/state';
+export type {
+  FarmMob,
+  FarmState,
+  GameOverReason,
+  InboxMessage,
+  InfraLedger,
+  LoggedAction,
+  MarketState,
+  MobWhere,
+  PlayStream,
+  PriceDay,
+  SeasonSpec,
+  YearRecord,
+  YearScore,
+  YearTotals,
+} from './sim/state';
+export type {
+  ActionEvent,
+  FarmEvent,
+  FarmStarted,
+  MobPlaceNote,
+  StartHerd,
+  TickEvent,
+} from './sim/events';
+export { HERD_STREAM, START_HERD_SHARE, createFarm, startHerd } from './sim/create';
+export type { CreateFarmOptions, FarmSizeName } from './sim/create';
+export {
+  areaIdOf,
+  areaNameOf,
+  placeAnchor,
+  plantingsNow,
+  pricesOf,
+  seasonsOf,
+  surveyOf,
+} from './sim/derived';
+export type { SourceEnv } from './sim/derived';
+export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
+export { stopsToday } from './sim/plans';
+export {
+  BREAKOUT_CHANCE,
+  BREAKOUT_COOLDOWN_DAYS,
+  BREAKOUT_FEED_SHARE,
+  BREAKOUT_SIZE,
+  EATEN_OUT_DAYS,
+  EATEN_OUT_KG,
+  stepDay,
+} from './sim/tick';
+export type { DayResult, TickEnv } from './sim/tick';
+export {
+  calibrationView,
+  farmTotals,
+  mobSummaries,
+  paddockSummaries,
+  pregTests,
+} from './sim/summary';
+export type {
+  CalibrationView,
+  FarmTotals,
+  MobSummary,
+  PaddockView,
+  PregTestResult,
+} from './sim/summary';
+
+export { MAX_BUY, applyAction } from './actions/apply';
+export type { ActionEnv } from './actions/apply';
+export type {
+  Action,
+  ActionDone,
+  ActionRefusal,
+  ActionRefusalReason,
+  ActionResult,
+  ActionType,
+  FenceKind,
+  MoveTarget,
+} from './actions/types';
+
+export { farmHash, fromBase64, loadFarm, saveFarm, toBase64 } from './save/save';
+export type { SavedFarm } from './save/save';

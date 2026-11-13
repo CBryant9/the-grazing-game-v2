@@ -124,7 +124,7 @@ export function groupKey(a: Animal): GroupId {
 }
 
 /** The class an animal is sold in. */
-export function marketClass(a: Animal): MarketClassId {
+export function marketClass(a: Pick<Animal, 'kind' | 'wt'>): MarketClassId {
   switch (a.kind) {
     case 'steer':
       return a.wt < 280 ? 'wean' : a.wt < 450 ? 'feed' : 'heavy';
