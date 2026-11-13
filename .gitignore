@@ -42,3 +42,10 @@ tmp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# raw responses fetched by scripts/data (re-runs read these instead of refetching)
+.data-cache/
+
+# Claude Code local settings and worktrees (machine-specific, never commit)
+.claude/settings.local.json
+.claude/worktrees/

@@ -27,3 +27,11 @@ export interface GrowthFactorSource {
    */
   factorsOn(day: number): GrowthFactors;
 }
+
+/**
+ * The average year: every day grows at the district curve. Calibration
+ * runs are judged against it.
+ */
+export const averageYear: GrowthFactorSource = {
+  factorsOn: () => ({ seasonF: 1, monthF: 1, label: 'Average' }),
+};
