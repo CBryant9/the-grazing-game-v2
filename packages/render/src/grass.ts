@@ -204,6 +204,28 @@ export interface Tuft {
   clover: boolean;
 }
 
+/** Numbers kept for each tuft spot: stand, vary, tall, across, down, tone, variant. */
+const SPOT = 7;
+let spots: Float32Array | null = null;
+
+/**
+ * The fixed scatter for every tuft spot on the farm, worked out once. It
+ * never changes, so a new view costs no scatter at all.
+ */
+function spotTable(): Float32Array {
+  if (!spots) {
+    spots = new Float32Array(GRID_N * TUFTS_PER_SQUARE * SPOT);
+    for (let i = 0; i < GRID_N; i++) {
+      for (let k = 0; k < TUFTS_PER_SQUARE; k++) {
+        const o = (i * TUFTS_PER_SQUARE + k) * SPOT;
+        for (let n = 0; n < 6; n++) spots[o + n] = unit(hash3(i, k, n + 1));
+        spots[o + 6] = hash3(i, k, 7) % 3;
+      }
+    }
+  }
+  return spots;
+}
+
 /**
  * The tufts standing on a square. Each square has nine fixed spots, so a
  * tuft never moves when the grass changes: it only grows, shrinks, changes
@@ -215,12 +237,14 @@ export function squareTufts(i: number, look: SquareLook, out: Tuft[] = []): Tuft
   const row = Math.floor(i / GRID_W);
   const shape: TuftShape =
     look.kind === 'stubble' ? 'stubble' : look.kind === 'crop' ? 'crop' : 'grass';
+  const table = spotTable();
   for (let k = 0; k < TUFTS_PER_SQUARE; k++) {
-    const stand = unit(hash3(i, k, 1));
+    const o = (i * TUFTS_PER_SQUARE + k) * SPOT;
+    const stand = table[o]!;
     // Tufts only stand where cover allows.
     if (stand > look.cover * 1.05) continue;
-    const vary = unit(hash3(i, k, 2));
-    const tall = 0.65 + 0.7 * unit(hash3(i, k, 3));
+    const vary = table[o + 1]!;
+    const tall = 0.65 + 0.7 * table[o + 2]!;
     const gx = k % 3;
     const gy = Math.floor(k / 3);
     let fx: number;
@@ -228,12 +252,12 @@ export function squareTufts(i: number, look: SquareLook, out: Tuft[] = []): Tuft
     let h: number;
     if (look.rows) {
       // Cultivated rows: three rows to a square, plants snapped to the row.
-      fx = (gx + 0.5 + (unit(hash3(i, k, 4)) - 0.5) * 0.2) / 3;
+      fx = (gx + 0.5 + (table[o + 3]! - 0.5) * 0.2) / 3;
       fy = (gy + 0.5) / 3;
       h = look.height * (0.9 + (0.15 * (tall - 0.65)) / 0.7);
     } else {
-      fx = (gx + 0.12 + 0.76 * unit(hash3(i, k, 4))) / 3;
-      fy = (gy + 0.12 + 0.76 * unit(hash3(i, k, 5))) / 3;
+      fx = (gx + 0.12 + 0.76 * table[o + 3]!) / 3;
+      fy = (gy + 0.12 + 0.76 * table[o + 4]!) / 3;
       h = look.height * tall;
     }
     h = Math.max(TUFT_MIN_HEIGHT, h);
@@ -245,7 +269,7 @@ export function squareTufts(i: number, look: SquareLook, out: Tuft[] = []): Tuft
         : look.greenShare >= 1
           ? h
           : h * Math.min(1, look.greenShare * (0.65 + 0.7 * vary) * 1.25);
-    const tone = 0.9 + 0.2 * unit(hash3(i, k, 6));
+    const tone = 0.9 + 0.2 * table[o + 5]!;
     const seedMin = look.rows ? 0.11 : 0.22;
     out.push({
       x: col + fx,
@@ -255,7 +279,7 @@ export function squareTufts(i: number, look: SquareLook, out: Tuft[] = []): Tuft
       w: Math.min(TUFT_WIDTH, Math.max(0.13, h * 1.5)) * (0.85 + 0.3 * vary),
       greenH,
       shape,
-      variant: hash3(i, k, 7) % 3,
+      variant: table[o + 6]!,
       leaf: shade(look.leaf, tone),
       straw: shade(look.straw, tone),
       seed: look.seed >= 0 && h > seedMin ? look.seed : -1,

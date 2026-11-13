@@ -19,6 +19,13 @@
 .bare .stage {
   height: 100dvh;
 }
+/* A fixed size, to try a phone or tablet screen. */
+.stage.boxed {
+  min-height: 0;
+  margin: 12px auto;
+  outline: 2px solid var(--line);
+  max-width: 100%;
+}
 .map {
   position: absolute;
   inset: 0;

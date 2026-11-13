@@ -17,8 +17,12 @@ import { GRID_H, GRID_N, GRID_W } from './grid';
 import { NATURAL } from './palette';
 import { hash2, unit } from './random';
 
-/** Pixels of the ground picture across one square. */
-export const GROUND_PX = 16;
+/**
+ * Pixels of the ground picture across one square. Nine keeps the picture
+ * small (360 by 234), so painting it for a new day is quick, and gives three
+ * even furrows to a square. The map smooths it as it stretches it.
+ */
+export const GROUND_PX = 9;
 export const GROUND_W = GRID_W * GROUND_PX;
 export const GROUND_H = GRID_H * GROUND_PX;
 

@@ -123,3 +123,79 @@ Colour tokens (CSS `:root`):
 
 - No horizontal scroll at phone width. Info-bar items wrap, and the feed charts shrink.
 - Confirmations and results appear **inline next to the button you pressed** (saleyard buy/sell confirm and result rows), not off-screen.
+
+## The rebuild's map (milestone 1.6a)
+
+How the PixiJS map in `packages/render` draws each thing above. The rule is unchanged: the picture must match the model. The map is drawn from the farm view (`FarmView`, built by `farmView` in the engine), which carries figures only. Everything in this section marked **(builder)** was decided while building and is for Claudia to check. The rest is hers or the PRD's.
+
+### The farm view
+
+- The map never sees the farm. It sees a view: for each square its land use, standing height in cm, green share, ground cover, how old the leaf looks, how weathered the dry feed looks, whether seed heads show, the neutral label, the planting on it, diet energy, recent grazing, distance to water and whether it is arable. Then fences, gates, pipe, troughs, hubs, the bore, buildings, paddocks, grazing areas, plantings and mobs.
+- Every figure is read from the model's own summaries. A square's height is the paddock summary's height for that one square, so the map, the paddock sheet and the side-view picture all use one height figure. *(The MVP's map used a second height formula of its own. It gave nearly the same answer.)* **(builder)**
+- Where seed heads show, which cattle look thin or fat, and how weathered dry feed looks are worked out on the server and sent as plain flags and steps. The browser holds no thresholds for them.
+- The view holds no seed, no prices, no soil fertility, no grain yield in prospect and nothing about days to come. A test lists every field it may hold.
+- A mob's cattle are counted by kind (with how many are thin and how many fat), not listed. The whole view for a farm with 4,141 head is 42 KB as JSON. The budget in the test is 64 KB.
+- Trees: the model has none, so the view's list of trees is empty and no trees are drawn. The tree sprite exists. *(The MVP's 16 trees were decoration.)*
+
+### Clear map zoomed out, detail zoomed in
+
+- **Switch point:** 26 screen pixels a square (PRD 7). At or below it each mob is one marker. Above it cattle and grass tufts are drawn.
+- **The hand-over is a fade in time** (about a fifth of a second), not a blend by zoom, so the map never sits half way between the two pictures. Each picture holds for one pixel a square past the switch point, so a pinch that hovers there does not flicker. With "reduce motion" the change is made at once. **(builder)**
+- **Zoom range:** from the whole farm in view to 96 pixels a square. *(v15 was 1 to 5 times.)* **(builder)**
+- **On a phone held upright** the farm fills the height and runs past the sides (PRD 6.1). On its side, and on a PC, the whole farm fits.
+- **Zoomed out:** each square is one clean colour worked out from its figures: soil, straw litter or shaded ground underneath, mixed with the colour of the tops by ground cover. Rank grass reads as straw, leafy grass as green, short grass shows soil. Each square is raised by its height (90 cm is half a square) and the front of a raised square shows where it stands taller than the square in front of it. Cropping country shows its rows.
+- **Zoomed in:** the ground is one soft picture, 9 pixels to a square. Squares blend into their neighbours inside a paddock but never across a fence line or a change of country, so a short paddock beside a rank one keeps a sharp fence-line contrast. Nine tufts stand on each square. **(builder)**
+- **Taps** open the paddock, never a cow. Zoomed out, the tap is tested against the raised squares as drawn (LESSONS 28).
+
+### Grass, square by square
+
+| Thing | How the rebuild draws it |
+|---|---|
+| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under cover × 1.05. Low cover shows soil between tufts. The cover figure is the model's (1,000 kg DM/ha covers the ground) |
+| Bare soil, litter, shaded ground | The colours above, unchanged. Dry grass sits on straw litter, never soil |
+| Height | Tuft height follows the view's height in cm: 90 cm is 0.62 of a square, each tuft give or take a third. Grass is drawn tall against the cattle on purpose, as in the MVP and the mockups, so height reads **(builder)** |
+| Green leaf colour | Young to old leaf, the colours above, by the view's leaf age |
+| Dry colour | Light straw to grey, the colours above, by how weathered the view says the dry feed is |
+| Green at the base of rank grass | Each tuft is two pieces: dry stems at full height behind, green from the ground up in front, to height × green share × (0.65 to 1.35) × 1.25. A square that is all green is green to the tip on every tuft **(builder: the all-green case)** |
+| Seed heads | A pale head on tufts where the view says so, on tufts tall enough to carry one |
+| Sown pasture | Deeper green, with a white clover flower on some tufts |
+| Crops | Upright plants in three rows to a square, bright green while leafy, golden with seed heads once heading or done. Three furrows to a square in the ground |
+| Fallow | Worked brown soil with furrows and a few lighter clods. No tufts |
+| Stubble | Pale straw ground with rows of very short stalks. No green, whatever its figures say |
+
+### Cattle
+
+- **Breeds:** Brahman style in Central Queensland (pale grey cows, cream heifers, red steers, dark grey bulls with a big hump, fawn calves, long ears). British-breed style elsewhere (black cows, dark brown heifers, red-brown steers with white faces, heavy grey bulls, brown calves). Colours for each kind **(builder)**.
+- **Body shape** follows condition: thin shows ribs and a hip bone, fat is deeper and rounder. Bulls are bigger, calves smaller.
+- **Never blurred into the grass:** every beast has a dark outline and, outside it, a thin pale rim. On pale ground the dark line carries it. On dark ground the pale rim does. A test holds the better of the two to 3 to 1 against every colour the ground or grass can be, at midday, first light, last light, under cloud and in rain. **(builder)**
+- **Where they stand:** the farm does not store it. The map works it out from the view, the same way every time, so cattle do not jump about. A mob gathers round the square it was put on (usually water) and spreads out from there, about two to a square, without crossing a fence. Cattle stand back from fence lines and never on a square with a trough, the bore or a building. Calves stand beside cows. They move only when the mob, its numbers, or a fence, gate or trough changes. **(builder)**
+- **Big mobs do not hide the pasture.** On open country a mob stands on no more than four squares in ten of its grazing area, three to a square at most. Past that it draws a sample. On a small area (eight squares or fewer, a tape cell say) it uses every square, up to six to a square, so high density looks crowded. The marker and badge always carry the real head count. *(v15 drew up to about 120 a mob.)* **(builder)**
+- **Zoomed out:** one marker for each mob with a cow and the head count, on a soft footprint of the squares it stands on. A mob with no water has a salmon border and says "no water".
+- **Zoomed in:** a small head-count badge above the mob.
+- A mob in the feedlot is not drawn. A mob in the stock yards is drawn at the yards, a few at a time.
+- Not yet: cattle walking and grazing, the selected mob, picked animals, and the profit marker over each beast.
+
+### Fences, gates and water
+
+- **Fences keep the colours above.** Every wire has a dark casing under it so it reads on any ground. Zoomed out they are bold lines. Zoomed in they have a ground shadow, posts every half square and wires standing above the ground. The boundary is heavier. Tape is white and dashed with orange posts.
+- **Knocked-down fence:** a sagging red line with a red "!" marker. It is steady, not flashing **(builder)**.
+- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is red when shut and green when open, drawn large so it reads zoomed out.
+- **Bore:** a windmill about 1.9 squares tall. A gold ring and "Bore: put a trough or water hub here" until the first trough or hub is built. The fan turns and the ring pulses only when ambient motion is switched on **(builder)**. A paddock label that would sit over the windmill steps to one side.
+- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, red below.
+- **Homestead and stock yards** are drawn on their squares. The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.** Sheds, silos and feed bins have sprites ready for when the model has them.
+
+### Layers, light and weather
+
+- **Layers:** water reach, pasture quality, recently grazed, arable land, pipe and labels, with the colours and strengths above. The profit layer is listed but not drawn yet: the view carries no figures for each beast.
+- **Labels:** the paddock's name and its neutral label chip, then hectares, then "no water" in salmon or "water via gate". They hang under the paddock's top fence. Where the name does not fit, the paddock's number and a dot in the label's colour. The planting's name sits on the crop. **(builder: placement and the short form)**
+- **Time of day:** one tint over the whole map. Warm and low at first light, white through the day, warm before last light, dark blue outside those hours. **Weather:** clear, overcast (dimmer) and rain (dimmer again, with falling streaks). The daytime tints are kept bright enough for the cattle contrast figure to hold. **(builder: the tint colours)**
+- **Reduce motion:** nothing moves. Rain is drawn still, and the change of detail is made at once.
+- **Themes:** the country keeps its natural colours in both. Only the surround, the labels and the markers change.
+
+### Art
+
+- Every sprite is drawn in code for now and registered by name (`cattle.british.cow.normal`, `trough.fixed`, `gate.across.open`, `tuft.leaf.0` and so on). Any one can be swapped for exported art without touching the map code. Grass pieces are drawn in greys and tinted with the colours worked out from the model, so one drawn piece serves every pasture state.
+
+### Side-view pictures
+
+- `drawSward` is kept as described above, drawn from the view's figures for the paddock: 0 to 80 cm frame, cm scale, litter layer, dry stems behind with seed heads past rankness 30, green leaf in front. A paddock that is part crop and part pasture gives two pictures, crop then pasture, each with its area. "Then vs now" is two calls with two views. It is plain canvas and loads without PixiJS.

@@ -480,6 +480,69 @@ Questions for Claudia:
 - **Western Victoria** varies least (year factors 0.71 to 1.25, and a season factor under 0.8 on 9% of days). Does that match the district?
 - **The dry and wet year tables** in `CALIBRATION.md`: do the years you remember look right?
 
+### 14 Nov 2026: milestone 1.6a, map core
+
+The first half of milestone 1.6: the map itself and the numbers it is drawn from. Branch `m1.6a-map-core`, cut from `m1.4-real-years`. Not wired into `/play`: the game screens are milestone 1.7.
+
+Built:
+
+- **The farm view.** A `FarmView` type in `packages/shared` and `farmView()` in the engine (`sim/view.ts`, a new file; no existing engine file was changed but for one export added to `index.ts`). It carries what the map draws and nothing about the rules: for each square its land use, height, green share, cover, leaf age, weathering, seed heads, neutral label, planting, diet energy, recent grazing, distance to water and arable flag. Then fences by line, gates (open or shut, with a `kind` ready for the three gate types), pipe, troughs with their level, hubs, the bore, a buildings list (homestead and yards now; sheds, silos and feed bins later), paddocks, grazing areas, plantings and mobs. Cattle are counted by kind, with how many look thin and fat. Each mob has a seed for the map, made from the mob's id alone. An optional `jobs` list is typed for the next milestone. The view for a farm with 4,141 head is 42 KB as JSON.
+- **The map** (`packages/render`, PixiJS 8). `createFarmMap(host, options)` gives a handle with `setView`, `setLayers`, `setTheme`, `setTimeOfDay`, `setWeather`, `setHighlight`, `fitFarm`, `zoomTo`, `panBy`, `centreOn`, `squareToScreen`, `resize`, `bench`, `stats`, `destroy`, and `on('tap' | 'hover' | 'camera')`. Touch: one finger pans, two pinch. Mouse: drag and wheel at the pointer. Keyboard: arrows, plus, minus, 0.
+- **Clear map zoomed out, detail zoomed in**, as `docs/VISUALS.md` now sets out in its new last section: each square one colour raised by its grass height and one marker for each mob zoomed out; grass tufts built from each square's figures and individual cattle zoomed in.
+- **Art drawn in code** behind a sprite registry of 54 named sprites. Any one can be swapped for exported art with `registry.replace(name, image)`.
+- **Layers** (water reach, pasture quality, recently grazed, arable land, pipe, labels), **time-of-day light**, **weather** (clear, overcast, rain), **reduce motion**, **both themes** from one palette file.
+- **Side-view pasture pictures** (`drawSward`, `swardParts`, `swardCaption`), plain canvas, loadable without PixiJS from `@gg/render/sward`.
+- **A builders' page** at `/dev/map`: pick a farm, a screen size, layers, theme, time of day, weather, and read the bench. It lazy-loads the renderer and reads fixture files. In a production build it returns 404 unless `GG_DEV_PAGES=1`. It is not in the sitemap, is marked noindex, and `/dev` is in the robots file.
+- **Fixtures:** `pnpm dev:map-fixtures` builds 13 farms with the engine and writes their views to `apps/web/dev-fixtures/map/` (views only, 0.5 MB in all): the four districts small and large, from scratch and running, a mixed farm with a ripe crop, fallow and stubble, a dry season, a green season, tape cells with a portable trough, gates, a hub and a length of tape lying down, and the 4,000 head farm.
+
+How it was tested:
+
+- 1,475 tests pass: the 1,219 from before with no expected number changed, and 256 new ones. 31 on the farm view (it holds only the fields listed in the test, is plain JSON, is the same for the same farm, changes when a paddock is grazed, a fence built or a mob moved, carries no seed or random stream state, and is under 64 KB with more than 4,000 head). 142 on the renderer's arithmetic: the camera and its limits, taps to a square and a paddock (against the raised squares when zoomed out), level of detail, where cattle stand, layers, light, the grass drawing rules, the ground picture, the sprite sheet and the palette. 83 that run the renderer's placement and grass code over every fixture.
+- **Cattle against grass:** the dark outline or the pale rim stands out at 3 to 1 or better (the WCAG figure for graphics) against every ground and grass colour the map can draw, at midday, first light, last light, under cloud, in rain, and in rain at first and last light. Labels and markers hold 4.5 to 1 in both themes.
+- `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm format:check` and `pnpm build` pass.
+- **The production build was checked by hand:** `/dev/map` and its fixture route return 404 with no flag and 200 with `GG_DEV_PAGES=1`. PixiJS is in 7 lazy chunks (490 KB before compression) and in none of the scripts the home page, `/play` or even `/dev/map` load first.
+- **Looked at in a browser** (the in-app browser pane, Chrome): Western Victoria small, Central Queensland large and 4,000 head, the mixed farm, the dry season, the green season and the tape cells farm; at 375 by 667, 667 by 375, 812 by 375 and about 1,024 by 768; dark and light; zoomed out and in to the closest zoom; the water reach and pipe layers; first light with rain. A tap opened the paddock with its split crop and pasture pictures. Screenshots were taken but the pane cropped and scaled them unevenly, so they were not kept.
+- **Frame rate was not measured.** The browser pane was a background tab, which the browser holds to about one frame a second. What was measured, in the production build on the build PC at 664 by 768: the processor time for a frame with all 4,409 beasts and 22,664 grass pieces drawn was 0.2 ms in the middle, 1.0 ms at 95% and 3.2 ms at 99%, with one first frame of 288 ms. With a wait for the graphics card after every frame it was 12.6 ms in the middle and 19.5 ms at 95%, but that wait alone was 7 to 12 ms on a nearly empty map in that tab, so it is an upper limit and not a frame time. A whole new farm's view took 29 to 92 ms to apply. Nothing was measured on a phone.
+
+Defaults used (each one easy to change):
+
+- Level of detail switches at 26 pixels a square (PRD 7). The fade is in time, about a fifth of a second.
+- Zoom from the whole farm to 96 pixels a square. Held upright the farm fills the height.
+- A cow is about 0.42 of a square long. Grass of 90 cm stands 0.62 of a square, taller than the cattle, so height reads.
+- On open country a mob stands on four squares in ten of its area at most, three to a square. On eight squares or fewer it uses them all, six to a square. Past that it is sampled.
+- Cattle stand 0.3 of a square back from a fence at the side and 0.55 below one.
+- Pixel ratio capped at 2, stepping down by a half when 45 frames in a row have a middle time over 25 ms.
+- Ambient motion (the windmill turning, the bore's ring pulsing) is off unless asked for, so a still map draws nothing.
+- Brahman colours for Central Queensland and British-breed colours elsewhere, by class.
+- PRD section 21 defaults: none new.
+
+Not done, and why:
+
+- **Not on a real phone, and frame rate not measured** (above).
+- **Trees:** the model has none, so none are drawn. The sprite is there.
+- **The bore's gold ring and pointer were not seen:** every fixture farm starts with a trough on the bore, so the case never came up. The code is there.
+- **The profit layer, the selected mob, picked animals, the Harvest, Mark calves and No water buttons, the fence drag preview and snap dots:** these belong to the game screens and tools (1.7). The view carries what the buttons need (`ready` on a planting, `toMark` and `noWater` on a mob) and the map gives screen positions for them.
+- **Cattle walking and grazing, the ute, time-lapse, frost, dust, heat haze, storm clouds:** the second half of 1.6.
+- **Half-built fence lines:** the view has a `jobs` field for them. Nothing draws it yet.
+- **The day's weather is not in the view.** `setWeather` is set by hand. The season code was being changed on another branch, so it was left alone.
+- **The overview inset** for a phone held upright (PRD 6.1) is a game screen item.
+- **Hover** was not tried: the browser pane has no mouse-over.
+- **`realism-guardian` was not run.** It runs before the pull request.
+- Lighthouse was not run. No website page changed.
+
+Packages added: `pixi.js` 8.23 in `@gg/render` (the map, PRD 14.2). `pixi-viewport` was not added: the camera is 200 lines of tested arithmetic of our own. pnpm reported "agent skills awaiting approval: pixi.js". They were not approved or used.
+
+Questions for Claudia:
+
+- **Big mobs.** Is a sample right for a big mob in a big paddock (a marker with the true count, and up to three cattle a square on four squares in ten), or do you want every beast drawn and the paddock full of cattle?
+- **Where a mob stands.** It gathers round the square it was put on, which is usually the trough. Should it follow where the model says they grazed lately?
+- **Grass taller than cattle.** Rank grass at 90 cm is drawn about twice a cow's height, as the MVP and the mockups did, so height reads. Too much?
+- **Cattle colours.** Black cows, dark brown heifers, red steers with white faces, grey bulls and brown calves in the south. Pale grey cows, cream heifers, red steers, dark grey bulls and fawn calves in Central Queensland. Right for each class?
+- **The pale rim round cattle.** It is what keeps a black cow readable on dark ground. Does it look right to you, or too much like a sticker?
+- **Labels.** They hang under the paddock's top fence. On a small paddock the name is cut to its number and a coloured dot. Is the number alone clear enough?
+- **Trees.** Do you want them back as decoration, or only once the model has shade?
+- **A knocked-down fence** is a steady red line with a "!" marker, not flashing. Is steady enough to catch the eye?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

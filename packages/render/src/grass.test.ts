@@ -253,9 +253,10 @@ describe('the ground picture', () => {
     return out;
   }
 
-  it('is 16 pixels to a square, and the same every time', () => {
-    expect(GROUND_W).toBe(640);
-    expect(GROUND_H).toBe(416);
+  it('is 9 pixels to a square, and the same every time', () => {
+    expect(GROUND_PX).toBe(9);
+    expect(GROUND_W).toBe(360);
+    expect(GROUND_H).toBe(234);
     expect(painted()).toEqual(painted());
     // Every pixel is solid.
     const out = painted();
@@ -267,11 +268,11 @@ describe('the ground picture', () => {
     const out = painted((view) => {
       for (let i = 0; i < 1040; i++) if (i % 40 < 20) setSquare(view, i, { ...RANK, green: 0 });
     });
-    const y = 10 * GROUND_PX + 8;
+    const y = 10 * GROUND_PX + 4;
     const lastLeft = pixel(out, 20 * GROUND_PX - 1, y);
-    const deepLeft = pixel(out, 15 * GROUND_PX + 8, y);
+    const deepLeft = pixel(out, 15 * GROUND_PX + 4, y);
     const firstRight = pixel(out, 20 * GROUND_PX, y);
-    const deepRight = pixel(out, 25 * GROUND_PX + 8, y);
+    const deepRight = pixel(out, 25 * GROUND_PX + 4, y);
     const near = (a: number[], b: number[]): boolean => a.every((v, k) => Math.abs(v - b[k]!) < 36);
     // Right up to the fence each side is its own paddock's colour (give or take the speckle).
     expect(near(lastLeft, deepLeft)).toBe(true);
@@ -289,11 +290,11 @@ describe('the ground picture', () => {
     // columns 9 and 10 the colour is in between the two.
     const column = (px: number): number => {
       let t = 0;
-      for (let py = 64; py < 352; py++) t += pixel(out, px, py)[0];
-      return t / 288;
+      for (let py = 36; py < 198; py++) t += pixel(out, px, py)[0];
+      return t / 162;
     };
-    const dry = column(5 * GROUND_PX + 8);
-    const leafy = column(15 * GROUND_PX + 8);
+    const dry = column(5 * GROUND_PX + 4);
+    const leafy = column(15 * GROUND_PX + 4);
     const join = column(10 * GROUND_PX);
     expect(dry).toBeGreaterThan(leafy + 60);
     expect(join).toBeLessThan(dry - 20);
@@ -306,19 +307,24 @@ describe('the ground picture', () => {
     });
     const rowMean = (py: number): number => {
       let t = 0;
-      for (let px = 16; px < 300; px++) t += pixel(out, px, py)[0];
-      return t / 284;
+      for (let px = 9; px < 170; px++) t += pixel(out, px, py)[0];
+      return t / 161;
     };
     const base = 10 * GROUND_PX;
-    // Furrows at pixel rows 0, 6 and 11 of each square.
-    for (const dark of [0, 6, 11]) {
-      expect(rowMean(base + dark)).toBeLessThan(rowMean(base + 3) - 12);
+    // Furrows at pixel rows 0, 3 and 6 of each square.
+    for (const dark of [0, 3, 6]) {
+      expect(rowMean(base + dark)).toBeLessThan(rowMean(base + 4) - 12);
     }
     // A few pixels are lighter than the plain fallow colour: the clods.
     let clods = 0;
-    for (let px = 16; px < 300; px++)
-      if (pixel(out, px, base + 3)[0] > red(NATURAL.fallow) + 15) clods++;
-    expect(clods).toBeGreaterThan(3);
-    expect(clods).toBeLessThan(60);
+    for (let py = base + 1; py < base + 36; py++) {
+      if ((py % GROUND_PX) % 3 === 0) continue;
+      for (let px = 9; px < 170; px++) {
+        if (pixel(out, px, py)[0] > red(NATURAL.fallow) + 15) clods++;
+      }
+    }
+    // About six pixels in a hundred.
+    expect(clods).toBeGreaterThan(100);
+    expect(clods).toBeLessThan(400);
   });
 });

@@ -26,10 +26,12 @@ export interface MapLabStart {
   zoom?: number;
   /** The square to start centred on. */
   at?: number;
+  /** A fixed size for the map, in CSS pixels, to try a phone or tablet screen. */
+  size?: { w: number; h: number };
   /** False hides the controls so the map fills the screen. */
   controls?: boolean;
-  /** True runs the bench as soon as the first farm is drawn. */
-  bench?: boolean;
+  /** Runs the bench as soon as the first farm is drawn: following the screen, or back to back. */
+  bench?: 'paced' | 'unpaced' | 'processor';
   /** True draws every beast, for the speed test. */
   everyBeast?: boolean;
   weather?: MapWeatherKind;
@@ -45,6 +47,15 @@ const LAYERS: { id: MapLayerId; name: string }[] = [
   { id: 'grazed', name: 'Recently grazed' },
   { id: 'arable', name: 'Arable land' },
   { id: 'pipe', name: 'Pipe' },
+];
+
+/** Screen sizes to try the map at, in CSS pixels. */
+const SCREENS = [
+  { value: 'fill', name: 'Fill the page' },
+  { value: '375x667', name: 'Phone, upright (375 by 667)' },
+  { value: '667x375', name: 'Phone, on its side (667 by 375)' },
+  { value: '812x375', name: 'Long phone, on its side (812 by 375)' },
+  { value: '1024x768', name: 'Tablet (1024 by 768)' },
 ];
 
 const clock = (minutes: number): string => {
@@ -70,7 +81,7 @@ export function MapLab({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<FarmMap | null>(null);
-  const benchWanted = useRef(start.bench === true);
+  const benchWanted = useRef(start.bench);
 
   const [render, setRender] = useState<Render | null>(null);
   const ready = render !== null;
@@ -93,18 +104,19 @@ export function MapLab({
   const [ambient, setAmbient] = useState(false);
   const [still, setStill] = useState(false);
   const [everyBeast, setEveryBeast] = useState(start.everyBeast === true);
+  const [size, setSize] = useState(start.size ? `${start.size.w}x${start.size.h}` : 'fill');
   const [hover, setHover] = useState<MapPointerEvent | null>(null);
   const [tapped, setTapped] = useState<MapPointerEvent | null>(null);
   const [stats, setStats] = useState<MapStats | null>(null);
   const [bench, setBench] = useState<BenchResult | null>(null);
   const [benching, setBenching] = useState(false);
 
-  const runBench = useCallback(async () => {
+  const runBench = useCallback(async (unpaced = false, processorOnly = false) => {
     const map = mapRef.current;
     if (!map) return;
     setBenching(true);
     setBench(null);
-    const result = await map.bench({ seconds: 6 });
+    const result = await map.bench({ seconds: 6, unpaced, processorOnly });
     setBench(result);
     setBenching(false);
     setStats(map.stats());
@@ -172,10 +184,15 @@ export function MapLab({
         setView(v);
         setTapped(null);
         setStats(map.stats());
+        // The standing grass is built over the next few frames. Read the figures again once it is in.
+        setTimeout(() => {
+          if (!dead && mapRef.current === map) setStats(map.stats());
+        }, 800);
         setError(null);
-        if (benchWanted.current) {
-          benchWanted.current = false;
-          setTimeout(() => void runBench(), 600);
+        const wanted = benchWanted.current;
+        if (wanted) {
+          benchWanted.current = undefined;
+          setTimeout(() => void runBench(wanted !== 'paced', wanted === 'processor'), 600);
         }
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
@@ -216,10 +233,15 @@ export function MapLab({
   const first = view?.light.first ?? 360;
   const last = view?.light.last ?? 1080;
   const controls = start.controls !== false;
+  const [bw, bh] = size.split('x').map(Number);
+  const box = bw && bh ? { w: bw, h: bh } : null;
 
   return (
     <div className={controls ? styles.page : styles.bare}>
-      <div className={styles.stage}>
+      <div
+        className={box ? `${styles.stage} ${styles.boxed}` : styles.stage}
+        style={box ? { width: box.w, height: box.h } : undefined}
+      >
         <div ref={hostRef} className={styles.map} data-testid="map-host" />
         {error && (
           <p className={styles.error} role="alert">
@@ -228,14 +250,14 @@ export function MapLab({
         )}
         {!fixtures.length && (
           <p className={styles.error} role="alert">
-            No fixtures yet. Run <code>node scripts/dev/make-map-fixtures.mjs</code> and reload.
+            No fixtures yet. Run <code>pnpm dev:map-fixtures</code> and reload.
           </p>
         )}
         {(bench || benching) && (
           <p className={styles.benchline} data-testid="bench-line">
             {benching || !bench
               ? 'Measuring…'
-              : `bench frame mean ${bench.frame.meanMs} p95 ${bench.frame.p95Ms} p99 ${bench.frame.p99Ms} max ${bench.frame.maxMs} ms | draw mean ${bench.draw.meanMs} p95 ${bench.draw.p95Ms} max ${bench.draw.maxMs} ms | ${bench.frame.fps} fps | ${bench.cattleDrawn} of ${bench.head} head drawn | ${bench.tuftPieces} grass pieces | ${bench.width}x${bench.height} at ${bench.pixelRatio}x`}
+              : `${bench.paced ? `paced: frame mean ${bench.frame.meanMs} p95 ${bench.frame.p95Ms} p99 ${bench.frame.p99Ms} max ${bench.frame.maxMs} ms, ${bench.frame.fps} fps | ` : 'unpaced | '}draw mean ${bench.draw.meanMs} p50 ${bench.draw.p50Ms} p95 ${bench.draw.p95Ms} p99 ${bench.draw.p99Ms} max ${bench.draw.maxMs} ms over ${bench.draw.frames} frames | out ${bench.parts.zoomedOut.p50Ms}/${bench.parts.zoomedOut.p95Ms} in ${bench.parts.zoomedIn.p50Ms}/${bench.parts.zoomedIn.p95Ms} zooming ${bench.parts.zooming.p50Ms}/${bench.parts.zooming.p95Ms} (p50/p95) | ${bench.cattleDrawn} of ${bench.head} head drawn | ${bench.tuftPieces} grass pieces | ${bench.width}x${bench.height} at ${bench.pixelRatio}x`}
           </p>
         )}
       </div>
@@ -254,6 +276,19 @@ export function MapLab({
               {fixtures.map((f) => (
                 <option key={f.name} value={f.name}>
                   {f.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Screen</span>
+            <select value={size} onChange={(e) => setSize(e.target.value)}>
+              {SCREENS.some((sc) => sc.value === size) ? null : (
+                <option value={size}>{size}</option>
+              )}
+              {SCREENS.map((sc) => (
+                <option key={sc.value} value={sc.value}>
+                  {sc.name}
                 </option>
               ))}
             </select>
@@ -396,13 +431,29 @@ export function MapLab({
             >
               {benching ? 'Measuring…' : 'Run the bench (6 s)'}
             </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void runBench(true)}
+              disabled={benching}
+            >
+              Measure drawing only
+            </button>
+            <p className="muted">
+              The bench follows the screen, so run it with this tab in front. The second button
+              draws frames back to back and waits for the graphics card each time, so it also works
+              in a background tab.
+            </p>
             {stats && (
               <p className="muted" data-testid="stats-line">
                 {stats.cattleDrawn.toLocaleString('en-AU')} of {stats.head.toLocaleString('en-AU')}{' '}
                 head drawn, {stats.tuftPieces.toLocaleString('en-AU')} grass pieces. {stats.zoom} px
                 a square ({stats.lod === 'far' ? 'zoomed out' : 'zoomed in'}), drawn at{' '}
-                {stats.pixelRatio}x. Last view took {stats.lastViewMs} ms. {stats.framesDrawn}{' '}
-                frames drawn so far.
+                {stats.pixelRatio}x. Last view took {stats.lastViewMs} ms (
+                {Object.entries(stats.lastViewParts)
+                  .map(([k, v]) => `${k} ${v}`)
+                  .join(', ')}
+                ). {stats.framesDrawn} frames drawn so far.
               </p>
             )}
             {bench && (
@@ -419,7 +470,7 @@ export function MapLab({
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
+                  <tr hidden={!bench.paced}>
                     <th scope="row">Frame to frame</th>
                     <td>{bench.frame.meanMs}</td>
                     <td>{bench.frame.p50Ms}</td>
@@ -438,7 +489,7 @@ export function MapLab({
                 </tbody>
               </table>
             )}
-            {bench && (
+            {bench && bench.paced && (
               <p className="muted">
                 {bench.frame.fps} frames a second. {Math.round(bench.frame.slowShare * 100)}% of
                 frames slower than 60 a second allows, {bench.frame.over50} over 50 ms.

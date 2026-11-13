@@ -21,6 +21,7 @@ const LAYER_IDS = ['waterReach', 'quality', 'grazed', 'arable', 'pipe', 'labels'
 /**
  * Where the page starts, from the address. For example:
  * /dev/map?fixture=cq-4000-head&theme=light&zoom=40&at=12,8&controls=0&bench=1
+ * bench=1 follows the screen. bench=2 draws back to back (for a background tab). all=1 draws every beast.
  */
 function startFrom(query: Query): MapLabStart {
   const one = (key: string): string | undefined => {
@@ -34,18 +35,31 @@ function startFrom(query: Query): MapLabStart {
   const theme = one('theme');
   const weather = one('weather');
   const layers = (one('layers') ?? '').split(',');
+  // size=375x667
+  const size = (one('size') ?? '').split('x').map(Number);
   // at=column,row
   const at = (one('at') ?? '').split(',').map(Number);
   return {
     fixture: one('fixture'),
     theme: theme === 'light' || theme === 'dark' ? theme : undefined,
     zoom: num('zoom'),
+    size:
+      size.length === 2 && size.every((v) => Number.isInteger(v) && v >= 200 && v <= 4000)
+        ? { w: size[0]!, h: size[1]! }
+        : undefined,
     at:
       at.length === 2 && at.every((v) => Number.isInteger(v) && v >= 0)
         ? at[1]! * 40 + at[0]!
         : undefined,
     controls: one('controls') !== '0',
-    bench: one('bench') === '1',
+    bench:
+      one('bench') === '1'
+        ? 'paced'
+        : one('bench') === '2'
+          ? 'unpaced'
+          : one('bench') === '3'
+            ? 'processor'
+            : undefined,
     everyBeast: one('all') === '1',
     weather:
       weather === 'overcast' || weather === 'rain' || weather === 'clear' ? weather : undefined,

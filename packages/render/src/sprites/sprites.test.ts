@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameStats } from '../bench';
+import { frameStats, struggling } from '../bench';
 import { swardCaption, swardParts, swardPlan } from '../sward';
 import { SWARD, sampleView } from '../testing/sampleView';
 import { cattleSprite, defaultSprites } from './painters';
@@ -264,6 +264,18 @@ describe('frame time figures', () => {
     expect(frameStats([17.8]).slowShare).toBe(1);
     expect(frameStats([50]).over50).toBe(0);
     expect(frameStats([50.1]).over50).toBe(1);
+  });
+
+  it('a screen is struggling when the middle frame of 45 in a row is over 25 ms', () => {
+    const run = (ms: number, n = 45): number[] => new Array<number>(n).fill(ms);
+    expect(struggling(run(16.7))).toBe(false);
+    expect(struggling(run(25))).toBe(false);
+    expect(struggling(run(25.1))).toBe(true);
+    expect(struggling(run(33))).toBe(true);
+    // A few slow frames among fast ones do not count.
+    expect(struggling([...run(16.7, 30), ...run(60, 15)])).toBe(false);
+    // A short run says nothing either way.
+    expect(struggling(run(40, 44))).toBe(false);
   });
 
   it('no frames gives zeros, not a broken number', () => {

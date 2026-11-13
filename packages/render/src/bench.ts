@@ -55,10 +55,17 @@ export function frameStats(times: readonly number[]): FrameStats {
 }
 
 export interface BenchResult {
-  /** Time from one frame to the next, as the screen showed them. */
+  /** True if frames followed the screen. False if they were drawn back to back. */
+  paced: boolean;
+  /** Time from one frame to the next, as the screen showed them. Empty for an unpaced run. */
   frame: FrameStats;
-  /** Time the map spent drawing each frame on the processor. */
+  /**
+   * Time the map spent on each frame: placing the camera and labels and
+   * drawing. On an unpaced run it also waits for the graphics card to finish.
+   */
   draw: FrameStats;
+  /** The same drawing times for each third of the run: zoomed out, zoomed in, and zooming through the change of detail. */
+  parts: { zoomedOut: FrameStats; zoomedIn: FrameStats; zooming: FrameStats };
   /** What was on the map. */
   cattleDrawn: number;
   head: number;
@@ -68,4 +75,17 @@ export interface BenchResult {
   width: number;
   height: number;
   seconds: number;
+}
+
+/**
+ * When a screen counts as struggling: this many frames in a row, with the
+ * middle one slower than this. 25 ms is 40 frames a second.
+ */
+export const STRUGGLE = { frames: 45, medianMs: 25 } as const;
+
+/** True if a run of frame times says the screen is struggling. A short run says nothing. */
+export function struggling(times: readonly number[]): boolean {
+  if (times.length < STRUGGLE.frames) return false;
+  const sorted = [...times].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)]! > STRUGGLE.medianMs;
 }

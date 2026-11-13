@@ -18,6 +18,7 @@
     "lighthouse": "lhci autorun",
     "data:mla": "node scripts/data/pull-mla.mjs",
     "data:silo": "node scripts/data/pull-silo.mjs",
+    "dev:map-fixtures": "node scripts/dev/make-map-fixtures.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "devDependencies": {

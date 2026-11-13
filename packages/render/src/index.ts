@@ -68,7 +68,7 @@ export type { Beast, BodyShape, MobPlacement, PlacementOptions } from './cattle'
 export { squareLook, squareTufts, TUFTS_PER_SQUARE } from './grass';
 export type { SquareLook, Tuft } from './grass';
 
-export { frameStats } from './bench';
+export { STRUGGLE, frameStats, struggling } from './bench';
 export type { BenchResult, FrameStats } from './bench';
 
 export { SpriteRegistry, packAtlas } from './sprites/registry';

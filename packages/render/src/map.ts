@@ -32,8 +32,8 @@ import {
   Text,
   Texture,
 } from 'pixi.js';
-import { PADDOCK_LABELS, VIEW_FENCE, type FarmView } from '@gg/shared';
-import { frameStats, type BenchResult } from './bench';
+import { FARM_VIEW_VERSION, PADDOCK_LABELS, VIEW_FENCE, type FarmView } from '@gg/shared';
+import { STRUGGLE, frameStats, struggling, type BenchResult } from './bench';
 import {
   MAX_ZOOM,
   clampCamera,
@@ -127,8 +127,9 @@ export interface MapStats {
   cattleDrawn: number;
   /** Grass pieces drawn zoomed in. */
   tuftPieces: number;
-  /** Milliseconds the last view took to apply. */
+  /** Milliseconds the last view took to apply, and where the time went. */
   lastViewMs: number;
+  lastViewParts: Record<string, number>;
   pixelRatio: number;
   zoom: number;
   lod: 'far' | 'near';
@@ -139,6 +140,16 @@ export interface MapStats {
 export interface BenchOptions {
   /** How long to run. 6 seconds unless set. */
   seconds?: number;
+  /**
+   * Draw frames back to back and wait for the graphics card after each one.
+   * Use this in a background tab, where the browser holds paced frames back.
+   */
+  unpaced?: boolean;
+  /**
+   * On an unpaced run, do not wait for the graphics card. The figure is then
+   * the time on the processor alone: the part that can block the page.
+   */
+  processorOnly?: boolean;
 }
 
 export interface FarmMap {
@@ -181,12 +192,21 @@ const PX = {
   farWire: 1.7,
   farBoundaryCasing: 4.8,
   farBoundaryWire: 2.4,
-  nearWire: 1.6,
-  nearPost: 1.8,
   pipe: 2.6,
   outline: 2,
   highlight: 3,
 } as const;
+
+/**
+ * Zoomed in, lines are drawn as if the zoom were this step: about 27 pixels
+ * a square, where the detail first shows. From there they grow with the zoom.
+ */
+const NEAR_LINES = Math.round(Math.log2(27) * 2);
+/** A fence wire's width zoomed in, in world units: about a pixel at the switch, four at the closest zoom. */
+const NEAR_WIRE = 0.042;
+
+/** Milliseconds a frame may spend rebuilding standing grass after a new view. */
+const GRASS_BUDGET_MS = 5;
 
 /** How high the wires and posts stand, in world units. */
 const WIRE_LIFT: Record<number, readonly number[]> = {
@@ -325,8 +345,12 @@ class PixiFarmMap implements FarmMap {
   private raf = 0;
   private lastFrameAt = 0;
   private framesDrawn = 0;
+  /** 1 for each row whose standing grass is waiting to be rebuilt. */
+  private readonly tuftsStale = new Uint8Array(GRID_H);
   private lastViewMs = 0;
+  private lastViewParts: Record<string, number> = {};
   private slowFrames: number[] = [];
+  private lastDrawnAt = 0;
   private lastStepDown = 0;
   private detachInput: (() => void) | null = null;
   private observer: ResizeObserver | null = null;
@@ -381,8 +405,14 @@ class PixiFarmMap implements FarmMap {
     canvas.style.userSelect = 'none';
     canvas.style.cursor = 'grab';
     canvas.tabIndex = 0;
-    canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', this.options.label ?? 'Map of the farm');
+    // It takes the keyboard (arrows move, plus and minus zoom, 0 shows it all).
+    canvas.setAttribute('role', 'application');
+    canvas.setAttribute('aria-roledescription', 'map');
+    canvas.setAttribute(
+      'aria-label',
+      (this.options.label ?? 'Map of the farm') +
+        '. Arrow keys move it. Plus and minus zoom. 0 shows the whole farm.',
+    );
     host.appendChild(canvas);
 
     this.buildAtlas(this.options.sprites ?? defaultSprites());
@@ -391,7 +421,7 @@ class PixiFarmMap implements FarmMap {
     this.detachInput = attachInput(canvas, {
       camera: () => this.cam,
       viewport: () => this.vp,
-      moveTo: (cam) => this.setCamera(cam, true),
+      moveTo: (cam) => this.setCamera(cam),
       tap: (x, y) => this.onTap(x, y),
       hover: (p) => this.onHover(p),
       fit: () => this.fitFarm(),
@@ -530,6 +560,7 @@ class PixiFarmMap implements FarmMap {
     if (this.destroyed) return;
     const dt = this.lastFrameAt ? Math.min(100, now - this.lastFrameAt) : 16.7;
     this.lastFrameAt = now;
+    this.watchSpeed(now);
     const moving = this.animate(now, dt);
     this.app.renderer.render(this.app.stage);
     this.framesDrawn++;
@@ -539,7 +570,7 @@ class PixiFarmMap implements FarmMap {
 
   /** Move whatever moves. Returns true if another frame is needed. */
   private animate(now: number, dt: number): boolean {
-    let moving = false;
+    let moving = this.rebuildGrass(GRASS_BUDGET_MS);
     // The fade between the zoomed-out map and the detail. With reduce motion it is instant.
     const target = this.lod.mode === 'near' ? 1 : 0;
     if (this.nearMix !== target) {
@@ -571,15 +602,42 @@ class PixiFarmMap implements FarmMap {
     return moving;
   }
 
+  /**
+   * Rebuild stale rows of standing grass for up to `budgetMs`, rows on screen
+   * first. Returns true if rows are still waiting.
+   */
+  private rebuildGrass(budgetMs: number): boolean {
+    const stale = this.tuftsStale;
+    if (!stale.includes(1)) return false;
+    const t0 = performance.now();
+    const [, y0, , y1] = visibleWorld(this.cam, this.vp);
+    let built = false;
+    for (const wantOnScreen of [true, false]) {
+      for (let r = 0; r < GRID_H; r++) {
+        if (!stale[r]) continue;
+        const onScreen = (r + 1) * K + 0.3 >= y0 && r * K - 2.4 <= y1;
+        if (onScreen !== wantOnScreen) continue;
+        if (built && performance.now() - t0 >= budgetMs) {
+          this.applyLod();
+          return true;
+        }
+        this.buildTufts(r);
+        stale[r] = 0;
+        built = true;
+      }
+    }
+    this.applyLod();
+    return false;
+  }
+
   // -------------------------------------------------------------------------
   // Camera
   // -------------------------------------------------------------------------
 
-  private setCamera(cam: Camera, interactive = false): void {
+  private setCamera(cam: Camera): void {
     const next = clampCamera(cam, this.vp);
     if (next.zoom === this.cam.zoom && next.x === this.cam.x && next.y === this.cam.y) return;
     this.cam = next;
-    if (interactive) this.watchSpeed();
     this.applyCamera();
     for (const h of this.handlers.camera) h({ ...this.cam });
   }
@@ -597,8 +655,10 @@ class PixiFarmMap implements FarmMap {
     this.lod.mode = mode;
     this.applyLod();
 
-    // Line widths are set in screen pixels, so lines are redrawn when the zoom moves a step.
-    const bucket = Math.round(Math.log2(cam.zoom) * 3);
+    // Zoomed out, line widths are set in screen pixels, so lines are redrawn
+    // when the zoom moves a step (two steps to a doubling). Zoomed in, lines
+    // are sized in squares and grow with the zoom, so nothing is redrawn.
+    const bucket = mode === 'near' ? NEAR_LINES : Math.round(Math.log2(cam.zoom) * 2);
     if (bucket !== this.fenceBucket) {
       this.fenceBucket = bucket;
       this.drawFences();
@@ -644,19 +704,28 @@ class PixiFarmMap implements FarmMap {
 
   /** One screen pixel in world units, at the zoom step the lines were last drawn for. */
   private px(): number {
-    return 1 / Math.pow(2, this.fenceBucket / 3);
+    return 1 / Math.pow(2, this.fenceBucket / 2);
   }
 
-  /** Step the pixel ratio down if dragging and zooming have been slow for a while. */
-  private watchSpeed(): void {
-    const now = performance.now();
+  /**
+   * Step the pixel ratio down on a screen that is struggling. Frames that
+   * follow each other closely are a drag, a pinch or something moving. If a
+   * run of them comes slowly, the map draws fewer pixels from then on.
+   */
+  private watchSpeed(now: number): void {
+    const gap = now - this.lastDrawnAt;
+    this.lastDrawnAt = now;
     const list = this.slowFrames;
-    list.push(now);
-    if (list.length < 40) return;
-    const span = now - list[0]!;
+    if (gap > 80) {
+      // A pause. Whatever came before was not one run of frames.
+      list.length = 0;
+      return;
+    }
+    list.push(gap);
+    if (list.length < STRUGGLE.frames) return;
+    const slow = struggling(list);
     list.length = 0;
-    // 40 moves should take about 0.65 s at 60 frames a second.
-    if (span > 1100 && span < 4000 && this.pixelRatio > 1 && now - this.lastStepDown > 3000) {
+    if (slow && this.pixelRatio > 1 && now - this.lastStepDown > 3000) {
       this.lastStepDown = now;
       this.pixelRatio = Math.max(1, this.pixelRatio - 0.5);
       this.app.renderer.resize(this.vp.width, this.vp.height, this.pixelRatio);
@@ -668,6 +737,11 @@ class PixiFarmMap implements FarmMap {
   // -------------------------------------------------------------------------
 
   setView(view: FarmView): void {
+    if (view.viewVersion !== FARM_VIEW_VERSION) {
+      throw new Error(
+        `The map draws farm view version ${FARM_VIEW_VERSION}. It was given version ${view.viewVersion}.`,
+      );
+    }
     const t0 = performance.now();
     const first = this.view === null;
     const prevLooks = this.looks;
@@ -689,13 +763,25 @@ class PixiFarmMap implements FarmMap {
     }
     const fencesKey = JSON.stringify([view.fences, view.gates, view.squares.paddock]);
     const fencesChanged = fencesKey !== this.keys.fences;
+    const parts: Record<string, number> = {};
+    let mark = performance.now();
+    const lap = (name: string): void => {
+      const now = performance.now();
+      parts[name] = Math.round((now - mark) * 10) / 10;
+      mark = now;
+    };
+    lap('looks');
     if (anyChanged || fencesChanged) {
       paintGround(view, this.looks, this.groundPixels.data);
       this.groundCanvas.getContext('2d')!.putImageData(this.groundPixels, 0, 0);
       this.groundSprite.texture.source.update();
+      lap('ground');
       this.drawFar();
+      lap('fields');
     }
-    for (let r = 0; r < GRID_H; r++) if (changedRows[r]) this.buildTufts(r);
+    // The standing grass is rebuilt a few rows a frame, so a new day never
+    // holds the page up. Until a row is rebuilt it shows yesterday's grass.
+    for (let r = 0; r < GRID_H; r++) if (changedRows[r]) this.tuftsStale[r] = 1;
 
     if (fencesChanged) {
       this.keys.fences = fencesKey;
@@ -715,12 +801,14 @@ class PixiFarmMap implements FarmMap {
       this.drawPipe();
       this.drawRing();
     }
+    lap('fencesAndThings');
     const placement = placementKey(view) + view.district + this.everyBeast;
     if (placement !== this.keys.placement) {
       this.keys.placement = placement;
       this.placements = placeCattle(view, { everyBeast: this.everyBeast });
       this.buildCattle();
     }
+    lap('cattle');
     const labelsKey = JSON.stringify([
       view.paddocks.map((p) => [p.id, p.name, p.ha, p.labelCell, p.label, p.water]),
       view.plantings.map((p) => [p.id, p.name, p.labelCell, p.squares, p.selfSown, p.oversown]),
@@ -736,6 +824,8 @@ class PixiFarmMap implements FarmMap {
     this.refreshWashes();
     this.applyLight();
     this.applyCamera();
+    lap('labelsAndRest');
+    this.lastViewParts = parts;
     this.lastViewMs = performance.now() - t0;
   }
 
@@ -863,7 +953,7 @@ class PixiFarmMap implements FarmMap {
     const g = this.footprints.clear();
     for (const p of this.placements) {
       for (const c of p.cells) g.rect(colOf(c), rowOf(c) * K, 1.02, K + 0.02);
-      g.fill({ color: 0x281a0a, alpha: 0.2 });
+      g.fill({ color: 0x281a0a, alpha: 0.14 });
     }
   }
 
@@ -1022,12 +1112,12 @@ class PixiFarmMap implements FarmMap {
     }
 
     // ---- Zoomed in: a ground shadow, posts every half square, and the wires standing above the ground.
-    const w = Math.max(PX.nearWire * px, 0.036);
+    const w = NEAR_WIRE;
     for (const r of runs) path(near, r, 0, false);
     near.stroke({ color: 0x140c04, width: w * 1.6, alpha: 0.4 });
     for (const code of Object.keys(post).map(Number)) {
       const ph = POST_HEIGHT[code]!;
-      const pw = Math.max(PX.nearPost * px, code === VIEW_FENCE.boundary ? 0.04 : 0.032);
+      const pw = code === VIEW_FENCE.boundary ? 0.05 : 0.042;
       let any = false;
       for (const r of runs) {
         if (r.code !== code) continue;
@@ -1300,7 +1390,17 @@ class PixiFarmMap implements FarmMap {
       const fits = widthPx >= 130;
       l.full.visible = fits;
       l.small.visible = !fits;
-      l.root.position.set(Math.round(s.x), Math.round(s.y + 15));
+      // The bore must stay easy to find: a label that would sit over the
+      // windmill steps to one side of it.
+      let x = s.x;
+      if (this.view) {
+        const bore = this.view.water.bore;
+        const b = worldToScreen(cam, vp, colOf(bore) + 0.5, (rowOf(bore) + 0.62) * K);
+        const half = (fits ? l.full.width : l.small.width) / 2 + 0.6 * cam.zoom + 4;
+        const overTower = s.y + 34 > b.y - 2 * cam.zoom && s.y < b.y;
+        if (overTower && Math.abs(x - b.x) < half) x = b.x + (x >= b.x ? half : -half);
+      }
+      l.root.position.set(Math.round(x), Math.round(s.y + 15));
     }
     for (const p of this.pinned) {
       const alpha = p.when === 'far' ? lod.far : p.when === 'near' ? lod.near : 1;
@@ -1521,6 +1621,7 @@ class PixiFarmMap implements FarmMap {
       cattleDrawn,
       tuftPieces,
       lastViewMs: Math.round(this.lastViewMs * 10) / 10,
+      lastViewParts: { ...this.lastViewParts },
       pixelRatio: this.pixelRatio,
       zoom: Math.round(this.cam.zoom * 10) / 10,
       lod: this.lod.mode,
@@ -1533,61 +1634,107 @@ class PixiFarmMap implements FarmMap {
    * frame times. A third of the run is zoomed out, a third is zoomed in with
    * as much of the farm on screen as fits, and a third zooms in and out
    * through the change of detail.
+   *
+   * Paced (the default), frames follow the screen, and the figures are what
+   * a player would see. Unpaced, frames are drawn back to back and each one
+   * waits for the graphics card to finish, so the figure is the whole cost
+   * of a frame. That works in a background tab, where the browser holds
+   * paced frames back to about one a second.
    */
   bench(options: BenchOptions = {}): Promise<BenchResult> {
     const seconds = options.seconds ?? 6;
+    const paced = !options.unpaced;
     const saved = { ...this.cam };
     const frames: number[] = [];
     const draws: number[] = [];
+    const parts: [number[], number[], number[]] = [[], [], []];
     const vp = this.vp;
     const lo = minZoom(vp);
     const nearAll = Math.min(MAX_ZOOM, Math.max(31, containZoom(vp)));
+    const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
+    // Finish any grass still waiting, so the run measures a settled map.
+    this.rebuildGrass(Infinity);
+    const pixel = new Uint8Array(4);
     if (this.raf) {
       cancelAnimationFrame(this.raf);
       this.raf = 0;
     }
+    /** Draw the frame at point t (0 to 1) of the path. Returns how long it took. */
+    const draw = (t: number, now: number, dt: number): number => {
+      const sweep = Math.sin(t * Math.PI * 6);
+      let cam: Camera;
+      if (t < 1 / 3) cam = { zoom: lo * 1.15, x: WORLD_W / 2 + sweep * 3, y: WORLD_H / 2 };
+      else if (t < 2 / 3) cam = { zoom: nearAll, x: WORLD_W / 2 + sweep * 16, y: WORLD_H / 2 };
+      else {
+        const z = lo * Math.pow(Math.max(1.01, 60 / lo), 0.5 + 0.5 * Math.sin(t * Math.PI * 8));
+        cam = { zoom: z, x: WORLD_W / 2 + sweep * 6, y: WORLD_H / 2 + sweep };
+      }
+      const d0 = performance.now();
+      this.cam = clampCamera(cam, vp);
+      this.applyCamera();
+      if (this.raf) {
+        cancelAnimationFrame(this.raf);
+        this.raf = 0;
+      }
+      this.animate(now, dt);
+      this.app.renderer.render(this.app.stage);
+      // Reading one pixel back makes the graphics card finish the frame first.
+      if (!paced && gl && !options.processorOnly)
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      this.framesDrawn++;
+      const took = performance.now() - d0;
+      draws.push(took);
+      parts[t < 1 / 3 ? 0 : t < 2 / 3 ? 1 : 2].push(took);
+      return took;
+    };
     return new Promise((resolve) => {
+      const finish = (): void => {
+        this.cam = clampCamera(saved, vp);
+        this.applyCamera();
+        const s = this.stats();
+        resolve({
+          paced,
+          frame: frameStats(frames),
+          draw: frameStats(draws),
+          parts: {
+            zoomedOut: frameStats(parts[0]),
+            zoomedIn: frameStats(parts[1]),
+            zooming: frameStats(parts[2]),
+          },
+          cattleDrawn: s.cattleDrawn,
+          head: s.head,
+          tuftPieces: s.tuftPieces,
+          pixelRatio: this.pixelRatio,
+          width: vp.width,
+          height: vp.height,
+          seconds,
+        });
+      };
+      if (!paced) {
+        // The same path, cut into as many frames as 60 a second would give.
+        const total = Math.max(1, Math.round(seconds * 60));
+        let k = 0;
+        const batch = (): void => {
+          if (this.destroyed) return;
+          for (let n = 0; n < 6 && k < total; n++, k++) {
+            draw(k / total, (k * 1000) / 60, 1000 / 60);
+          }
+          if (k < total) setTimeout(batch, 0);
+          else finish();
+        };
+        batch();
+        return;
+      }
       const t0 = performance.now();
       let last = t0;
       const step = (now: number): void => {
         if (this.destroyed) return;
         const t = (now - t0) / (seconds * 1000);
         if (t >= 1) {
-          this.cam = clampCamera(saved, vp);
-          this.applyCamera();
-          const s = this.stats();
-          resolve({
-            frame: frameStats(frames),
-            draw: frameStats(draws),
-            cattleDrawn: s.cattleDrawn,
-            head: s.head,
-            tuftPieces: s.tuftPieces,
-            pixelRatio: this.pixelRatio,
-            width: vp.width,
-            height: vp.height,
-            seconds,
-          });
+          finish();
           return;
         }
-        const sweep = Math.sin(t * Math.PI * 6);
-        let cam: Camera;
-        if (t < 1 / 3) cam = { zoom: lo * 1.15, x: WORLD_W / 2 + sweep * 3, y: WORLD_H / 2 };
-        else if (t < 2 / 3) cam = { zoom: nearAll, x: WORLD_W / 2 + sweep * 16, y: WORLD_H / 2 };
-        else {
-          const z = lo * Math.pow(Math.max(1.01, 60 / lo), 0.5 + 0.5 * Math.sin(t * Math.PI * 8));
-          cam = { zoom: z, x: WORLD_W / 2 + sweep * 6, y: WORLD_H / 2 + sweep };
-        }
-        this.cam = clampCamera(cam, vp);
-        this.applyCamera();
-        if (this.raf) {
-          cancelAnimationFrame(this.raf);
-          this.raf = 0;
-        }
-        const d0 = performance.now();
-        this.animate(now, now - last);
-        this.app.renderer.render(this.app.stage);
-        this.framesDrawn++;
-        draws.push(performance.now() - d0);
+        draw(t, now, now - last);
         if (now > t0) frames.push(now - last);
         last = now;
         requestAnimationFrame(step);
