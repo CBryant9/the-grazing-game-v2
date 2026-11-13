@@ -23,9 +23,43 @@
       "docs": "https://app.nlrsreports.mla.com.au/statistics/documentation",
       "baseUrl": "https://api-mlastatistics.mla.com.au",
       "note": "Reformatted: values rounded to 2 decimal places, head to whole numbers, one file per series. Daily rows as served. An indicator row holds the last 7 days of sales, so a value repeats until the next sale."
+    },
+    "abs": {
+      "name": "Australian Bureau of Statistics, Consumer Price Index, Australia (ABS data service)",
+      "credit": "Source: Australian Bureau of Statistics, Consumer Price Index, Australia.",
+      "licence": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "licencePage": "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+      "note": "Reformatted: one series, two columns (quarter, index number). Values as served."
     }
   },
   "files": [
+    {
+      "path": "abs/cpi-all-groups.csv",
+      "source": "abs",
+      "kind": "cpi",
+      "what": "Consumer Price Index, All groups CPI, index numbers, original, Australia, quarterly",
+      "url": "https://data.api.abs.gov.au/rest/data/ABS,CPI/1.10001.10.50.Q?startPeriod=1990-Q1&format=csvfilewithlabels",
+      "series": {
+        "dataflow": "ABS:CPI",
+        "key": "1.10001.10.50.Q",
+        "measure": "Index numbers",
+        "index": "All groups CPI",
+        "adjustment": "Original",
+        "region": "Australia",
+        "frequency": "Quarterly"
+      },
+      "columns": [
+        "quarter",
+        "index"
+      ],
+      "units": {
+        "index": "index number, Sep 2025 = 100.0"
+      },
+      "first": "1990-Q1",
+      "last": "2026-Q3",
+      "rows": 147,
+      "pulled": "2026-11-14"
+    },
     {
       "path": "mla/national/eastern-young-cattle.csv",
       "source": "mla",

@@ -28,8 +28,9 @@ import { knockDownTape } from '../farm/layout';
 import { paddockSummary } from '../pasture/summary';
 import { LAND } from '../pasture/state';
 import { farmHash } from '../save/save';
+import { loadRealData } from '../server';
 import { createFarm } from './create';
-import { plantingsNow, surveyOf } from './derived';
+import { dateOn, plantingsNow, surveyOf } from './derived';
 import { cloneFarm, type FarmState } from './state';
 import { farmTotals, paddockSummaries } from './summary';
 import { stepDay } from './tick';
@@ -662,6 +663,50 @@ describe('the farm view says what the model says', () => {
     expect(view.paddocks.every((p) => p.parts.length !== 1)).toBe(true);
     const grazingOnly = farmView(runningFarm());
     expect(grazingOnly.paddocks.every((p) => p.parts.length === 0)).toBe(true);
+  });
+});
+
+describe('the farm view of a farm that plays real years', () => {
+  const data = loadRealData();
+  const realFarm = (): FarmState =>
+    createFarm(
+      {
+        seed: 7,
+        district: 'cw',
+        size: 'small',
+        start: { year: 2025, month: 0 },
+        startType: 'running',
+        difficulty: 'medium',
+        years: { kind: 'real', order: 'in-order' },
+      },
+      { data },
+    );
+
+  it('needs the real data, as every read of the weather does', () => {
+    expect(() => farmView(realFarm())).toThrow(/real/);
+  });
+
+  it('reports the real date and the light of that date, not the farm calendar', () => {
+    const farm = realFarm();
+    // In order from 2025 the year after is 1997.
+    for (let d = 0; d < 366; d++) stepDay(farm, { data });
+    const view = farmView(farm, { data });
+    expect(view.date).toEqual(dateOn(farm));
+    expect(view.date.year).toBe(1997);
+    expect(dateAt(farm.start, farm.day).year).toBe(2026);
+    const light = daylightFor(DISTRICT_PLACES.cw, dateOn(farm));
+    expect(view.light).toEqual({
+      first: Math.round(light.firstLight),
+      last: Math.round(light.lastLight),
+    });
+    expect(problems(view)).toEqual([]);
+  });
+
+  it('holds nothing about the years to come', () => {
+    const text = JSON.stringify(farmView(realFarm(), { data }));
+    for (const word of ['dataVersion', 'firstYear', 'order', 'seed":7', 'indicator']) {
+      expect(text.includes(word), word).toBe(false);
+    }
   });
 });
 

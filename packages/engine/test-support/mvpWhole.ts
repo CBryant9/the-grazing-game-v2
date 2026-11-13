@@ -22,6 +22,7 @@ import { applyAction } from '../src/actions/apply';
 import type { Action, ActionResult } from '../src/actions/types';
 import { dateAt, monthIndex } from '../src/calendar';
 import type { Animal } from '../src/cattle/types';
+import { asStandIn } from '../src/market/standIn';
 import { infraInPlace } from '../src/money/worth';
 import { rngFromState, rngStream, type Rng } from '../src/rng';
 import { HERD_STREAM } from '../src/sim/create';
@@ -366,10 +367,11 @@ export function putWholeFarm(loaded: LoadedMvpWhole, farm: FarmState): void {
   S.broke = farm.broke;
   S.energiser = farm.energiser;
   S.infra = infraInPlace(farm);
-  S.R = farm.market.indicator;
-  S.noise = farm.market.noise;
-  S.cn = { ...farm.market.drift };
-  S.ext = farm.market.ext.slice();
+  const market = asStandIn(farm.market);
+  S.R = market.indicator;
+  S.noise = market.noise;
+  S.cn = { ...market.drift };
+  S.ext = market.ext.slice();
   S.ph = [];
   const f0 = seasonsOf(farm).factorsOn(0);
   S.rainF = f0.seasonF;
@@ -453,11 +455,12 @@ export function farmDifferences(farm: FarmState, mvp: MvpWhole, o: CompareOption
   same('days eaten out', farm.noFeedDays, S.noFeed);
   same('game over', !!farm.over, !!S.over);
   same('indicator', farm.market.indicator, S.R);
-  same('market noise', farm.market.noise, S.noise);
-  for (const k of Object.keys(farm.market.drift)) {
-    same(`class drift ${k}`, farm.market.drift[k as keyof typeof farm.market.drift], S.cn[k]);
+  const market = asStandIn(farm.market);
+  same('market noise', market.noise, S.noise);
+  for (const k of Object.keys(market.drift)) {
+    same(`class drift ${k}`, market.drift[k as keyof typeof market.drift], S.cn[k]);
   }
-  sameArray('market series past 2025', farm.market.ext, S.ext);
+  sameArray('market series past 2025', market.ext, S.ext);
   same('next mob id', farm.nextMobId, S.mobSeq);
   if (!o.skipNextTag) same('next tag', farm.animalIds.next, S.nid);
 

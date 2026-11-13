@@ -209,8 +209,63 @@ Each edge is halfway between two of the MVP's season factors, except 0.8. That o
 - **In order:** each next year in turn. After the newest playable year it goes back to 1997.
 - **At random:** every playable year once, shuffled from the farm's seed, then all of them again in a new shuffle. The same year never comes up twice running. Each round of the shuffle has its own stream, `real-years:<round>`. The first year can be chosen or left to the shuffle.
 - **The real date behind a farm day** (`realDateOn`): the farm's own calendar runs straight on from its start. Each game year is moved, whole, onto its real year, keeping the month and day. Within a game year the real days run on without a break, so a growing season that crosses New Year stays in one piece. If the farm calendar has 29 February and the real year does not, 28 February is read twice. A real 29 February the farm calendar does not have is passed over. In order, the real date is the farm calendar date until the newest playable year has been played. After that the game goes back to 1997 and the two part: a farm that starts in 2025 reads 1 January 1997 on day 365.
-- **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025.
-- Weather and prices should both read the real date from the same plan, so they agree on the day.
+- **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025. On a farm the list is cut again to the years the prices and the sale calendar cover (`DistrictRealData.years`). As pulled that is 1997 to 2025 for a start in any month from January to November, and 1997 to 2024 for a December start.
+- Weather, prices and sale days all read the real date from the same plan, so they agree on the day.
+
+### A real-year farm (milestone 1.4, wired in)
+
+Code: `sim/create.ts`, `sim/derived.ts`, `sim/tick.ts`, `real/realData.ts`, `server/realDataFiles.ts`. Tests: `sim/realYears.test.ts`.
+
+**Making one.** `createFarm(options, env)` takes `years`:
+
+- left out, or `{ kind: 'random' }`: the MVP's random seasons and the stand-in market. Such a farm runs exactly as it did before real years were wired in, bit for bit.
+- `{ kind: 'real', order: 'in-order' | 'random' }`: real years. `start.month` is the start month. `start.year` is the first real year and can be left out: in order the oldest year is then used, and at random the first year is drawn from the seed. A first year that can't be played is refused.
+
+On a real-year farm the pasture run-up uses the real weather before the start (above), the market opens on the real prices of day 0, and a running farm's herd is valued at those prices.
+
+**How the engine gets the tables.** Engine model code never reads a file, and a save never holds a table. The server (or a test) builds one bundle, once, and passes it as `data` in the `env` of `createFarm`, `stepDay`, `applyAction` and the summaries:
+
+```
+import { loadRealData } from '@gg/engine/server';   // server code and tests only
+const data = loadRealData();
+const farm = createFarm({ ..., years: { kind: 'real', order: 'in-order' } }, { data });
+stepDay(farm, { data });
+```
+
+The bundle (`RealData`) is given one thing, a way to get a table's text by its path, and reads a district's tables the first time that district is asked for: its SILO weather, the six national and six yard cattle indicators, the yard's yardings and the CPI. A test can build a bundle from changed or made-up tables with `buildRealData(reader)`.
+
+**What the farm keeps.** Only what it needs to lay its years out again and to price stock today: the order, the first year, the oldest and newest year that could be played when it started, the data version, and today's prices (`farm.seasons`, `farm.market`). A real-year farm's save is the same size as any other.
+
+**The data version.** Each district's data has a version: 16 hex digits worked from the text of every table that district's farms read. A farm records the version it started on. `stepDay`, `applyAction` and the summaries refuse data of any other version, so a later pull can't change a running farm's past without anyone knowing. Any change to any of those tables changes the version, including a pull that only adds new days. Moving a running farm to new data is not built: it is a decision for the server milestone (the same question as moving a farm to a new engine version, PRD 14.3).
+
+**Failing loudly.** A real-year farm with no `data` in the `env` stops with an error in `stepDay`, in every `applyAction` (whether or not the action reads the weather) and in the summaries that read the season. Nothing on the farm changes. It never falls back to random seasons or the stand-in market. Today's prices and the date are on the farm itself, so `pricesOf`, `mobSummaries` and `dateOn` work without the bundle.
+
+**A season source handed in.** `env.seasons` still replaces the farm's growth factors, as on any farm (the calibration runs use it for the average year). The prices, the date and the sale days stay real, and the bundle is still needed.
+
+### The calendar on a real-year farm
+
+Two calendars run side by side, and they are kept in step by how the real date is made:
+
+- **The farm calendar** is `dateAt(farm.start, day)`: an ordinary calendar that runs straight on from the farm's first day. `farm.start` is the first real year and the start month. The grass, the crops, the water and the 1 July and 1st-of-the-month events read their month and day from it, exactly as on a farm with random seasons.
+- **The real date** is `realDateOn(day)`: the farm calendar's month and day, in the real year of the game year the day falls in. It is what the weather, the prices and the sale days are read by, and it is the date the game reports (`DayResult.date`, `farmTotals().date`, `dateOn(farm)`).
+
+So the month and day the grass grows by are the real date's month and day. A new season is reported on the real 1 July, and ground cover is read on the real 1st of each month. There is one kind of day where the two differ:
+
+| Case | What happens |
+|---|---|
+| In order, from the start until the newest year has been played | The real date is the farm calendar date, every day, leap days included. From 1997 that is 29 years with nothing out |
+| In order, after the newest year | The game goes back to the oldest year. A farm that started in 2025 reads 1 January 1997 on day 365. The weather, the prices and the date all jump together. The pasture and the cattle carry over as they are |
+| The farm calendar has 29 February and the real year does not | The real date reads 28 February again. That day's weather, prices and sale day are used twice. The grass reads 29 February from the farm calendar. At most one day in a year |
+| The real year has 29 February and the farm calendar does not | The real 29 February is passed over. It is not played |
+| At random | Every game year is some real year, whole. One year ends on the day before the start month's 1st and the next begins on the 1st, in another real year. The two leap-day cases above can come up in any year |
+
+**The year closes when the game year ends** on a real-year farm: on the last day before the start month's 1st, 365 or 366 days after it opened. So each scored year is exactly one real year, and the year's record carries that year (`YearRecord.realYear`). The score still counts years 1, 2, 3 (`YearRecord.n`). A farm with random seasons closes its year every 365 days, as the MVP does.
+
+**A real year is scored on its own prices.** The year closes on the prices of its own last day, before the market moves to the next day. That next day can belong to any real year (years at random, or back to 1997 after the newest), and a jump in prices between two real years is in neither year's score: the year that closed is valued at its last day's prices (`worth1`), and the new year opens valued at its own first day's prices (`worth0`). With years in order before the wrap the two days are one real day apart, so the two figures differ only by a day's price move. A farm with random seasons closes its year after the market has moved, as the MVP did.
+
+**The 1 July "new season" event on a real-year farm** reports the season of the 12 months just gone, because the season factor is a rolling 365-day figure (above). It does not say what the season ahead will be. The label can also change on any other day, and no event marks that. On a farm with random seasons the event is the new season drawn for the year ahead. The screens must word the two differently. A question for Claudia (CALIBRATION.md, real years, CHECK 3).
+
+Not changed: running costs are still a 365th of the yearly figure each day, so a 366-day year costs one day more.
 
 ### The run-up
 
@@ -492,6 +547,7 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 
 ### The day, as built
 
+0. **A real-year farm checks its real data first.** With no data bundle, or one of another version, the day stops with an error before anything changes (section 1A).
 1. **Season and month factor** for the day, from the season source. On the 1st of a month the farm's ground cover is read for the year's score, before anything grows or is eaten. A new season on 1 July is reported (not on the farm's first day).
 2. **Crop events** (`fieldTick`).
 3. **Grass growth**. The feed grown is added to the year's total.
@@ -501,7 +557,7 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 7. **Running costs and interest.** Overheads are $4,000 + $0.60 a hectare a year. Animal health is the district's figure a head a year, counted on every head, calves included. Both are charged a 365th each day. Interest is worked on the balance after the day's feed bill and before the day's running costs: 9.5% a year on an overdraft, 3% a year earned on money in the bank.
 8. **Grazing plans** move mobs here. Plans are a later milestone. The place for them is `sim/plans.ts`: the cattle step already takes a mob's stops for the day.
 9. **The day counter goes up, then the market moves** to the new day. Mobs with no cattle left are dropped.
-10. **The year closes** every 365 farm days (not on a calendar date, and leap years make no difference). The year is scored and filed, and a new one opens at the farm's net worth.
+10. **The year closes.** On a farm with random seasons that is every 365 farm days (not on a calendar date, and leap years make no difference). On a real-year farm it is when the game year ends, 365 or 366 days after it opened, so each scored year is one real year (section 1A, "The calendar on a real-year farm"). The year is scored and filed, and a new one opens at the farm's net worth.
 11. **Game over** if cash is at or past the bank's limit. Otherwise, if there are cattle on pasture, the feed cattle can reach is averaged over every square of the farm: `max(0, G + D − 250)`. Under 40 kg DM/ha counts as eaten out. A warning event goes out on the first day, and after 10 days in a row the game is over. Cattle in the feedlot don't count, and the count starts again on any day the farm is not eaten out or has no cattle on pasture.
 
 Once the game is over the tick does nothing and every action is refused.
@@ -543,7 +599,28 @@ One number is drawn for each beast that is not a calf at its dam's side, from th
 
 ### The market, behind an interface
 
-The engine reads prices through a `PriceSource`: the market on day 0, a step to each new day, and today's prices (the young cattle indicator and a price for each class). Milestone 1.4 puts real MLA data behind it. Until then the source is the MVP's mechanism, matched exactly (`market/standIn.ts`): the approximate 2019 to 2025 monthly series joined mid-month to mid-month, the random walk after it, the daily wobble and the slow drift of each class. See DATA.md, Market.
+The engine reads prices through a `PriceSource`: the market on day 0, a step to each new day, and today's prices (the young cattle indicator and a price for each class). There are two sources, and a farm has one or the other for its whole life.
+
+**The stand-in market** (`market/standIn.ts`) is the MVP's mechanism, matched exactly: the approximate 2019 to 2025 monthly series joined mid-month to mid-month, the random walk after it, the daily wobble and the slow drift of each class. See DATA.md, Market. A farm with random seasons has this one.
+
+**The real market** (`market/realMarket.ts`, milestone 1.4) is for a real-year farm. On each farm day:
+
+```
+real date   = realDateOn(day)                                  (section 1A)
+figure(i)   = indicator i at the district yard on the real date (the fill-in rules, DATA.md)
+class price = figure(the class's indicator) × the class's multiple (the mapping, DATA.md)
+indicator   = figure(restocker yearling steer)
+in today's dollars: every price × CPI(September quarter 2026) ÷ CPI(the real date's quarter)
+```
+
+- The mapping from MLA's indicators to the game's classes is **proposed, for Claudia**. It, the fill-in rules, the yard premiums, the feeder stand-in before June 2003 and the CPI are all in DATA.md ("Real prices: indicators to classes" and "Inflation").
+- There is no random part. The real market never draws from the market stream, and has no daily wobble or class drift of its own: the real figures move by themselves.
+- The farm keeps only today's prices and which dollars they are in (`farm.market`). So today's prices can be read with no tables to hand. Moving the market to a new day needs the data bundle.
+- Inflation has one switch, `REAL_PRICE_DOLLARS`: `today` (the default) or `of-the-day`. A farm keeps the setting it started with.
+- With years at random, or in order after the newest year, the market on the first day of a game year is another real year's market, so prices step between the last day of one game year and the first of the next. The step is in neither year's score (section 1A, "A real year is scored on its own prices"), but the player's stock is worth more or less overnight.
+- Cattle only. The sheep tables are not read yet.
+
+**Sale days** (`market/saleCalendar.ts`). A real-year farm can ask whether its district yard holds a cattle sale on a farm day, of what type, and when the next one is (`saleDayOn`, `nextSaleDay`). Past years use the days the yard really sold, with a weekly stand-in for the stretches MLA has nothing for (DATA.md, "Sale calendars"). Nothing uses the calendar yet: buying and selling are still instant. Booking stock onto a sale, and delivery, are milestone 1.5.
 
 What an animal is worth is the MVP's rule and does not depend on the source: its class price, the condition adjustments, the pregnancy premium, 5% commission and $30 a head.
 
@@ -590,7 +667,7 @@ Each part draws from its own named stream, and each stream's state is saved with
 
 ### Saves and the farm hash
 
-`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
+`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. The save format is 2 from milestone 1.4: a farm's `seasons` and `market` can be a real-year farm's. A format 1 save loads as it is, because nothing was added to a farm with random seasons. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
 
 `farmHash` is 16 hex digits worked from the whole saved form, with keys in order. The same seed and the same actions always give the same hash.
 
@@ -603,6 +680,6 @@ Each part draws from its own named stream, and each stream's state is saved with
 - Selling a very small calf can net less than $0 (its value less 5% and $30), and that is what is banked. Net worth never counts a beast below $0.
 - The energiser is counted in net worth but not in the year's "spent on infrastructure" total.
 - Weaners from a mob in the feedlot are sent out to a paddock, not kept in the feedlot.
-- The year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year.
+- On a farm with random seasons the year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year. (A real-year farm closes its year when the real year ends.)
 - A harvest goes by the season the last day ran on, so a crop harvested on 1 July before the day runs is scored on the old season.
 - A hungry mob with no tape round it still uses a number from the breakouts stream each day.

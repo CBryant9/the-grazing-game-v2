@@ -16,12 +16,16 @@ import { FARM_SIZES } from '../data/farms';
 import { generateFarm, type StartType } from '../farm/generate';
 import type { GrazingArea as TopologyArea } from '../farm/topology';
 import { buyPrice } from '../market/prices';
+import { realMarket, type RealMarket } from '../market/realMarket';
 import { standInMarket } from '../market/standIn';
 import { carryingCapacityAE, startMoney, type Difficulty, type StartMoney } from '../money/costs';
 import { newYear } from '../money/worth';
 import { rngStream, type Rng, type RngState } from '../rng';
+import type { GrowthFactorSource } from '../season/factors';
+import { planRealYears, type YearOrder } from '../season/realYears';
+import { weatherSeasons } from '../season/weatherSeasons';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
-import { placeAnchor, pricesOf, seasonsOf, surveyOf } from './derived';
+import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
 import type { FarmStarted, StartHerd } from './events';
 import { mergeShared, newMob } from './mobs';
 import {
@@ -29,7 +33,9 @@ import {
   emptyLedger,
   toInbox,
   type FarmState,
+  type MarketState,
   type PlayStream,
+  type RealYearsSpec,
   type YearTotals,
 } from './state';
 
@@ -42,8 +48,22 @@ export interface CreateFarmOptions {
   district: DistrictId;
   /** One of the district's three sizes, or a size in hectares. */
   size: FarmSizeName | number;
-  /** The farm starts on the 1st of this month. */
-  start: FarmStart;
+  /**
+   * The farm starts on the 1st of this month (0 is January).
+   *
+   * With random seasons the year is needed. With real years the year is
+   * the first real year played, and can be left out: in order the oldest
+   * year is then used, and at random the first year is drawn from the seed.
+   */
+  start: { year?: number; month: number };
+  /**
+   * The years the farm plays (PRD 5.14). Left out, or `random`: the MVP's
+   * random seasons with the stand-in market. `real`: real years from 1997,
+   * each with its real weather and real prices, as they happened
+   * (`in-order`) or shuffled from the seed (`random`). After the newest
+   * year an in-order farm goes back to the oldest.
+   */
+  years?: { kind: 'random' } | { kind: 'real'; order: YearOrder };
   /** Start from scratch (no cattle), or take over a running farm with its herd. */
   startType: StartType;
   /** A mixed farm: the arable share of the farm and the share of that in the rotation, both %. */
@@ -108,17 +128,79 @@ export function startHerd(farm: FarmState, rng: Rng): StartHerd | null {
   return { cows, bulls, weaners, ae, share };
 }
 
-/** Build a new farm. */
-export function createFarm(o: CreateFarmOptions): FarmState {
+/** What a real-year farm is set up with: its years, its weather and its market on day 0. */
+interface RealStart {
+  spec: RealYearsSpec;
+  start: FarmStart;
+  seasons: GrowthFactorSource;
+  market: RealMarket;
+}
+
+/** Lay out a real-year farm's years and open its market, from the real data. */
+function startRealYears(o: CreateFarmOptions, order: YearOrder, env: SourceEnv): RealStart {
+  if (!env.data) {
+    throw new Error(
+      'A real-year farm needs the real weather and price tables: pass the real data bundle as `data`.',
+    );
+  }
+  const data = env.data.district(o.district);
+  const years = data.years(o.start.month);
+  if (!years.length) throw new Error('The real data has no year that can be played.');
+  const first = years[0]!;
+  const last = years.at(-1)!;
+  // The farm saves only the oldest and newest year, so there must be none missing between.
+  if (last - first + 1 !== years.length) {
+    throw new Error('The real years that can be played must run on with none missing.');
+  }
+  const plan = planRealYears({
+    years,
+    order,
+    seed: o.seed,
+    startMonth: o.start.month,
+    firstYear: o.start.year,
+  });
+  const market = realMarket({
+    prices: data.prices,
+    cpi: data.cpi,
+    realDateOn: plan.realDateOn,
+  }).open(plan.start, rngStream(o.seed, PLAY_STREAMS.market));
+  return {
+    spec: {
+      kind: 'real',
+      order,
+      firstYear: plan.start.year,
+      years: { first, last },
+      dataVersion: data.version,
+    },
+    start: plan.start,
+    seasons: weatherSeasons({ growth: data.weather, plan }),
+    market,
+  };
+}
+
+/**
+ * Build a new farm.
+ *
+ * A real-year farm (`years: { kind: 'real', ... }`) needs the real data
+ * bundle in `env.data`. Its pasture run-up uses the real weather before
+ * its start, and its market opens on the real prices of its first day.
+ */
+export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState {
   const farmHa = typeof o.size === 'number' ? o.size : FARM_SIZES[o.district][SIZE_INDEX[o.size]];
   const running = o.startType === 'running';
+  const real = o.years?.kind === 'real' ? startRealYears(o, o.years.order, env) : null;
+  if (!real && o.start.year === undefined) {
+    throw new RangeError('A farm with random seasons needs a start year.');
+  }
+  const start: FarmStart = real ? real.start : { year: o.start.year!, month: o.start.month };
   const gen = generateFarm({
     seed: o.seed,
     district: o.district,
     farmHa,
-    start: o.start,
+    start,
     startType: o.startType,
     mixed: o.mixed,
+    seasons: real?.seasons,
   });
   const money = o.money ?? startMoney(o.district, farmHa, o.difficulty, running);
 
@@ -126,17 +208,22 @@ export function createFarm(o: CreateFarmOptions): FarmState {
   for (const name of Object.keys(PLAY_STREAMS) as PlayStream[]) {
     rng[name] = rngStream(o.seed, PLAY_STREAMS[name]).state();
   }
-  // The market opens on day 0. Past the end of its series it draws from its stream.
-  const marketRng = rngStream(o.seed, PLAY_STREAMS.market);
-  const market = standInMarket.open(o.start, marketRng);
-  rng.market = marketRng.state();
+  // The market opens on day 0. Past the end of its series the stand-in
+  // draws from its stream. The real market never draws.
+  let market: MarketState;
+  if (real) market = real.market;
+  else {
+    const marketRng = rngStream(o.seed, PLAY_STREAMS.market);
+    market = standInMarket.open(start, marketRng);
+    rng.market = marketRng.state();
+  }
 
   const farm: FarmState = {
     engineVersion: ENGINE_VERSION,
     saveFormat: SAVE_FORMAT_VERSION,
     seed: o.seed,
     district: o.district,
-    start: { year: o.start.year, month: o.start.month },
+    start: { year: start.year, month: start.month },
     startType: o.startType,
     mixed: !!o.mixed,
     arablePct: gen.arablePct,
@@ -155,7 +242,7 @@ export function createFarm(o: CreateFarmOptions): FarmState {
     mobs: [],
     animalIds: { next: 1 },
     nextMobId: 1,
-    seasons: { kind: 'random' },
+    seasons: real ? real.spec : { kind: 'random' },
     market,
     priceHistory: [],
     rng,
@@ -173,7 +260,7 @@ export function createFarm(o: CreateFarmOptions): FarmState {
   const herd = running ? startHerd(farm, rngStream(o.seed, HERD_STREAM)) : null;
   farm.year = newYear(farm);
 
-  const season = seasonsOf(farm).factorsOn(0);
+  const season = seasonsOf(farm, { data: env.data }).factorsOn(0);
   const started: FarmStarted = {
     type: 'farm-started',
     farmHa,

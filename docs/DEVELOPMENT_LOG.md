@@ -480,6 +480,93 @@ Questions for Claudia:
 - **Western Victoria** varies least (year factors 0.71 to 1.25, and a season factor under 0.8 on 9% of days). Does that match the district?
 - **The dry and wet year tables** in `CALIBRATION.md`: do the years you remember look right?
 
+### 14 Nov 2026: milestone 1.4, real years wired in
+
+Engine 0.6.0. Engine work only, no screens. Branch `m1.4c-real-years-wiring`, on top of `m1.4-real-years`.
+
+Built, all in `packages/engine` unless said:
+
+- **A farm can play real years.** `createFarm(options, env)` takes `years: { kind: 'real', order: 'in-order' | 'random' }`, with the first year in `start.year` or left out. Left out, or `{ kind: 'random' }`, is the MVP's random seasons with the stand-in market, unchanged. The farm keeps its order, first year, the years that could be played, a data version and today's prices (`farm.seasons`, `farm.market`).
+- **One way for the engine to get the tables** (`real/realData.ts`, `server/realDataFiles.ts`). The server builds one bundle with `loadRealData()` from `@gg/engine/server` and passes it as `data` in the `env` of `createFarm`, `stepDay`, `applyAction` and the summaries. Model code still reads no file, and a save holds no table. A real-year farm with no bundle, or one of another data version, stops with an error and nothing changes.
+- **The real market** (`market/priceTable.ts`, `realPrices.ts`, `realMarket.ts`): the second `PriceSource`. MLA's six cattle indicators mapped to the game's eight classes, the district yard's own figure where it has one, the national figure times the yard's premium where it has not, and a stand-in for the two feeder indicators before June 2003.
+- **Inflation** (`market/cpi.ts`): past prices in today's dollars by the Consumer Price Index, with one switch. The ABS table is in `data/raw/abs/`, pulled by the new `pnpm data:cpi` (`scripts/data/pull-cpi.mjs`).
+- **Real sale calendars** (`market/saleCalendar.ts`, `data/yards.ts`): for each district's cattle yard, whether there is a sale on a real date and of what type, with a weekly stand-in for the stretches MLA has nothing for. `saleDayOn` and `nextSaleDay` answer for a farm day.
+- **The calendar.** The date the game reports is the real date. On a real-year farm the year closes when the real year ends (365 or 366 days), and the year's record carries its real year. A farm with random seasons still closes every 365 days.
+- **Calibration on real years** (`test-support/realYearSteers.ts`, `realYearHerds.ts`, and one small test file a case in `src/calibration`): the 1.3 steers and herds suites through every start year from 1997 to 2025, on the wired-in farm.
+- The save format is now 2. A format 1 save loads as it is.
+
+How it was tested:
+
+- 1,417 tests pass in 63 files: the 1,219 from before, and 198 new ones.
+- **A farm with random seasons is unchanged.** Every test from before passes with no expected figure changed. The only edits to old tests are five places that now say which market they read (`asStandIn`), and one type cast.
+- **Seeded and repeatable.** The same seed, options and data give the same farm hash. A second bundle built from the same tables gives the same farm. Save, load and carry on equals running straight through, on four real-year farms (in order and at random, over a year end, with buying and selling), reloading every 7 days for 480 days.
+- **Failing loudly.** Stepping, acting on and summing up a real-year farm with no bundle each stop with an error and leave the farm hash as it was. So does a bundle with one rain figure changed.
+- **Prices.** Every class has a price above 0 on every day from 1997 to 2025 in all four districts. The fill-in rules are each tested either side of their figure on made-up tables (19 and 20 head, 14 and 15 days, 729 and 730 days, 21 and 22 days). The yard premiums and stand-in multiples are pinned.
+- **The CPI.** All 147 quarters match the Reserve Bank's table G1 to two decimal places (checked by hand on the day, not by a test). Six figures are pinned in a test.
+- **Sale days.** Every day in each yard's sales table is a sale day in the calendar with the same head, and no other day is unless it is a stand-in.
+- **Calibration.** 435 steer runs and 232 herd runs. The tables and what the tests hold are in `CALIBRATION.md`.
+- **42 break-it checks** across the new code (a figure or a rule changed, the tests run, the change put back): 41 failed a test at once. One did not: leaving the class prices out of the CPI lift, with the indicator still lifted. The wiring tests compared the farm's prices with the same function that makes them. `market/realMarket.test.ts` now works the lift out from the CPI figures written in the test, and the check fails (LESSONS W10 again).
+- `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:speed` and `pnpm format:check` pass.
+
+PRD defaults and builder's defaults used (each one line to change):
+
+- Earliest real year 1997 (PRD section 21, row 32). Years in order or at random, picked at setup (PRD 5.14).
+- **Inflation: prices in today's dollars by the CPI.** PRD section 21 gives no default, so this is the brief's. "Today" is fixed at the September quarter 2026. `REAL_PRICE_DOLLARS` switches it.
+- The mapping from indicators to classes, and its four multiples (weaners 1.08, bulls 0.906 of cows, calves 1.10), carried from the MVP's own spread.
+- Fill-in figures: a yard row needs 20 head, holds for 14 days, and a yard series needs 730 usable days. The premium is worked out over 1997 to 2025.
+- The feeder stand-in before June 2003: a multiple of the geometric mean of the restocker and heavy steer indicators.
+- Sale day stand-ins: a prime sale every Monday at Gracemere and Mortlake where there are no records, none from 16 December to 7 January.
+- A real-year farm's scored year is the real year. Running costs are still a 365th a day.
+- Any change to any table a district reads changes its data version, and a farm will not run on another version.
+- With no first year given: in order starts in 1997, at random draws the first year from the seed.
+
+Not done, and why:
+
+- **Nothing uses the sale calendar yet.** Buying and selling are still instant. Booking stock onto a sale and delivery are milestone 1.5, as the brief said.
+- **Sheep prices and sheep sale days** are not read. The tables are pulled and listed, and the bundle has room for them.
+- **Moving a running farm to new data** is not built. Until it is, a new pull stops every running real-year farm. That is a server milestone decision. The data versions are pinned in a test so a pull can't slip through.
+- **Daily Farm's "today" prices and weather** (fetched daily) are not built. This is past years only.
+- **The MLA credit line and the CPI credit line** are in the manifest and the docs. Nothing shows them on a screen yet.
+- **The calibration suites were run in order only**, on three steer blocks and two herds a year. Years at random are tested in the wiring tests, not in the suites.
+- **The real-year herd test does not hold the 1.5 to 3.6% deaths benchmark.** It first did, and failed on the Northern Tablelands (3.7%), because two herds are too few. It now holds real years against the same herds' average year (LESSONS Y2). The lead should look at this.
+- **The eight capital cities wording for the CPI series was not confirmed.** The ABS service labels the series "Australia". The figures match the Reserve Bank's "Consumer price index; All groups".
+- **Whether MLA's indicator weights were the same back to 1997** was not checked. The sheet read is dated December 2024.
+- **`realism-guardian` was not run.** It runs before the pull request.
+- Not looked at on a screen. There is nothing to see yet.
+- No more MLA or SILO data was pulled. The fill-in yards are not used.
+
+Found on the way:
+
+- A yard's own figure jumps from week to week with who turned up. Dubbo restocker steers read 114 and then 58 c/kg two days apart in October 2002, on 136 and 81 head.
+- Mortlake's restocker steer and heifer rows are too few to use (182 and 371 usable days) and read about 20% under the national figure.
+- Gracemere sold on Mondays to August 2004 and on Fridays when its records start again in October 2014. The day it sold on between is not in the data.
+- The season label is for the 12 months as a whole, so it can read "Below average" on a year in which unsupplemented steers lost 41% (LESSONS Y6).
+- Central West is the district the real years move most: four of 29 years lose steers heavily when nothing is done.
+
+Questions for Claudia:
+
+- **The class mapping** (`DATA.md`, "Real prices: indicators to classes"). Is each class on the right indicator? In particular: weaners at 1.08 times the restocker yearling figure, heifers of 280 kg and over on the feeder heifer figure, and bulls at 0.906 of the cow price when sold.
+- **Yard or national?** The yard's own weekly figure jumps about. Should a district play its yard's figure as it is, or the national figure shifted by the yard's usual premium, which is smoother?
+- **Western Victoria's young cattle** play on national prices, because Mortlake's own rows are too thin. Is that acceptable, or is Ballarat wanted?
+- **Central Queensland before October 2014 and Western Victoria before 2018** play on national prices times the yard's later premium. Is that acceptable, or are Emerald and Ballarat wanted?
+- **Today's dollars.** Should past prices be lifted by the CPI, as built, so a 1997 sale reads about 200 c/kg and not 90? The other choice is the prices of the day, with the game's costs left at today's level.
+- **Sale days where there are no records:** Mondays at Gracemere from 1997 to 1999 and from 2004 to 2014, and at Mortlake before 2018. Do you know the days those yards really sold?
+- **The dry and wet years.** Do the steer and herd tables in `CALIBRATION.md` look right, year by year? Central West from April 2002, 2006, 2018 and 2019 first.
+- **Central West with nothing done** loses 5 to 54% of set-stocked weaners in its four worst years. Is that the right size?
+- **Western Victoria** never drops under its band, even from April 2006. Is that right?
+- **The season label** reads the whole 12 months. Should it lean on the last few months?
+- **A 366-day year** costs one more day of overheads than a 365-day year. Leave it?
+- Still open from 1.3 and 1.4b: what a band is held on, the soil, the ceiling, and starting after a dry time.
+
+After the realism check (same milestone, before the push):
+
+- **Fixed: a real year was scored on the next year's prices.** The year closed after the market had moved to the next day. With years at random, or in order after the newest year, that day is another real year. The year now closes on its own last prices and the next opens on its own first prices (`sim/tick.ts`, MODEL.md section 1A). Tested in order past 2025 and at random.
+- **Fixed: thin national price rows were used.** The 20-head rule covered yard rows only. National rows under 20 head are now passed over, in the daily figure, the yard premiums and the feeder stand-ins. The stand-in multiples moved to 1.0169 and 0.9990. The premiums are unchanged to three places.
+- **The real-year herd deaths test now holds the band** (1.5 to 3.6%) on six herds over the years with fair weather, in place of only comparing two herds with their own average year.
+- Each fix was taken out again to confirm a test fails without it.
+- More questions for Claudia, all written up in CALIBRATION.md (real years, CHECK 8 to 10) and DATA.md: how a farm's data version should work once Daily Farm fetches data every day; which quarter "today's dollars" should be; whether a farm starting in 1997 can pay its way; and how the 1 July "new season" message should read on a real-year farm, where it reports the 12 months just gone.
+- Known gap, older than this change: the lint rule that keeps the engine out of browser code covers `apps/web/components` and `packages/render`, not `apps/web/app`. Nothing in `apps/web` imports the engine today. It is closed properly in milestone 3.2, when the browser build is tested to hold no engine.
+
 ### 14 Nov 2026: milestone 1.6a, map core
 
 The first half of milestone 1.6: the map itself and the numbers it is drawn from. Branch `m1.6a-map-core`, cut from `m1.4-real-years`. Not wired into `/play`: the game screens are milestone 1.7.

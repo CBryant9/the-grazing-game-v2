@@ -5,6 +5,7 @@ import { applyAction } from '../actions/apply';
 import type { Action } from '../actions/types';
 import { EDGE } from '../farm/topology';
 import { GRID_N } from '../grid';
+import { asStandIn } from '../market/standIn';
 import { rngStream } from '../rng';
 import { createFarm } from '../sim/create';
 import { cloneFarm, emptyLedger, type FarmState } from '../sim/state';
@@ -320,8 +321,8 @@ describe('the farm hash', () => {
       (f) => (f.mobs[0]!.name = 'Other'),
       (f) => (f.mobs[0]!.where = { kind: 'lot' }),
       (f) => (f.rng.deaths = [1, 2, 3, 4]),
-      (f) => (f.market.noise += 1e-12),
-      (f) => (f.market.drift.cow += 1e-12),
+      (f) => (asStandIn(f.market).noise += 1e-12),
+      (f) => (asStandIn(f.market).drift.cow += 1e-12),
       (f) => (f.year.grown += 1),
       (f) => (f.ledger.pipe = 1),
       (f) => (f.ledger.edges.h5 = 350),

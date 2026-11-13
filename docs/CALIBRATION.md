@@ -623,6 +623,450 @@ Each line was broken on purpose, the season tests run, and the line put back.
 - **Changes nothing:** a different step size in the scaling solver. It reaches the same figures by another route, so no test should fail.
 - **Lint:** an import of `node:fs`, an import of the server-only file reader and a `Math.random`, each put into the model code, each fail lint.
 
+### 14 Nov 2026, rebuild milestone 1.4 (real years wired in): engine 0.6.0
+
+**Two faults found by the realism check and fixed before this was pushed.** A real year was being scored on the next day's prices, which with years at random, or in order after 2025, are another year's: one Central West farm went into 31 December 2025 worth $809,926 and closed the year at $337,374 on 1 January 1997 prices. A year now closes on its own last prices. And national price rows resting on under 20 head were being used (147 c/kg on 1 head at Christmas 2004). They are now passed over. Neither changes the steer and herd tables below: those runs buy once and sell nothing, and gain and deaths do not read prices.
+
+**No model figure changed.** Engine 0.6.0 adds the real-year farm: real weather, real prices and real sale days behind `createFarm`, `stepDay` and `applyAction` (MODEL.md, section 1A and section 8). A farm with random seasons runs exactly as it did on 0.5.0, and every 1.3 benchmark test passes with no figure changed: steers, herds, grain, steers on oats, 500 head on 4 ha.
+
+This entry is the build plan's check for 1.4: "Averaged over 1997 to now, growth matches each district curve, so 1.3 still passes. Known dry and wet years look right to Claudia." The first half is held by tests, as far as it is true (below). **The second half is Claudia's to judge**, from the tables here and the ones in the 1.4b entry.
+
+**What was run.** The steers suite and the herds suite of 1.3, on real-year farms made by `createFarm` with `years: { kind: 'real', order: 'in-order' }`. So the pasture run-up, each day's growth, the prices and the date all come through the engine's own wiring, not a source passed by hand. Each run starts in a given real year and goes for 365 days.
+
+- **Steers:** weaner steers at about 60% of carrying capacity on a 260 ha block with one water, set-stocked from a scratch start, nothing sold and nothing fed but the lick where the case has it. Each case starts in its usual month (Central Qld September, Northern Tablelands October, Central West and Western Victoria April) in every year from 1997 to 2025, on seeds 1, 2 and 3. That is 435 runs.
+- **Herds:** a running farm of the district's medium size on medium difficulty, left alone from 1 September of every year from 1997 to 2025, on seeds 1 and 2. That is 232 runs.
+- **"The average year"** is the same blocks or herds as 1.3 runs them: every day at the district curve.
+- **"Season of the run"** is the season factor on the last day: the feed the weather allowed over the run's own 12 months, as a share of the district curve. **"Season before the run"** is the same figure on day 0, for the 12 months before.
+
+**How to run it again.** `pnpm test` runs both as tests (`packages/engine/src/calibration/realYearSteers.*.test.ts` and `realYearHerds.*.test.ts`, one file a case so they run side by side). To print the tables below:
+
+```bash
+GG_REAL_YEARS_RUN=1 pnpm exec vitest run packages/engine/src/calibration/realYearSteers --disable-console-intercept --no-file-parallelism
+GG_REAL_YEARS_RUN=1 pnpm exec vitest run packages/engine/src/calibration/realYearHerds --disable-console-intercept --no-file-parallelism
+```
+
+#### Steers: summary
+
+Kg a head over the year, seeds 1 to 3 together.
+
+| Case | Target | The average year | 29 real years, average | The middle year of the 29 | Lowest and highest year | Years under the band | Years over the band | Deaths, 29 years |
+|---|---|---|---|---|---|---|---|---|
+| Central Qld, no lick | 20 to 60 | 44 | 34 | 39 | -20 (2019) to 53 (2012) | 3 | 0 | 3.4% |
+| Central Qld, with lick | 75 to 130 | 131 | 124 | 126 | 93 (2019) to 137 (2010, 2012) | 0 | 11 | 1.6% |
+| Northern Tablelands | 90 to 105 | 104 | 98 | 101 | 45 (2025) to 124 (2020) | 7 | 10 | 2.5% |
+| Central West NSW | 115 to 130 | 130 | 102 | 126 | -48 (2019) to 149 (2020) | 11 | 11 | 5.8% |
+| Western Victoria | 155 to 185 | 183 | 180 | 182 | 160 (2006) to 195 (2010) | 0 | 10 | 2.3% |
+
+**What the tests hold** (each is true of these runs, and each test fails if it stops being true):
+
+1. Over the 29 real years the average gain is no higher than the top of the band, in every case.
+2. It is no higher than the same blocks gain in the average year, and not far under it. "Not far" is a guard set 3 kg past what the runs gave (10, 7, 6, 28 and 3 kg under). It is there so a change shows up. It is not a benchmark.
+3. The middle year of the 29 is inside the band, in every case.
+4. A named dry year gains less than a named wet year, on every block: Central Qld 2002 against 2010, Northern Tablelands 2018 against 2020, Central West 2019 against 2016, Western Victoria 2006 against 2016. The test also checks the weather calls the first one dry (season of the run under 0.8) and the second wet (over 1.075).
+5. In every year whose own 12 months grew average feed or better (season of the run 0.925 or more), the three blocks together lose 1.5 to 3.6% of the steers.
+6. The same run gives the same figures again.
+
+**What the tests do not hold.** A single real year is not held to its band. The build plan says "an average or better year outside the target fails". On real years that is not met, in the same way it is not met on single blocks in 1.3 (the first CHECK there, still open): the years over the band are listed under each table. Nothing was tuned.
+
+**Against the lead's rough read** (seed 1, a weather source passed by hand): Central Qld no lick 47 and with lick 129, Northern Tablelands 109, Central West 110 with a middle year of 129, Western Victoria 191. Through the wiring, seed 1 gives 46, 127, 109, 108 and 191. Central West seed 1 in 2002, 2006, 2018 and 2019 gives -21, -50, 1 and -57 kg, where the rough read had -17, -40, 34 and -61, and loses 63% of its steers in 2019 where the rough read had 65%. The small differences were not chased down. The likeliest cause is the run-up: the wired farm runs its pasture up on the real weather before the start, with the 0.85 floor.
+
+#### Steers: Central Qld, no lick
+
+| Start | Gain, kg a head (seeds 1, 2, 3) | Average | Deaths % | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 41, 23, 16 | 27 | 1.6 | Above average (1.13) | Below average (0.81) |
+| 1998 | 56, 41, 36 | 44 | 1.6 | Below average (0.81) | Above average (1.18) |
+| 1999 | 69, 46, 42 | 52 | 1.6 | Above average (1.18) | Average (1.06) |
+| 2000 | 41, 22, 14 | 26 | 1.6 | Average (1.06) | Below average (0.83) |
+| 2001 | 25, 9, 7 | 14 | 1.6 | Below average (0.83) | Well below average (0.61) |
+| 2002 | 0, -10, -3 | -4 | 17.1 | Below average (0.83) | Well below average (0.67) |
+| 2003 | 29, 18, 17 | 21 | 1.6 | Below average (0.87) | Below average (0.82) |
+| 2004 | 47, 32, 32 | 37 | 1.6 | Below average (0.85) | Average (0.94) |
+| 2005 | 54, 33, 29 | 38 | 1.6 | Average (0.95) | Well below average (0.76) |
+| 2006 | 44, 31, 30 | 35 | 1.6 | Below average (0.86) | Average (1.01) |
+| 2007 | 62, 48, 40 | 50 | 1.6 | Average (1.01) | Wet (1.50) |
+| 2008 | 57, 41, 30 | 43 | 1.6 | Wet (1.50) | Wet (1.44) |
+| 2009 | 53, 37, 30 | 40 | 1.6 | Wet (1.44) | Wet (1.31) |
+| 2010 | 59, 42, 31 | 44 | 1.6 | Wet (1.31) | Wet (1.46) |
+| 2011 | 53, 36, 28 | 39 | 1.6 | Wet (1.46) | Wet (1.42) |
+| 2012 | 65, 51, 44 | 53 | 1.6 | Wet (1.42) | Average (0.94) |
+| 2013 | 44, 30, 27 | 33 | 1.6 | Average (0.94) | Well below average (0.72) |
+| 2014 | 35, 23, 23 | 27 | 1.6 | Well below average (0.72) | Below average (0.90) |
+| 2015 | 49, 37, 35 | 40 | 1.6 | Below average (0.90) | Average (0.97) |
+| 2016 | 58, 42, 37 | 46 | 1.6 | Average (0.97) | Average (0.99) |
+| 2017 | 54, 35, 28 | 39 | 1.6 | Average (0.99) | Average (0.93) |
+| 2018 | 29, 23, 29 | 27 | 1.6 | Average (0.93) | Drought (0.59) |
+| 2019 | -20, -23, -17 | -20 | 41.1 | Below average (0.83) | Below average (0.86) |
+| 2020 | 54, 38, 36 | 42 | 1.6 | Below average (0.86) | Below average (0.83) |
+| 2021 | 48, 28, 23 | 33 | 1.6 | Below average (0.87) | Below average (0.87) |
+| 2022 | 63, 46, 43 | 51 | 1.6 | Below average (0.87) | Wet (1.35) |
+| 2023 | 39, 21, 14 | 25 | 1.6 | Wet (1.35) | Average (1.04) |
+| 2024 | 55, 40, 37 | 44 | 1.6 | Average (1.04) | Wet (1.31) |
+| 2025 | 59, 43, 34 | 45 | 1.6 | Wet (1.31) | Average (0.99) |
+| **29 years** | 46, 30, 27 | **34** (middle year 39) | 3.4 | | |
+| **The average year** | 57, 38, 39 | **44** | 1.6 | | |
+
+Under the band (20): 2001, 2002, 2019.
+Over the band (60): none.
+
+#### Steers: Central Qld, with lick
+
+| Start | Gain, kg a head (seeds 1, 2, 3) | Average | Deaths % | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 129, 121, 118 | 123 | 1.6 | Above average (1.13) | Below average (0.81) |
+| 1998 | 132, 128, 126 | 129 | 1.6 | Below average (0.81) | Above average (1.18) |
+| 1999 | 144, 133, 132 | 136 | 1.6 | Above average (1.18) | Average (1.06) |
+| 2000 | 127, 122, 120 | 123 | 1.6 | Average (1.06) | Below average (0.83) |
+| 2001 | 105, 106, 104 | 105 | 1.6 | Below average (0.83) | Well below average (0.61) |
+| 2002 | 98, 99, 108 | 102 | 1.6 | Below average (0.83) | Well below average (0.67) |
+| 2003 | 119, 116, 118 | 118 | 1.6 | Below average (0.87) | Below average (0.82) |
+| 2004 | 126, 122, 123 | 124 | 1.6 | Below average (0.85) | Average (0.94) |
+| 2005 | 131, 124, 122 | 126 | 1.6 | Average (0.95) | Well below average (0.76) |
+| 2006 | 125, 121, 123 | 123 | 1.6 | Below average (0.86) | Average (1.01) |
+| 2007 | 138, 131, 131 | 133 | 1.6 | Average (1.01) | Wet (1.50) |
+| 2008 | 141, 133, 129 | 135 | 1.6 | Wet (1.50) | Wet (1.44) |
+| 2009 | 137, 132, 131 | 133 | 1.6 | Wet (1.44) | Wet (1.31) |
+| 2010 | 145, 135, 131 | 137 | 1.6 | Wet (1.31) | Wet (1.46) |
+| 2011 | 138, 130, 130 | 133 | 1.6 | Wet (1.46) | Wet (1.42) |
+| 2012 | 137, 136, 137 | 137 | 1.6 | Wet (1.42) | Average (0.94) |
+| 2013 | 123, 124, 123 | 123 | 1.6 | Average (0.94) | Well below average (0.72) |
+| 2014 | 117, 115, 116 | 116 | 1.6 | Well below average (0.72) | Below average (0.90) |
+| 2015 | 127, 126, 125 | 126 | 1.6 | Below average (0.90) | Average (0.97) |
+| 2016 | 135, 130, 130 | 132 | 1.6 | Average (0.97) | Average (0.99) |
+| 2017 | 135, 124, 123 | 127 | 1.6 | Average (0.99) | Average (0.93) |
+| 2018 | 100, 106, 109 | 105 | 1.6 | Average (0.93) | Drought (0.59) |
+| 2019 | 88, 89, 100 | 93 | 1.6 | Below average (0.83) | Below average (0.86) |
+| 2020 | 128, 123, 124 | 125 | 1.6 | Below average (0.86) | Below average (0.83) |
+| 2021 | 131, 122, 122 | 125 | 1.6 | Below average (0.87) | Below average (0.87) |
+| 2022 | 138, 133, 131 | 134 | 1.6 | Below average (0.87) | Wet (1.35) |
+| 2023 | 130, 121, 122 | 124 | 1.6 | Wet (1.35) | Average (1.04) |
+| 2024 | 135, 128, 129 | 131 | 1.6 | Average (1.04) | Wet (1.31) |
+| 2025 | 137, 130, 128 | 131 | 1.6 | Wet (1.31) | Average (0.99) |
+| **29 years** | 127, 123, 123 | **124** (middle year 126) | 1.6 | | |
+| **The average year** | 135, 129, 129 | **131** | 1.6 | | |
+
+Under the band (75): none.
+Over the band (130): 1999, 2007, 2008, 2009, 2010, 2011, 2012, 2016, 2022, 2024, 2025.
+
+#### Steers: Northern Tablelands
+
+| Start | Gain, kg a head (seeds 1, 2, 3) | Average | Deaths % | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 119, 96, 88 | 101 | 2.5 | Above average (1.09) | Above average (1.18) |
+| 1998 | 109, 89, 84 | 94 | 2.5 | Above average (1.18) | Below average (0.84) |
+| 1999 | 123, 98, 92 | 105 | 2.5 | Below average (0.84) | Above average (1.20) |
+| 2000 | 114, 94, 87 | 98 | 2.5 | Above average (1.19) | Average (1.02) |
+| 2001 | 94, 85, 81 | 87 | 2.5 | Average (1.02) | Below average (0.82) |
+| 2002 | 112, 105, 104 | 107 | 2.5 | Below average (0.82) | Well below average (0.79) |
+| 2003 | 114, 96, 91 | 100 | 2.5 | Below average (0.86) | Average (1.00) |
+| 2004 | 90, 86, 80 | 85 | 2.5 | Average (1.00) | Below average (0.87) |
+| 2005 | 100, 88, 82 | 90 | 2.5 | Below average (0.88) | Average (1.05) |
+| 2006 | 121, 102, 99 | 107 | 2.5 | Average (1.05) | Average (0.95) |
+| 2007 | 111, 97, 93 | 100 | 2.5 | Average (0.95) | Above average (1.14) |
+| 2008 | 118, 100, 95 | 104 | 2.5 | Above average (1.14) | Average (1.03) |
+| 2009 | 120, 107, 103 | 110 | 2.5 | Average (1.03) | Average (0.96) |
+| 2010 | 128, 103, 96 | 109 | 2.5 | Average (0.96) | Wet (1.48) |
+| 2011 | 114, 92, 83 | 96 | 2.5 | Wet (1.48) | Wet (1.26) |
+| 2012 | 102, 102, 100 | 101 | 2.5 | Wet (1.26) | Below average (0.83) |
+| 2013 | 87, 93, 92 | 91 | 2.5 | Below average (0.83) | Well below average (0.66) |
+| 2014 | 121, 109, 109 | 113 | 2.5 | Below average (0.86) | Average (0.96) |
+| 2015 | 105, 100, 100 | 102 | 2.5 | Average (0.96) | Below average (0.80) |
+| 2016 | 125, 97, 92 | 105 | 2.5 | Below average (0.81) | Above average (1.16) |
+| 2017 | 87, 81, 75 | 81 | 2.5 | Above average (1.16) | Below average (0.81) |
+| 2018 | 52, 60, 55 | 56 | 2.5 | Below average (0.81) | Well below average (0.64) |
+| 2019 | 114, 108, 112 | 112 | 2.5 | Below average (0.85) | Average (0.94) |
+| 2020 | 138, 118, 117 | 124 | 2.5 | Average (0.95) | Above average (1.25) |
+| 2021 | 131, 105, 99 | 112 | 2.5 | Above average (1.25) | Wet (1.49) |
+| 2022 | 98, 78, 70 | 82 | 2.5 | Wet (1.49) | Average (0.94) |
+| 2023 | 128, 107, 105 | 113 | 2.5 | Average (0.94) | Average (1.04) |
+| 2024 | 137, 105, 101 | 114 | 2.5 | Average (1.05) | Average (1.00) |
+| 2025 | 38, 52, 45 | 45 | 2.5 | Average (1.00) | Drought (0.58) |
+| **29 years** | 109, 95, 91 | **98** (middle year 101) | 2.5 | | |
+| **The average year** | 118, 97, 97 | **104** | 2.5 | | |
+
+Under the band (90): 2001, 2004, 2005, 2017, 2018, 2022, 2025.
+Over the band (105): 2002, 2006, 2009, 2010, 2014, 2019, 2020, 2021, 2023, 2024.
+
+#### Steers: Central West NSW
+
+| Start | Gain, kg a head (seeds 1, 2, 3) | Average | Deaths % | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 92, 84, 80 | 85 | 1.8 | Wet (1.28) | Well below average (0.74) |
+| 1998 | 139, 122, 120 | 127 | 1.8 | Well below average (0.74) | Wet (1.29) |
+| 1999 | 149, 133, 127 | 136 | 1.8 | Wet (1.30) | Wet (1.34) |
+| 2000 | 151, 131, 125 | 135 | 1.8 | Wet (1.34) | Above average (1.24) |
+| 2001 | 148, 129, 123 | 134 | 1.8 | Above average (1.24) | Above average (1.24) |
+| 2002 | -21, -4, -7 | -11 | 5.5 | Above average (1.25) | Drought (0.47) |
+| 2003 | 135, 121, 122 | 126 | 1.8 | Well below average (0.69) | Average (1.00) |
+| 2004 | 114, 101, 102 | 106 | 1.8 | Average (1.00) | Below average (0.86) |
+| 2005 | 82, 72, 75 | 76 | 1.8 | Below average (0.86) | Average (1.00) |
+| 2006 | -50, -34, -33 | -39 | 24.5 | Average (1.01) | Drought (0.43) |
+| 2007 | 138, 134, 135 | 136 | 1.8 | Well below average (0.75) | Average (0.94) |
+| 2008 | 115, 104, 103 | 108 | 1.8 | Average (0.96) | Average (0.93) |
+| 2009 | 126, 124, 121 | 123 | 1.8 | Below average (0.92) | Below average (0.88) |
+| 2010 | 157, 139, 138 | 145 | 1.8 | Below average (0.88) | Wet (1.47) |
+| 2011 | 144, 130, 126 | 133 | 1.8 | Wet (1.47) | Wet (1.35) |
+| 2012 | 108, 108, 101 | 106 | 1.8 | Wet (1.35) | Well below average (0.72) |
+| 2013 | 118, 116, 118 | 117 | 1.8 | Well below average (0.72) | Below average (0.81) |
+| 2014 | 140, 135, 132 | 136 | 1.8 | Below average (0.88) | Below average (0.90) |
+| 2015 | 154, 133, 132 | 139 | 1.8 | Below average (0.90) | Above average (1.10) |
+| 2016 | 131, 115, 114 | 120 | 1.8 | Above average (1.10) | Above average (1.24) |
+| 2017 | 85, 87, 78 | 84 | 1.8 | Above average (1.25) | Well below average (0.74) |
+| 2018 | 1, 1, 11 | 4 | 39.2 | Well below average (0.73) | Well below average (0.74) |
+| 2019 | -57, -47, -41 | -48 | 53.5 | Below average (0.82) | Drought (0.52) |
+| 2020 | 164, 142, 141 | 149 | 1.8 | Well below average (0.76) | Wet (1.39) |
+| 2021 | 154, 131, 126 | 137 | 1.8 | Wet (1.39) | Wet (1.37) |
+| 2022 | 145, 123, 115 | 128 | 1.8 | Wet (1.37) | Wet (1.43) |
+| 2023 | 80, 87, 86 | 85 | 1.8 | Wet (1.43) | Below average (0.83) |
+| 2024 | 156, 141, 139 | 145 | 1.8 | Below average (0.83) | Above average (1.08) |
+| 2025 | 136, 125, 121 | 127 | 1.8 | Above average (1.08) | Below average (0.90) |
+| **29 years** | 108, 99, 98 | **102** (middle year 126) | 5.8 | | |
+| **The average year** | 139, 125, 127 | **130** | 1.8 | | |
+
+Under the band (115): 1997, 2002, 2004, 2005, 2006, 2008, 2012, 2017, 2018, 2019, 2023.
+Over the band (130): 1999, 2000, 2001, 2007, 2010, 2011, 2014, 2015, 2020, 2021, 2024.
+
+#### Steers: Western Victoria
+
+| Start | Gain, kg a head (seeds 1, 2, 3) | Average | Deaths % | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 191, 174, 173 | 179 | 2.3 | Average (0.94) | Average (1.00) |
+| 1998 | 205, 187, 183 | 192 | 2.3 | Average (1.00) | Average (1.06) |
+| 1999 | 190, 173, 171 | 178 | 2.3 | Average (1.06) | Average (0.99) |
+| 2000 | 201, 181, 178 | 187 | 2.3 | Average (0.98) | Above average (1.09) |
+| 2001 | 205, 181, 178 | 188 | 2.3 | Above average (1.09) | Above average (1.23) |
+| 2002 | 196, 179, 174 | 183 | 2.3 | Above average (1.23) | Average (1.02) |
+| 2003 | 202, 184, 181 | 189 | 2.3 | Average (1.02) | Above average (1.12) |
+| 2004 | 198, 177, 174 | 183 | 2.3 | Above average (1.12) | Average (1.00) |
+| 2005 | 170, 156, 159 | 162 | 2.3 | Average (1.00) | Below average (0.83) |
+| 2006 | 160, 162, 159 | 160 | 2.3 | Below average (0.83) | Well below average (0.71) |
+| 2007 | 196, 180, 180 | 186 | 2.3 | Below average (0.82) | Average (0.97) |
+| 2008 | 184, 170, 166 | 173 | 2.3 | Average (0.98) | Below average (0.87) |
+| 2009 | 193, 180, 180 | 184 | 2.3 | Below average (0.87) | Average (0.96) |
+| 2010 | 211, 188, 186 | 195 | 2.3 | Average (0.96) | Wet (1.25) |
+| 2011 | 202, 178, 175 | 185 | 2.3 | Wet (1.26) | Average (1.06) |
+| 2012 | 177, 166, 165 | 169 | 2.3 | Average (1.06) | Below average (0.90) |
+| 2013 | 194, 178, 179 | 184 | 2.3 | Below average (0.89) | Average (1.06) |
+| 2014 | 177, 164, 160 | 167 | 2.3 | Average (1.06) | Well below average (0.79) |
+| 2015 | 174, 170, 171 | 172 | 2.3 | Well below average (0.79) | Well below average (0.79) |
+| 2016 | 201, 183, 181 | 188 | 2.3 | Below average (0.89) | Above average (1.12) |
+| 2017 | 197, 171, 168 | 179 | 2.3 | Above average (1.12) | Average (1.06) |
+| 2018 | 189, 173, 170 | 177 | 2.3 | Average (1.06) | Below average (0.90) |
+| 2019 | 191, 177, 178 | 182 | 2.3 | Below average (0.90) | Average (0.94) |
+| 2020 | 204, 184, 180 | 189 | 2.3 | Average (0.94) | Above average (1.15) |
+| 2021 | 195, 178, 174 | 182 | 2.3 | Above average (1.15) | Average (1.02) |
+| 2022 | 198, 180, 180 | 186 | 2.3 | Average (1.02) | Above average (1.17) |
+| 2023 | 196, 172, 169 | 179 | 2.3 | Above average (1.17) | Average (0.98) |
+| 2024 | 169, 160, 162 | 164 | 2.3 | Average (0.97) | Below average (0.92) |
+| 2025 | 185, 170, 170 | 175 | 2.3 | Below average (0.92) | Above average (1.08) |
+| **29 years** | 191, 175, 173 | **180** (middle year 182) | 2.3 | | |
+| **The average year** | 195, 176, 179 | **183** | 2.3 | | |
+
+Under the band (155): none.
+Over the band (185): 1998, 2000, 2001, 2003, 2007, 2010, 2011, 2016, 2020, 2022.
+
+#### Years that look odd, with the figures
+
+These are recorded, not failed. Each is a set-stocked mob with nothing done: no sales, no feeding, no move.
+
+- **Central Qld, no lick, from September 2019: -20 kg and 41% of the steers lost, in a year the season reads "Below average" (0.86).** The label is for the 12 months as a whole, weighted by when the grass usually grows. The months tell it: the growth factor was 0.07, 0.20, 0.09 and 0.00 from September to December 2019, then 0.94, 1.78 and 1.37 from January to March 2020. On seed 1 the standing feed fell from 1,170 to 530 kg DM/ha by the end of December, the steers went from 201 kg at the end of September to 155 kg at the end of January, and 28 of the 86 died between December and March (36 over the whole year). The rain then came, and the steers left were at 196 kg by the end of July. With the lick the same year loses 1.6% and gains 93 kg.
+- **Central Qld, no lick, from September 2018: 27 kg and 1.6% lost, in a year that reads "Drought" (0.59).** The other way round: October 2018 and March to May 2019 grew well (1.41, 1.10, 1.77, 1.46), and the dry months fell where little grows anyway.
+- **Central Qld, no lick, from September 2002: -4 kg and 17% lost** (season 0.67).
+- **Central West, from April 2002, 2006, 2018 and 2019: -11, -39, 4 and -48 kg, with 5.5, 24.5, 39 and 53.5% lost.** These four years take the 29-year average from 126 (the middle year) down to 102. From April 2018 on seed 1: the block started with 970 kg DM/ha, the growth factor was 0.15 to 0.41 from April to September, the steers fell from 210 kg at the end of April to 151 kg at the end of September, and 38 of 91 died by the end of November. From April 2019 the factor was under 0.4 from June to December and 57 of 91 died.
+- **Northern Tablelands, from October 2025: 45 kg, in a year that reads "Drought" (0.58).** The run goes to September 2026, the newest weather in the table. January to April 2026 read 0.38, 0.39, 0.22 and 0.10. The last days of the SILO table are provisional (DATA.md).
+- **Western Victoria never leaves its band on the low side.** Its lowest year is 160 kg, from April 2006 ("Well below average", 0.71), against a band of 155 to 185. Its herds gain 175 kg from September 2006. The weather moves Western Victoria much less than the other three districts.
+- **Deaths do not move until condition falls a long way.** In every case the deaths are the same figure in 25 or more of the 29 years (1.6, 1.6, 2.5, 1.8 and 2.3%), because each seed draws the same luck every year. They rise only in the years above.
+- **A scratch block starts with about 1,000 kg DM/ha.** The 540-day run-up with no stock left 970 to 1,230 kg DM/ha on day 0 on the six blocks looked at (nearly all dry feed in Central Qld in September). That is the 1.3 set-up, unchanged. It means a run that starts into a dry spell has little feed in hand.
+
+#### Herds: summary
+
+Seeds 1 and 2 together. Deaths as % of the head at the start. Gain is kg for each head at the start.
+
+| District | Head at the start | Deaths, the average year | Deaths, the years that grew average feed or better | Deaths, all 29 years | Gain, the average year | Gain, 29 years | Highest deaths in a year |
+|---|---|---|---|---|---|---|---|
+| Central Qld (on lick) | 790 and 786 | 2.8% | 2.9% (17 years) | 2.9% | 129 kg | 123 kg | 3.1% (2019) |
+| Northern Tablelands | 271 and 269 | 3.9% | 3.7% (18 years) | 3.8% | 97 kg | 91 kg | 5.0% (2019) |
+| Central West NSW | 418 and 416 | 3.0% | 3.1% (19 years) | 4.8% | 121 kg | 97 kg | 32.4% (2006) |
+| Western Victoria | 223 and 221 | 3.6% | 3.6% (21 years) | 3.6% | 175 kg | 174 kg | 3.6% |
+
+**What the tests hold:** over the years that grew average feed or better, the two herds lose within half a point of what the same two herds lose in the average year. A named dry year puts on less weight than a named wet one (Central Qld 2002 against 2010, Northern Tablelands 2018 against 2020, Central West 2018 against 2010, Western Victoria 2006 against 2010). The same run gives the same figures again.
+
+**What they do not hold: the 1.5 to 3.6% deaths benchmark.** Two herds are too few for it. Each seed is the same herd with the same luck in every year, so 29 years do not average the luck out: the Tablelands herd on seed 1 loses 4.1% in nearly every year, and does in the average year too (1.3 found single herds from 0.9 to 4.1%). The benchmark is held by `herds.test.ts` on 16 herds in the average year (2.4 to 2.6%). What these runs add is that a real year with fair weather loses what the average year loses.
+
+- **Central West herds in the droughts, left alone:** 11.4% lost from September 2002, 32.4% from 2006, 4.6% from 2017 and 12.6% from 2019.
+- **Central Qld herds on the lick hold through every year:** 2.8 to 3.1% lost, 91 to 138 kg gained.
+
+#### Herds: Central Qld
+
+| Start | Deaths % (seeds 1, 2) | Deaths %, both | Gain a head, kg | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 2.9, 2.7 | 2.8 | 121 | Above average (1.13) | Below average (0.81) |
+| 1998 | 3.0, 2.7 | 2.9 | 127 | Below average (0.81) | Above average (1.18) |
+| 1999 | 2.9, 2.8 | 2.9 | 134 | Above average (1.18) | Average (1.06) |
+| 2000 | 3.0, 2.9 | 3.0 | 121 | Average (1.06) | Below average (0.83) |
+| 2001 | 3.0, 2.7 | 2.9 | 104 | Below average (0.83) | Well below average (0.61) |
+| 2002 | 2.9, 2.9 | 2.9 | 101 | Below average (0.83) | Well below average (0.67) |
+| 2003 | 2.9, 2.7 | 2.8 | 118 | Below average (0.87) | Below average (0.82) |
+| 2004 | 3.0, 2.7 | 2.9 | 123 | Below average (0.85) | Average (0.94) |
+| 2005 | 2.9, 2.8 | 2.9 | 124 | Average (0.95) | Well below average (0.76) |
+| 2006 | 3.0, 2.7 | 2.9 | 124 | Below average (0.86) | Average (1.01) |
+| 2007 | 2.9, 2.7 | 2.8 | 131 | Average (1.01) | Wet (1.50) |
+| 2008 | 2.9, 2.9 | 2.9 | 131 | Wet (1.50) | Wet (1.44) |
+| 2009 | 2.9, 2.8 | 2.9 | 134 | Wet (1.44) | Wet (1.31) |
+| 2010 | 2.9, 2.7 | 2.8 | 132 | Wet (1.31) | Wet (1.46) |
+| 2011 | 2.9, 2.7 | 2.8 | 131 | Wet (1.46) | Wet (1.42) |
+| 2012 | 2.9, 2.9 | 2.9 | 138 | Wet (1.42) | Average (0.94) |
+| 2013 | 3.0, 2.7 | 2.9 | 123 | Average (0.94) | Well below average (0.72) |
+| 2014 | 3.0, 2.9 | 3.0 | 116 | Well below average (0.72) | Below average (0.90) |
+| 2015 | 3.0, 2.7 | 2.9 | 126 | Below average (0.90) | Average (0.97) |
+| 2016 | 2.9, 3.1 | 3.0 | 131 | Average (0.97) | Average (0.99) |
+| 2017 | 2.9, 2.7 | 2.8 | 125 | Average (0.99) | Average (0.93) |
+| 2018 | 2.9, 2.7 | 2.8 | 108 | Average (0.93) | Drought (0.59) |
+| 2019 | 3.2, 3.1 | 3.1 | 91 | Below average (0.83) | Below average (0.86) |
+| 2020 | 2.9, 2.8 | 2.9 | 125 | Below average (0.86) | Below average (0.83) |
+| 2021 | 2.9, 2.8 | 2.9 | 122 | Below average (0.87) | Below average (0.87) |
+| 2022 | 3.0, 2.8 | 2.9 | 131 | Below average (0.87) | Wet (1.35) |
+| 2023 | 3.0, 2.7 | 2.9 | 123 | Wet (1.35) | Average (1.04) |
+| 2024 | 3.0, 2.8 | 2.9 | 131 | Average (1.04) | Wet (1.31) |
+| 2025 | 3.0, 2.7 | 2.9 | 131 | Wet (1.31) | Average (0.99) |
+| **29 years** | | **2.9** | **123** | | |
+| **Years that grew average feed or better** (17) | | **2.9** | **130** | | |
+| **The average year** | 2.9, 2.7 | **2.8** | **129** | | |
+
+Head at the start: 790 and 786.
+
+#### Herds: Northern Tablelands
+
+| Start | Deaths % (seeds 1, 2) | Deaths %, both | Gain a head, kg | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 4.1, 4.1 | 4.1 | 90 | Above average (1.09) | Above average (1.17) |
+| 1998 | 4.4, 3.3 | 3.9 | 85 | Above average (1.17) | Below average (0.86) |
+| 1999 | 4.1, 4.1 | 4.1 | 94 | Below average (0.88) | Above average (1.20) |
+| 2000 | 4.1, 3.0 | 3.5 | 95 | Above average (1.20) | Average (1.03) |
+| 2001 | 4.1, 3.0 | 3.5 | 84 | Average (1.03) | Below average (0.82) |
+| 2002 | 4.1, 3.0 | 3.5 | 110 | Below average (0.82) | Below average (0.80) |
+| 2003 | 4.1, 3.3 | 3.7 | 88 | Below average (0.86) | Average (0.96) |
+| 2004 | 4.1, 3.7 | 3.9 | 75 | Average (0.96) | Below average (0.86) |
+| 2005 | 4.4, 4.1 | 4.3 | 86 | Below average (0.89) | Above average (1.09) |
+| 2006 | 4.1, 3.0 | 3.5 | 98 | Above average (1.09) | Average (0.93) |
+| 2007 | 4.1, 3.0 | 3.5 | 94 | Average (0.93) | Above average (1.14) |
+| 2008 | 4.4, 3.7 | 4.1 | 98 | Above average (1.14) | Average (1.04) |
+| 2009 | 4.1, 3.0 | 3.5 | 99 | Average (1.04) | Average (0.93) |
+| 2010 | 4.4, 3.3 | 3.9 | 98 | Average (0.93) | Wet (1.48) |
+| 2011 | 4.4, 3.3 | 3.9 | 90 | Wet (1.48) | Wet (1.28) |
+| 2012 | 4.4, 3.3 | 3.9 | 104 | Wet (1.28) | Below average (0.85) |
+| 2013 | 4.1, 3.7 | 3.9 | 89 | Below average (0.86) | Well below average (0.64) |
+| 2014 | 4.1, 3.3 | 3.7 | 108 | Below average (0.83) | Average (0.95) |
+| 2015 | 4.1, 3.0 | 3.5 | 95 | Average (0.95) | Well below average (0.78) |
+| 2016 | 4.1, 3.3 | 3.7 | 99 | Below average (0.83) | Above average (1.22) |
+| 2017 | 4.4, 3.3 | 3.9 | 74 | Above average (1.22) | Well below average (0.78) |
+| 2018 | 4.1, 3.0 | 3.5 | 59 | Well below average (0.78) | Well below average (0.68) |
+| 2019 | 4.8, 5.2 | 5.0 | 90 | Below average (0.87) | Below average (0.89) |
+| 2020 | 4.1, 3.3 | 3.7 | 113 | Below average (0.90) | Above average (1.24) |
+| 2021 | 4.1, 3.0 | 3.5 | 101 | Above average (1.24) | Wet (1.49) |
+| 2022 | 4.1, 3.0 | 3.5 | 84 | Wet (1.49) | Average (1.01) |
+| 2023 | 4.1, 3.3 | 3.7 | 98 | Average (1.01) | Average (0.99) |
+| 2024 | 4.1, 3.0 | 3.5 | 101 | Average (0.99) | Average (0.99) |
+| 2025 | 4.1, 3.0 | 3.5 | 47 | Average (0.99) | Well below average (0.63) |
+| **29 years** | | **3.8** | **91** | | |
+| **Years that grew average feed or better** (18) | | **3.7** | **96** | | |
+| **The average year** | 4.1, 3.7 | **3.9** | **97** | | |
+
+Head at the start: 271 and 269.
+
+#### Herds: Central West NSW
+
+| Start | Deaths % (seeds 1, 2) | Deaths %, both | Gain a head, kg | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 2.9, 3.4 | 3.1 | 136 | Above average (1.14) | Average (0.97) |
+| 1998 | 2.9, 3.4 | 3.1 | 118 | Average (0.98) | Wet (1.28) |
+| 1999 | 3.1, 3.1 | 3.1 | 133 | Wet (1.28) | Wet (1.45) |
+| 2000 | 2.9, 3.4 | 3.1 | 133 | Wet (1.45) | Above average (1.15) |
+| 2001 | 2.9, 3.1 | 3.0 | 85 | Above average (1.16) | Average (1.03) |
+| 2002 | 7.2, 15.6 | 11.4 | 4 | Average (1.02) | Well below average (0.61) |
+| 2003 | 2.9, 3.1 | 3.0 | 104 | Below average (0.85) | Average (0.93) |
+| 2004 | 2.9, 3.4 | 3.1 | 69 | Average (0.93) | Below average (0.80) |
+| 2005 | 3.1, 3.1 | 3.1 | 66 | Below average (0.86) | Average (0.99) |
+| 2006 | 27.0, 37.7 | 32.4 | -32 | Average (0.99) | Drought (0.57) |
+| 2007 | 3.1, 3.4 | 3.2 | 93 | Below average (0.86) | Well below average (0.78) |
+| 2008 | 2.9, 3.1 | 3.0 | 117 | Below average (0.80) | Average (1.07) |
+| 2009 | 2.9, 3.1 | 3.0 | 142 | Average (1.07) | Average (1.02) |
+| 2010 | 3.1, 3.4 | 3.2 | 101 | Average (1.02) | Wet (1.32) |
+| 2011 | 2.9, 3.6 | 3.2 | 121 | Wet (1.32) | Wet (1.34) |
+| 2012 | 2.9, 3.4 | 3.1 | 102 | Wet (1.34) | Well below average (0.69) |
+| 2013 | 3.1, 3.4 | 3.2 | 147 | Well below average (0.78) | Average (1.01) |
+| 2014 | 3.1, 3.1 | 3.1 | 135 | Average (1.01) | Below average (0.88) |
+| 2015 | 2.9, 3.4 | 3.1 | 120 | Below average (0.88) | Average (1.00) |
+| 2016 | 2.9, 3.4 | 3.1 | 86 | Average (1.00) | Above average (1.16) |
+| 2017 | 5.0, 4.1 | 4.6 | -19 | Above average (1.16) | Drought (0.58) |
+| 2018 | 2.9, 3.1 | 3.0 | 64 | Below average (0.81) | Well below average (0.77) |
+| 2019 | 9.3, 15.9 | 12.6 | 52 | Below average (0.91) | Below average (0.89) |
+| 2020 | 2.9, 3.4 | 3.1 | 125 | Average (0.93) | Wet (1.28) |
+| 2021 | 2.9, 3.1 | 3.0 | 131 | Wet (1.28) | Wet (1.47) |
+| 2022 | 2.9, 3.1 | 3.0 | 94 | Wet (1.47) | Above average (1.17) |
+| 2023 | 2.9, 3.1 | 3.0 | 132 | Above average (1.17) | Above average (1.08) |
+| 2024 | 2.9, 3.1 | 3.0 | 133 | Above average (1.09) | Average (0.99) |
+| 2025 | 2.9, 3.1 | 3.0 | 121 | Average (0.99) | Well below average (0.79) |
+| **29 years** | | **4.8** | **97** | | |
+| **Years that grew average feed or better** (19) | | **3.1** | **117** | | |
+| **The average year** | 2.9, 3.1 | **3.0** | **121** | | |
+
+Head at the start: 418 and 416.
+
+#### Herds: Western Victoria
+
+| Start | Deaths % (seeds 1, 2) | Deaths %, both | Gain a head, kg | Season before the run | Season of the run |
+|---|---|---|---|---|---|
+| 1997 | 3.6, 3.6 | 3.6 | 175 | Average (0.95) | Average (1.01) |
+| 1998 | 3.6, 3.6 | 3.6 | 177 | Average (1.01) | Average (1.03) |
+| 1999 | 3.6, 3.6 | 3.6 | 180 | Average (1.03) | Average (1.05) |
+| 2000 | 3.6, 3.6 | 3.6 | 184 | Average (1.05) | Above average (1.10) |
+| 2001 | 3.6, 3.6 | 3.6 | 166 | Above average (1.10) | Above average (1.16) |
+| 2002 | 3.6, 3.2 | 3.4 | 180 | Above average (1.16) | Average (1.04) |
+| 2003 | 3.6, 3.6 | 3.6 | 178 | Average (1.04) | Above average (1.13) |
+| 2004 | 3.6, 3.6 | 3.6 | 140 | Above average (1.13) | Below average (0.87) |
+| 2005 | 3.6, 3.6 | 3.6 | 186 | Below average (0.87) | Average (0.97) |
+| 2006 | 3.6, 3.6 | 3.6 | 175 | Average (0.97) | Well below average (0.66) |
+| 2007 | 3.6, 3.6 | 3.6 | 175 | Well below average (0.78) | Average (0.98) |
+| 2008 | 3.6, 3.6 | 3.6 | 176 | Average (0.98) | Below average (0.85) |
+| 2009 | 3.6, 3.6 | 3.6 | 186 | Below average (0.85) | Average (1.04) |
+| 2010 | 3.6, 3.6 | 3.6 | 182 | Average (1.04) | Wet (1.27) |
+| 2011 | 3.6, 3.2 | 3.4 | 177 | Wet (1.27) | Average (0.98) |
+| 2012 | 3.6, 3.6 | 3.6 | 161 | Average (0.98) | Below average (0.87) |
+| 2013 | 3.6, 3.6 | 3.6 | 177 | Below average (0.87) | Above average (1.12) |
+| 2014 | 3.6, 3.6 | 3.6 | 186 | Above average (1.12) | Well below average (0.79) |
+| 2015 | 3.6, 3.6 | 3.6 | 190 | Well below average (0.79) | Well below average (0.79) |
+| 2016 | 3.6, 3.6 | 3.6 | 182 | Well below average (0.79) | Above average (1.15) |
+| 2017 | 3.6, 3.2 | 3.4 | 170 | Above average (1.15) | Average (1.00) |
+| 2018 | 3.6, 3.6 | 3.6 | 169 | Average (1.00) | Below average (0.88) |
+| 2019 | 3.6, 3.6 | 3.6 | 184 | Below average (0.88) | Average (1.02) |
+| 2020 | 3.6, 3.6 | 3.6 | 170 | Average (1.02) | Above average (1.10) |
+| 2021 | 3.6, 3.2 | 3.4 | 169 | Above average (1.10) | Average (0.98) |
+| 2022 | 3.6, 3.6 | 3.6 | 183 | Average (0.98) | Wet (1.29) |
+| 2023 | 3.6, 3.2 | 3.4 | 142 | Wet (1.29) | Below average (0.81) |
+| 2024 | 3.6, 3.6 | 3.6 | 164 | Below average (0.81) | Average (0.94) |
+| 2025 | 3.6, 3.6 | 3.6 | 179 | Average (0.94) | Above average (1.17) |
+| **29 years** | | **3.6** | **174** | | |
+| **Years that grew average feed or better** (21) | | **3.6** | **177** | | |
+| **The average year** | 3.6, 3.6 | **3.6** | **175** | | |
+
+Head at the start: 223 and 221.
+
+**CHECK, for Claudia** (real years):
+
+1. **Do the dry and wet years look right?** The build plan leaves this to Claudia. The steer and herd tables above give every year from 1997 to 2025, and the 1.4b entry gives the feed grown and the rain. Years to look at first: Central West 2002, 2006, 2018 and 2019. Central Qld 2002 and 2019. Northern Tablelands 2018.
+2. **Central West loses a lot of steers in its four worst years** when nothing is done: 5.5 to 53.5% of set-stocked weaners at 60% of carrying capacity, and 11 to 32% of a breeding herd left alone. Is that the right size for doing nothing through 2002, 2006, 2018 and 2019 at Dubbo? A grazier would have sold or fed. The game lets the player do both.
+3. **Central Qld without lick loses 41% from September 2019** in a year the label calls "Below average", because the rain came late. The label states the 12 months as a whole. Should the season label look at the months that have just gone by more than at the year?
+4. **Western Victoria hardly answers the weather.** Its lowest steer year is 160 kg (2006) against 183 in the average year, and no year is under the band. Is a year like 2006 at Hamilton really only 12% under an average one for stock?
+5. **Eleven of 29 years are over the band** for Central Qld with lick and Central West, and ten for the Tablelands and Western Victoria. It is the same question as the first CHECK of 1.3: is a band for the average, or a limit on every year?
+6. **The 29-year averages sit under the average year** by 3 to 10 kg in four cases and by 28 kg in Central West. The bands were held on the average year in 1.3. If a band is meant for the long run of real years, Central West (102) is under its band (115 to 130) and the others are inside.
+7. **The newest year uses weather to 12 Nov 2026**, which SILO marks as provisional for its last few days. A Northern Tablelands run from October 2025 reads as a drought year.
+8. **How herd deaths are held on real years.** The first real-year herd test held the 1.5 to 3.6% band on two herds a district and failed: the two Northern Tablelands herds lose 3.7% over the years with fair weather, and 3.9% in the average year. Two herds are too few, because a seed is the same herd with the same luck every year. The test now runs six herds through the years whose own 12 months grew average feed or better and holds the band on the six together: Central Qld 2.5%, Northern Tablelands 2.7%, Central West 2.5%, Western Victoria 2.7%. It is still the reading of CHECK 4 in 1.3 (herds together, not herd by herd), which is yours to decide. A second test holds the first two herds within half a point of their own average year.
+9. **Steers on real years are held loosely.** The 29-year average must be no higher than the top of the band and above 0, and not far under the same blocks' average year. The second limit was set from the runs plus 3 kg, so it only guards against a change. Central West's 29-year average (102) passes while under its band (115 to 130), because the droughts are in it.
+10. **Can a farm pay its way in 1997 to 2003?** A farm played in order with no year picked starts in 1997. In today's dollars Dubbo restocker steers are about 188 c/kg then against about 457 in 2025, and the game's costs are the same in every year. No run has checked that a farm starting in 1997 can make money. It needs a look once buying and selling on sale days are in (milestone 1.5).
+
+**Not tested here:** real years played at random through the calibration suites (the wiring is tested at random in `sim/realYears.test.ts`, the suites only in order). May starts for herds. Mixed farms and crops on real years. More than three steer blocks or two herds a year.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

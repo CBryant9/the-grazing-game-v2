@@ -80,10 +80,12 @@ import { rngFromState } from '../rng';
 import {
   areaIdOf,
   cropContextOf,
+  keepSources,
   keepSurvey,
   placeAnchor,
   plantingsNow,
   pricesOf,
+  realSourcesOf,
   seasonsOf,
   surveyOf,
   type SourceEnv,
@@ -468,7 +470,7 @@ function wean(j: Job, a: Extract<Action, { type: 'wean' }>): Out {
   const s = j.survey;
   let where: MobWhere | null;
   if (a.to === undefined) {
-    const dest = autoWeanDest(farm, s, plantingsNow(farm, j.env.seasons), m);
+    const dest = autoWeanDest(farm, s, plantingsNow(farm, j.env), m);
     where = dest === null ? null : { kind: 'paddock', anchor: dest };
   } else {
     const w = j.whereFor(a.to);
@@ -926,9 +928,7 @@ function doHarvest(j: Job, a: Extract<Action, { type: 'harvest' }>): Out {
   const { farm } = j;
   const ctx = cropContextOf(farm);
   // The season is the one the last daily tick ran on.
-  const seasonF = (j.env.seasons ?? seasonsOf(farm)).factorsOn(
-    farm.day > 0 ? farm.day - 1 : 0,
-  ).seasonF;
+  const seasonF = seasonsOf(farm, j.env).factorsOn(farm.day > 0 ? farm.day - 1 : 0).seasonF;
   const out = harvestField(farm.crops, farm.pasture, ctx, a.field, farm.day, seasonF);
   if (!out.ok) return out;
   const no = j.bankSays(out.cost, 'harvesting');
@@ -1018,6 +1018,9 @@ function run(j: Job, a: Action): Out {
  * with the reason. The farm passed in is never changed.
  */
 export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
+  // A real-year farm needs its real data for any action, whether or not
+  // this one reads it. Without it this stops with an error.
+  realSourcesOf(farm, env);
   if (farm.over) return refuse('game-over', 'The game is over on this farm.');
   if (!action || typeof action !== 'object') {
     return refuse('bad-request', 'That is not something that can be done on a farm.');
@@ -1025,6 +1028,8 @@ export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}
   const next = cloneFarm(farm);
   // The paddocks and water are the same until the action changes the layout.
   keepSurvey(next.layout, surveyOf(farm));
+  // So are the farm's seasons and, on a real-year farm, its real years.
+  keepSources(next, farm);
   const job = new Job(next, env);
   const no = run(job, action);
   if (no) return no;

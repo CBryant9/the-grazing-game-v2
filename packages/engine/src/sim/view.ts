@@ -35,7 +35,6 @@ import {
   type FarmViewTrough,
   type ViewCattleKind,
 } from '@gg/shared';
-import { dateAt } from '../calendar';
 import { fieldProgress } from '../crops/fields';
 import { DISTRICTS } from '../data/districts';
 import { SPECIES } from '../data/species';
@@ -48,7 +47,7 @@ import { clamp } from '../num';
 import { LAND } from '../pasture/state';
 import { paddockSummary, type PaddockSummary } from '../pasture/summary';
 import { hash32 } from '../rng';
-import { plantingsNow, surveyOf, type SourceEnv } from './derived';
+import { dateOn, plantingsNow, surveyOf, type SourceEnv } from './derived';
 import type { FarmState } from './state';
 import { mobSummaries, paddockSummaries } from './summary';
 
@@ -102,6 +101,8 @@ const KIND_ORDER: readonly ViewCattleKind[] = ['cow', 'heifer', 'steer', 'bull',
 /**
  * Build the view of a farm as it stands. The farm is only read.
  * `env.seasons` is for a farm run on growth factors other than its own.
+ * A real-year farm needs its real data in `env.data`, as every read of
+ * its weather does.
  */
 export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
   const survey = surveyOf(farm);
@@ -109,7 +110,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
   const { pasture, crops, layout } = farm;
   const { fences, water, scale } = layout;
   const district = DISTRICTS[farm.district];
-  const plantings = plantingsNow(farm, env.seasons);
+  const plantings = plantingsNow(farm, env);
   const cropCtx = { district: farm.district, start: farm.start };
 
   // ---- Plantings
@@ -344,7 +345,8 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     };
   });
 
-  const date = dateAt(farm.start, farm.day);
+  // The date the game reports: the real date on a real-year farm.
+  const date = dateOn(farm);
   const light = daylightFor(DISTRICT_PLACES[farm.district], date);
 
   return {

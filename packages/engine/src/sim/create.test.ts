@@ -7,10 +7,11 @@ import {
   putWholeFarm,
 } from '../../test-support/mvpWhole';
 import { aeOf, classOf } from '../cattle/animal';
+import type { FarmStart } from '../calendar';
 import { FARM_SIZES } from '../data/farms';
 import { generateFarm } from '../farm/generate';
 import { buyPrice } from '../market/prices';
-import { standInMarket } from '../market/standIn';
+import { asStandIn, standInMarket } from '../market/standIn';
 import { carryingCapacityAE, startMoney } from '../money/costs';
 import { netWorth } from '../money/worth';
 import { rngStream } from '../rng';
@@ -231,7 +232,7 @@ describe('createFarm', () => {
         seed: o.seed,
         district: o.district,
         farmHa: FARM_SIZES.nsw[1],
-        start: o.start,
+        start: o.start as FarmStart,
         startType,
         mixed: o.mixed,
       });
@@ -316,7 +317,7 @@ describe('createFarm', () => {
     // From 2026 the price series has run out, so the market draws its first months as it opens.
     const start = { year: 2027, month: 3 };
     const farm = createFarm(options({ start, startType: 'scratch' }));
-    expect(farm.market.ext.length).toBeGreaterThan(10);
+    expect(asStandIn(farm.market).ext.length).toBeGreaterThan(10);
     const replay = rngStream(42, 'market');
     const opened = standInMarket.open(start, replay);
     expect(farm.market).toEqual(opened);
@@ -324,7 +325,7 @@ describe('createFarm', () => {
     expect(farm.rng.market).not.toEqual(rngStream(42, 'market').state());
     // Before 2026 nothing is drawn.
     const early = createFarm(options({ startType: 'scratch' }));
-    expect(early.market.ext).toEqual([]);
+    expect(asStandIn(early.market).ext).toEqual([]);
     expect(early.rng.market).toEqual(rngStream(42, 'market').state());
   });
 

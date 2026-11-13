@@ -78,7 +78,7 @@ In the rebuild the same chances, ranges and limits are drawn from the farm's see
 
 > **Warning: approximate.** This series was written from memory during the build, not from a data source. It follows the real shape (the 2019 low, the 2021–22 peak near 690, the 2023 crash near 200, then the recovery), but the monthly values are not exact. In the rebuild, replace it with real MLA restocker yearling steer indicator data and record the source and date here.
 >
-> **Superseded from milestone 1.4.** The real MLA series has been pulled and is recorded under "Real data sources" below. Once milestone 1.4 wires it into the engine, the game no longer plays from this approximate series or the random walk after 2025. They are not deleted: BUILD_PLAN section 9 keeps a stand-in series as the fallback if MLA withdraws permission.
+> **Superseded from milestone 1.4.** A real-year farm plays on the real MLA prices ("Real prices: indicators to classes", below). It never reads this approximate series or the random walk after 2025. They are not deleted: a farm made with random seasons still runs on them, the tests that match the MVP need them, and BUILD_PLAN section 9 keeps a stand-in series as the fallback if MLA withdraws permission.
 
 ```
 2019: 280 255 262 272 282 292 302 312 302 305 330 352
@@ -126,7 +126,7 @@ Corrections from the code (milestone 1.2c):
 
 Real price and weather history, pulled once by the scripts in `scripts/data/` (see the README there) and kept in `packages/engine/data/raw/`. `manifest.json` in that folder lists every table with its source address, units, first and last date, row count and the date pulled. A test (`packages/engine/src/data/raw-data.test.ts`) checks every table against it.
 
-**Status: weather is read, prices are not yet.** The SILO tables feed the soil-water growth factor (milestone 1.4b, "Growth from real weather" below). The engine's model code takes a table as data. Only the server-only helper `packages/engine/src/server/weatherFiles.ts` reads the files. The MLA tables are not read yet. The rest of milestone 1.4 wires them in, with the mapping from MLA indicators to the game's classes. From then the approximate `MKT` series above is superseded for play, and kept only as the fallback.
+**Status: weather, cattle prices, cattle sale days and the CPI are read. The sheep tables are not yet.** The SILO tables feed the soil-water growth factor (milestone 1.4b, "Growth from real weather" below). The MLA cattle tables feed the real market and the sale calendars, and the ABS table puts past prices into today's dollars (milestone 1.4, the three sections after AussieGRASS below). The engine's model code takes every table as data. Only the server-only helpers in `packages/engine/src/server/` read the files, and they hand the engine one bundle (`loadRealData`). The sheep and lamb tables wait for the sheep milestone.
 
 These tables are server-side engine data. Browser code must never import them (rule 14).
 
@@ -198,7 +198,7 @@ Gaps (days with no row):
 - **Mortlake** has nothing before 2018. Its restocker steers have none in 2023 and one week a year in 2024, 2025 and 2026.
 - **Odd rows, kept as served.** Hamilton Merino lamb reads 11.95 c/kg on 27 and 28 Nov 2006 and **-6.67 c/kg from 6 to 12 Dec 2006** (37 and 46 head in the indicator). Hamilton mutton reads 12.82 c/kg from 18 to 24 Oct 2006 (3,994 head). Every other price row is between 20 and 3,000 c/kg. The price mapping in milestone 1.4 must not pass a negative price to the game. A test pins these 16 rows, so a new odd row fails the build.
 
-Where a yard's own history is short or thin, the national indicator or a nearby yard fills in (BUILD_PLAN section 3). The rule for that is milestone 1.4 work.
+Where a yard's own history is short or thin, the national indicator fills in (BUILD_PLAN section 3). The rule is under "Real prices: indicators to classes" below. No nearby yard is used.
 
 **Sale days pulled** (from the service's yardings report, cattle and sheep):
 
@@ -214,7 +214,7 @@ Where a yard's own history is short or thin, the national indicator or a nearby 
 - `mla/sales/*.csv` is `date,head`: each day the yard held a sale and the head yarded, every sale type that day added together.
 - `mla/yardings/*.csv` is the report as served, `date,type,head`, with `type` Prime or Store. Sheep and lambs are separate files: `DUB-sheep` (1,938 rows), `DUB-lamb` (1,899), `HAM-sheep` (1,970) and `HAM-lamb` (1,567). A sheep sale day is any day in either file.
 - How the sale days were found: straight from the yardings report, which is small (500 to 2,477 rows a yard). As a check, 547 of the 554 changes in Gracemere's restocker steer indicator fall on a sale day in the yardings table.
-- **Sale days missing from the service** need a stand-in in milestone 1.4: Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
+- **Sale days missing from the service** have a stand-in ("Sale calendars" below): Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
 - **Fill-in yards are proposed, not agreed.** The milestone brief named Emerald (for Gracemere), IRLX Inverell (for Armidale) and CVLX Ballarat (for Mortlake and Hamilton) as nearby yards to cover short histories. They are not in the PRD or the build plan, and none has been pulled. Armidale's own history turns out to be long, so Inverell may not be needed. **A question for Claudia** before any of them is used.
 
 **Not pulled** (the scripts carry on from the cache, so nothing above is fetched again):
@@ -305,6 +305,150 @@ The scaling figures themselves are worked out from the SILO tables, not typed in
 - **What it is:** a shire-wide average from the AussieGRASS model. The file also carries standing feed, feed eaten and utilisation, so stocking is in that model. It is not a point and not a potential. Its level can't be compared with the district curve. Its ups and downs from year to year can.
 - **Licence:** the Long Paddock pages carry a Creative Commons Attribution 4.0 badge. The page does not say in words that the badge covers the AussieGRASS files. **Not confirmed.** The figures are used here for checking only and are not shipped.
 - The FAO-56 pages above, and the search result for the Rallo paper (`https://iris.unipa.it/retrieve/e3ad8916-c841-da0e-e053-3705fe0a2b96/Rallo%202014%20JIDE-FAO56%20SWD%20Olive.pdf`, 13 Nov 2026), are the only other outside sources used.
+
+### Real prices: indicators to classes (milestone 1.4, PROPOSED, FOR CLAUDIA)
+
+A real-year farm prices its cattle from MLA's indicators for the real date, at the district's yard. Code: `packages/engine/src/market/realPrices.ts` (the mapping and the fill-in rules), `realMarket.ts` (the price source) and `priceTable.ts`. The formulas are in MODEL.md, section 8. "Sourced" means the figure comes from a source named here. "Tuning" means it was chosen for this game and has no outside source.
+
+**What each indicator measures.** From MLA's "National Cattle Indicators" sheet, December 2024 (`https://mla.com.au/contentassets/2b3a2fcab8bf4b868bfcd0bdbdce3c21/mla_nlrs-national-cattle-indicators-spec-sheet.pdf`, read 14 Nov 2026). Every indicator is a seven-day rolling average over all NLRS saleyards, any muscle and fat score, in c/kg live weight.
+
+| Indicator | Cattle | Live weight | Bought by |
+|---|---|---|---|
+| Restocker Yearling Steer | Yearling steers | 200 to 400 kg | Restockers (back to a paddock) |
+| Restocker Yearling Heifer | Yearling heifers | 200 to 400 kg | Restockers |
+| Feeder Steer | Yearling steers 200 kg and over, grown steers up to 600 kg | | Feedlots |
+| Feeder Heifer | Not on the sheet. Taken to be the heifer match of the Feeder Steer. **Not confirmed** | | Feedlots |
+| Heavy Steer | Grown steers | 400 to 750 kg | Processors |
+| Processor Cow | Cows | 400 kg and over | Processors |
+
+The sheet describes the indicators as they are now. Whether the same weights applied back to 1997 was not checked.
+
+**The mapping** (`CLASS_INDICATORS`). Each game class is one indicator times a multiple.
+
+| Game class | Who is in it | Indicator | × | Why |
+|---|---|---|---|---|
+| `wean` Weaner steers | Steers under 280 kg | Restocker Yearling Steer | 1.08 | The indicator covers 200 to 400 kg and weaners are at the light end, which makes more a kg. The multiple is the MVP's (weaners at 1.08 times its indicator). **Tuning** |
+| `feed` Yearling steers | Steers 280 to under 450 kg | Feeder Steer | 1 | The weight range feedlots buy. **Sourced** (the indicator as it is) |
+| `heavy` Heavy steers | Steers 450 kg and over | Heavy Steer | 1 | Grown steers to processors. **Sourced** |
+| `wheif` Weaner heifers | Heifers under 280 kg | Restocker Yearling Heifer | 1.08 | As for weaner steers. The MVP's weaner heifers over its heifers is 0.92 ÷ 0.85 = 1.08. **Tuning** |
+| `heifer` Heifers | Heifers 280 kg and over | Feeder Heifer | 1 | The match of yearling steers. **Proposed reading:** what the Feeder Heifer indicator covers was not found on MLA's sheet, so this rests on its name |
+| `cow` Cows | Cows | Processor Cow | 1 | **Sourced.** The game's cows include breeders. Their extra worth is the pregnancy premium and the condition adjustments, which are unchanged (Market, above) |
+| `bull` Bulls (when sold) | Bulls | Processor Cow | 0.906 | No indicator for bulls. A bull sold at the yards goes to a processor, as a cow does. The multiple is the MVP's bulls over its cows, 0.58 ÷ 0.64. **Tuning** |
+| `calf` Calves | Calves | Restocker Yearling Steer | 1.10 | No indicator for calves. The MVP's multiple. **Tuning** |
+| The game's "indicator" | | Restocker Yearling Steer | 1 | It scales the pregnancy premium ($320 at 400 c/kg) and the price of a bull bought ($5,500 at 400 c/kg) |
+
+For comparison, the national indicators as a share of the Restocker Yearling Steer, averaged over every day both have a row from 1997 to 2025, beside the MVP's multiples: feeder steers 0.97 (MVP 1.00), heavy steers 0.94 (0.90), feeder heifers 0.88 (0.85), restocker heifers 0.86, cows 0.71 (0.64). So cows and heavy steers are dearer against young cattle on real prices than they were in the MVP.
+
+**Fill-in rules** (`REAL_PRICE_RULES`), for one indicator at one yard on one real date:
+
+1. **The yard's own row** for the day is used when it has 20 head or more behind it.
+2. **Held:** with no such row that day, the yard's newest row with 20 head or more is used if it is no more than 14 days old. MLA repeats a sale's figure for seven days and then the rows stop, so this carries a yard that sells fortnightly from one sale to the next.
+3. **Otherwise the national figure times the yard's premium.** The premium is the average of yard ÷ national over every day from 1997 to 2025 on which the yard and the national indicator each have a row with 20 head or more.
+4. **A yard series with under 730 such days is not used at all.** The national figure is used as it is, with no premium. This catches Mortlake's restocker steers and heifers.
+5. **The national figure** is the newest national row on or before the day with 20 head or more behind it. A national figure usually rests on thousands of head, but around Christmas it can rest on one: restocker steers read 147 c/kg on 1 head from 29 December 2004, against 183.4 c/kg on 290 head four days before, and heavy steers read 230 c/kg on 5 head on 25 December 2024 against 324. Each national table has 13 to 80 rows under 20 head, nearly all in December and January. With those left out the longest break from 1997 is 15 days. A break of more than 21 days stops with an error. The limit is the same low one as for a yard because the national restocker heifer figure rested on 20 to 70 head through early 1997. Rows with 20 to 99 head are still used (124 to 247 a table for the restocker indicators, fewer for the rest).
+6. **A price is never negative and never from a blank row.** A row with a blank, zero or negative figure is dropped when the table is read and counted. The cattle tables have none. If one ever appears the bundle stops with an error so it gets looked at.
+
+| Figure | Value | Kind |
+|---|---|---|
+| Thin row, yard or national | under 20 head | **Tuning.** A yard row's distance from its yard's usual premium averages 7 to 10% under 20 head and 4 to 6% over 50 |
+| Hold | 14 days | **Tuning** |
+| Days needed to use a yard series | 730 | **Tuning** |
+| Premium years | 1997 to 2025 | Fixed, so a later pull does not move a past price |
+| Longest national break allowed | 21 days | **Tuning**, a safety limit |
+
+**The yard premiums** as worked out from the tables (pinned in `realPrices.test.ts`), with the days behind each: (The day counts were taken before national rows under 20 head were left out. The premiums are unchanged to three places; the day counts are a few lower.)
+
+| Indicator | Gracemere `GME` | Armidale `ARM` | Dubbo `DUB` | Mortlake `MTL` |
+|---|---|---|---|---|
+| Restocker yearling steer | 0.944 (3,469 days) | 1.017 (7,868) | 0.978 (8,343) | **not used** (182 days, which read 0.80) |
+| Restocker yearling heifer | 0.933 (3,483) | 1.030 (5,656) | 0.989 (7,046) | **not used** (371 days, which read 0.81) |
+| Feeder steer | 0.922 (3,488) | 0.976 (4,651) | 1.012 (7,639) | 0.923 (1,603) |
+| Feeder heifer | 0.909 (3,483) | 0.980 (4,028) | 1.013 (7,244) | 0.986 (1,869) |
+| Heavy steer | 0.945 (3,814) | 0.994 (4,480) | 1.008 (9,472) | 1.008 (2,016) |
+| Processor cow | 0.997 (5,062) | 1.004 (8,207) | 1.024 (9,890) | 1.034 (2,464) |
+
+**Where each district's prices come from**, as a share of the days from 1997 to 2025 (the yard's own row or its held row; the rest is the national figure times the premium):
+
+| District | Restocker steers | Feeder steers | Heavy steers | Cows |
+|---|---|---|---|---|
+| Central Queensland (Gracemere, rows from Oct 2014; heavy steers and cows also Nov 1999 to Aug 2004) | 37% | 37% | 48% | 53% |
+| Northern Tablelands (Armidale) | 95% | 67% | 62% | 97% |
+| Central West NSW (Dubbo) | 93% | 77% | 98% | 99% |
+| Western Victoria (Mortlake, rows from Jan 2018) | 0% | 21% | 25% | 26% |
+
+So Central Queensland before October 2014 and Western Victoria before 2018 play on national prices shifted by the yard's later premium. The fill-in yards (Emerald, Inverell, Ballarat) are not used: they are not agreed and not pulled.
+
+**Feeder indicators before 16 June 2003** (`FEEDER_STAND_INS`). The two feeder indicators start on 16 June 2003. Before that:
+
+```
+feeder steer  = a × √(restocker yearling steer × heavy steer)       a = 1.0169
+feeder heifer = b × √(restocker yearling heifer × heavy steer)      b = 0.9990
+```
+
+All national figures for the day. `a` and `b` are the average of the real feeder figure over that mean, across every day all three have a row with 20 head or more from 16 June 2003 to the end of 2025. They are worked out from the tables, not typed in, and pinned in a test. The yard premium is then applied as usual. **Tuning**: the form was picked because it tracks the real feeder steer indicator more closely than a multiple of restocker steers alone or of heavy steers alone. From June 2003 to 2025 the real figure over the stand-in has a standard deviation of 2.7%, against 6.0% and 6.6%. For heifers it is 3.4%, against 3.9% for a multiple of feeder steers and 7.1% for restocker heifers alone. It can't be checked against 1997 to 2003, because there is nothing to check it against.
+
+**Things a grazier may question (for Claudia):**
+
+- **Yard rows jump.** A yard's figure is whoever turned up that week. Dubbo restocker steers read 132, 114, 58 and 92 c/kg on 8, 15, 17 and 24 October 2002 (66, 136, 81 and 154 head) while the national figure moved from 117 to 111. The game uses the yard's row as it is. The other choice is the national figure times the premium every day, which is smoother and less local.
+- **Mortlake's restocker steers and heifers** have too few rows to use, and the rows there are read about 20% under the national figure. Western Victoria's weaner and calf prices are the national figures as they are.
+- **Prices change from one real year to the next at random.** With years at random, or in order after 2025, the market on the first day of a game year is another year's market. In today's dollars the restocker steer indicator runs from about 110 c/kg (Dubbo, October 2002) to about 900 (Gracemere, January 2022).
+- **Sheep are not mapped.** The sheep and lamb tables are pulled and listed but not read. The Hamilton rows that are negative or near zero are dropped by rule 6 when they are.
+
+### Inflation: the Consumer Price Index (milestone 1.4)
+
+Real prices from 1997 are in the dollars of their day, and the game's costs are in today's dollars. PRD section 21 gives no default, so the builder's default is used: **prices are shown and used in today's dollars**, lifted by the Consumer Price Index. **For Claudia to confirm.**
+
+- **Source:** Australian Bureau of Statistics, Consumer Price Index, Australia, from the ABS data service: `https://data.api.abs.gov.au/rest/data/ABS,CPI/1.10001.10.50.Q?startPeriod=1990-Q1&format=csvfilewithlabels`. No key. No contact detail was sent (a plain client name).
+- **The series,** as the service labels it: Measure "Index numbers", Index "All groups CPI", Adjustment Type "Original", Region "Australia" (region code 50), Frequency "Quarterly", reference base "Sep 2025 = 100.0". The brief asked for the weighted average of eight capital cities. The service's label for this series is "Australia", and the page was not found that says in words that it is the eight capital cities figure. **Not confirmed in words.**
+- **Read:** 14 Nov 2026, one request. 147 quarters, March quarter 1990 to September quarter 2026.
+- **Checked:** all 147 figures match the Reserve Bank's table G1 ("Consumer price index; All groups", series `GCPIAG`, source "ABS / RBA", published 29 Oct 2026) to two decimal places. Read the same day at `https://www.rba.gov.au/statistics/tables/csv/g1-data.csv`.
+- **Licence:** Creative Commons Attribution 4.0 International. The ABS copyright page says "All material presented on this website is provided under a Creative Commons Attribution 4.0 International licence" (`https://www.abs.gov.au/website-privacy-copyright-and-disclaimer`, read 14 Nov 2026). Credit line: "Source: Australian Bureau of Statistics, Consumer Price Index, Australia." The table was changed in form only (one series, two columns).
+- **Table:** `packages/engine/data/raw/abs/cpi-all-groups.csv` (`quarter,index`), listed in `manifest.json`. Pulled by `pnpm data:cpi` (`scripts/data/pull-cpi.mjs`).
+
+| Figure | Value | Kind | In code |
+|---|---|---|---|
+| Today's dollars | The September quarter 2026 (index 103.64), the newest quarter in the table | Fixed, so a newer table does not move a past price. Changing it is a model change | `TODAYS_DOLLARS` |
+| The lift for a date | index of the September quarter 2026 ÷ index of the date's own quarter. A date in or after that quarter gets 1 | **Sourced** figures, **tuning** method: every day of a quarter uses that quarter's figure, so the lift steps on the first day of a quarter (by under 1% as a rule, 3.7% on 1 July 2000) | `todaysDollarsFactor` |
+| The switch | `today` or `of-the-day`. A new real-year farm takes `today` and keeps what it started with | The one place to change it | `REAL_PRICE_DOLLARS` |
+
+Examples: the March quarter 1997 is 46.58, so a 1997 price is multiplied by 103.64 ÷ 46.58 = 2.225. The December quarter 2025 is 100.32, so a late 2025 price is multiplied by 1.033.
+
+The restocker steer indicator at Dubbo, yearly average, c/kg, as reported and in today's dollars: 1997 84 and 188. 2002 135 and 262. 2010 191 and 297. 2016 349 and 478. 2019 252 and 327. 2022 574 and 674. 2025 437 and 457.
+
+**What the CPI does not do.** It measures what households pay, not what farms pay. Fence, fuel and feed may have risen faster or slower. It was chosen because it is the plain public measure. The game's costs are not changed by it: they stay as they are in every year played.
+
+### Sale calendars (milestone 1.4)
+
+For each district's cattle yard the engine answers "is there a cattle sale on this real date, and of what type" (`packages/engine/src/market/saleCalendar.ts`). Booking stock onto a sale and delivery are milestone 1.5.
+
+- **Source:** `mla/yardings/<yard>-cattle.csv`, the yardings report as served: one row for each sale type on a day, `Prime` or `Store`, with the head yarded. `mla/sales/<yard>-cattle.csv` is the same days with the types added together. A test checks that every day in the sales table is a sale day in the calendar with the same head, and that no other day is unless it is a stand-in.
+- **A sale day** has its date, its types (prime first), the head yarded and whether it is a stand-in.
+- **The calendar runs** from 1 January 1997 to the yard's last record (5 to 12 Nov 2026). A date outside it is an error.
+- **Next sale day:** `nextSaleDay(farm, env)` gives the first sale on or after a farm day, of a type if asked. It follows the farm's own days, so at a year's end it carries on into the next game year whatever real year that is. `saleDayOn(farm, env, day)` answers for one day.
+
+**Stand-ins for the stretches the service has nothing for** (`CATTLE_SALE_STAND_INS`). **Tuning, for Claudia.**
+
+| Yard | Stretch | Stand-in | Why that day |
+|---|---|---|---|
+| Gracemere | 1 Jan 1997 to 7 Nov 1999 | A prime sale every Monday | The yard sold on Mondays once its records start (45 of its 47 prime sales in 2000) |
+| Gracemere | 17 Aug 2004 to 9 Oct 2014 | A prime sale every Monday | The yard sold on Mondays in the year before. **The real day is not known.** When the records start again in October 2014 it sells on Fridays, so it changed somewhere in the gap |
+| Mortlake | 1 Jan 1997 to 28 Jan 2018 | A prime sale every Monday | The yard sold on Mondays in the year after |
+
+- **No stand-in sale from 16 December to 7 January** (`STAND_IN_BREAK`). The four yards' own last prime sale of a year falls between 4 and 21 December, and their first of the next between 3 and 21 January. **Tuning.**
+- A stand-in day has no head count, and no store sales.
+- Public holidays are not allowed for.
+- A real record inside a stand-in stretch stops the build, so a stand-in can never cover up a real sale day.
+- Armidale and Dubbo have records for every year from 1997 and nothing there is a stand-in.
+
+### The data version (milestone 1.4)
+
+Every table a district's farms read is fingerprinted together: the SILO weather, the six national and six yard cattle indicators, the yard's cattle yardings and the CPI (`districtTablePaths`). The fingerprint is 16 hex digits (`DistrictRealData.version`). As pulled: Central Queensland `81313cdc124d11e3`, Northern Tablelands `525d82ca4aa73029`, Central West `2efe5d572683f104`, Western Victoria `c45fa535fcacb5e2`. A real-year farm records its district's version and will not run on any other (MODEL.md, section 1A). **Any new pull changes the version**, even one that only adds days. See the README in `scripts/data/`.
+
+**A question for Claudia and a known limit.** As built, any change to any table a district reads gives a new version, and a farm refuses to run on another version. That keeps a farm's past fixed. It also means one pull that adds a year stops every running real-year farm until a way to move a farm across is built, and it cannot serve Daily Farm as it stands, because Daily Farm fetches new weather and prices every day (PRD 5.14). The version will need to cover only the dates a farm has already played. That is Stage 3 work (the server), and it must be designed before real-year farms are kept for long.
+
+**Today's dollars is fixed at the September quarter 2026.** That quarter was picked by the builder as the newest in the table. The game's costs are the MVP's, and no date is recorded for when they were set. If the costs are in the dollars of another time, the base quarter should move to match. For Claudia.
+
+**Sale calendar look-ahead:** `nextSaleDay` looks 120 farm days ahead and then gives up. **Tuning**, longer than any break in a yard's records since 1997.
 
 ## Saleyard classes (`BUYS`)
 

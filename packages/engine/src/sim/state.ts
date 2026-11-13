@@ -15,10 +15,12 @@ import type { CropState } from '../crops/fields';
 import type { MarketClassId } from '../data/cattle';
 import type { FarmBuildings, StartType } from '../farm/generate';
 import type { FarmLayout } from '../farm/layout';
+import type { RealMarket } from '../market/realMarket';
 import type { StandInMarket } from '../market/standIn';
 import type { Difficulty } from '../money/costs';
 import type { PastureState } from '../pasture/state';
 import type { RngState } from '../rng';
+import type { YearOrder } from '../season/realYears';
 import type { Action } from '../actions/types';
 import type { FarmEvent } from './events';
 
@@ -98,6 +100,8 @@ export interface YearRecord extends YearTotals {
   score: YearScore;
   /** 1 for the farm's first year. */
   n: number;
+  /** On a real-year farm, the real year this game year started in. */
+  realYear?: number;
   /** The farm day the year closed. */
   end: number;
 }
@@ -136,11 +140,40 @@ export const emptyLedger = (): InfraLedger => ({
   pasture: {},
 });
 
-/** Where the growth factors come from. Real weather joins this in milestone 1.4. */
-export type SeasonSpec = { kind: 'random' };
+/**
+ * The years a real-year farm plays (PRD 5.14). Enough to lay the years out
+ * again without the tables: the order, the first year and the years that
+ * could be played when the farm started. The start month is the farm's own.
+ */
+export interface RealYearsSpec {
+  kind: 'real';
+  /** The years as they happened, or shuffled from the farm's seed. */
+  order: YearOrder;
+  /** The real year the farm started in. */
+  firstYear: number;
+  /**
+   * The oldest and newest years that could be played when the farm
+   * started. Kept so a later data pull that adds a year does not change
+   * the order of the years to come.
+   */
+  years: { first: number; last: number };
+  /**
+   * The version of the district's real data the farm runs on (see
+   * `DistrictRealData.version`). The farm can only be stepped on data
+   * with this version.
+   */
+  dataVersion: string;
+}
 
-/** The market's saved state. Real prices join this in milestone 1.4. */
-export type MarketState = StandInMarket;
+/**
+ * Where the growth factors, the prices and the date come from: the MVP's
+ * random seasons with the stand-in market, or real years with real weather
+ * and real prices.
+ */
+export type SeasonSpec = { kind: 'random' } | RealYearsSpec;
+
+/** The market's saved state: the stand-in's, or today's real prices. */
+export type MarketState = StandInMarket | RealMarket;
 
 /** One day of class prices, for the market chart. */
 export interface PriceDay {
