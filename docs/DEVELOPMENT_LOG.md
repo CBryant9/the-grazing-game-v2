@@ -378,7 +378,9 @@ Built:
 - `packages/engine/src/calibration/speed.timed.ts`, `vitest.speed.config.ts`, `pnpm test:speed` and a CI step: the speed benchmark on its own.
 - **The Central West tune:** peak green digestibility 0.70 to 0.68 (`data/districts.ts`). The MVP copy used by the comparison tests is given the same figure in memory (`REBUILD_TUNES` in `test-support/mvp.ts`), and loading stops if the MVP file no longer holds 0.70.
 
-Results, with before and after, are in CALIBRATION.md. Lessons K1 to K4 are in LESSONS.md.
+Results, with before and after, are in CALIBRATION.md. Lessons K1 to K5 are in LESSONS.md.
+
+**The milestone's done condition is not met as the build plan words it.** Every benchmark is a test and the Central West tune is in, but four benchmarks pass only on a reading that is Claudia's to decide: steer bands held on the average of twelve blocks, Central Qld with lick 1 kg over, the oats figures held to one fortnight, and herd deaths counted over all herds together. The `realism-guardian` check found that the first write-up stated those readings as settled. They are now marked as proposed, in the tests and in CALIBRATION.md.
 
 One existing test changed: `cattle/simMob.test.ts`, "500 head on 4 ha, moved on to the next 16 ha". It said the 16 ha runs short within four days. In Central West it is now five, because the feed is a little less digestible and the steers eat a little less of it. The test now finds the day and holds it to four (five in Central West).
 
@@ -387,7 +389,7 @@ PRD defaults used: none new.
 Not done:
 
 - Several moves a day and a long walk at whole-farm level, real dry and wet years, and the 180-day run (BUILD_PLAN section 3). They need grazing plans, walking times and real weather (milestones 1.4 and 1.5).
-- Central Qld with lick is 1 kg over its band in the average year. Not tuned. Listed for Claudia in CALIBRATION.md with four other questions.
+- Central Qld with lick is 1 kg over its band in the average year. Not tuned. Listed for Claudia in CALIBRATION.md with ten other questions.
 
 ## Ideas raised but not built yet
 
