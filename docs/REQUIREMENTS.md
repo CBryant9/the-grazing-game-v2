@@ -189,12 +189,12 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 - [ ] Permanent ("proper") fence: 500 m a day on your own. *(Changed: the PRD had about 250 m a day.)*
 - [ ] Permanent fence has a contractor option in the fencing tool: a 1-man team costs more and gets double done in a day; a 2-man team more again. Time and cost depend on the option chosen. *(details open)*
 - [ ] Other fence types scale sensibly: rolling out tape and putting it on posts takes about as long as walking it; electric fence needs posts hit in, so it sits between tape and permanent.
-- [ ] Every farm has a house and yards. How long a job takes depends on "driving the cruiser out there and back".
-- [ ] Moving stock takes time by distance. The paddock next door "shouldn't take long at all". Cattle walk at about 1.5 km/h. *(Changed: the PRD had about 3 km/h.)*
-- [ ] On a day a mob has "a bit of a walk", assume they didn't eat much for weight gain. Walking through other paddocks has no effect on those paddocks.
-- [ ] Gates: consider doing gate types now so it is realistic (a cheap gate, a real gate, a pull-up tape gate). *(details open)*
-- [ ] Supplements are stock you hold. A lick block gets low and needs topping up; how fast it goes depends on the stock on it. A lick run takes time.
-- [ ] Feeding out means loading at a feed bin, shed or silo and driving out from there. Players can build sheds and silos closer to the stock, or build a feedlot and feed them there. *(Earlier rule: no feedlot drawn on the map. A feedlot the player builds on the farm is new; confirm how it shows.)*
+- [ ] Every farm has a house and yards. How long a job takes depends on "driving the cruiser out there and back". *(Reversed 14 Nov 2026: no house and no driving. The yards stay, for bought cattle. See "The working day made simpler".)*
+- [ ] Moving stock takes time by distance. The paddock next door "shouldn't take long at all". Cattle walk at about 1.5 km/h. *(Changed: the PRD had about 3 km/h.)* *(Reversed 14 Nov 2026: moving a mob is "pick the paddock, done". No walking time.)*
+- [ ] On a day a mob has "a bit of a walk", assume they didn't eat much for weight gain. Walking through other paddocks has no effect on those paddocks. *(Reversed 14 Nov 2026, for now: there is no walk.)*
+- [ ] Gates: consider doing gate types now so it is realistic (a cheap gate, a real gate, a pull-up tape gate). *(details open)* *(Reversed 14 Nov 2026, for now: one kind of gate.)*
+- [ ] Supplements are stock you hold. A lick block gets low and needs topping up; how fast it goes depends on the stock on it. A lick run takes time. *(Changed 14 Nov 2026: this holds for Daily Farm. In Fast Farm a supplement is switched on at a daily price with no daylight cost.)*
+- [ ] Feeding out means loading at a feed bin, shed or silo and driving out from there. Players can build sheds and silos closer to the stock, or build a feedlot and feed them there. *(Earlier rule: no feedlot drawn on the map. A feedlot the player builds on the farm is new; confirm how it shows.)* *(Reversed 14 Nov 2026: no sheds, silos or driving. A feeder or lick block in the paddock is filled where it is, and no feeder has to be bought.)*
 
 ### Buying and selling
 
@@ -251,11 +251,49 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 - [ ] "Electric fencing is really fast if it's just one wire or tape."
 - [ ] Contractor fencing: a 1-man team does 500 m a day and a 2-man team 1,000 m a day, and neither takes the farmer's daylight. Any workers could be helping them. The farmer can draw their own extra fence as well, shown in a different colour from the team's.
 - [ ] Workers helping on a fence the farmer draws: the first part of the line is the workers' share and uses none of the farmer's daylight (about 500 m for a worker, more or less by their skills). Then the line continues and uses the farmer's daylight.
-- [ ] The line stops drawing when the day is used up, with a warning that this is the full day, and that to move cows as well they need to do less fence.
-- [ ] Driving on the farm is faster than 25 km/h in real life, but 25 works for the game's scale.
+- [ ] The line stops drawing when the day is used up, with a warning that this is the full day, and that to move cows as well they need to do less fence. *(Kept, and made firmer on 14 Nov 2026: the part that fits is built, the rest shows red and is drawn again another day.)*
+- [ ] Driving on the farm is faster than 25 km/h in real life, but 25 works for the game's scale. *(Reversed 14 Nov 2026: no driving.)*
 - [ ] Nobody under 14 can make an account. No community under 16. *(Changed: PRD v1.0 had 13.)*
 - [ ] For everything else on the list, Claudia accepted the suggested defaults "for now": "better to get this in and then scale and adapt as we go". They are listed in PRD section 21.
 
 ### Security
 
 - [ ] Claudia is "worried about this security and stuff". The rules, players' data and payments must all be safe, and she wants it explained in plain words.
+
+## 14 Nov 2026: the working day made simpler
+
+Given after the first cut of the working day (milestone 1.5a) was built with driving, a homestead, contractor bookings and jobs that carried over. Where these differ from the PRD or from rules above, these win. The earlier lines they reverse are marked "Reversed 14 Nov 2026" where they stand.
+
+Her words: "Let's take the driving and all of that part out." "The drive home is just adding too much of an element into the time." "I don't think we want to be putting too much emphasis on them watching the time. Obviously, we want them to have little notes and be aware of it, but we don't want them thinking about it too much." "The yard stuff and the driving from the house and all of that really, really overcomplicates it."
+
+### Time and jobs
+
+- [ ] **No driving and no drive home.** A job's time is its work only. *(Reverses: travel at 25 km/h, "driving the cruiser out there and back", PRD 5.1 and 5.4.)*
+- [ ] **Time is shown lightly.** The player has "little notes" and is aware of the day, but is not made to watch the clock or think about it much.
+- [ ] **A fence or pipe line too long for today:** the part that fits is built. The rest shows red with "You don't have enough time to do this today" and is drawn again another day. A line that takes the whole day says so: "this would use up your full day". **No half-built jobs that carry on by themselves.** *(Reverses PRD 5.1 "job in progress".)*
+- [ ] Any other job is done if it fits in the light left, and is not done if it does not.
+- [ ] **At last light the farm goes dark but can still be looked at, and the Next day button invites a click.**
+- [ ] **Harvest and sowing happen at once:** "they can straight up just go and harvest." They cost money and take none of the day. *(Reverses the contractor's wait, PRD 5.4.)*
+
+### The farm
+
+- [ ] **No homestead.** "I think we don't need to have a cellar, yards, or a house", then, on the yards: "the yards can stay for buying them so they will place them but they don't have to come in for husbandry." *(Reverses: "Every farm has a house and yards".)*
+- [ ] **The stock yards stay** as the place bought cattle arrive. The player moves them out to a paddock. Stock never have to come to the yards for husbandry.
+- [ ] No sheds, silos or other buildings for now. *(Reverses: sheds and silos closer to the stock, and a feedlot the player builds.)*
+
+### Stock work
+
+- [ ] **Husbandry is a button on the mob, done where the mob is.** "The animal husbandry and stuff should happen, and they don't need to take them into the yards." "Make clicking the button easy. It would come up with the banner and say, 'You need to mark your calves,' and then they go and do it, or you look in the mob."
+- [ ] **A banner and the mob card say what needs doing** (calves to mark, calves to wean, a mob with no water, a crop ready). They state facts.
+- [ ] **Moving a mob is "pick the paddock, done".** No route through gates, no walking time, no gate needed on the way. *(Reverses: moving stock takes time by distance, cattle walk at 1.5 km/h, a long walk costs the day's gain, PRD 5.13 routes, and the three gate types, for now.)*
+
+### Feed
+
+- [ ] **Fast Farm:** "in the fast game they just turn it on", at a daily price that "doesn't cut their daylight".
+- [ ] **Daily Farm:** supplements are stock on hand. "Each supplement has a capacity like 100 animals for 5 days for lick (find realistic)", "they would feed grain each day as part of their tasks", with "a warning if things needed filling". There is "a lick block with an amount used or a feeder and we could see if it's empty", "you tap on it to replenish it on that day and it has a cost obviously and uses some of their daylight". A notification like "Paddock X is out of lick block or feed". Levels keep falling on days the player misses. The player can "put a different ration in the feeder" or put out a new lick block, and can "remove the feeder" to stop the empty warning. "I'm happy for them to not have to buy a feeder."
+- *(Changes: "supplements are stock you hold" now holds for Daily Farm only. Loading at a shed or silo and driving out is reversed.)*
+
+### For the game screens milestone
+
+- [ ] An information panel explains how the day works.
+- [ ] Onboarding and a tour show how things work, with help available at any time.

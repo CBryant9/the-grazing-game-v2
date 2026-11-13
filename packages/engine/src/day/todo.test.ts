@@ -7,6 +7,7 @@ import {
   setUp,
   work,
 } from '../../test-support/workingDay';
+import { EDGE, cloneFences, getEdge, setEdge } from '../farm/topology';
 import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
 import { surveyOf } from '../sim/derived';
@@ -214,6 +215,21 @@ describe('things to do', () => {
     ]);
     const fixed = work(b.farm, { type: 'fixFence', edge: b.downed }).farm;
     expect(ofType(thingsToDo(fixed), 'fence-down')).toEqual([]);
+    // Tape that has been pushed down is listed too, as tape. Standing tape is not.
+    expect(getEdge(b.farm.layout.fences, b.tape)).toBe(EDGE.tape);
+    const fences = cloneFences(fixed.layout.fences);
+    setEdge(fences, b.tape, EDGE.tapeDown);
+    const pushed = { ...fixed, layout: { ...fixed.layout, fences } };
+    expect(ofType(thingsToDo(pushed), 'fence-down')).toEqual([
+      {
+        type: 'fence-down',
+        edge: b.tape,
+        fence: 'tape',
+        count: 1,
+        does: 'fixFence',
+        action: { type: 'fixFence', edge: b.tape },
+      },
+    ]);
   });
 
   it('every action it offers is one the farm accepts, and water comes first', () => {
