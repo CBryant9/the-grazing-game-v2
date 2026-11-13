@@ -9,3 +9,4 @@ art
 *.md
 .data-cache
 packages/engine/data/raw
+.claude
