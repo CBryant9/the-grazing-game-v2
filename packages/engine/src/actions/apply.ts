@@ -1,9 +1,15 @@
 /**
- * Doing an action on a farm.
+ * What each action does to a farm, with no clock: the rules and the money.
  *
- * `applyAction` never changes the farm it is given. It works on a copy and
+ * `tryAction` never changes the farm it is given. It works on a copy and
  * returns that copy with the events, or a refusal with a plain reason and
  * nothing changed. So a server can check every action before it saves.
+ *
+ * This file knows nothing about time. The working day (../day) decides
+ * when a job can start, how long it takes and how much of it fits today,
+ * and calls `tryAction` for what the work does. The player's way in is
+ * `applyAction` in ../day/act.ts. `applyInstant` here does a whole action
+ * at once without the clock: it is for calibration and tests only.
  *
  * The rules and prices are the MVP's (buyCattle, sellAnimals, sellGroup,
  * sellClass, movePicked, moveMob, toLot, weanMob, markCalves, and the cost
@@ -96,8 +102,10 @@ import {
   cloneFarm,
   deepCopy,
   toInbox,
+  type ClockSpan,
   type FarmMob,
   type FarmState,
+  type LoggedAction,
   type MobWhere,
 } from '../sim/state';
 import type {
@@ -136,7 +144,27 @@ const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isI
 const edgeKey = (e: EdgeRef): string => e.line + e.index;
 
 /** What an action can be given in place of the farm's own sources. */
-export type ActionEnv = SourceEnv;
+export interface ActionEnv extends SourceEnv {
+  /**
+   * FOR CALIBRATION AND TESTS ONLY. True does the whole action at once
+   * with no farm clock: no travel, no job time, no daylight limit, nothing
+   * left in progress, and sowing and harvest done on the spot. The
+   * calibration suites and the MVP comparisons drive farms this way so
+   * their figures stay what they were before jobs took time
+   * (docs/MODEL.md, section 9). Only test support sets it. Nothing a
+   * player can reach may set it: it is not part of an action, and the
+   * server builds the `env` itself.
+   */
+  instant?: boolean;
+}
+
+/** What a part of a bigger job tells the rules about the job it belongs to. */
+export interface PartOptions {
+  /** True if the $10 tape fee has already been paid on this job. */
+  tapeFeePaid?: boolean;
+  /** The job name to report, when the part is done by another action (rolling up tape piece by piece). */
+  label?: string;
+}
 
 /** The work of one action, on a farm that may be changed freely. */
 class Job {
@@ -144,6 +172,7 @@ class Job {
   constructor(
     readonly farm: FarmState,
     readonly env: ActionEnv,
+    readonly part: PartOptions = {},
   ) {}
 
   get survey(): Survey {
@@ -567,8 +596,9 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   let fee = 0;
   let energiser = false;
   if (a.fence === 'tape') {
-    // New tape by the metre. Running out tape that was on the roll costs a small fee.
-    fee = out.tapeFromRoll > 0 ? COSTS.tapeRoll : 0;
+    // New tape by the metre. Running out tape that was on the roll costs a
+    // small fee, once for the job however many days it takes.
+    fee = out.tapeFromRoll > 0 && !j.part.tapeFeePaid ? COSTS.tapeRoll : 0;
     cost = out.tapeNew * each + fee;
   } else {
     cost = out.segments * each;
@@ -619,8 +649,8 @@ function doRemoveFence(j: Job, edges: readonly EdgeRef[], job: string): Out {
   const out = removeFence(farm.layout, edges);
   if (!out.ok) return out;
   let cost = 0;
-  if (out.tapeToRoll > 0) {
-    // Rolling tape up costs a small fee. It comes straight off the account.
+  if (out.tapeToRoll > 0 && !j.part.tapeFeePaid) {
+    // Rolling tape up costs a small fee, once for the job. It comes straight off the account.
     cost = COSTS.tapeRoll;
     farm.cash -= cost;
     farm.year.running += cost;
@@ -631,7 +661,7 @@ function doRemoveFence(j: Job, edges: readonly EdgeRef[], job: string): Out {
   farm.layout = out.layout;
   j.events.push({
     type: 'layout-job',
-    job,
+    job: j.part.label ?? job,
     cost,
     detail: {
       segments: out.segments,
@@ -1013,11 +1043,22 @@ function run(j: Job, a: Action): Out {
   }
 }
 
-/**
- * Do an action. Returns the farm after it and what happened, or a refusal
- * with the reason. The farm passed in is never changed.
- */
-export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
+/** A copy of a farm that keeps what has been worked out for it: its paddocks, water, seasons and real years. */
+export function workingCopy(farm: FarmState): FarmState {
+  const next = cloneFarm(farm);
+  // The paddocks and water are the same until an action changes the layout.
+  keepSurvey(next.layout, surveyOf(farm));
+  // So are the farm's seasons and, on a real-year farm, its real years.
+  keepSources(next, farm);
+  return next;
+}
+
+/** The checks every action meets first, whatever it is. Null when it can go ahead. */
+export function refusedOutright(
+  farm: FarmState,
+  action: Action,
+  env: ActionEnv,
+): ActionRefusal | null {
   // A real-year farm needs its real data for any action, whether or not
   // this one reads it. Without it this stops with an error.
   realSourcesOf(farm, env);
@@ -1025,15 +1066,53 @@ export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}
   if (!action || typeof action !== 'object') {
     return refuse('bad-request', 'That is not something that can be done on a farm.');
   }
-  const next = cloneFarm(farm);
-  // The paddocks and water are the same until the action changes the layout.
-  keepSurvey(next.layout, surveyOf(farm));
-  // So are the farm's seasons and, on a real-year farm, its real years.
-  keepSources(next, farm);
-  const job = new Job(next, env);
+  return null;
+}
+
+/**
+ * What an action does, all at once, with no clock. Returns a copy of the
+ * farm with the action done and what happened, or a refusal with the
+ * reason. The farm passed in is never changed. Nothing is added to the
+ * action log or the inbox: the caller records it (`recordAction`), with
+ * the time of day when there is one.
+ */
+export function tryAction(
+  farm: FarmState,
+  action: Action,
+  env: ActionEnv = {},
+  part: PartOptions = {},
+): ActionResult {
+  const no0 = refusedOutright(farm, action, env);
+  if (no0) return no0;
+  const next = workingCopy(farm);
+  const job = new Job(next, env, part);
   const no = run(job, action);
   if (no) return no;
-  next.actionLog.push({ day: next.day, action: deepCopy(action) });
-  toInbox(next, next.day, job.events);
   return { ok: true, farm: next, events: job.events };
+}
+
+/** Put an action in the farm's action log and its events in the inbox. */
+export function recordAction(
+  farm: FarmState,
+  action: Action,
+  events: readonly FarmEvent[],
+  when?: { at: ClockSpan; job?: number },
+): void {
+  const entry: LoggedAction = { day: farm.day, action: deepCopy(action) };
+  if (when) {
+    entry.at = { start: when.at.start, end: when.at.end };
+    if (when.job !== undefined) entry.job = when.job;
+  }
+  farm.actionLog.push(entry);
+  toInbox(farm, farm.day, events, when?.at.end);
+}
+
+/**
+ * FOR CALIBRATION AND TESTS ONLY. Do a whole action at once, with no farm
+ * clock (see `ActionEnv.instant`). The farm passed in is never changed.
+ */
+export function applyInstant(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
+  const done = tryAction(farm, action, env);
+  if (done.ok) recordAction(done.farm, action, done.events);
+  return done;
 }

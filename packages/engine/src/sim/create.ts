@@ -13,6 +13,7 @@ import { makeSaleBatch } from '../cattle/animal';
 import type { Animal } from '../cattle/types';
 import type { SaleClassId } from '../data/cattle';
 import { FARM_SIZES } from '../data/farms';
+import { DEFAULT_WORK_RULES } from '../data/jobTimes';
 import { generateFarm, type StartType } from '../farm/generate';
 import type { GrazingArea as TopologyArea } from '../farm/topology';
 import { buyPrice } from '../market/prices';
@@ -25,6 +26,7 @@ import type { GrowthFactorSource } from '../season/factors';
 import { planRealYears, type YearOrder } from '../season/realYears';
 import { weatherSeasons } from '../season/weatherSeasons';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
+import { startDay } from './clock';
 import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
 import type { FarmStarted, StartHerd } from './events';
 import { mergeShared, newMob } from './mobs';
@@ -32,10 +34,12 @@ import {
   PLAY_STREAMS,
   emptyLedger,
   toInbox,
+  type FarmClock,
   type FarmState,
   type MarketState,
   type PlayStream,
   type RealYearsSpec,
+  type WorkRules,
   type YearTotals,
 } from './state';
 
@@ -71,6 +75,12 @@ export interface CreateFarmOptions {
   difficulty: Difficulty;
   /** Money to use in place of the difficulty's. For tests and calibration. */
   money?: StartMoney;
+  /**
+   * The switches for the working day, in place of the defaults (PRD 21,
+   * row 4): whether driving takes time, and whether the drive home must
+   * fit inside daylight. The farm keeps what it starts with.
+   */
+  work?: Partial<WorkRules>;
 }
 
 /** The stream the starting herd is drawn from. */
@@ -255,7 +265,15 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     noFeedDays: 0,
     over: null,
     actionLog: [],
+    // Set below: the clock reads the date from the farm.
+    clock: null as unknown as FarmClock,
+    workRules: { ...DEFAULT_WORK_RULES, ...(o.work ?? {}) },
+    jobs: [],
+    nextJobId: 1,
+    bookings: [],
+    nextBookingId: 1,
   };
+  startDay(farm);
 
   const herd = running ? startHerd(farm, rngStream(o.seed, HERD_STREAM)) : null;
   farm.year = newYear(farm);

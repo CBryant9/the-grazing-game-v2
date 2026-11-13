@@ -1,7 +1,7 @@
 import { DISTRICT_IDS } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { PLENTY, act, boxEdges, cellAt, farCorner, notFinite } from '../../test-support/wholeFarm';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from '../actions/types';
 import { EDGE } from '../farm/topology';
 import { GRID_N } from '../grid';
@@ -159,7 +159,7 @@ describe('save, load and carry on', () => {
       for (let d = 0; d < 200 && !farm.over; d++) {
         for (const [day, job] of jobs) {
           if (day !== d) continue;
-          const out = applyAction(farm, job);
+          const out = applyInstantly(farm, job);
           if (out.ok) farm = out.farm;
         }
         stepDay(farm);
@@ -273,7 +273,7 @@ describe('old saves', () => {
     for (let d = 0; d < 30; d++) stepDay(loaded);
     expect(notFinite(loaded)).toEqual([]);
     expect(loaded.day).toBe(35);
-    expect(applyAction(loaded, { type: 'placePortable', cell: 9 }).ok).toBe(true);
+    expect(applyInstantly(loaded, { type: 'placePortable', cell: 9 }).ok).toBe(true);
   });
 
   it('keeps what an old save does have, and numbers the inbox on from it', () => {

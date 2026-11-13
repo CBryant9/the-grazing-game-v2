@@ -18,6 +18,7 @@
  *   9. the market moves and the day ends
  *  10. the year closes every 365 days
  *  11. game-over checks
+ *  12. the farm clock goes back to first light for the new day
  *
  * The tick changes the farm in place and returns what happened as events.
  * It never stops a clock or opens a dialog: the screens decide that.
@@ -54,6 +55,7 @@ import {
   type SourceEnv,
 } from './derived';
 import type { TickEvent } from './events';
+import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { stopsToday } from './plans';
 import {
@@ -406,5 +408,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     }
   }
   toInbox(farm, day, events);
+  // The new day starts at first light, with the player at the homestead.
+  startDay(farm);
   return result;
 }

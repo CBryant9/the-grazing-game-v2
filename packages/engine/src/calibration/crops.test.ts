@@ -1,6 +1,6 @@
 import type { DistrictId } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from '../actions/types';
 import type { SpeciesId } from '../data/species';
 import { GRID_H, GRID_W } from '../grid';
@@ -34,7 +34,7 @@ vi.setConfig({ testTimeout: 600_000 });
 const env = { seasons: AVERAGE_YEAR };
 
 function must(farm: FarmState, action: Action): FarmState {
-  const done = applyAction(farm, action, env);
+  const done = applyInstantly(farm, action, env);
   if (!done.ok) throw new Error(`${action.type} was refused: ${done.message}`);
   return done.farm;
 }
@@ -67,7 +67,7 @@ function arableBox(farm: FarmState, size: number): { x: number; y: number } {
 function grainYield(district: DistrictId, species: SpeciesId, month: number, seed: number): number {
   let farm = mixedFarm(district, month, seed);
   const at = arableBox(farm, 6);
-  const sown = applyAction(
+  const sown = applyInstantly(
     farm,
     { type: 'sow', species, cells: boxCells(at.x, at.y, at.x + 5, at.y + 5) },
     env,
@@ -82,7 +82,7 @@ function grainYield(district: DistrictId, species: SpeciesId, month: number, see
       (e) => e.type === 'crop' && e.event.type === 'harvest-ready',
     );
     if (!ready) continue;
-    const done = applyAction(farm, { type: 'harvest', field: event.fieldId }, env);
+    const done = applyInstantly(farm, { type: 'harvest', field: event.fieldId }, env);
     if (!done.ok) throw new Error(done.message);
     const harvested = done.events.find((e) => e.type === 'harvested');
     if (harvested && harvested.type === 'harvested') return harvested.tha;

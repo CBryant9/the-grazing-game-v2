@@ -9,7 +9,9 @@
  */
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
+import { DEFAULT_WORK_RULES } from '../data/jobTimes';
 import { GRID_N } from '../grid';
+import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 
@@ -274,6 +276,15 @@ function upgrade(f: Record<string, unknown>): void {
     farm.layout.water.nextPortId ??=
       farm.layout.water.ports.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   }
+  // The working day (format 3). A farm saved before it had no clock: it
+  // loads at first light with the player at the homestead, no jobs in
+  // progress and nothing booked, on the default switches.
+  farm.workRules = { ...DEFAULT_WORK_RULES, ...(farm.workRules ?? {}) };
+  farm.jobs ??= [];
+  farm.nextJobId ??= farm.jobs.reduce((m, j) => Math.max(m, j.id), 0) + 1;
+  farm.bookings ??= [];
+  farm.nextBookingId ??= farm.bookings.reduce((m, b) => Math.max(m, b.id), 0) + 1;
+  if (!farm.clock) startDay(farm as FarmState);
 }
 
 /**

@@ -18,7 +18,7 @@
  */
 
 import { expect } from 'vitest';
-import { applyAction } from '../src/actions/apply';
+import { applyInstantly } from './instant';
 import type { Action, ActionResult } from '../src/actions/types';
 import { dateAt, monthIndex } from '../src/calendar';
 import type { Animal } from '../src/cattle/types';
@@ -674,7 +674,7 @@ export class WholeFarmRun {
     const { mvp, loaded } = this;
     const buying = rngFromState(this.farm.rng.buying);
     loaded.route({ buying: () => buying.next() });
-    const done = applyAction(this.farm, action);
+    const done = applyInstantly(this.farm, action);
     if (!done.ok) throw new Error(`${action.type} was refused: ${done.message}`);
     this.farm = done.farm;
     for (const e of done.events) this.seen.add(e.type);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import { createFarm } from '../sim/create';
 import { surveyOf } from '../sim/derived';
 import { farmTotals } from '../sim/summary';
@@ -34,7 +34,7 @@ describe('speed of the daily tick', () => {
     const s = surveyOf(farm);
     for (const r of s.topology.areas) {
       if (!s.points.areaTroughs[r.id]!.length) continue;
-      const done = applyAction(farm, {
+      const done = applyInstantly(farm, {
         type: 'buyCattle',
         cls: 'weanerSteer',
         qty: 700,
