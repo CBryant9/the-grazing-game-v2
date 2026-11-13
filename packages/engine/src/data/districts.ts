@@ -74,7 +74,9 @@ const FIGURES: Record<DistrictId, DistrictFigures> = {
     g: [16, 16, 20, 22, 15, 8, 7, 12, 28, 38, 26, 18],
     scale: 0.8,
     bmax: 4500,
-    dmdMax: 0.7,
+    // Tuned down from the MVP's 0.7 in milestone 1.3, so steers gain 115 to
+    // 130 kg a year in an average year (docs/CALIBRATION.md, docs/DATA.md).
+    dmdMax: 0.68,
     dmdMin: 0.51,
     dmdDead: 0.5,
     cpMax: 14,

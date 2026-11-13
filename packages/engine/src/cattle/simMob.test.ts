@@ -239,8 +239,16 @@ describe('stocking, light to very heavy, against the MVP', () => {
     expect(first.notes.some((n) => n.type === 'shortOfFeed')).toBe(true);
     run.day();
     run.move(pair, AREAS.small);
-    for (let d = 0; d < 4; d++) run.day();
-    expect(pair.e.st!.f).toBeLessThan(1);
+    // Within a week the 16 ha runs short too. (Five days in Central West
+    // since its 1.3 tune: the feed is a little less digestible, so the
+    // steers eat a little less of it a day.)
+    let shortOn = -1;
+    for (let d = 0; d < 7 && shortOn < 0; d++) {
+      run.day();
+      if (pair.e.st!.f < 1) shortOn = d + 1;
+    }
+    expect(shortOn).toBeGreaterThanOrEqual(1);
+    expect(shortOn).toBeLessThanOrEqual(id === 'cw' ? 5 : 4);
   });
 
   it.each(DISTRICT_IDS)('%s: light, normal and heavy mobs side by side for 12 days', (id) => {

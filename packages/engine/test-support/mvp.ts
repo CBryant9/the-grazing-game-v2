@@ -237,6 +237,23 @@ export function seededRandom(seed: number): () => number {
   };
 }
 
+/**
+ * District figures the rebuild has tuned away from the MVP on purpose
+ * (docs/CALIBRATION.md, docs/DATA.md). Each loaded copy of the MVP is given
+ * the rebuild's figure, in memory, so every comparison still proves the
+ * formulas are the same. `mvp` is what the MVP file holds: loading stops if
+ * that is no longer true, so this list can't go stale.
+ */
+export const REBUILD_TUNES: readonly {
+  district: string;
+  key: 'dmdMax';
+  mvp: number;
+  rebuild: number;
+}[] = [
+  // Milestone 1.3: Central West steers ran 154 kg a year against 115 to 130.
+  { district: 'cw', key: 'dmdMax', mvp: 0.7, rebuild: 0.68 },
+];
+
 /** The MVP script text, straight from the HTML file. */
 export function readMvpScript(): string {
   const html = readFileSync(MVP_PATH, 'utf8');
@@ -282,6 +299,13 @@ export function loadMvp(extraHook = ''): LoadedMvp {
 
   const mvp = (context as { __mvp?: Mvp }).__mvp;
   if (!mvp) throw new Error('MVP file: the test hook did not load');
+  for (const t of REBUILD_TUNES) {
+    const region = mvp.REGIONS[t.district];
+    if (!region || region[t.key] !== t.mvp) {
+      throw new Error(`MVP file: ${t.district} ${t.key} is not ${t.mvp} any more`);
+    }
+    region[t.key] = t.rebuild;
+  }
   return {
     mvp,
     script,
