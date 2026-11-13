@@ -21,6 +21,7 @@ import {
   CLASS_MULTIPLIERS,
   STAND_IN_FIRST_YEAR,
   STAND_IN_SERIES,
+  asStandIn,
   standInMarket,
   type StandInMarket,
 } from './standIn';
@@ -177,16 +178,16 @@ describe('the market over time, against the MVP', () => {
       difficulty: 'easy',
     });
     const run = new WholeFarmRun(loaded, farm);
-    const lo = { ...farm.market.drift };
-    const hi = { ...farm.market.drift };
+    const lo = { ...asStandIn(farm.market).drift };
+    const hi = { ...asStandIn(farm.market).drift };
     for (let d = 0; d < 6 * 365; d++) {
       run.day();
       for (const k of CLASS_IDS) {
-        lo[k] = Math.min(lo[k], run.farm.market.drift[k]);
-        hi[k] = Math.max(hi[k], run.farm.market.drift[k]);
+        lo[k] = Math.min(lo[k], asStandIn(run.farm.market).drift[k]);
+        hi[k] = Math.max(hi[k], asStandIn(run.farm.market).drift[k]);
       }
     }
-    const m = run.farm.market;
+    const m = asStandIn(run.farm.market);
     // 2026 to mid-2030 came from the random walk, inside its limits.
     expect(m.ext.length).toBeGreaterThan(50);
     expect(Math.min(...m.ext)).toBeGreaterThanOrEqual(180);

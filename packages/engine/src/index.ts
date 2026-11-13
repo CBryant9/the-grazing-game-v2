@@ -415,9 +415,54 @@ export {
   STAND_IN_FIRST_YEAR,
   STAND_IN_SERIES,
   STAND_IN_WALK,
+  asStandIn,
   standInMarket,
 } from './market/standIn';
 export type { StandInMarket } from './market/standIn';
+// Milestone 1.4: real prices, inflation, real sale days and the real data
+// bundle. The tables themselves are read by server code only
+// (`@gg/engine/server`) and handed to the engine as `env.data`.
+export { DISTRICT_YARDS, YARDS } from './data/yards';
+export type { SaleSpecies, YardId } from './data/yards';
+export {
+  latestPriceRow,
+  parsePriceTable,
+  priceRowOn,
+  priceTableFirst,
+  priceTableLast,
+} from './market/priceTable';
+export type { PriceRow, PriceTable } from './market/priceTable';
+export {
+  TODAYS_DOLLARS,
+  cpiFor,
+  parseCpiTable,
+  quarterOf,
+  todaysDollarsFactor,
+} from './market/cpi';
+export type { CpiTable, Quarter } from './market/cpi';
+export {
+  CATTLE_INDICATORS,
+  CLASS_INDICATORS,
+  FEEDER_STAND_INS,
+  HEADLINE_INDICATOR,
+  REAL_PRICE_RULES,
+  buildDistrictPrices,
+  buildNationalPrices,
+} from './market/realPrices';
+export type {
+  CattleIndicatorId,
+  DistrictPrices,
+  IndicatorFigure,
+  IndicatorTables,
+  NationalPrices,
+  PriceOrigin,
+} from './market/realPrices';
+export { REAL_PRICE_DOLLARS, realMarket, realPricesOn } from './market/realMarket';
+export type { PriceDollars, RealMarket, RealMarketOptions } from './market/realMarket';
+export { CATTLE_SALE_STAND_INS, STAND_IN_BREAK, buildSaleCalendar } from './market/saleCalendar';
+export type { SaleCalendar, SaleDay, SaleType, StandInStretch } from './market/saleCalendar';
+export { RAW_TABLE_PATHS, buildRealData, districtTablePaths, tablesVersion } from './real/realData';
+export type { DistrictRealData, RawTableReader, RealData } from './real/realData';
 
 export { INBOX_LIMIT, PLAY_STREAMS, PRICE_HISTORY_DAYS, cloneFarm, emptyLedger } from './sim/state';
 export type {
@@ -431,6 +476,7 @@ export type {
   MobWhere,
   PlayStream,
   PriceDay,
+  RealYearsSpec,
   SeasonSpec,
   YearRecord,
   YearScore,
@@ -449,13 +495,18 @@ export type { CreateFarmOptions, FarmSizeName } from './sim/create';
 export {
   areaIdOf,
   areaNameOf,
+  dateOn,
+  nextSaleDay,
   placeAnchor,
   plantingsNow,
   pricesOf,
+  realPlanOf,
+  realSourcesOf,
+  saleDayOn,
   seasonsOf,
   surveyOf,
 } from './sim/derived';
-export type { SourceEnv } from './sim/derived';
+export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
 export { stopsToday } from './sim/plans';
 export {

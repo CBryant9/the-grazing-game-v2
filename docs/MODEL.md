@@ -209,8 +209,59 @@ Each edge is halfway between two of the MVP's season factors, except 0.8. That o
 - **In order:** each next year in turn. After the newest playable year it goes back to 1997.
 - **At random:** every playable year once, shuffled from the farm's seed, then all of them again in a new shuffle. The same year never comes up twice running. Each round of the shuffle has its own stream, `real-years:<round>`. The first year can be chosen or left to the shuffle.
 - **The real date behind a farm day** (`realDateOn`): the farm's own calendar runs straight on from its start. Each game year is moved, whole, onto its real year, keeping the month and day. Within a game year the real days run on without a break, so a growing season that crosses New Year stays in one piece. If the farm calendar has 29 February and the real year does not, 28 February is read twice. A real 29 February the farm calendar does not have is passed over. In order, the real date is the farm calendar date until the newest playable year has been played. After that the game goes back to 1997 and the two part: a farm that starts in 2025 reads 1 January 1997 on day 365.
-- **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025.
-- Weather and prices should both read the real date from the same plan, so they agree on the day.
+- **Playable years** (`weatherYears`): from 1997, each year whose whole 12 months from the start month are in the weather table, with 905 days of table before it (the 540-day run-up and the 365-day look back). With a January start and the table as pulled these are 1997 to 2025. On a farm the list is cut again to the years the prices and the sale calendar cover (`DistrictRealData.years`). As pulled that is 1997 to 2025 for a start in any month from January to November, and 1997 to 2024 for a December start.
+- Weather, prices and sale days all read the real date from the same plan, so they agree on the day.
+
+### A real-year farm (milestone 1.4, wired in)
+
+Code: `sim/create.ts`, `sim/derived.ts`, `sim/tick.ts`, `real/realData.ts`, `server/realDataFiles.ts`. Tests: `sim/realYears.test.ts`.
+
+**Making one.** `createFarm(options, env)` takes `years`:
+
+- left out, or `{ kind: 'random' }`: the MVP's random seasons and the stand-in market. Such a farm runs exactly as it did before real years were wired in, bit for bit.
+- `{ kind: 'real', order: 'in-order' | 'random' }`: real years. `start.month` is the start month. `start.year` is the first real year and can be left out: in order the oldest year is then used, and at random the first year is drawn from the seed. A first year that can't be played is refused.
+
+On a real-year farm the pasture run-up uses the real weather before the start (above), the market opens on the real prices of day 0, and a running farm's herd is valued at those prices.
+
+**How the engine gets the tables.** Engine model code never reads a file, and a save never holds a table. The server (or a test) builds one bundle, once, and passes it as `data` in the `env` of `createFarm`, `stepDay`, `applyAction` and the summaries:
+
+```
+import { loadRealData } from '@gg/engine/server';   // server code and tests only
+const data = loadRealData();
+const farm = createFarm({ ..., years: { kind: 'real', order: 'in-order' } }, { data });
+stepDay(farm, { data });
+```
+
+The bundle (`RealData`) is given one thing, a way to get a table's text by its path, and reads a district's tables the first time that district is asked for: its SILO weather, the six national and six yard cattle indicators, the yard's yardings and the CPI. A test can build a bundle from changed or made-up tables with `buildRealData(reader)`.
+
+**What the farm keeps.** Only what it needs to lay its years out again and to price stock today: the order, the first year, the oldest and newest year that could be played when it started, the data version, and today's prices (`farm.seasons`, `farm.market`). A real-year farm's save is the same size as any other.
+
+**The data version.** Each district's data has a version: 16 hex digits worked from the text of every table that district's farms read. A farm records the version it started on. `stepDay`, `applyAction` and the summaries refuse data of any other version, so a later pull can't change a running farm's past without anyone knowing. Any change to any of those tables changes the version, including a pull that only adds new days. Moving a running farm to new data is not built: it is a decision for the server milestone (the same question as moving a farm to a new engine version, PRD 14.3).
+
+**Failing loudly.** A real-year farm with no `data` in the `env` stops with an error in `stepDay`, in every `applyAction` (whether or not the action reads the weather) and in the summaries that read the season. Nothing on the farm changes. It never falls back to random seasons or the stand-in market. Today's prices and the date are on the farm itself, so `pricesOf`, `mobSummaries` and `dateOn` work without the bundle.
+
+**A season source handed in.** `env.seasons` still replaces the farm's growth factors, as on any farm (the calibration runs use it for the average year). The prices, the date and the sale days stay real, and the bundle is still needed.
+
+### The calendar on a real-year farm
+
+Two calendars run side by side, and they are kept in step by how the real date is made:
+
+- **The farm calendar** is `dateAt(farm.start, day)`: an ordinary calendar that runs straight on from the farm's first day. `farm.start` is the first real year and the start month. The grass, the crops, the water and the 1 July and 1st-of-the-month events read their month and day from it, exactly as on a farm with random seasons.
+- **The real date** is `realDateOn(day)`: the farm calendar's month and day, in the real year of the game year the day falls in. It is what the weather, the prices and the sale days are read by, and it is the date the game reports (`DayResult.date`, `farmTotals().date`, `dateOn(farm)`).
+
+So the month and day the grass grows by are the real date's month and day. A new season is reported on the real 1 July, and ground cover is read on the real 1st of each month. There is one kind of day where the two differ:
+
+| Case | What happens |
+|---|---|
+| In order, from the start until the newest year has been played | The real date is the farm calendar date, every day, leap days included. From 1997 that is 29 years with nothing out |
+| In order, after the newest year | The game goes back to the oldest year. A farm that started in 2025 reads 1 January 1997 on day 365. The weather, the prices and the date all jump together. The pasture and the cattle carry over as they are |
+| The farm calendar has 29 February and the real year does not | The real date reads 28 February again. That day's weather, prices and sale day are used twice. The grass reads 29 February from the farm calendar. At most one day in a year |
+| The real year has 29 February and the farm calendar does not | The real 29 February is passed over. It is not played |
+| At random | Every game year is some real year, whole. One year ends on the day before the start month's 1st and the next begins on the 1st, in another real year. The two leap-day cases above can come up in any year |
+
+**The year closes when the game year ends** on a real-year farm: on the last day before the start month's 1st, 365 or 366 days after it opened. So each scored year is exactly one real year, and the year's record carries that year (`YearRecord.realYear`). The score still counts years 1, 2, 3 (`YearRecord.n`). A farm with random seasons closes its year every 365 days, as the MVP does.
+
+Not changed: running costs are still a 365th of the yearly figure each day, so a 366-day year costs one day more.
 
 ### The run-up
 

@@ -46,8 +46,10 @@ import {
   grazingArea,
   keepSurvey,
   landOf,
-  priceSourceOf,
+  pricesOf,
+  realSourcesOf,
   seasonsOf,
+  stepMarket,
   surveyOf,
   type SourceEnv,
 } from './derived';
@@ -88,6 +90,7 @@ export interface TickEnv extends SourceEnv {
 export interface DayResult {
   /** The farm day that was run. */
   day: number;
+  /** The date the game reports for the day. On a real-year farm it is the real date. */
   date: CalendarDate;
   /** False when the game was already over and nothing ran. */
   ran: boolean;
@@ -124,10 +127,23 @@ function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace {
 
 /** Run one day. Changes the farm in place. */
 export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
+  // A real-year farm needs its real data. Without it this stops here,
+  // before anything on the farm has changed.
+  const real = realSourcesOf(farm, env);
   const day = farm.day;
+  // The farm's own calendar. The grass, the crops and the water read their
+  // month and day from it. On a real-year farm it has the real date's
+  // month and day (docs/MODEL.md, section 1A, "The calendar").
   const date = dateAt(farm.start, day);
   const events: TickEvent[] = [];
-  const result: DayResult = { day, date, ran: false, events, deaths: [], births: [] };
+  const result: DayResult = {
+    day,
+    date: real ? real.plan.realDateOn(day) : date,
+    ran: false,
+    events,
+    deaths: [],
+    births: [],
+  };
   if (farm.over) return result;
   result.ran = true;
 
@@ -142,7 +158,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   const scale = farm.layout.scale;
 
   // 1. Season and month factor.
-  const factors = (env.seasons ?? seasonsOf(farm)).factorsOn(day);
+  const factors = seasonsOf(farm, env).factorsOn(day);
   if (date.date === 1) {
     if (date.month === 6 && day > 0) {
       events.push({ type: 'new-season', label: factors.label, factor: factors.seasonF });
@@ -331,14 +347,22 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 9. The market moves and the day ends.
   farm.day++;
-  const source = priceSourceOf(farm.market);
-  source.step(farm.market, farm.start, farm.day, rng.market);
-  farm.priceHistory.push({ day: farm.day, c: { ...source.prices(farm.market).classes } });
+  stepMarket(farm, env, farm.day, rng.market);
+  farm.priceHistory.push({ day: farm.day, c: { ...pricesOf(farm).classes } });
   if (farm.priceHistory.length > PRICE_HISTORY_DAYS) farm.priceHistory.shift();
   farm.mobs = farm.mobs.filter((m) => m.animals.length);
 
-  // 10. The year closes.
-  if (farm.day % 365 === 0) events.push({ type: 'year-end', year: closeYear(farm) });
+  // 10. The year closes. With random seasons that is every 365 days, as in
+  // the MVP. On a real-year farm it is when the game year ends, so each
+  // score year is one real year, 365 or 366 days long.
+  if (real) {
+    const gameYear = real.plan.gameYearOn(day);
+    if (real.plan.gameYearOn(farm.day) !== gameYear) {
+      const year = closeYear(farm);
+      year.realYear = real.plan.yearAt(gameYear);
+      events.push({ type: 'year-end', year });
+    }
+  } else if (farm.day % 365 === 0) events.push({ type: 'year-end', year: closeYear(farm) });
 
   // 11. Game over: the bank's limit, or the whole farm eaten out for 10
   // days with cattle still on it.

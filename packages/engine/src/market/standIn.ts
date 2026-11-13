@@ -81,6 +81,18 @@ export interface StandInMarket {
 }
 
 /**
+ * A farm's market as the stand-in's. For code that only makes sense on a
+ * stand-in market, such as the comparisons with the MVP. Any other market
+ * is an error.
+ */
+export function asStandIn(market: { kind: string }): StandInMarket {
+  if (market.kind !== 'standIn') {
+    throw new Error(`This needs the stand-in market, and the farm has the ${market.kind} one.`);
+  }
+  return market as StandInMarket;
+}
+
+/**
  * A normally distributed number, drawn the way the MVP drew it: two numbers
  * from the stream, either redrawn if it comes up exactly zero.
  */

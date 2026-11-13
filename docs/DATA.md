@@ -78,7 +78,7 @@ In the rebuild the same chances, ranges and limits are drawn from the farm's see
 
 > **Warning: approximate.** This series was written from memory during the build, not from a data source. It follows the real shape (the 2019 low, the 2021–22 peak near 690, the 2023 crash near 200, then the recovery), but the monthly values are not exact. In the rebuild, replace it with real MLA restocker yearling steer indicator data and record the source and date here.
 >
-> **Superseded from milestone 1.4.** The real MLA series has been pulled and is recorded under "Real data sources" below. Once milestone 1.4 wires it into the engine, the game no longer plays from this approximate series or the random walk after 2025. They are not deleted: BUILD_PLAN section 9 keeps a stand-in series as the fallback if MLA withdraws permission.
+> **Superseded from milestone 1.4.** A real-year farm plays on the real MLA prices ("Real prices: indicators to classes", below). It never reads this approximate series or the random walk after 2025. They are not deleted: a farm made with random seasons still runs on them, the tests that match the MVP need them, and BUILD_PLAN section 9 keeps a stand-in series as the fallback if MLA withdraws permission.
 
 ```
 2019: 280 255 262 272 282 292 302 312 302 305 330 352
@@ -126,7 +126,7 @@ Corrections from the code (milestone 1.2c):
 
 Real price and weather history, pulled once by the scripts in `scripts/data/` (see the README there) and kept in `packages/engine/data/raw/`. `manifest.json` in that folder lists every table with its source address, units, first and last date, row count and the date pulled. A test (`packages/engine/src/data/raw-data.test.ts`) checks every table against it.
 
-**Status: weather is read, prices are not yet.** The SILO tables feed the soil-water growth factor (milestone 1.4b, "Growth from real weather" below). The engine's model code takes a table as data. Only the server-only helper `packages/engine/src/server/weatherFiles.ts` reads the files. The MLA tables are not read yet. The rest of milestone 1.4 wires them in, with the mapping from MLA indicators to the game's classes. From then the approximate `MKT` series above is superseded for play, and kept only as the fallback.
+**Status: weather, cattle prices, cattle sale days and the CPI are read. The sheep tables are not yet.** The SILO tables feed the soil-water growth factor (milestone 1.4b, "Growth from real weather" below). The MLA cattle tables feed the real market and the sale calendars, and the ABS table puts past prices into today's dollars (milestone 1.4, the three sections after AussieGRASS below). The engine's model code takes every table as data. Only the server-only helpers in `packages/engine/src/server/` read the files, and they hand the engine one bundle (`loadRealData`). The sheep and lamb tables wait for the sheep milestone.
 
 These tables are server-side engine data. Browser code must never import them (rule 14).
 
@@ -198,7 +198,7 @@ Gaps (days with no row):
 - **Mortlake** has nothing before 2018. Its restocker steers have none in 2023 and one week a year in 2024, 2025 and 2026.
 - **Odd rows, kept as served.** Hamilton Merino lamb reads 11.95 c/kg on 27 and 28 Nov 2006 and **-6.67 c/kg from 6 to 12 Dec 2006** (37 and 46 head in the indicator). Hamilton mutton reads 12.82 c/kg from 18 to 24 Oct 2006 (3,994 head). Every other price row is between 20 and 3,000 c/kg. The price mapping in milestone 1.4 must not pass a negative price to the game. A test pins these 16 rows, so a new odd row fails the build.
 
-Where a yard's own history is short or thin, the national indicator or a nearby yard fills in (BUILD_PLAN section 3). The rule for that is milestone 1.4 work.
+Where a yard's own history is short or thin, the national indicator fills in (BUILD_PLAN section 3). The rule is under "Real prices: indicators to classes" below. No nearby yard is used.
 
 **Sale days pulled** (from the service's yardings report, cattle and sheep):
 
@@ -214,7 +214,7 @@ Where a yard's own history is short or thin, the national indicator or a nearby 
 - `mla/sales/*.csv` is `date,head`: each day the yard held a sale and the head yarded, every sale type that day added together.
 - `mla/yardings/*.csv` is the report as served, `date,type,head`, with `type` Prime or Store. Sheep and lambs are separate files: `DUB-sheep` (1,938 rows), `DUB-lamb` (1,899), `HAM-sheep` (1,970) and `HAM-lamb` (1,567). A sheep sale day is any day in either file.
 - How the sale days were found: straight from the yardings report, which is small (500 to 2,477 rows a yard). As a check, 547 of the 554 changes in Gracemere's restocker steer indicator fall on a sale day in the yardings table.
-- **Sale days missing from the service** need a stand-in in milestone 1.4: Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
+- **Sale days missing from the service** have a stand-in ("Sale calendars" below): Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
 - **Fill-in yards are proposed, not agreed.** The milestone brief named Emerald (for Gracemere), IRLX Inverell (for Armidale) and CVLX Ballarat (for Mortlake and Hamilton) as nearby yards to cover short histories. They are not in the PRD or the build plan, and none has been pulled. Armidale's own history turns out to be long, so Inverell may not be needed. **A question for Claudia** before any of them is used.
 
 **Not pulled** (the scripts carry on from the cache, so nothing above is fetched again):

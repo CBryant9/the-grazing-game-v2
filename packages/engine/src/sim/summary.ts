@@ -6,7 +6,7 @@
  * formulas behind them (PRD 5.16).
  */
 
-import { dateAt, type CalendarDate } from '../calendar';
+import type { CalendarDate } from '../calendar';
 import { DSE_PER_AE, aeOf, classOf, stockOn } from '../cattle/animal';
 import type { MobDay } from '../cattle/types';
 import type { CattleClassId } from '../data/cattle';
@@ -17,7 +17,15 @@ import { netSaleValue } from '../market/prices';
 import { carryingCapacityAE } from '../money/costs';
 import { netWorthParts } from '../money/worth';
 import { coverPct, paddockSummary, type PaddockSummary } from '../pasture/summary';
-import { areaIdOf, plantingsNow, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
+import {
+  areaIdOf,
+  dateOn,
+  plantingsNow,
+  pricesOf,
+  seasonsOf,
+  surveyOf,
+  type SourceEnv,
+} from './derived';
 import type { FarmEvent } from './events';
 import type { FarmState, MobWhere, YearRecord, YearTotals } from './state';
 
@@ -104,7 +112,7 @@ export interface PaddockView extends PaddockSummary {
 export function paddockSummaries(farm: FarmState, env: SourceEnv = {}): PaddockView[] {
   const survey = surveyOf(farm);
   const { topology, points } = survey;
-  const plantings = plantingsNow(farm, env.seasons);
+  const plantings = plantingsNow(farm, env);
   const district = DISTRICTS[farm.district];
   return topology.paddocks.map((pd) => {
     const areaId = topology.areaOf[pd.cells[0]!]!;
@@ -181,10 +189,10 @@ export function farmTotals(farm: FarmState, env: SourceEnv = {}): FarmTotals {
     g += farm.pasture.G[i]!;
     d += farm.pasture.D[i]!;
   }
-  const f = (env.seasons ?? seasonsOf(farm)).factorsOn(farm.day > 0 ? farm.day - 1 : 0);
+  const f = seasonsOf(farm, env).factorsOn(farm.day > 0 ? farm.day - 1 : 0);
   return {
     day: farm.day,
-    date: dateAt(farm.start, farm.day),
+    date: dateOn(farm),
     season: { label: f.label, factor: f.seasonF },
     head,
     calves,

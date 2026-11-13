@@ -11,11 +11,11 @@ import { describe, expect, it } from 'vitest';
 
 const RAW_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../data/raw');
 
-type Kind = 'indicator' | 'yardings' | 'sales' | 'weather';
+type Kind = 'indicator' | 'yardings' | 'sales' | 'weather' | 'cpi';
 
 interface ManifestFile {
   path: string;
-  source: 'mla' | 'silo';
+  source: 'mla' | 'silo' | 'abs';
   kind: Kind;
   url: string;
   columns: string[];
@@ -113,6 +113,19 @@ describe('real data tables', () => {
     expect(manifest.sources.mla?.note).toContain('Reformatted');
   });
 
+  it('records the Bureau of Statistics as the source of the CPI table, with its licence', () => {
+    expect(manifest.sources.abs?.credit).toBe(
+      'Source: Australian Bureau of Statistics, Consumer Price Index, Australia.',
+    );
+    expect(manifest.sources.abs?.licence).toContain('CC BY 4.0');
+    expect(manifest.sources.abs?.note).toContain('Reformatted');
+    const cpi = manifest.files.filter((f) => f.kind === 'cpi');
+    expect(cpi.map((f) => f.path)).toEqual(['abs/cpi-all-groups.csv']);
+    expect(cpi[0]?.source).toBe('abs');
+    expect(cpi[0]?.url).toContain('data.api.abs.gov.au');
+    expect(cpi[0]?.units.index).toBe('index number, Sep 2025 = 100.0');
+  });
+
   it('lists every table on disk, and every listed table exists', () => {
     const listed = manifest.files.map((f) => f.path).sort();
     expect(new Set(listed).size).toBe(listed.length);
@@ -156,6 +169,25 @@ describe('real data tables', () => {
       expect(file.url).toMatch(/^https:\/\//);
       expect(table.text).not.toContain('\r');
     });
+
+    if (file.kind === 'cpi') {
+      it('has every quarter once, in order, with an index number above 0', () => {
+        let bad = 0;
+        let prev = 0;
+        for (const row of table.rows) {
+          const m = /^(\d{4})-Q([1-4])$/.exec(row[0] ?? '');
+          const quarter = m ? Number(m[1]) * 4 + Number(m[2]) : NaN;
+          const index = Number(row[1]);
+          if (!m || row.length !== 2 || (prev !== 0 && quarter !== prev + 1)) bad++;
+          if (row[1] === '' || !(index > 10 && index < 500)) bad++;
+          prev = quarter;
+        }
+        expect(bad).toBe(0);
+        // The game's years start in 1997. The table must reach back past them.
+        expect(file.first <= '1997-Q1').toBe(true);
+      });
+      return;
+    }
 
     it('has real dates in order, with no repeats', () => {
       let prev = '';
