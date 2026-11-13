@@ -4,11 +4,12 @@ import { MARKET_CLASSES, type MarketClassId } from '../data/cattle';
 import { DISTRICT_YARDS } from '../data/yards';
 import { loadRealData } from '../server';
 import { dateOfSerial, daySerial, isoDate } from '../season/weatherTable';
-import { parsePriceTable, priceRowOn, type PriceTable } from './priceTable';
+import { latestPriceRow, parsePriceTable, priceRowOn, type PriceTable } from './priceTable';
 import {
   CATTLE_INDICATORS,
   CLASS_INDICATORS,
   HEADLINE_INDICATOR,
+  REAL_PRICE_RULES,
   buildDistrictPrices,
   buildNationalPrices,
   type CattleIndicatorId,
@@ -203,6 +204,30 @@ describe("the district yard's own figure, where it has one", () => {
 });
 
 describe('the national figure', () => {
+  it('passes over a row with under 20 head behind it, and takes the newest row that has 20', () => {
+    const thinDay = day('2005-12-27');
+    const cow = series(
+      '1996-07-12',
+      '2026-06-30',
+      (s) => (s === thinDay ? 60 : 120),
+      (s) => (s === thinDay ? 19 : 500),
+    );
+    const national = buildNationalPrices(nationalTables({ 'processor-cow': cow }));
+    expect(national.on('processor-cow', thinDay)).toEqual({ value: 120, standIn: false });
+    const justEnough = series(
+      '1996-07-12',
+      '2026-06-30',
+      (s) => (s === thinDay ? 60 : 120),
+      (s) => (s === thinDay ? 20 : 500),
+    );
+    expect(
+      buildNationalPrices(nationalTables({ 'processor-cow': justEnough })).on(
+        'processor-cow',
+        thinDay,
+      ),
+    ).toEqual({ value: 60, standIn: false });
+  });
+
   it('stands across a break of up to 21 days, and is refused past that', () => {
     const gap = day('2005-12-20');
     const cow = series('1996-07-12', '2026-06-30', (s) => (s > gap && s <= gap + 30 ? null : 120));
@@ -274,8 +299,29 @@ describe('the real tables', () => {
 
   it('give these stand-in multiples for the feeder indicators', () => {
     const t = data.district('cw').prices.national.standInTimes;
-    expect(t['feeder-steer']).toBeCloseTo(1.0171, 4);
-    expect(t['feeder-heifer']).toBeCloseTo(0.9992, 4);
+    expect(t['feeder-steer']).toBeCloseTo(1.0169, 4);
+    expect(t['feeder-heifer']).toBeCloseTo(0.999, 4);
+  });
+
+  it('never take a national price from a row with under 20 head behind it', () => {
+    // Restocker steers read 147 c/kg on 1 head from 29 December 2004, and
+    // 183.4 c/kg on 290 head four days before. The thin row is passed over.
+    const national = data.district('cw').prices.national;
+    const table = national.tables['restocker-yearling-steer'];
+    const thin = priceRowOn(table, day('2004-12-29'))!;
+    expect(thin.head).toBe(1);
+    expect(thin.value).toBeCloseTo(147, 0);
+    const used = national.on('restocker-yearling-steer', day('2004-12-29'));
+    expect(used.value).toBeGreaterThan(165);
+    // Every national figure from 1997 to 2025 comes from a row with 20 head or more.
+    for (const id of CATTLE_INDICATORS) {
+      const t = national.tables[id];
+      for (let s = Math.max(day('1997-01-01'), t.firstSerial); s <= day('2025-12-31'); s++) {
+        const row = latestPriceRow(t, s, REAL_PRICE_RULES.nationalMaxGapDays, 20)!;
+        expect(row.head, `${id} ${isoDate(dateOfSerial(s))}`).toBeGreaterThanOrEqual(20);
+        expect(national.on(id, s).value).toBe(row.value);
+      }
+    }
   });
 
   it('give each yard these premiums over the national figures (docs/DATA.md)', () => {

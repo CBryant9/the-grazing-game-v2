@@ -5,6 +5,7 @@ import type { Action } from '../actions/types';
 import { dateAt, type CalendarDate } from '../calendar';
 import { generateFarm } from '../farm/generate';
 import { buyPrice } from '../market/prices';
+import { netWorth } from '../money/worth';
 import { realPricesOn } from '../market/realMarket';
 import { buildRealData, type RealData } from '../real/realData';
 import { rngStream } from '../rng';
@@ -319,6 +320,47 @@ describe('a day on a real-year farm', () => {
     expect(farm.years.map((y) => y.end - y.start)).toEqual([365, 366, 365, 365]);
     // Twelve readings of ground cover in every year, on the 1st of each month.
     for (const y of farm.years) expect(y.covers.length).toBe(12);
+  });
+
+  it("scores a real year on its own last prices, and opens the next on that year's first prices", () => {
+    // Two farms with a herd, each run to the last day of a game year whose
+    // next day belongs to another real year: in order past the newest year
+    // (31 December 2025, then 1 January 1997), and years at random.
+    const cases: CreateFarmOptions[] = [
+      options({ size: 'medium', startType: 'running', start: { year: 2025, month: 0 } }),
+      options({
+        seed: 11,
+        size: 'medium',
+        startType: 'running',
+        start: { month: 0 },
+        years: { kind: 'real', order: 'random' },
+      }),
+    ];
+    for (const o of cases) {
+      const farm = createFarm(o, env);
+      const plan = realPlanOf(farm)!;
+      const first = plan.yearAt(0);
+      const last = isLeapYear(first) ? 365 : 364;
+      run(farm, last);
+      expect(text(dateOn(farm))).toBe(`${first}-12-31`);
+      const lastDayMarket = cloneFarm(farm).market;
+      const closing = run(farm, 1)[0]!;
+      expect(closing.events.some((e) => e.type === 'year-end')).toBe(true);
+      expect(dateOn(farm).year).toBe(plan.yearAt(1));
+      expect(plan.yearAt(1)).not.toBe(first + 1);
+
+      // The year that closed is valued at the prices of its own last day.
+      const year = farm.years[0]!;
+      const atOldPrices = cloneFarm(farm);
+      atOldPrices.market = lastDayMarket;
+      expect(year.realYear).toBe(first);
+      expect(year.worth1).toBe(netWorth(atOldPrices));
+      expect(year.score.profit).toBe(year.worth1 - year.worth0);
+      // The new year opens at the prices of its own first day, which are another year's.
+      expect(farm.year.worth0).toBe(netWorth(farm));
+      expect(farm.year.worth0).not.toBe(year.worth1);
+      expect(pricesOf(farm).indicator).not.toBe(lastDayMarket.indicator);
+    }
   });
 
   it('closes a year that starts in July on 30 June, leap day and all', () => {

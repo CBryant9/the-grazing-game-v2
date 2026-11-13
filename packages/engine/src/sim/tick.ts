@@ -36,7 +36,7 @@ import { EDGE, areaEdges } from '../farm/topology';
 import { drainPortables, waterNeedPerHead } from '../farm/water';
 import { GRID_N } from '../grid';
 import { INTEREST, overheadsPerYear } from '../money/costs';
-import { closeYear } from '../money/worth';
+import { closeYear, netWorth } from '../money/worth';
 import { growGrass } from '../pasture/grow';
 import { coverPct } from '../pasture/summary';
 import { rngFromState, type Rng } from '../rng';
@@ -62,6 +62,7 @@ import {
   toInbox,
   type FarmMob,
   type FarmState,
+  type YearRecord,
   type PlayStream,
 } from './state';
 
@@ -347,22 +348,32 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 9. The market moves and the day ends.
   farm.day++;
+  farm.mobs = farm.mobs.filter((m) => m.animals.length);
+  // On a real-year farm the year closes when the game year ends, so each
+  // score year is one real year, 365 or 366 days long. It closes on its own
+  // last prices, before the market moves: the next day can belong to any
+  // real year (years at random, or back to 1997 after the newest), and its
+  // prices must not land in this year's score.
+  const realYearEnds =
+    real !== null && real.plan.gameYearOn(farm.day) !== real.plan.gameYearOn(day);
+  let closed: YearRecord | null = null;
+  if (real && realYearEnds) {
+    closed = closeYear(farm);
+    closed.realYear = real.plan.yearAt(real.plan.gameYearOn(day));
+  }
   stepMarket(farm, env, farm.day, rng.market);
   farm.priceHistory.push({ day: farm.day, c: { ...pricesOf(farm).classes } });
   if (farm.priceHistory.length > PRICE_HISTORY_DAYS) farm.priceHistory.shift();
-  farm.mobs = farm.mobs.filter((m) => m.animals.length);
+  // The new real year opens on its own first day's prices, so the step in
+  // prices between two real years is in neither year's score.
+  if (closed) farm.year.worth0 = netWorth(farm);
 
-  // 10. The year closes. With random seasons that is every 365 days, as in
-  // the MVP. On a real-year farm it is when the game year ends, so each
-  // score year is one real year, 365 or 366 days long.
-  if (real) {
-    const gameYear = real.plan.gameYearOn(day);
-    if (real.plan.gameYearOn(farm.day) !== gameYear) {
-      const year = closeYear(farm);
-      year.realYear = real.plan.yearAt(gameYear);
-      events.push({ type: 'year-end', year });
-    }
-  } else if (farm.day % 365 === 0) events.push({ type: 'year-end', year: closeYear(farm) });
+  // 10. The year closes. With random seasons that is every 365 days, on the
+  // new day's prices, as in the MVP.
+  if (closed) events.push({ type: 'year-end', year: closed });
+  else if (!real && farm.day % 365 === 0) {
+    events.push({ type: 'year-end', year: closeYear(farm) });
+  }
 
   // 11. Game over: the bank's limit, or the whole farm eaten out for 10
   // days with cattle still on it.

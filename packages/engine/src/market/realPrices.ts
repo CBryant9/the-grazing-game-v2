@@ -20,7 +20,7 @@ import { MARKET_CLASSES, type MarketClassId } from '../data/cattle';
 import type { YardId } from '../data/yards';
 import { dateOfSerial, daySerial, isoDate } from '../season/weatherTable';
 import type { Prices } from './prices';
-import { latestPriceRow, priceRowOn, type PriceTable } from './priceTable';
+import { latestPriceRow, priceRowOn, type PriceRow, type PriceTable } from './priceTable';
 
 /** The MLA cattle indicators the game reads. All are c/kg live weight. */
 export const CATTLE_INDICATORS = [
@@ -61,7 +61,15 @@ export const HEADLINE_INDICATOR: CattleIndicatorId = 'restocker-yearling-steer';
 
 /** The figures behind the fill-in rules. All tuning values but the years. */
 export const REAL_PRICE_RULES = {
-  /** A yard row with fewer head than this behind it is too thin to use. */
+  /**
+   * A row with fewer head than this behind it is too thin to use, at a
+   * yard or nationally. A national figure usually has thousands of head
+   * behind it, but around Christmas it can rest on one beast: restocker
+   * steers read 147 c/kg on 1 head from 29 December 2004, against 183 c/kg
+   * on 290 head four days before. The same low limit is used for both
+   * because the national restocker heifer figure rested on 20 to 70 head
+   * through early 1997.
+   */
   thinHead: 20,
   /** A yard's last usable figure stands for this many days after its date. */
   holdDays: 14,
@@ -72,7 +80,10 @@ export const REAL_PRICE_RULES = {
   seriesMinDays: 730,
   /** The years a yard's premium is worked out over. Fixed, so a later pull does not move it. */
   premiumYears: { first: 1997, last: 2025 },
-  /** The national figure stands this long across a break in the rows (the longest real break is 14 days). */
+  /**
+   * The national figure stands this long across a break in the usable
+   * rows. The longest break, with the thin rows left out, is 15 days.
+   */
   nationalMaxGapDays: 21,
 } as const;
 
@@ -119,6 +130,12 @@ const premiumTo = daySerial({ year: REAL_PRICE_RULES.premiumYears.last, month: 1
 
 const dateText = (serial: number): string => isoDate(dateOfSerial(serial));
 
+/** A national row for a day, if it has enough head behind it to use. */
+function usableNational(table: PriceTable, serial: number): PriceRow | null {
+  const row = priceRowOn(table, serial);
+  return row && row.head >= REAL_PRICE_RULES.thinHead ? row : null;
+}
+
 /** The national indicators, with the feeder stand-ins worked out. */
 export function buildNationalPrices(tables: IndicatorTables): NationalPrices {
   const standInTimes: Partial<Record<CattleIndicatorId, number>> = {};
@@ -129,9 +146,9 @@ export function buildNationalPrices(tables: IndicatorTables): NationalPrices {
     let sum = 0;
     let n = 0;
     for (let s = t.firstSerial; s <= premiumTo; s++) {
-      const row = priceRowOn(t, s);
-      const a = priceRowOn(tables[pair[0]], s);
-      const b = priceRowOn(tables[pair[1]], s);
+      const row = usableNational(t, s);
+      const a = usableNational(tables[pair[0]], s);
+      const b = usableNational(tables[pair[1]], s);
       if (!row || !a || !b) continue;
       sum += row.value / Math.sqrt(a.value * b.value);
       n++;
@@ -143,7 +160,12 @@ export function buildNationalPrices(tables: IndicatorTables): NationalPrices {
   }
 
   const real = (id: CattleIndicatorId, serial: number): number => {
-    const row = latestPriceRow(tables[id], serial, REAL_PRICE_RULES.nationalMaxGapDays);
+    const row = latestPriceRow(
+      tables[id],
+      serial,
+      REAL_PRICE_RULES.nationalMaxGapDays,
+      REAL_PRICE_RULES.thinHead,
+    );
     if (!row) {
       throw new RangeError(`There is no national ${id} figure for ${dateText(serial)}.`);
     }
@@ -199,7 +221,7 @@ export function buildDistrictPrices(
     for (let s = from; s <= premiumTo; s++) {
       const row = priceRowOn(t, s);
       if (!row || row.head < R.thinHead) continue;
-      const base = priceRowOn(nat, s);
+      const base = usableNational(nat, s);
       if (!base) continue;
       sum += row.value / base.value;
       n++;
