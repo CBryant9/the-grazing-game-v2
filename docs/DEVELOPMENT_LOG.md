@@ -285,6 +285,37 @@ Things in the MVP that look odd, kept as they are, for Claudia:
 - A crop that has not been sown yet read "ready to harvest" in the MVP's stage text. It can't happen in play. The engine reads it as not sown.
 - Some species blurbs lean towards a judgement ("Excellent for fattening", "Top-quality feed"). They are the MVP's wording, kept for now.
 
+### 13 Nov 2026: milestone 1.4a, real data pulled (groundwork for 1.4)
+
+Built:
+
+- `scripts/data/pull-mla.mjs` and `scripts/data/pull-silo.mjs` (`pnpm data:mla`, `pnpm data:silo`). One request at a time, every answer cached in the untracked `.data-cache/`, so a stopped run carries on and a second run fetches nothing twice.
+- Tables in `packages/engine/data/raw/` (23 files, 4.2 MB) with a `manifest.json`, and a test that checks every table against it.
+- `docs/DATA.md` has a new "Real data sources" section with the credit lines, licence notes, dates, row counts and gaps.
+
+Pulled:
+
+- SILO weather, all four districts, 1 Jan 1990 to 12 Nov 2026, in four requests.
+- MLA: seven national cattle indicators from 1996 (2003 for the feeder ones), the restocker yearling steer indicator at Gracemere, Armidale, Dubbo and Mortlake, and cattle yardings and sale days at those four yards.
+
+Not done, and why:
+
+- The MLA pull is about one fifth done. The service gives 100 rows a page and a yard's indicator has a row for every day, so the full list is about 7,000 requests. About 7 in 100 requests also failed on MLA's side and had to wait. The pull was stopped after about 105 minutes with the most useful series in hand. Left to pull: the National Young Cattle Indicator, the six national sheep indicators, the other yard indicators, sheep yardings, and the fill-in yards (Emerald, Inverell, Ballarat). The list and sizes are in `DATA.md`.
+- Nothing is wired into the engine. The mapping from indicators to the game's classes, the fill-in rules for missing years and the soil-water growth factor are milestone 1.4.
+
+Found on the way (for 1.4):
+
+- Gracemere has no sale days on the service before 8 Nov 1999 or from 17 Aug 2004 to 9 Oct 2014, and its restocker prices start in October 2014. Mortlake has nothing before 29 Jan 2018.
+- Feeder steer and heifer indicators start in June 2003.
+- Armidale's own restocker steer indicator has no rows from June to November 2026 though the yard kept selling. A yard series can go quiet while the yard is open.
+- The last three days of SILO evaporation are long-term averages until the observations arrive.
+
+Questions for Claudia:
+
+- The brief named Emerald, IRLX Inverell and CVLX Ballarat as nearby yards to fill short histories. They are not in the PRD or the build plan. Are they the right ones? Armidale's own history is long, so Inverell may not be needed.
+- Are the four SILO grid points where the district's weather should be taken from (town or airport)? They came from the brief and were not checked against a map here.
+- Should the rest of the MLA pull (about 6 to 9 more hours at a polite pace) run in one go, or only the series milestone 1.4 turns out to need?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

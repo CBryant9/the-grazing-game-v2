@@ -60,6 +60,8 @@ In the rebuild the same chances, ranges and limits are drawn from the farm's see
 `MKT`: restocker yearling steer indicator, c/kg live weight, monthly Jan 2019 to Dec 2025 (eastern Australia).
 
 > **Warning: approximate.** This series was written from memory during the build, not from a data source. It follows the real shape (the 2019 low, the 2021–22 peak near 690, the 2023 crash near 200, then the recovery), but the monthly values are not exact. In the rebuild, replace it with real MLA restocker yearling steer indicator data and record the source and date here.
+>
+> **Superseded from milestone 1.4.** The real MLA series has been pulled and is recorded under "Real data sources" below. Once milestone 1.4 wires it into the engine, the game no longer plays from this approximate series or the random walk after 2025. They are not deleted: BUILD_PLAN section 9 keeps a stand-in series as the fallback if MLA withdraws permission.
 
 ```
 2019: 280 255 262 272 282 292 302 312 302 305 330 352
@@ -87,6 +89,145 @@ Class multipliers on the indicator (`MCLS`):
 | calf | calves | 1.10 |
 
 Adjustments: cows CS < 2 × 0.85, CS ≥ 3 × 1.05; other non-bull, non-calf stock at CS < 2 × 0.86. Pregnant females (≥ 50 days) add $320 × (indicator ÷ 400). Selling costs 5% commission plus $30/head. Bulls bought for the starting herd are valued at $5,500 × (indicator ÷ 400).
+
+## Real data sources
+
+Real price and weather history, pulled once by the scripts in `scripts/data/` (see the README there) and kept in `packages/engine/data/raw/`. `manifest.json` in that folder lists every table with its source address, units, first and last date, row count and the date pulled. A test (`packages/engine/src/data/raw-data.test.ts`) checks every table against it.
+
+**Status: pulled, not wired in.** Nothing in the engine reads these tables yet. Milestone 1.4 wires them in, with the mapping from MLA indicators to the game's classes and the soil-water growth factor. From then the approximate `MKT` series above is superseded for play, and kept only as the fallback.
+
+These tables are server-side engine data. Browser code must never import them (rule 14).
+
+### Prices: Meat & Livestock Australia
+
+- **Source:** Meat & Livestock Australia's public statistics service, which carries the National Livestock Reporting Service figures. `https://api-mlastatistics.mla.com.au`, no key. Documentation: `https://app.nlrsreports.mla.com.au/statistics/documentation`.
+- **Credit line** (wherever these prices are shown): "Reproduced courtesy of Meat & Livestock Australia Limited – www.mla.com.au".
+- **Terms:** every answer from the service points to MLA's Market Report and Information Terms of Use. Claudia emails MLA for written confirmation of commercial use before launch (PRD 5.14).
+- **Pulled:** 13 Nov 2026, up to 12 Nov 2026. About 1,300 requests over about 105 minutes, one at a time: 1,207 answers kept in the cache, about 90 tries that failed on MLA's side, and about 17 test requests made by hand. The script's own tally (1,046 requests, 69 failed) is lower because it misses three runs that were stopped by hand. **The pull is not finished.** What is left is listed below.
+- **Checked on the day:** the indicator IDs against the service's `/indicator` list and the yard IDs against `/saleyard`. For every series pulled, the row count matches the count the service gives for the whole range.
+- **Changed in form only:** one file per series, values rounded to 2 decimal places, head counts to whole numbers. Rows are as served.
+
+**What a price row is.** `date,value,head`. One row for each calendar day the service gives, weekends included. `value` is cents per kg, live weight (lwt) or carcase weight (cwt) as listed. `head` is the head counted in the indicator. Each figure covers the last seven days of sales. At a yard that means the value repeats for seven days after a sale, then the rows stop if no sale follows. Nationally the value changes on most days, in every year from 1997.
+
+**National indicators pulled** (all yards that feed the indicator):
+
+| File | MLA indicator (ID) | Unit | First | Last | Rows |
+|---|---|---|---|---|---|
+| `mla/national/restocker-yearling-steer.csv` | National Restocker Yearling Steer (2) | c/kg lwt | 21 Oct 1996 | 12 Nov 2026 | 10,770 |
+| `mla/national/restocker-yearling-heifer.csv` | National Restocker Yearling Heifer (12) | c/kg lwt | 2 Dec 1996 | 12 Nov 2026 | 10,736 |
+| `mla/national/feeder-steer.csv` | National Feeder Steer (3) | c/kg lwt | 16 Jun 2003 | 12 Nov 2026 | 8,390 |
+| `mla/national/feeder-heifer.csv` | National Feeder Heifer (17) | c/kg lwt | 16 Jun 2003 | 12 Nov 2026 | 8,379 |
+| `mla/national/heavy-steer.csv` | National Heavy Steer (4) | c/kg lwt | 12 Jul 1996 | 12 Nov 2026 | 10,916 |
+| `mla/national/processor-cow.csv` | National Processor Cow (13) | c/kg lwt | 12 Jul 1996 | 12 Nov 2026 | 10,916 |
+| `mla/national/eastern-young-cattle.csv` | Eastern Young Cattle Indicator (0) | c/kg cwt | 15 Jul 1996 | 12 Nov 2026 | 10,882 |
+
+Gaps (days with no row):
+
+- **Christmas and New Year.** Most years have a break, but not all: each table has 21 to 25 of them in 30 years. They run from a day or two up to 11 days (12 for the Eastern Young Cattle Indicator, 14 for the two restocker indicators at Christmas 1996).
+- **Early 1997, inside the first game year.** Restocker steers: 30 Jan to 2 Feb 1997. Restocker heifers: 27 to 29 Jan and 24 Feb to 2 Mar 1997.
+- **Late 1996, before the game's years.** Restocker steers: 4 to 10 Nov and 18 Nov to 1 Dec 1996.
+- The other five tables have no gaps outside Christmas and New Year.
+- Feeder steers and heifers start in June 2003, so the 1997 to 2003 game years need another indicator to stand in for them.
+
+**Yard indicators pulled.** Only the restocker yearling steer indicator, at each district's cattle yard:
+
+| File | Yard | First | Last | Rows | Gaps to know about |
+|---|---|---|---|---|---|
+| `mla/yards/GME/restocker-yearling-steer.csv` | CQLX Gracemere (cq) | 10 Oct 2014 | 12 Nov 2026 | 3,810 | Nothing before October 2014 |
+| `mla/yards/ARM/restocker-yearling-steer.csv` | Armidale (nsw) | 23 Jan 1997 | 11 Nov 2026 | 8,701 | No rows from 11 Jun to 4 Nov 2026, though the yard held 10 sales in that time. Fewer rows from 2020, when sales went fortnightly |
+| `mla/yards/DUB/restocker-yearling-steer.csv` | Dubbo (cw) | 6 Mar 1997 | 12 Nov 2026 | 9,378 | Thin in 1997 and 1998 (50 and 25 rows). The longest gap is 4 May 1997 to 23 Apr 1998 |
+| `mla/yards/MTL/restocker-yearling-steer.csv` | Mortlake (wv) | 29 Jan 2018 | 8 Mar 2026 | 1,141 | Nothing before 2018. None in 2023, and one week a year in 2024, 2025 and 2026 |
+
+Where a yard's own history is short or thin, the national indicator or a nearby yard fills in (BUILD_PLAN section 3). The rule for that is milestone 1.4 work.
+
+**What each district yard has on the service** (first date and row count, from one request per series on 13 Nov 2026):
+
+| Indicator | Gracemere `GME` | Armidale `ARM` | Dubbo `DUB` | Mortlake `MTL` |
+|---|---|---|---|---|
+| Restocker yearling steer | Oct 2014, 3,810 (pulled) | Jan 1997, 8,701 (pulled) | Mar 1997, 9,378 (pulled) | Jan 2018, 1,141 (pulled) |
+| Restocker yearling heifer | Oct 2014, 3,810 | Jan 1997, 7,245 | Jan 1997, 8,714 | Jan 2018, 1,218 |
+| Feeder steer | Oct 2014, 3,808 | Jun 2003, 5,981 | Jun 2003, 7,962 | Jan 2018, 2,629 |
+| Feeder heifer | Oct 2014, 3,808 | Jul 2003, 5,344 | Jun 2003, 7,853 | Jan 2018, 2,657 |
+| Heavy steer | Nov 1999, 5,270 | Sep 1996, 8,389 | Jul 1996, 10,385 | Jan 2018, 2,783 |
+| Processor cow | Nov 1999, 5,368 | Sep 1996, 8,970 | Jul 1996, 10,405 | Jan 2018, 2,825 |
+| Eastern Young Cattle Indicator | nothing served | Sep 1996, 8,970 | Jul 1996, 10,412 | nothing served |
+| National Young Cattle (14) | not given by yard | not given by yard | not given by yard | not given by yard |
+
+The service will not give the National Young Cattle Indicator by yard. Its answer: "Indicators that contain online livestock sales data are not available via the Indicators by Saleyard endpoint."
+
+Sheep, sized but not pulled: Dubbo has all six sheep indicators (light, trade, heavy, Merino and restocker lamb, and mutton) from between July 1996 and January 1997, 8,525 to 10,185 rows each. Hamilton `HAM` has the same six from between April and November 1997, 6,179 to 10,276 rows each.
+
+**Sale days pulled** (from the service's yardings report, cattle):
+
+| File | Yard | First | Last | Sale days | Pattern in the data |
+|---|---|---|---|---|---|
+| `mla/sales/GME-cattle.csv` | CQLX Gracemere | 8 Nov 1999 | 11 Nov 2026 | 788 | Prime sales on Mondays 1999 to 2004, Fridays from October 2014 to 2019, Wednesdays from 2020. One or two store sales a year from 2018. **Nothing served from 17 Aug 2004 to 9 Oct 2014** (2004 has 30 sale days, the last on 16 Aug) |
+| `mla/sales/ARM-cattle.csv` | Armidale | 5 Sep 1996 | 5 Nov 2026 | 1,301 | Thursdays. About weekly to 2019 (38 to 52 a year), about fortnightly from 2020 (24 to 31 a year). A few store sales on Fridays |
+| `mla/sales/DUB-cattle.csv` | Dubbo | 15 Jul 1996 | 12 Nov 2026 | 2,474 | Prime sales on Mondays and Thursdays to 2004, Thursdays only from 2005. Store sales on Fridays from 2001 (about 30 a year to 2017, fewer since) |
+| `mla/sales/MTL-cattle.csv` | Mortlake | 29 Jan 2018 | 12 Nov 2026 | 499 | Prime sales on Mondays. Store sales on Thursdays from 2023 (20 to 25 a year). **Nothing before 2018** |
+
+- `mla/sales/*.csv` is `date,head`: each day the yard held a sale and the head yarded, every sale type that day added together.
+- `mla/yardings/*.csv` is the report as served, `date,type,head`, with `type` Prime or Store.
+- How the sale days were found: straight from the yardings report, which is small (500 to 2,477 rows a yard). As a check, 547 of the 554 changes in Gracemere's restocker steer indicator fall on a sale day in the yardings table.
+- **Sale days missing from the service** need a stand-in in milestone 1.4: Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
+- **Fill-in yards are proposed, not agreed.** The milestone brief named Emerald (for Gracemere), IRLX Inverell (for Armidale) and CVLX Ballarat (for Mortlake and Hamilton) as nearby yards to cover short histories. They are not in the PRD or the build plan, and none has been pulled. Armidale's own history turns out to be long, so Inverell may not be needed. **A question for Claudia** before any of them is used.
+
+**Not pulled yet** (the scripts carry on from the cache, so nothing above is fetched again):
+
+| What | Size |
+|---|---|
+| National Young Cattle Indicator (14), from 21 Oct 1996 | about 110 requests |
+| Six national sheep indicators: Light Lamb (6), Trade Lamb (7), Heavy Lamb (8), Merino Lamb (9), Restocker Lamb (10), Mutton (11), all from mid to late 1996 | about 670 requests |
+| The other cattle indicators at Gracemere, Armidale, Dubbo and Mortlake (table above) | about 1,730 requests |
+| Sheep indicators at Dubbo and Hamilton | about 1,320 requests |
+| Sheep and lamb yardings and sale days at Dubbo and Hamilton | not sized, small |
+| Proposed fill-in yards, if Claudia agrees: Emerald `EME`, IRLX Inverell `INV`, CVLX Ballarat `BAL` (indicators, yardings, sale days) | not sized |
+
+To carry on: `pnpm data:mla`, or a stage at a time, for example `node scripts/data/pull-mla.mjs --only=national --species=Sheep`.
+
+**How the service behaved on 13 Nov 2026:**
+
+- 100 rows a page, no bulk download, and no page-size setting (an unknown setting gets HTTP 404).
+- Deep pages of a long range fail: page 60 of a 30-year request timed out after 29 seconds. The script asks for fixed 100-day windows instead.
+- About 7 requests in 100 came back as HTTP 500 from inside the service ("Throttling ... ListExports", "Endpoint currently unavailable due to loging request issue"). The same request worked after a wait. The rate was the same at one request every two seconds and one every three. Once a request failed three times running and the script stopped, as designed. Once a request needed four tries.
+- Asking for today's date returned HTTP 500. The script asks up to yesterday.
+- Two indicators in one request returned HTTP 500. The `/report` list of endpoints returned HTTP 500.
+- Yardings pages come back in no date order, so the script walks them by date window.
+
+### Weather: SILO
+
+- **Source:** SILO Data Drill, Queensland Government (Long Paddock). `https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php`. It asks for an email address as the user name. The address is kept in `SILO_CONTACT_EMAIL` in the untracked `.env.local`, never in the repo.
+- **Credit line, with its change notice:** "Climate data: SILO, Queensland Government (© State of Queensland), CC BY 4.0, built from Bureau of Meteorology observations. The data has been reformatted." Use the two sentences together. The same wording is in `manifest.json`.
+- **Licence:** Creative Commons Attribution 4.0 International. SILO's access page says users may copy, change and pass on the data if they credit SILO as the source and say whether the data was changed. **Ours was changed in form only:** one file per district, six of SILO's variables, the source-code columns counted and then dropped. The values are as served. Once milestone 1.4 works a soil-water figure out of it, the change notice needs to say so.
+- **Pulled:** 13 Nov 2026, four requests, one per district. 1 Jan 1990 to 12 Nov 2026, 13,465 days each, no gaps.
+- **What a row is:** one day at one point on SILO's 0.05 degree grid. Data Drill values are worked out from the weather stations around the point, so they are not one station's record.
+
+| File | Town | Grid point | Elevation SILO gives |
+|---|---|---|---|
+| `silo/cq.csv` | Emerald, Qld | 23.55 S, 148.20 E | 182.3 m |
+| `silo/nsw.csv` | Armidale, NSW (the grid point nearest the airport) | 30.55 S, 151.60 E | 1,045.0 m |
+| `silo/cw.csv` | Dubbo, NSW | 32.20 S, 148.60 E | 265.0 m |
+| `silo/wv.csv` | Hamilton, Vic | 37.65 S, 142.05 E | 233.9 m |
+
+| Column | SILO variable (code) | Unit |
+|---|---|---|
+| `rain` | Daily rainfall (R) | mm |
+| `tmax` | Maximum temperature (X) | °C |
+| `tmin` | Minimum temperature (N) | °C |
+| `rad` | Solar radiation (J) | MJ/m² |
+| `evap` | Evaporation, "combination" (C): SILO's synthetic estimate before 1970, Class A pan from 1970. Every day here is after 1970, so it is Class A pan | mm |
+| `et0` | Evapotranspiration, FAO-56 short crop (F) | mm |
+
+The variable codes were checked on SILO's climate variables page on 13 Nov 2026.
+
+**Where the grid points came from.** The four points were given in the milestone brief, snapped to SILO's grid. Armidale's is the grid point nearest the airport. They were not checked against a gazetteer here, and it is not recorded whether the other three sit on the town or on its airport. SILO confirmed each point it answered for and gave the elevations above. **To check before 1.4:** that each point is where Claudia wants the district's weather taken from. Moving a point is one new request.
+
+**Gaps and soft spots:**
+
+- **The last three days are provisional.** Evaporation for 10 to 12 Nov 2026 and maximum temperature for 12 Nov 2026 carry SILO's source code 75, which means "interpolated from the long term averages", used until the observations arrive. Pull again before using November 2026.
+- **A few radiation days are long-term averages** (source code 75): 20 days at Hamilton, 9 at Dubbo, 2 at Armidale, none at Emerald, all between 1996 and 2013. Most radiation days are SILO's satellite estimate (code 42).
+- Rain, minimum temperature, and maximum temperature on every other day, are interpolated from that day's observations (code 25).
+- The count of each source code for each variable is in `manifest.json` under `sourceCodes`.
 
 ## Saleyard classes (`BUYS`)
 
