@@ -174,6 +174,50 @@ Things in the MVP that look odd, kept as they are, for Claudia:
 - The month limits (0.15 to 1.9, and 0.2 to 1.8) can never be reached with the six seasons.
 - Some phase wording leans towards a judgement ("best quality", "stale", "losing ground cover"). It is the MVP's wording, kept for now.
 
+### 13 Nov 2026: milestone 1.2a, cattle
+
+Half of milestone 1.2. The farm half (paddocks, fences, water, crops, layout) is 1.2b, built alongside on its own branch. Branch `m1.2a-cattle`, cut from `m1.1-grass`.
+
+Built, all in `packages/engine`:
+
+- Feed and cattle tables (`data/feed.ts`, `data/cattle.ts`): supplement and feedlot figures, saleyard classes without prices, class and group names, health and marking costs.
+- Animals and mobs (`cattle/types.ts`, `cattle/animal.ts`): making an animal and a bought batch, class names, groups, market classes, adult equivalents, water need per head.
+- Diet selection, intake and grazing (`cattle/graze.ts`): where a mob grazes, what each animal eats, and what that does to each square, including trampling, the 250 kg DM/ha residual and the 4 passes.
+- Breeding (`cattle/breeding.ts`): cycling, conception by condition, bull cover, calving, weaning, marking, the joining notes and the preg test.
+- Expected gains and the reasons for a loss (`cattle/gains.ts`).
+- The daily cattle step and the end-of-day deaths (`cattle/simMob.ts`), with several shifts a day, the feedlot and every supplement. It stops no clock and writes no diary line. It returns deaths, births, weanings, notes, the mob's figures, the feed cost and the planted squares grazed (`cattle/notes.ts`).
+
+How it was proven: the same way as the grass. The tests load the MVP in memory and give it the same herd on the same farm as the engine. The MVP's own code works out the grazing areas and the distance to water from test fences and troughs. After every day, every animal, every mob figure, the pasture, the year totals, the deaths and the notes must be exactly equal, with no tolerance. The engine's notes are put into the MVP's words by the test and compared with the MVP's diary line for line.
+
+The random parts (conception, slipped calves, calving losses, calf sex, barren females, deaths, orphans) were compared by giving both sides the same numbers: a fixed value (0.999999 so nothing random happens, 0 so everything does, and sweeps of values in between), a scripted list, or the same seeded sequence. The MVP also drew a random spot on the map for each new animal. The test tells those draws apart by which MVP function asked, gives them a fixed value, and checks both sides finish having drawn the same count.
+
+Covered: every class, weights and ages across the range, CS 1 to 5, dry, pregnant early and late, milking with young and old calves; the four districts on green, dry, rank, short and bare pasture and on sown pasture and crops; 4 head to 500 head on 4 ha; water near and over 3 km out; 1 to 4 days with no water; each supplement; the feedlot; 1, 2 and 4 shifts a day; and herds run for 150 to 240 days in a row with the grass growing.
+
+As a check on the tests, 265 figures in the cattle code were nudged one at a time. 19 were missed at first, most of them chances and limits that a random run only meets by luck. Tests were added that go looking for each (`cattle/thresholds.test.ts` and extra samples). 264 are now caught. The last one changes no result: milk is at its full rate on day 60 whichever side of the step it falls.
+
+Direct benchmarks from CALIBRATION.md are tested too: intake on green and dry feed, conception by condition, the 9-week joining rate and anoestrus. Two need Claudia's eye and are logged in CALIBRATION.md: heavier dry cattle eat a smaller share of live weight than the intake ranges, and the 9-week rate at CS 3 is 84%, a point under the 85 to 95% range.
+
+MVP faults fixed, each with a test (BUILD_PLAN 2.4): the no-water count clears in the feedlot; a cow whose calf dies is dried off; weaning dries off a dam in another mob; making an animal draws no map position. In the long runs, when a calf dies the test checks the engine has dried the cow off and the MVP has not, then dries her off in the MVP so the two carry on side by side.
+
+Where the docs and the MVP code disagreed in these parts (docs corrected, MODEL.md and DATA.md):
+
+- The low-protein penalty uses the CP of pasture plus hay or pellets, and applies on hay and pellets too.
+- Calves get 40% of the hay and pellet ration.
+- Only calves 90 days or older are weaned with the drop.
+- Trampling counts calves in the head per hectare, never works on less than 0.25 ha, and can take a square below the residual.
+- Open females for bull cover include barren females and heifers too young to cycle.
+- The 2.4% appetite band starts at 450 kg, not above it.
+- The calf with a bought cow and calf unit is a steer or heifer calf (already marked), 36 kg plus 0.8 kg a day.
+
+What was left for later:
+
+- The farm side supplies the grazing areas, the distance to water, and where weaners go. The daily tick that joins the two halves is the next step.
+- Notes and reasons are data. Their wording for players belongs to the screens (1.7).
+- Prices, feed as stock on hand, and plans are later milestones. The cattle step returns the figures they need.
+- The engine version was not bumped here, to keep clear of the farm branch. Bump it when the two halves are joined.
+
+Things in the MVP that look odd, kept as they are, for Claudia: listed in MODEL.md, section 3, "MVP behaviour kept as it is".
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

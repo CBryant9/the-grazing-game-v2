@@ -137,18 +137,33 @@ The mob's diet is the weighted average of DMD and CP. Availability = 1 − exp(�
 
 Each day's intake is taken from squares in proportion to weight, leaving a 250 kg DM/ha residual, over up to 4 passes. In each square, green is taken in proportion to `pg` first, then dead. Trampling removes extra dead: `trample = 0.04 + 0.12 × min(1, head per ha / 4)` × amount eaten. A square counts as grazed (`lastG`) if more than 15 kg DM/ha was taken.
 
+Details from the code (milestone 1.2a):
+
+- Head per ha counts every animal in the mob, calves included, over the area's hectares (never less than 0.25 ha).
+- Trampling takes dead feed only, and it can take a square below the residual.
+- Each graze raises the square's recent-grazing mark by kg DM/ha eaten ÷ 120, up to 1.
+- Distance to water is counted in squares, in a straight line from each square to the nearest water point in the same grazing area, then turned into metres. With no water in the area there is no pull towards water and no walk.
+- The weights are stored as 32-bit numbers, as are the amounts taken from each square. Like the pasture arrays, the storage size is part of the model.
+
+**Several shifts a day.** When a plan moves a mob more than once a day, the day's stops that have water are the shifts. With two or more shifts, the diet is the plain average of the diet on each one (DMD, CP, feed, availability and walk), and the day's pasture demand is split equally between them, each grazed in turn. The same paddock can come up twice in a day. With one watered stop or none, the mob grazes the area it is standing in.
+
+In the rebuild the farm hands the cattle step each grazing area (its squares, its hectares and whether it has water) and the distance-to-water array. Planted squares that were grazed come back as a list for the crop model to act on.
+
 ## 3. Cattle (`intakeOf`, `simMob`)
 
 ### Intake, kg DM/day
 
 ```
-k = 3.0% LW (< 300 kg), 2.7% (300–450), 2.4% (> 450); calves 3% × clamp((age−30)/120, 0, 1)
+k = 3.0% LW (< 300 kg), 2.7% (300 to under 450), 2.4% (450 and over); calves 3% × clamp((age−30)/120, 0, 1)
 +0.6% LW if milking a calf
 × max(0.55, 1 − (CS − 3.5) × 0.4) if CS > 3.5       (fat cattle eat less)
 pasture = LW × k × clamp(0.62 + (DMD − 0.5) × 2, 0.5, 1.05) × availability
-no lick and diet CP < 7%: × (1 − (7 − CP) × 0.05)   (rumen slows)
 lick: × 1.25 if CP < 7, × 1.08 if CP 7–9
+hay: 3 kg fed, pasture − 0.5 kg per kg of hay;  pellets: 2 kg fed, pasture − 0.3 kg per kg
+no lick and CP of the mix < 7%: × (1 − (7 − CP of the mix) × 0.05)   (rumen slows)
 ```
+
+The protein that counts is the mix: pasture plus hay or pellets, by weight. So the penalty applies on hay and pellets too, while the mix is still under 7%. With a lick there is no penalty. Calves get 40% of the hay or pellet ration and pay 40% of the lick cost. In the feedlot an animal eats LW × k of the ration (calves 60% of that) and no pasture.
 
 Mob intake is then limited by what the paddock supplies (`f` = supplied ÷ demand).
 
@@ -167,6 +182,15 @@ no water: −4% of LW a day
 condition    CS += gain/(0.15·LW) (× 0.3 for gains in young growing stock under 900 days). 1 CS ≈ 15% of LW.
 ```
 
+Details from the code (milestone 1.2a):
+
+- "Young growing stock" is anything under 900 days old that is not a cow or a bull.
+- Live weight never falls below 25 kg. CS is held between 1 and 5.
+- The daily gain shown for an animal is smoothed: 93% of yesterday's figure plus 7% of today's.
+- Calves are worked out after the adults in their mob, so a calf gets its dam's milk for the same day. The milk energy is added to the calf's intake as it is.
+- In the feedlot the ration is DMD 0.77, ME 11.6, CP 14%. Milk in the lot is worked from the DMD (ME about 11.5).
+- Each animal carries a running cost for the stock book: its feed, plus the district's health cost a day.
+
 ### Breeding
 
 - Cycling: heifers from 400 days and 270 kg. After calving, anoestrus = 45 + max(0, 3 − CS) × 40 days (45 at CS 3, 85 at CS 2).
@@ -178,11 +202,12 @@ condition    CS += gain/(0.15·LW) (× 0.3 for gains in young growing stock unde
 
   - × 0.85 if lactating, × bull coverage
   - daily chance = rate ÷ 21
-- Bull coverage = min(1, bulls × 40 ÷ open females). Unmarked young bulls (from 300 days) count 0.6 each.
+- Bull coverage = min(1, bulls × 40 ÷ open females). Unmarked young bulls (from 300 days) count 0.6 each. Open females are all the cows and heifers in the mob that are not in calf, including barren ones and heifers too young to cycle.
 - Expected 9-week rate = 0.96 × (1 − (1 − p)³). About 4% are barren.
 - Gestation 283 days. Calf losses at birth are 7% for first calvers and 2.5% for cows, +6% if CS < 1.8. Abortion is 0.2%/day if CS < 1.6.
 - Calves weigh 32 kg (heifer's first) or 36 kg. Bull calves stay entire until marked, and become fertile young bulls once weaned unmarked.
-- The whole drop is weaned when the oldest calf reaches about 280 days. An orphan under 100 days has a 2%/day death risk.
+- When a calf reaches 280 days with its dam still on the farm, the drop is weaned: every calf in the mob that is 90 days or older. Younger calves stay on their dams. A calf with no dam is weaned at 100 days. Under 100 days it has a 2%/day death risk.
+- A calf is a bull calf or a heifer calf, 50:50. About 4% of heifer calves are barren.
 - Joining reports every 3 weeks; a preg test at 9 weeks compares against the expected rate and leaves out recently calved cows.
 
 ### Deaths
@@ -190,6 +215,7 @@ condition    CS += gain/(0.15·LW) (× 0.3 for gains in young growing stock unde
 - Base 0.004% a day.
 - Plus (1.4 − CS) × 1.5% a day below CS 1.4.
 - Everything dies on day 4 without water.
+- The cause recorded: "no water" from the third day without water, "poor condition" if CS is under 1.6, otherwise "natural causes". An orphan lost to its 2% risk is "orphaned".
 
 ### Adult equivalents (`aeOf`)
 
@@ -197,6 +223,34 @@ condition    CS += gain/(0.15·LW) (× 0.3 for gains in young growing stock unde
 - Lactating × 1.3; late pregnant × 1.1.
 - Calves count 0 under 90 days, then 0.5 × (LW/450)^0.75.
 - DSE = AE × 8.
+
+### Expected gains and the reasons (`gainOn`, `gainWhy`, `predictGains`)
+
+The forecast for a class on an area's feed uses the same intake and energy rules, with the mob getting its fill (no shortfall) and calves left out. When the forecast is under 0.05 kg a day it comes with up to two reasons, in this order: not much feed where they graze (availability under 0.75), low energy (ME under 8), protein under 7% with no lick, milking for a calf, late pregnancy (over 190 days). If none applies, intake is just short of needs. In the rebuild the reasons are data, and the screens write the words.
+
+### The rebuild: cattle (milestone 1.2a)
+
+The formulas above are matched to the MVP number for number. Around them:
+
+- **The day's order.** For each mob in turn: wean the drop if it is due, then run the mob's day. A mob made by weaning goes on the end and has its day too. After the last mob, the deaths are settled: counted, dams and calves unhooked, and the dead taken out.
+- **Nothing stops the clock.** The cattle step returns what happened as data: deaths with their cause, births, weanings, notes for the inbox, the mob's figures, the feed cost, and the planted squares grazed. The screens decide what to show and when to stop a skip.
+- **Random draws.** Breeding (conception, slipped calves, calving losses, calf sex, barren females) and deaths (daily deaths, orphans) draw from their own seeded streams.
+
+**MVP faults fixed. These are the rules now:**
+
+- **The feedlot has water.** A mob's days-without-water count is set to 0 in the lot. (In the MVP a mob sent to the lot while out of water kept losing 4% a day, and died there if it went in on day 4.)
+- **A cow whose calf dies is dried off** when the day's deaths are settled: no calf at foot, not milking. (The MVP left her milking: eating more, spending energy on milk, counted at 1.3 AE and slower back in calf.) A dam that has since had a newer calf is left alone.
+- **Weaning dries off the dam wherever she is on the farm.** (The MVP only looked in the calf's own mob.)
+- **Making an animal draws no map position.** The engine draws nothing, so a new animal uses up no extra random numbers.
+
+**MVP behaviour kept as it is, for Claudia to rule on:**
+
+- A note made on a farm's first day (day 0) for short feed, low condition or fertile young bulls is made again on day 1, because the MVP reads a stored day of 0 as "not noted yet".
+- A calf born on the fourth day without water has no day of its own until tomorrow, so it dies on day 5, not day 4.
+- From the third day without water, any death is recorded as "no water", though only day 4 kills by thirst.
+- Bull coverage counts barren females and heifers too young to cycle as open females, so a mob with many young heifers lowers conception for the cows.
+- A cow that loses her calf at birth, or slips a calf, can cycle again the next day. There is no wait.
+- Intake as a share of potential (the mob's `pct` figure) ignores the extra appetite of a milking cow, so a mob of cows with calves can read over 100%.
 
 ## 4. Crops and plantings (`fieldState`, `fieldTick`, `cropGrazed`)
 

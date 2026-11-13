@@ -190,6 +190,18 @@ globalThis.__mvp={
 };
 `;
 
+// Cattle (milestone 1.2a). The types for these are in test-support/cattle.ts.
+const CATTLE_HOOK = `
+Object.defineProperties(globalThis.__mvp,Object.getOwnPropertyDescriptors({
+  get PADS(){return PADS},set PADS(v){PADS=v},
+  get POF(){return POF},set POF(v){POF=v},
+  DIST,FEED,BUYS,GROUPS,GNAME,MCLS,U,
+  recompute,health,makeAnimal,makeBatch,label,groupKey,mclass,condConc,dietOf,intakeOf,simMob,grazeAlloc,
+  cycling,anoDays,expectedRate,breedingNotes,joinReport,markCalves,calve,weanOne,weanMob,
+  gainOn,gainWhy,predictGains,planSubs,waterUse,cropGrazed
+}));
+`;
+
 /**
  * A stand-in for any browser object. Every property is itself, it can be
  * called or built with `new`, it is empty when looped over, and it reads as
@@ -240,7 +252,7 @@ export function loadMvp(): LoadedMvp {
   // The whole script sits inside one function that ends with `})();`.
   const end = script.lastIndexOf('})();');
   if (end < 0) throw new Error('MVP file: could not find the end of its script');
-  const hooked = script.slice(0, end) + HOOK + script.slice(end);
+  const hooked = script.slice(0, end) + HOOK + CATTLE_HOOK + script.slice(end);
 
   const dom = browserStandIn();
   let random = seededRandom(1);

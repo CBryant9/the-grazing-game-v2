@@ -53,3 +53,88 @@ export {
   randomSeasons,
 } from './season/randomSeasons';
 export type { MonthWobble, RandomSeasonsOptions, SeasonOutlook } from './season/randomSeasons';
+
+export {
+  CALF_RATION_SHARE,
+  FEED_COST,
+  HAY,
+  LICK,
+  LOT_RATION,
+  PELLETS,
+  SUPPLEMENTS,
+} from './data/feed';
+export type { Supplement } from './data/feed';
+export {
+  BARREN_CHANCE,
+  BOUGHT_CALF,
+  CLASS_LABELS,
+  GROUPS,
+  HEALTH_COST_PER_HEAD_YEAR,
+  MARKET_CLASSES,
+  MARKING,
+  SALE_CLASSES,
+} from './data/cattle';
+export type {
+  CattleClassId,
+  GroupId,
+  MarketClassId,
+  Range,
+  SaleClass,
+  SaleClassId,
+} from './data/cattle';
+export { animalLookup, createCattleMob, emptyCattleTotals } from './cattle/types';
+export type {
+  Animal,
+  AnimalIds,
+  AnimalKind,
+  AnimalLookup,
+  CattleMob,
+  CattleRngs,
+  CattleTotals,
+  GrazingArea,
+  GrazingLand,
+  Joining,
+  MobDay,
+  Sex,
+} from './cattle/types';
+export {
+  DSE_PER_AE,
+  aeOf,
+  classOf,
+  groupKey,
+  label,
+  makeAnimal,
+  makeSaleBatch,
+  marketClass,
+  stockOn,
+  waterNeed,
+} from './cattle/animal';
+export { LOT_DIET, RESIDUAL, dietOf, grazeAlloc, intakeOf } from './cattle/graze';
+export type { Diet, DietResult, GrazeInputs, Intake, PlantingGraze } from './cattle/graze';
+export {
+  CYCLE_DAYS,
+  FEMALES_PER_BULL,
+  GESTATION_DAYS,
+  LACTATING_CONCEPTION,
+  PUBERTY,
+  WEAN_MIN_AGE,
+  WEAN_TRIGGER_AGE,
+  YOUNG_BULL_SHARE,
+  anoDays,
+  breedingNotes,
+  bullCover,
+  calve,
+  condConc,
+  cycling,
+  expectedRate,
+  joinReport,
+  markCalves,
+  weanMob,
+  weanOne,
+  weaningDue,
+} from './cattle/breeding';
+export type { CalveInputs, MarkResult } from './cattle/breeding';
+export { gainOn, gainWhy, milkMJ, predictGains } from './cattle/gains';
+export type { CattleNote, GainForecast, GainReason } from './cattle/notes';
+export { settleDeaths, simMob } from './cattle/simMob';
+export type { Death, DeathCause, MobDayResult, MobPlace, SimMobInputs } from './cattle/simMob';

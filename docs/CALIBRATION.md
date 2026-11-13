@@ -77,6 +77,32 @@ Established herds (deaths, gain/head, preg test vs expected):
 
 Speed: 1.2–3.1 ms/day on medium farms (250–2,900 head). A large Top End farm with 11,362 head ran at 6.7 ms/day, about 0.6 ms per 1,000 head, so it scales linearly and is within target.
 
+### 13 Nov 2026, rebuild milestone 1.2a (cattle): the benchmarks that need no farm
+
+The cattle formulas were matched to the MVP number for number, so these are the MVP's figures, now held by automated tests in `packages/engine/src/cattle`. The whole-farm benchmarks (steer gains, deaths, speed) wait for milestone 1.3.
+
+Intake as % of live weight, dry stock, no supplement, on a paddock painted all one kind of feed:
+
+| District | Green leafy: 250 / 350 / 500 kg | Dry stemmy: 250 / 350 / 500 kg |
+|---|---|---|
+| Central Qld (ME 9.1 green, 6.8 dry) | 2.58 / 2.32 / 2.06 | 1.59 / 1.43 / 1.27 |
+| Northern Tablelands (9.8, 6.9) | 2.80 / 2.52 / 2.24 | 1.65 / 1.48 / 1.32 |
+| Central West NSW (9.8, 6.9) | 2.80 / 2.52 / 2.24 | 1.65 / 1.48 / 1.32 |
+| Western Victoria (10.1, 7.1) | 2.92 / 2.63 / 2.34 | 1.74 / 1.57 / 1.39 |
+
+- **Passes for cattle under 300 kg in every district:** 2.5 to 3% on green leafy feed and 1.5 to 2% on dry stemmy feed. A 450 kg cow with a calf on her is in the green range too (2.58 to 2.92%).
+- **CHECK: heavier dry stock sit under both ranges.** The MVP's appetite steps down at 300 kg and again at 450 kg. A 500 kg bullock eats 2.1 to 2.3% on green feed and 1.3 to 1.4% on dry feed. Nothing was changed. For Claudia: is the benchmark meant for young cattle, or for all classes?
+- With a lick, a 250 kg steer on the dry feed eats 2.2 to 2.4% (the × 1.25 lift).
+
+Breeding:
+
+- Conception per 3-week cycle: 50% at CS 3, 60% at CS 3.5, 65% at CS 4, 25% at CS 2. Passes.
+- Expected in calf after 9 weeks: 84.0% at CS 3, 89.9% at CS 3.5, 91.9% at CS 4, 55.5% at CS 2. **CHECK:** at CS 3 exactly it is one point under the 85 to 95% range. It is inside from about CS 3.1.
+- Anoestrus after calving: 45 days at CS 3 and above, 85 days at CS 2. Passes.
+- No water: every animal that has a day on the fourth day dies. Passes in all four districts.
+
+The MVP faults fixed in this milestone (the feedlot has water, a cow whose calf dies is dried off, weaning dries off a dam in another mob) change results a little from the MVP in those cases only. They have not been through the whole-farm suites yet. Re-run them in 1.3.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

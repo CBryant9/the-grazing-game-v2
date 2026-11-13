@@ -101,6 +101,15 @@ Adjustments: cows CS < 2 × 0.85, CS ≥ 3 × 1.05; other non-bull, non-calf sto
 
 About 4% of females are born or bought barren (never get in calf).
 
+From the code (milestone 1.2a):
+
+- Weight and condition are drawn anywhere in the range. Ages, days pregnant and calf ages are whole days, both ends included.
+- A bought cow has had 1 to 4 calves.
+- The calf with a cow and calf unit is already marked: a steer calf or a heifer calf, 50:50. It weighs 36 kg plus 0.8 kg for each day of its age.
+- These classes carry no prices here. Prices come from the market model.
+
+Names used for cattle on the farm (`label`): Weaner steer (under 280 kg), Yearling steer (280 to under 450 kg), Bullock (450 kg and over), Weaner heifer (under 280 kg), Heifer, PTIC heifer, Dry cow, Cow with calf, PTIC cow, PTIC cow with calf, Bull, Young bull (unmarked), Heifer calf, Steer calf, Bull calf (unmarked).
+
 ## Infrastructure and running costs
 
 | Item | Cost |
@@ -133,6 +142,12 @@ Water use: 10% of live weight in litres a day, × 1.3 in summer (Dec–Feb), × 
 | Hay | $0.28/kg, 3 kg/head/day | ME 8.4, CP 9%; replaces 0.5 kg pasture per kg |
 | Pellets | $0.50/kg, 2 kg/head/day | ME 12.5, CP 16%; replaces 0.3 kg pasture per kg |
 | Feedlot | $0.40/kg ration + $0.35/head/day yard | ME 11.6, CP 14%; full intake (calves 60%) |
+
+From the code (milestone 1.2a):
+
+- Calves get 40% of the hay or pellet ration (1.2 kg of hay, 0.8 kg of pellets), and pay 40% of the lick cost.
+- The low-protein intake penalty uses the CP of pasture plus hay or pellets together, so it still applies on hay or pellets while the mix is under 7%. See MODEL.md, section 3.
+- The feedlot ration has a DMD of 0.77. It is used for a cow's milk in the lot.
 
 ## Money and difficulty
 
