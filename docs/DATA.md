@@ -21,10 +21,12 @@ The rebuild carries the four launch districts (cq, nsw, cw, wv) in `packages/eng
 | cq | 42,46,34,15,6,2,1,1,2,6,18,32 | 1 | 5500 | .66 / .48 / .50 | 11 | Jun–Aug (.012) | Feb–Apr | .25 |
 | nt | 56,60,44,14,3,1,0,0,0,3,14,40 | .45 | 7000 | .64 / .47 / .48 | 10 | none | Mar–May | .20 |
 | nsw | 34,31,25,16,7,2,1,3,10,24,33,37 | .9 | 5000 | .70 / .51 / .50 | 14 | May–Aug (.010) | Nov–Feb | .35 |
-| cw | 16,16,20,22,15,8,7,12,28,38,26,18 | .8 | 4500 | .70 / .51 / .50 | 14 | Jun–Aug (.006) | Oct–Dec | .30 |
+| cw | 16,16,20,22,15,8,7,12,28,38,26,18 | .8 | 4500 | .68 / .51 / .50 | 14 | Jun–Aug (.006) | Oct–Dec | .30 |
 | wv | 5,4,8,16,18,12,10,18,40,55,40,15 | 1 | 5000 | .72 / .52 / .51 | 16 | none | Oct–Jan | .40 |
 
 (Month indexes in code are 0-based: `head:[1,2,3]` = Feb–Apr.)
+
+**Central West `DMD max` is .68 in the rebuild. The MVP had .70.** It was tuned down in milestone 1.3 (14 Nov 2026) because Central West steers gained 154 kg a head in an average year against a benchmark of 115 to 130. At .68 they gain 128. It is a tuning value with no outside source. It sits between Central Queensland (.66) and the Northern Tablelands (.70). The other levers that were tried, and why they did not work, are in CALIBRATION.md. For Claudia to confirm.
 
 ## Farm sizes (`FARMS`, ha: small / medium / large)
 

@@ -364,6 +364,31 @@ What is not done:
 - **Calibration.** The whole-farm benchmarks (steer gains, deaths, the Central West tune) are milestone 1.3. Nothing here changed a formula.
 - The `realism-guardian` agent was not run by the builder of this part. It is for the reviewer before the pull request.
 
+### 14 Nov 2026: milestone 1.3, calibration
+
+Branch `m1.3-calibration`, cut from `m1.2c-whole-farm`. The engine version is now 0.5.0.
+
+Built:
+
+- `packages/engine/test-support/calibration.ts`: the MVP's steers and herds suites as runs on fixed seeds, in the average year or with the farm's random seasons.
+- `packages/engine/src/calibration/steers.test.ts`: the five steer cases on twelve seeds.
+- `packages/engine/src/calibration/herds.test.ts`: established herds in the four districts on eight seeds and two start months: deaths, preg tests, gain.
+- `packages/engine/src/calibration/crops.test.ts`: Central West barley and wheat yields, and steers on oats.
+- `packages/engine/src/calibration/density.test.ts`: 500 head on 4 ha moved daily in each district, and the same mob left on one cell.
+- `packages/engine/src/calibration/speed.timed.ts`, `vitest.speed.config.ts`, `pnpm test:speed` and a CI step: the speed benchmark on its own.
+- **The Central West tune:** peak green digestibility 0.70 to 0.68 (`data/districts.ts`). The MVP copy used by the comparison tests is given the same figure in memory (`REBUILD_TUNES` in `test-support/mvp.ts`), and loading stops if the MVP file no longer holds 0.70.
+
+Results, with before and after, are in CALIBRATION.md. Lessons K1 to K4 are in LESSONS.md.
+
+One existing test changed: `cattle/simMob.test.ts`, "500 head on 4 ha, moved on to the next 16 ha". It said the 16 ha runs short within four days. In Central West it is now five, because the feed is a little less digestible and the steers eat a little less of it. The test now finds the day and holds it to four (five in Central West).
+
+PRD defaults used: none new.
+
+Not done:
+
+- Several moves a day and a long walk at whole-farm level, real dry and wet years, and the 180-day run (BUILD_PLAN section 3). They need grazing plans, walking times and real weather (milestones 1.4 and 1.5).
+- Central Qld with lick is 1 kg over its band in the average year. Not tuned. Listed for Claudia in CALIBRATION.md with four other questions.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

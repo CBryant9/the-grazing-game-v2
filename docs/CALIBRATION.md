@@ -26,7 +26,30 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 
 Seasons are random. Judge a run against its season: a drought year below target is expected, but an average year outside target is a bug.
 
-## How to run the checks
+## How to run the checks (the rebuild)
+
+The benchmarks are automated tests in `packages/engine/src/calibration`. The runs they use are in `packages/engine/test-support/calibration.ts`.
+
+```bash
+pnpm test
+```
+
+```bash
+pnpm test:speed
+```
+
+- `pnpm test` runs every benchmark with the rest of the tests: steer gains, established herds, grain yields, steers on oats, and 500 head on 4 ha moved daily. The cattle benchmarks that need no farm (intake, conception, joining, anoestrus, no water) are in `packages/engine/src/cattle`. Carrying capacity is in `packages/engine/src/money/costs.test.ts`.
+- `pnpm test:speed` runs the speed benchmark on its own, because a timing taken beside the other tests reads several times slower. The limit is 5 ms. CI runs it with a looser limit (15 ms) for its slower shared machines.
+- After any change to the model or its data: bump `ENGINE_VERSION`, run both, and add the before and after figures to the results log below.
+
+### How a benchmark is judged
+
+- Every run is on a fixed seed, so the same run always gives the same figures.
+- **The average year** is the measure for a band. Every day grows at the district curve, with no good or poor months. The seed still changes the block (its land, its soil and the pasture it starts with).
+- **A band is held on the average over the blocks, not on each block.** In the very same season one block differs from the next by 20 to 30 kg a head. That is wider than the Tablelands and Central West bands, which are 15 kg wide.
+- **Random seasons** are run on the same seeds. A run is judged against its season: a year with a poor season may fall under the band, and that is recorded, not failed. The long run of seasons must not be over the band.
+
+## How to run the checks (the MVP, kept for reference)
 
 1. Make a scratch copy with the debug hook. The `tests/tmp/` folder is git-ignored:
 
@@ -111,6 +134,109 @@ No grass or cattle formula changed. The whole farm (the daily tick, costs, the m
 - **No water:** every animal in a mob with no water dies on the fourth day, in all four districts, as a whole-farm test (cows, calves, steers and bulls). Passes.
 - **Rule checks that sit beside the benchmarks:** breakouts only through tape and only when hungry or thirsty; one mob to a grazing area after any fence or gate change; a year in each district ends with every figure a finite number.
 - The rebuild's differences from the MVP in this part (tape and energiser costs, net worth, a fence through a mob) change money and mob membership, not growth, intake, gain, breeding or deaths.
+
+### 14 Nov 2026, rebuild milestone 1.3 (calibration): engine 0.5.0
+
+The MVP's three suites now run as automated tests on fixed seeds, with the other benchmarks beside them. **One figure changed: Central West peak green digestibility (`dmdMax`), 0.70 to 0.68.** No formula changed. The copy of the MVP that the comparison tests load is given the same figure in memory, so those tests still prove the formulas are the same (`REBUILD_TUNES` in `packages/engine/test-support/mvp.ts`).
+
+**Steers.** Weaner steers at about 60% of carrying capacity on a 260 ha block with one water, a year from a scratch start, on seeds 1 to 12. Kg a head a year. Only Central West changed, so its "before" is shown. The other four rows are the same before and after.
+
+| Case | Target | Average year: mean (lowest to highest block) | Random seasons, all 12 | The 4 years with no poor season | The 4 years with a poor season | Deaths, average year |
+|---|---|---|---|---|---|---|
+| Central Qld, no lick | 20 to 60 | 41 (31 to 57) | 35 | 44 | 26 | 1.6% |
+| Central Qld, lick | 75 to 130 | 131 (127 to 136) | 126 | 135 | 118 | 1.6% |
+| Northern Tablelands | 90 to 105 | 103 (91 to 118) | 93 | 104 | 80 | 1.7% |
+| Central West NSW, before | 115 to 130 | **154** | 135 | | | |
+| Central West NSW, after | 115 to 130 | **128** (119 to 139) | 109 | 129 | 75 | 1.6% |
+| Western Victoria | 155 to 185 | 182 (171 to 195) | 162 | 179 | 133 | 1.7% |
+
+"No poor season" means both seasons in the run were average or better. "A poor season" means one of them was well below average or a drought.
+
+Every run, after the tune (seasons are the start season's factor, then the factor from 1 July):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Seasons | 1, 1 | 0.85, 1.15 | 0.85, 1.15 | 0.85, 0.5 | 1, 1 | 0.85, 0.5 | 0.85, 1 | 1.35, 1 | 1.15, 1.35 | 0.5, 1.15 | 1, 0.5 | 0.85, 1 |
+| Central Qld, no lick, average year | 57 | 38 | 39 | 42 | 31 | 54 | 46 | 34 | 35 | 50 | 37 | 32 |
+| Central Qld, no lick, random seasons | 60 | 37 | 35 | 31 | 36 | 42 | 42 | 42 | 37 | 0 | 33 | 21 |
+| Central Qld, lick, average year | 135 | 129 | 129 | 133 | 128 | 136 | 127 | 134 | 131 | 134 | 129 | 128 |
+| Central Qld, lick, random seasons | 137 | 128 | 128 | 125 | 130 | 126 | 124 | 139 | 133 | 93 | 128 | 121 |
+| Northern Tablelands, average year | 118 | 97 | 97 | 105 | 91 | 115 | 108 | 100 | 98 | 111 | 98 | 92 |
+| Northern Tablelands, random seasons | 121 | 96 | 100 | 83 | 89 | 90 | 99 | 97 | 109 | 48 | 98 | 81 |
+| Central West NSW, average year | 139 | 125 | 127 | 126 | 122 | 139 | 127 | 123 | 124 | 135 | 124 | 119 |
+| Central West NSW, random seasons | 136 | 126 | 128 | 51 | 120 | 48 | 124 | 129 | 133 | 121 | 81 | 112 |
+| Western Victoria, average year | 195 | 176 | 179 | 185 | 172 | 195 | 188 | 176 | 176 | 194 | 176 | 171 |
+| Western Victoria, random seasons | 192 | 175 | 176 | 125 | 171 | 89 | 186 | 174 | 177 | 173 | 147 | 163 |
+
+**Why Central West ran high, and why digestibility was the tune.** In the average year Central West steers gained in every month: 0.23 kg a day in July and August and 0.25 to 0.35 from January to March, where Tablelands steers lose 0.15 to 0.33 kg a day through winter. There is green feed all year, so they never go backwards. Each lever was tried on its own in the average year (8 seeds):
+
+| Lever (Central West only) | Gain, kg a head | What else it did |
+|---|---|---|
+| As the MVP | 155 | |
+| Frost loss a day 0.006 to 0.010, 0.014, 0.020 | 155, 155, 153 | Winter gain fell, spring gain rose to match |
+| Frost months and loss as the Tablelands | 153 | |
+| Winter growth (June to August) at 60%, 40% | 151, 150 | Carrying capacity 0.33 to 0.31, 0.30 AE/ha |
+| Summer growth (December to March) at 70%, 50% | 144, 134 | Carrying capacity 0.33 to 0.30, 0.28 AE/ha |
+| Growth scale 0.8 to 0.7, 0.6 | 147, 136 | Carrying capacity 0.33 to 0.29, 0.25 AE/ha |
+| Peak protein 14% to 13, 12, 11 | 155, 154, 150 | |
+| Lowest green digestibility 0.51 to 0.50, 0.49, 0.48 | 155, 155, 155 | |
+| **Peak green digestibility 0.70 to 0.69, 0.68, 0.67, 0.66** | **142, 129, 115, 102** | Nothing else |
+
+Less winter or frosted feed did not move the year, because the steers made it up in spring. Less growth lowered carrying capacity before it lowered the gain enough. Only peak digestibility moved the year without moving anything else. 0.68 is the smallest step that puts the average year inside the band.
+
+**Established herds.** A running medium farm on medium difficulty, left alone for a year, seeds 1 to 8, September and May starts. Deaths are over all the herds together, with the lowest and highest single herd in brackets.
+
+| District | Head at the start | Deaths, average year | Deaths, random seasons, September start | Gain a head, September start | Gain a head, May start | In calf at preg tests | Preg tests against the expected rate |
+|---|---|---|---|---|---|---|---|
+| Central Qld (on lick) | 629 to 938 | 2.4% (1.5 to 3.0) | 2.4% (1.5 to 3.0) | 130 kg | 150 kg | 91% | 4.1 points over |
+| Northern Tablelands | 216 to 323 | 2.6% (0.9 to 4.1) | 2.6% (0.9 to 4.1) | 97 kg | 135 kg | 89% | 5.5 points over |
+| Central West NSW | 333 to 496 | 2.4% (1.2 to 3.4) | 2.4% (1.2 to 3.1) | 123 kg | 135 kg | 91% | 3.4 points over |
+| Western Victoria | 178 to 265 | 2.6% (1.1 to 3.6) | 2.6% (1.1 to 3.6) | 177 kg | 171 kg | 92% | 2.7 points over |
+
+- Deaths pass in every district (1.5 to 3.6%). A single small herd can sit outside the range on a handful of deaths.
+- Central West herd gain before the tune was 144 kg (September start) and 161 kg (May start). Deaths before were 2.3 to 2.4%.
+- **Recorded, not failed:** with random seasons and a May start, Northern Tablelands herds that drew a drought from 1 July lost 13 to 20% with no destocking (seen on 12 seeds before the tune; the Tablelands figures did not change). That is the intended result of doing nothing in a drought.
+
+**Grain, Central West, average year, not grazed** (three farms, each sowing month): barley 2.88 t/ha (target about 2.5), wheat 2.70 t/ha (target 2.4 to 3), oats 2.25 t/ha.
+
+**Steers on oats, Central West, average year.** 36 ha of oats sown in March, 30 weaner steers put on at day 50 and left on:
+
+| Days after sowing | Diet ME | Diet CP % | Gain, kg a day |
+|---|---|---|---|
+| 50 to 64 (settling in) | 11.4 | 21.0 | 0.78 |
+| 64 to 106 | 11.4 to 11.5 | 21.1 | 1.2 to 1.6 |
+| 106 to 120 | 11.3 | 20.2 | 1.57 |
+| **120 to 134 (straight after lock-up)** | **10.7** | **17.4** | **1.43** |
+| 134 to 148 | 10.1 | 14.4 | 1.13 |
+| 148 to 162 | 9.5 | 11.8 | 0.83 |
+
+The benchmark (ME about 10.7, CP about 18%, about 1.4 kg a day) is the fortnight straight after lock-up. That is when the MVP check behind it was made. Passes.
+
+**500 head on 4 ha, moved to a fresh 4 ha every day for 20 days, average year.** 1,040 ha farm, 1 ha squares, tape cells with a trough each.
+
+| District and month | Intake, % of live weight | Feed on the cell before | Left behind | Gain, kg a day |
+|---|---|---|---|---|
+| Central Qld, February | 2.2 to 2.3 | 1,840 to 2,530 kg DM/ha | 1,130 to 1,810 | 0.43 to 0.57 |
+| Northern Tablelands, December | 2.4 to 2.5 | 1,490 to 2,060 | 720 to 1,250 | 0.69 to 0.80 |
+| Central West NSW, October | 2.1 to 2.3 | 1,170 to 1,670 | 520 to 940 | 0.45 to 0.59 |
+| Western Victoria, October | 2.5 to 2.6 | 1,720 to 2,370 | 910 to 1,530 | 0.74 to 0.90 |
+
+- The mob got all the feed it wanted every day, stayed one mob, and never pushed through the tape.
+- What came off a cell was what the mob ate plus 13 to 15% trampled or lost.
+- Left on the same 4 ha instead, the mob has its fill on day 1, is short by day 3 and is losing weight by day 5.
+- The figures in the table are from sampled days in the run. The tests hold every day to wider limits: intake 2 to 3%, at least a third of the feed and 400 kg DM/ha left, gain 0.3 to 1.1 kg a day.
+
+**Speed:** 1.96 ms a simulated day with 4,895 head and 411 calves in three mobs, on its own on the build PC (`pnpm test:speed`). Target under 5 ms. Passes.
+
+**CHECK, for Claudia:**
+
+1. **Central Qld with lick is 1 kg over its band in the average year** (131 against 75 to 130). It is inside over the long run of seasons (126). Nothing was tuned. The test records the gap and fails if it grows past 5 kg or goes away.
+2. **The bands are narrower than the spread between blocks.** In the average year single blocks ran 91 to 118 kg on the Tablelands (band 90 to 105), 119 to 139 in Central West (115 to 130) and 171 to 195 in Western Victoria (155 to 185). The tests hold the average over twelve blocks to the band. Is that how the bands are meant, or should every block in an average year be inside?
+3. **Three districts sit at the top of their bands in the average year** (Tablelands 103, Central West 128, Western Victoria 182) and in the middle or below over the long run (93, 109, 162). Central West's long run is under its band because three of the twelve years drew a drought (48 to 81 kg). If the bands are meant for the long run and not the average year, Central West wants about 0.69, not 0.68.
+4. **Barley is 2.88 t/ha in the average year** against "about 2.5". Nothing was changed. The test allows 2.0 to 3.0.
+5. Still open from 1.2a: heavier dry stock eat under the intake ranges, and a 9-week joining at CS 3 exactly gives 84.0%.
+
+**Not in this milestone:** several moves a day at whole-farm level and a mob walked a long way (both need grazing plans and walking times, milestone 1.5; several moves a day is tested against the MVP at mob level in `cattle/simMob.test.ts`). Real dry and wet years (1.4). The 180-day run from BUILD_PLAN section 3.
 
 ### Earlier checks (build sessions, older model versions)
 
