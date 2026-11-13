@@ -234,13 +234,17 @@ export function readMvpScript(): string {
   return html.slice(open + '<script>'.length, close);
 }
 
-/** Load a fresh copy of the MVP. Each call gives a separate game. */
-export function loadMvp(): LoadedMvp {
+/**
+ * Load a fresh copy of the MVP. Each call gives a separate game.
+ * `extraHook` is more script text added after the hook, in memory only, for
+ * a test-support file that needs to reach more of the MVP (see mvpFarm.ts).
+ */
+export function loadMvp(extraHook = ''): LoadedMvp {
   const script = readMvpScript();
   // The whole script sits inside one function that ends with `})();`.
   const end = script.lastIndexOf('})();');
   if (end < 0) throw new Error('MVP file: could not find the end of its script');
-  const hooked = script.slice(0, end) + HOOK + script.slice(end);
+  const hooked = script.slice(0, end) + HOOK + extraHook + script.slice(end);
 
   const dom = browserStandIn();
   let random = seededRandom(1);
