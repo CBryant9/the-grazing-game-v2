@@ -482,6 +482,14 @@ export type {
   PaddockView,
   PregTestResult,
 } from './sim/summary';
+// Milestone 1.6: the farm view the map is drawn from (numbers only).
+export {
+  VIEW_BODY_SHAPE,
+  VIEW_OLD_LEAF_DAYS,
+  VIEW_SEED_HEADS,
+  VIEW_WEATHERED_KG,
+  farmView,
+} from './sim/view';
 
 export { MAX_BUY, applyAction } from './actions/apply';
 export type { ActionEnv } from './actions/apply';

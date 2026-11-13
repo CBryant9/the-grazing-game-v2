@@ -89,3 +89,39 @@ export const SITE = {
     'A free, realistic grazing game for Australian graziers. Real seasons, real prices, real decisions about grass and stock. Play on your phone or PC.',
   locale: 'en-AU',
 } as const;
+
+// The farm view: the numbers the server sends the map to draw (PRD 5.16).
+export {
+  FARM_GRID_H,
+  FARM_GRID_N,
+  FARM_GRID_W,
+  FARM_VIEW_VERSION,
+  VIEW_FENCE,
+  VIEW_LABELS,
+  VIEW_LAND,
+} from './farmView';
+export type {
+  FarmView,
+  FarmViewArea,
+  FarmViewBuilding,
+  FarmViewCattle,
+  FarmViewFences,
+  FarmViewGate,
+  FarmViewJob,
+  FarmViewMob,
+  FarmViewPaddock,
+  FarmViewPart,
+  FarmViewPlanting,
+  FarmViewSquares,
+  FarmViewSward,
+  FarmViewTrough,
+  FarmViewWater,
+  ViewBuildingKind,
+  ViewCattleKind,
+  ViewEdge,
+  ViewFence,
+  ViewGateKind,
+  ViewLand,
+  ViewPlantingKind,
+  ViewPlantingStage,
+} from './farmView';
