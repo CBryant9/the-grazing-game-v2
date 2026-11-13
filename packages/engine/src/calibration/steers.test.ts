@@ -20,6 +20,10 @@ import {
  *                      the twelve seeds this is the long run: droughts and
  *                      wet years in about their usual shares.
  *
+ * PROPOSED, WAITING ON CLAUDIA (docs/CALIBRATION.md, the 1.3 entry): the
+ * build plan judges every run, and some single blocks are over their band
+ * in the average year. Until she answers, this is how the bands are held.
+ *
  * The band is held in the average year, as the average over the seeds. One
  * block differs from the next by 20 to 30 kg in the very same season, which
  * is wider than some of the bands, so a single run can't be held to it.
@@ -51,7 +55,7 @@ const CASES: Case[] = [
     supp: 'lick',
     lo: 75,
     hi: 130,
-    averageYearOver: 5,
+    averageYearOver: 2,
   },
   { name: 'Northern Tablelands', district: 'nsw', month: 9, supp: 'none', lo: 90, hi: 105 },
   { name: 'Central West NSW', district: 'cw', month: 3, supp: 'none', lo: 115, hi: 130 },
@@ -101,12 +105,12 @@ for (const c of CASES) {
       expect(mean(gains(poor))).toBeLessThan(mean(gains(fair)));
     });
 
-    it('loses between 0.5% and 3.6% of the steers a year, average year, all blocks together', () => {
+    it('loses 1.5 to 3.6% of the steers a year, average year, all blocks together', () => {
       const bought = average.reduce((n, r) => n + r.head, 0);
       const died = average.reduce((n, r) => n + (r.deathsPct * r.head) / 100, 0);
       const pct = (died / bought) * 100;
-      expect(pct).toBeGreaterThan(0.5);
-      expect(pct).toBeLessThan(3.6);
+      expect(pct).toBeGreaterThanOrEqual(1.5);
+      expect(pct).toBeLessThanOrEqual(3.6);
     });
 
     it('gives the same figures when run again', () => {

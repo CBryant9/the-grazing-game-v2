@@ -21,10 +21,12 @@ import { boxCells, boxEdges, cellAt, openFarm } from '../../test-support/wholeFa
  * wheat, and for the oats: ME within 0.4, CP within 2 points, and gain
  * within 0.2 kg a day.
  *
- * The oats figures are for the fortnight straight after lock-up (days 120
- * to 134 after sowing), which is when the MVP check behind the benchmark
- * was made. Younger oats is better feed than that, and it falls away as
- * the crop runs up to head.
+ * PROPOSED, WAITING ON CLAUDIA (docs/CALIBRATION.md, the 1.3 entry): the
+ * oats figures are held for the fortnight straight after lock-up (days 120
+ * to 134 after sowing). That is the one stretch where the model gives the
+ * benchmark's figures. The benchmark does not say which stage it is for.
+ * Younger oats is better feed than the benchmark (ME 11.4, CP 21%), and it
+ * falls away as the crop runs up to head.
  */
 
 vi.setConfig({ testTimeout: 600_000 });
@@ -198,6 +200,7 @@ describe('steers on oats in the average year, Central West NSW', () => {
     expect(young.me).toBeGreaterThan(afterLockUp.me);
     expect(young.cp).toBeGreaterThan(afterLockUp.cp);
     expect(young.gain).toBeGreaterThan(1.2);
+    expect(young.gain).toBeLessThan(1.7);
     expect(heading.me).toBeLessThan(afterLockUp.me);
     expect(heading.cp).toBeLessThan(afterLockUp.cp);
     expect(heading.gain).toBeLessThan(afterLockUp.gain);

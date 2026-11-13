@@ -13,6 +13,9 @@ import { AVERAGE_YEAR, herdRun, type HerdRun } from '../../test-support/calibrat
  *   Preg tests run a few points above the expected rate, because the
  *   expected rate is for three cycles and some cows get a fourth.
  *
+ * PROPOSED, WAITING ON CLAUDIA (docs/CALIBRATION.md, the 1.3 entry): single
+ * herds run from 0.9 to 4.1% in the average year.
+ *
  * Deaths are counted over all the herds together. A medium farm outside
  * Central Qld has 200 to 500 head, so one herd's year swings by a point or
  * two on a handful of deaths.
@@ -53,7 +56,7 @@ for (const district of ['cq', 'nsw', 'cw', 'wv'] as const) {
       for (const r of average) expect(r.deathsPct, `seed ${r.seed}`).toBeLessThan(6);
     });
 
-    it('loses 1.5 to 3.6% a year over the long run of seasons from a September start', () => {
+    it('loses 1.5 to 3.6% a year with random seasons from a September start, all herds together', () => {
       const pct = pooledDeaths(random);
       expect(pct).toBeGreaterThanOrEqual(1.5);
       expect(pct).toBeLessThanOrEqual(3.6);
