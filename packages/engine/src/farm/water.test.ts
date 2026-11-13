@@ -204,4 +204,12 @@ describe('water need', () => {
     expect(b.events).toEqual([]);
     expect(b.changed).toBe(false);
   });
+
+  it('with less than a day of water left the warning still says one day', () => {
+    const layout = bareLayout(4000);
+    layout.water.ports.push({ id: 1, cell: 5, level: 2000, warned: false, lastUse: 0 });
+    const survey = surveyLayout(layout);
+    const r = drainPortables(layout.water, survey.topology, survey.points, () => 1200);
+    expect(r.events).toEqual([{ type: 'portable-low', portId: 1, cell: 5, pct: 13, daysLeft: 1 }]);
+  });
 });

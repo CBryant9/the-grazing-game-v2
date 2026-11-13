@@ -546,6 +546,111 @@ describe('sowing, ending and harvesting, against the MVP', () => {
     expect(e.crops.fields).toContain(forage);
     expect(e.crops.fields).toContain(pasture);
   });
+
+  it.each(DISTRICT_IDS)('%s: the cases a season seldom reaches', (id) => {
+    mixedFarm(id, 3, 90);
+    const S = mvp.S;
+    const arable: number[] = [];
+    const notArable: number[] = [];
+    S.arable.forEach((v, i) => {
+      if (S.fid[i]! >= 0) return;
+      if (v) arable.push(i);
+      else notArable.push(i);
+    });
+    const pastureKey = LAND_OPTIONS[id].find(
+      (k) => SPECIES[k].type === 'pasture' && !SPECIES[k].oversow,
+    )!;
+    const dual = 'oats';
+    let e = cropsFromMvp(mvp);
+    const same = (where: string): void => expectSameCrops(e, mvp, `${id}: ${where}`);
+    const both = (
+      key: SpeciesId,
+      cells: number[],
+      sown: number,
+      o?: { str?: number; regen?: boolean; keep?: boolean },
+    ): { theirs: MvpFarmField; mine: Field } => ({
+      theirs: mvp.addField(key, cells, sown, o),
+      mine: addField(e.crops, e.pasture, e.ctx, key, cells, sown, o),
+    });
+    const graze = (
+      f: { theirs: MvpFarmField; mine: Field },
+      i: number,
+      r: number,
+      rg: number,
+      g: number,
+    ) => {
+      mvp.cropGrazed(f.theirs, i, r, rg, g);
+      return cropGrazed(e.crops, f.mine, i, r, rg, g, S.day);
+    };
+
+    // A pasture grazed before it is established has a thin stand. Sowing a
+    // crop over all of it starts a full stand, and the old pasture is gone.
+    const a = arable.slice(0, 5);
+    S.day = 0;
+    const thin = both(pastureKey, a, 0);
+    S.day = 10;
+    for (const i of a) graze(thin, i, 300, 100, 120);
+    expect(e.crops.density[a[0]!]).toBeLessThan(1);
+    same('pasture grazed early');
+    const over = both(dual, a, 20);
+    expect(e.crops.fields).not.toContain(thin.mine);
+    expect(e.crops.density[a[0]!]).toBe(1);
+    same('crop sown over the thin pasture');
+
+    // The crop is grazed before it is established, then again at lock-up to
+    // the day. Each gives its own notice. Left standing, it ends as a full stand of stubble.
+    S.day = 30;
+    expect(graze(over, a[0]!, 200, 30, 40)?.type).toBe('grazed-before-established');
+    S.day = 20 + SPECIES[dual].lock!;
+    expect(graze(over, a[1]!, 200, 150, 900)?.type).toBe('grazed-after-lock-up');
+    expect(graze(over, a[2]!, 200, 150, 900)).toBeNull();
+    same('grazed at lock-up');
+    S.day = 20 + SPECIES[dual].mature! + 60;
+    mvp.endField(over.theirs);
+    endField(e.crops, e.pasture, e.ctx, over.mine, S.day);
+    expect(e.crops.density[a[0]!]).toBe(1);
+    same('left standing and ended');
+
+    // A forage that ends off arable land goes back to native pasture as it stands.
+    const off = both('millet', notArable.slice(0, 4), 400);
+    S.day = 600;
+    mvp.endField(off.theirs);
+    endField(e.crops, e.pasture, e.ctx, off.mine, 600);
+    expect(e.pasture.land[notArable[0]!]).toBe(LAND.native);
+    same('ended off arable land');
+
+    // A grain crop harvested on the very day it is ready, over heavy dead
+    // feed: the stubble is held to 3,500 kg DM/ha.
+    const grain = both(
+      id === 'nsw' ? 'oats' : id === 'cq' ? 'grsorg' : 'barley',
+      arable.slice(5, 9),
+      700,
+    );
+    for (const i of arable.slice(5, 9)) {
+      S.D[i] = 9000;
+      e.pasture.D[i] = 9000;
+    }
+    S.day = 700 + SPECIES[grain.mine.sp].mature!;
+    S.rainF = 1;
+    mvp.harvestField(grain.theirs);
+    const h = harvestField(e.crops, e.pasture, e.ctx, grain.mine.id, S.day, 1);
+    expect(h.ok).toBe(true);
+    expect(e.pasture.D[arable[5]!]).toBe(3500);
+    same('harvested on the day, heavy dead feed');
+
+    // Seed from an annual pasture: the day it comes up, for every day the stand could end.
+    const seedCells = arable.slice(9, 11);
+    for (let end = 1000; end < 1400; end++) {
+      S.regen = [];
+      e = cropsFromMvp(mvp);
+      const rye = both('annrye', seedCells, end - 280);
+      S.day = end;
+      mvp.endField(rye.theirs);
+      endField(e.crops, e.pasture, e.ctx, rye.mine, end);
+      expect(e.crops.regen.map((r) => r.day)).toEqual(S.regen.map((r) => r.day));
+      expect(e.crops.regen).toHaveLength(1);
+    }
+  });
 });
 
 describe('what stock would meet, against the MVP', () => {
@@ -571,10 +676,20 @@ describe('what stock would meet, against the MVP', () => {
     mvp.addField(id === 'cq' ? 'grsorg' : id === 'nsw' ? 'oats' : 'barley', arable.slice(0, 6), 0);
     mvp.addField('oats', arable.slice(6, 12), -100);
     for (const i of arable.slice(12, 20)) mvp.S.land[i] = 5;
+    const fallow = arable.slice(20).filter((i) => mvp.S.land[i] === 4);
+    expect(fallow.length).toBeGreaterThan(0);
+    const areas = [
+      ...mvp.PADS,
+      { cells: arable.slice(0, 30) },
+      { cells: [0, 1, 2] },
+      // Crop and nothing else, and crop beside bare fallow: neither is "a mix".
+      { cells: arable.slice(0, 6) },
+      { cells: [...arable.slice(0, 6), ...fallow] },
+    ];
     for (let day = 0; day < 260; day += 9) {
       mvp.S.day = day;
       const e = cropsFromMvp(mvp);
-      for (const area of [...mvp.PADS, { cells: arable.slice(0, 30) }, { cells: [0, 1, 2] }]) {
+      for (const area of areas) {
         const theirs = mvp.cropRisks(area);
         const mine = cropRisks(e.crops, e.pasture, e.ctx, Array.from(area.cells), day);
         expect(mine.map((r) => r.type)).toEqual(Array.from(theirs).map(kindOf));

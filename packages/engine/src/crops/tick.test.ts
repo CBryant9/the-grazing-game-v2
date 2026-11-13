@@ -136,6 +136,13 @@ function runFarm(id: DistrictId, month: number, seed: number, days: number): voi
   for (let i = 0; i < GRID_N && old.length < 10; i++)
     if (!S.arable[i] && S.fid[i]! < 0) old.push(i);
   mvp.addField(firstPasture, old, 100 - SPECIES[firstPasture].life! * 365, { keep: true });
+  if (LAND_OPTIONS[id].includes('stylo')) {
+    // Old oversown stylo too. It thins, but gives no notice.
+    const more: number[] = [];
+    for (let i = 0; i < GRID_N && more.length < 6; i++)
+      if (!S.arable[i] && S.fid[i]! < 0) more.push(i);
+    mvp.addField('stylo', more, 200 - SPECIES.stylo.life! * 365, { keep: true });
+  }
 
   const e = cropsFromMvp(mvp);
   const district = DISTRICTS[id];
@@ -239,6 +246,64 @@ describe('the daily crop step, against the MVP', () => {
 
   it.each(DISTRICT_IDS)('%s: 800 days from a spring start', { timeout: 120000 }, (id) => {
     runFarm(id, 9, 202, 800);
+  });
+
+  it('seed comes up on fallow, native pasture and stubble, but not under another planting', () => {
+    mvpNewGame(
+      loaded,
+      { region: 'wv', year: 2021, month: 2, ha: 2000, mixed: true, arable: 35, cropped: 50 },
+      seededRandom(7),
+    );
+    const S = mvp.S;
+    const cells: number[] = [];
+    S.arable.forEach((v, i) => {
+      if (v && S.fid[i]! < 0 && cells.length < 8) cells.push(i);
+    });
+    mvp.addField('annrye', cells, 0);
+    const e = cropsFromMvp(mvp);
+    const step = (day: number): CropEvent[] => {
+      S.day = day;
+      S.monthF = 1;
+      S.rainF = 1;
+      const seq = S.logSeq ?? 0;
+      mvp.fieldTick();
+      const events = fieldTick(e.crops, e.pasture, e.ctx, day, 1, 1);
+      expectEvents(events, logSince(mvp, seq), `day ${day}`);
+      expectSameCrops(e, mvp, `day ${day}`);
+      return events;
+    };
+    step(250);
+    step(280);
+    const mine = (r: { cells: number[] }): boolean => r.cells.includes(cells[0]!);
+    expect(e.crops.regen.filter(mine).map((r) => r.day)).toEqual([379]);
+    // By the time the seed comes up, two squares have been worked to
+    // fallow, two have gone back to native pasture, and one is under a new pasture.
+    for (const [i, land] of [
+      [cells[0]!, LAND.fallow],
+      [cells[1]!, LAND.fallow],
+      [cells[2]!, LAND.native],
+      [cells[3]!, LAND.native],
+    ] as const) {
+      S.land[i] = land;
+      e.pasture.land[i] = land;
+    }
+    S.day = 300;
+    mvp.addField('rye', [cells[4]!], 300);
+    addField(e.crops, e.pasture, e.ctx, 'rye', [cells[4]!], 300);
+    expect(step(378).some((x) => x.type === 'self-sown')).toBe(false);
+    expect(step(379).some((x) => x.type === 'self-sown')).toBe(true);
+    const stand = e.crops.fields.find((f) => f.regen && mine(f))!;
+    expect(stand.cells).toEqual([
+      cells[0],
+      cells[1],
+      cells[2],
+      cells[3],
+      cells[5],
+      cells[6],
+      cells[7],
+    ]);
+    expect(stand).toMatchObject({ sp: 'annrye', sown: 379, str: 0.12, regen: true });
+    expect(e.crops.regen.filter(mine)).toEqual([]);
   });
 
   afterAll(() => {

@@ -248,6 +248,18 @@ describe('paddock and area rules', () => {
     expect(areaChanges(a, b)).toEqual({ splits: [{ from: 0, into: [0, 1] }], joins: [] });
     expect(areaChanges(b, a)).toEqual({ splits: [], joins: [{ from: [0, 1], into: 0 }] });
     expect(areaChanges(a, a)).toEqual({ splits: [], joins: [] });
+    // It is grazing areas that are compared, not paddocks: two paddocks
+    // joined by an open gate are one area, and shutting the gate splits it.
+    const open = bareLayout();
+    vRun(open.fences, 20, 0, GRID_H, EDGE.permanent);
+    open.fences.vE[vIdx(4, 20)] = EDGE.gateOpen;
+    const shut = bareLayout();
+    vRun(shut.fences, 20, 0, GRID_H, EDGE.permanent);
+    shut.fences.vE[vIdx(4, 20)] = EDGE.gateShut;
+    const o = buildTopology(open.fences, 1);
+    const s = buildTopology(shut.fences, 1);
+    expect(areaChanges(o, s)).toEqual({ splits: [{ from: 0, into: [0, 1] }], joins: [] });
+    expect(areaChanges(s, o)).toEqual({ splits: [], joins: [{ from: [0, 1], into: 0 }] });
     // A fence that splits one area in three, and a gate that joins two others.
     const c = bareLayout();
     hRun(c.fences, 8, 0, GRID_W, EDGE.permanent);

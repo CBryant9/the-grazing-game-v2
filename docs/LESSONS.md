@@ -72,6 +72,9 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | R3 | The newest TypeScript (7) could not be used | `typescript-eslint` supports TypeScript below 6.1 | Check that tools support each other before taking the newest version. TypeScript is pinned to 6.0 |
 | R4 | A model doc and the MVP code disagreed in 15 places | The docs were written after the code | Port from the code, correct the doc in the same change (BUILD_PLAN 2.4) |
 | R5 | Grass tests that matched the MVP exactly would still have passed with six rules wrong | The sample squares never reached those thresholds (for example a paddock between 760 and 800 kg DM/ha) | A match only proves the cases the inputs reach. After porting a formula, nudge each figure in turn and check a test fails. Add a sample for each one missed |
+| RF1 | Farm tests that passed one file at a time timed out when the whole suite ran | The MVP runs slowly inside its test sandbox (about half a second to start a game), and slower again when test files run side by side. The default limit is 5 seconds a test | Tests that start MVP games set a long time limit for the file. Run the whole suite before calling it done, not just the file being worked on |
+| RF2 | On a mixed farm with all its arable land cropped, the MVP's rotation sat on land that was not arable (found on Northern Tablelands at 30% arable) | The patch-growing code skipped marking its starting squares when there was nothing more to add | Fixed in the rebuild. **Rule: check generated farms against the rules they are meant to meet, on every setup choice, not only against the MVP's output** |
+| RF3 | A test written to show that fault was wrong about what the MVP did (it expected no arable land at all; a second patch still appeared) | The fault was reasoned out from the code and not looked at | Look at what the MVP really produces before writing down how it is wrong |
 
 ## Process lessons
 

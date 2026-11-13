@@ -677,6 +677,8 @@ describe('the rules, one at a time', () => {
     const loose = ok(layPipe(l, pipeLine(3, 9)));
     expect(loose.connected).toBe(false);
     expect(placeTrough(loose.layout, 5).ok).toBe(false);
+    // Pipe in two pieces, one joined to the bore and one not, is not all connected.
+    expect(ok(layPipe(l, [bore + 1, 5])).connected).toBe(false);
     expect(layPipe(piped.layout, pipeLine(bore, bore + 3))).toMatchObject({
       ok: false,
       reason: 'pipe-already-there',

@@ -115,16 +115,12 @@ function expectRunningRules(layout: FarmLayout, where: string): number {
     if (pd.ha >= scale.farmHa * 0.02) {
       expect(troughs.length, `water in paddock ${pd.id + 1} ${where}`).toBeGreaterThanOrEqual(1);
     }
-    // About one water for each 2,500 ha, and never more than 8 in a paddock.
-    expect(troughs.length).toBeLessThanOrEqual(Math.max(1, want));
+    // One water for each 2,500 ha or part of it, and never more than 8 in a
+    // paddock. The code also stops adding waters once no point is 2 km from
+    // one, but that can't come first: a water can only be that close to
+    // about 1,260 ha, so the count by area is always reached before it.
     if (troughs.length) {
-      // Either it has all the waters its size calls for, or no point is 2 km from water.
-      let far = 0;
-      for (const c of pd.cells) far = Math.max(far, points.dist[c]!);
-      expect(
-        troughs.length >= want || far * scale.sideM < 2000,
-        `paddock ${pd.id + 1} has ${troughs.length} of ${want} waters, ${far * scale.sideM} m out, ${where}`,
-      ).toBe(true);
+      expect(troughs.length, `waters in paddock ${pd.id + 1} ${where}`).toBe(Math.max(1, want));
     }
   }
   // Every trough is on the bore or on pipe that reaches it.
@@ -239,9 +235,12 @@ describe('fences, gates and water at the start, against the MVP', () => {
       let electric = 0;
       let extraWaters = 0;
       let addedGates = 0;
-      for (let k = 0; k < 80; k++) {
+      let mostWaters = 0;
+      for (let k = 0; k < 140; k++) {
         const id = DISTRICT_IDS[k % 4]!;
-        const farmHa = FARM_SIZES[id][k % 3]!;
+        // The last 60 are very big farms, up to the Top End's sizes, where a
+        // paddock needs several waters and the limit of 8 comes into play.
+        const farmHa = k < 80 ? FARM_SIZES[id][k % 3]! : [12000, 50000, 150000][k % 3]!;
         const scale = farmScale(farmHa);
         const bore = genBore(rngStream(k, 'bore'));
         putLayout(mvp, bareLayout(farmHa, bore));
@@ -273,8 +272,12 @@ describe('fences, gates and water at the start, against the MVP', () => {
           extraWaters++;
         // At most three lines, each with its own gate. Any more were added for paddocks without one.
         if (laid.improvements.gates > 3) addedGates++;
+        const survey = surveyLayout(layout);
+        for (const t of survey.points.paddockTroughs) mostWaters = Math.max(mostWaters, t.length);
       }
-      // The 80 farms cover 2, 3, 4 and 6 paddocks, electric lines, extra gates and extra waters.
+      // The farms cover 2, 3, 4 and 6 paddocks, electric lines, extra gates,
+      // extra waters, and a paddock with the most waters allowed.
+      expect(mostWaters).toBe(8);
       expect([...paddockCounts].sort()).toEqual([2, 3, 4, 6]);
       expect(electric).toBeGreaterThan(10);
       expect(extraWaters).toBeGreaterThan(10);
@@ -521,6 +524,68 @@ describe('arable land and the starting rotation, against the MVP', () => {
       ).toBe(true);
     }
   });
+
+  it.each(DISTRICT_IDS)('%s: the rotation worked out for every day of a year', (id) => {
+    // Farms start on the 1st of a month, but the rule works for any day.
+    // Going through a whole year reaches the turning points to the day: a
+    // crop sown its whole life ago, just established, and just heading.
+    const S = mvp.S;
+    S.region = id;
+    S.startM = 0;
+    S.startY = 2022;
+    S.mixed = true;
+    loaded.setRandom(randomFrom(rngStream(5, `rotation-days-${id}`)));
+    mvp.genArable(ARABLE_SHARES[id].mixed[1]!, 50);
+    const ages = new Set<string>();
+    for (let day = 0; day < 365; day++) {
+      resetCrops();
+      S.day = day;
+      const e = cropsFromMvp(mvp);
+      mvp.startCropping();
+      const made = startCropping(e.crops, e.pasture, e.ctx, day);
+      expectSameCrops(e, mvp, `${id} day ${day}`);
+      for (const f of made) {
+        const sp = SPECIES[f.sp];
+        const t = day - f.sown;
+        const life = (sp.type === 'crop' ? sp.mature : sp.life)!;
+        if (t === life + 10) ages.add('sown its whole life ago');
+        if (t === sp.estab) ages.add('just established');
+        if (t === (sp.head || life * 0.75)) ages.add('just heading');
+      }
+    }
+    expect([...ages].sort()).toEqual([
+      'just established',
+      'just heading',
+      'sown its whole life ago',
+    ]);
+  });
+
+  it('arable and cropped shares that are not on the setup list match the MVP too', () => {
+    // 9.4% arable is 98 squares, and a quarter of that is 24.5: the point
+    // where rounding the cropped area up or down changes the block size.
+    let compared = 0;
+    for (const id of DISTRICT_IDS) {
+      mvp.S.region = id;
+      for (const [pct, cropPct] of [
+        [9.4, 25],
+        [7.3, 33],
+        [13.7, 60],
+        [33.3, 45],
+        [4.71, 50],
+      ] as const) {
+        const name = `odd-${id}-${pct}-${cropPct}`;
+        loaded.setRandom(randomFrom(rngStream(2, name)));
+        mvp.genArable(pct, cropPct);
+        const land = genArable(id, pct, cropPct, rngStream(2, name));
+        expect(land.rotBlocks).toEqual(mvp.S.rotBlocks.map((b) => Array.from(b)));
+        if (mvp.S.rotBlocks.some((b) => b.some((i) => !mvp.S.arable[i]))) continue;
+        expect(firstDifference(land.arable, mvp.S.arable), name).toBeNull();
+        compared++;
+      }
+    }
+    expect(compared).toBeGreaterThan(12);
+    expect(genArable('cw', 9.4, 25, rngStream(2, 'x')).rotBlocks[0]).toHaveLength(9);
+  });
 });
 
 /** Growth factors drawn the way the MVP's run-up drew them: the season first, then each month. */
@@ -705,6 +770,13 @@ describe('generating a farm from its seed', () => {
       const laid = layRunning(rngStream(seed, GENERATION_STREAMS.layout), bore, scale);
       expect(Array.from(running.layout.fences.vE)).toEqual(Array.from(laid.fences.vE));
       expect(running.layout.water).toEqual(laid.water);
+      // A grazing farm's arable share and its patch come from the arable stream.
+      const arableRng = rngStream(seed, GENERATION_STREAMS.arable);
+      const pct = arableRng.range(...ARABLE_SHARES.cq.graze);
+      expect(running.arablePct).toBe(pct);
+      expect(Array.from(running.crops.arable)).toEqual(
+        Array.from(genArable('cq', pct, 0, arableRng).arable),
+      );
       // The homestead and yards have their own stream too, and are placed last.
       expect(running.buildings).toEqual(
         placeBuildings(rngStream(seed, GENERATION_STREAMS.buildings), laid.water),
@@ -805,8 +877,14 @@ describe('generating a farm from its seed', () => {
           expect(farm.arablePct).toBe(share.mixed[seed % 4]);
           expectSquareBlocks(id, crops);
           expect(squares).toBe(Math.round((GRID_N * farm.arablePct) / 100));
-          expect(farm.startFields.length).toBe(crops.fields.length);
+          // An April start: a winter crop is in the ground in every district,
+          // and the last rotation block is bare fallow.
+          expect(farm.startFields.length).toBeGreaterThanOrEqual(1);
+          expect(farm.startFields).toEqual(crops.fields);
           for (const f of crops.fields) expect(ROTATIONS[id]).toContain(f.sp);
+          for (const i of crops.rotBlocks[ROTATIONS[id].length]!) {
+            expect(pasture.land[i]).toBe(LAND.fallow);
+          }
         } else {
           expect(farm.arablePct).toBeGreaterThanOrEqual(share.graze[0]);
           expect(farm.arablePct).toBeLessThan(share.graze[1]);
