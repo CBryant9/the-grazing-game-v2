@@ -39,7 +39,7 @@ First light and last light are worked out for each district's town (PRD 14.4), u
 
 Daylight saving comes from the time zone database, so past real years use the rules of their day.
 
-**Not yet checked:** the calculated times have not been compared with a published twilight table (for example Geoscience Australia's). To do in milestone 1.5.
+**Checked against a published table (13 Nov 2026).** The calculated times were compared with the US Naval Observatory's civil twilight times for the same coordinates (`https://aa.usno.navy.mil/api/rstt/oneday?date=<date>&coords=<lat>,<lon>&tz=10`, read 13 Nov 2026). Six dates for each of the four towns: 20 Mar, 21 Jun, 23 Sep and 21 Dec 2026, 15 Jan 1997 and 4 Jul 2010. The published times are rounded to the minute. The biggest difference in 48 times was 1.2 minutes, and 46 of the 48 were under one minute. The published times are kept in `packages/engine/src/daylight/daylight.test.ts`, and the test fails if any calculated time is more than 2 minutes out.
 
 ## Farm sizes (`FARMS`, ha: small / medium / large)
 

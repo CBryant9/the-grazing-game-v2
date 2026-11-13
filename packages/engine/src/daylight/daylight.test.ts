@@ -93,6 +93,66 @@ describe('first light and last light', () => {
   });
 });
 
+describe('against a published twilight table', () => {
+  // Civil twilight begins and ends, from the US Naval Observatory for the
+  // same coordinates, in UTC+10 and rounded to the minute. Read 13 Nov 2026
+  // (docs/DATA.md, "District towns, for daylight").
+  const PUBLISHED: Record<(typeof DISTRICT_IDS)[number], [string, string, string][]> = {
+    cq: [
+      ['2026-03-20', '05:48', '18:41'],
+      ['2026-06-21', '06:24', '17:54'],
+      ['2026-09-23', '05:34', '18:26'],
+      ['2026-12-21', '04:52', '19:18'],
+      ['1997-01-15', '05:09', '19:24'],
+      ['2010-07-04', '06:25', '17:58'],
+    ],
+    nsw: [
+      ['2026-03-20', '05:33', '18:29'],
+      ['2026-06-21', '06:24', '17:27'],
+      ['2026-09-23', '05:18', '18:14'],
+      ['2026-12-21', '04:20', '19:23'],
+      ['1997-01-15', '04:39', '19:27'],
+      ['2010-07-04', '06:25', '17:31'],
+    ],
+    cw: [
+      ['2026-03-20', '05:44', '18:42'],
+      ['2026-06-21', '06:39', '17:36'],
+      ['2026-09-23', '05:30', '18:27'],
+      ['2026-12-21', '04:27', '19:40'],
+      ['1997-01-15', '04:46', '19:43'],
+      ['2010-07-04', '06:40', '17:40'],
+    ],
+    wv: [
+      ['2026-03-20', '06:08', '19:10'],
+      ['2026-06-21', '07:17', '17:50'],
+      ['2026-09-23', '05:54', '18:55'],
+      ['2026-12-21', '04:35', '20:24'],
+      ['1997-01-15', '04:56', '20:25'],
+      ['2010-07-04', '07:18', '17:54'],
+    ],
+  };
+  const minutesOf = (clock: string): number => {
+    const [h, m] = clock.split(':').map(Number);
+    return h! * 60 + m!;
+  };
+
+  it('is within two minutes of every published time', () => {
+    let checked = 0;
+    for (const id of DISTRICT_IDS) {
+      for (const [iso, first, last] of PUBLISHED[id]) {
+        const [y, m, d] = iso.split('-').map(Number);
+        const light = daylightFor(DISTRICT_PLACES[id], day(y!, m! - 1, d!));
+        // The table is in UTC+10. Take daylight saving back off.
+        const shift = light.utcOffset - 600;
+        expect(Math.abs(light.firstLight - shift - minutesOf(first))).toBeLessThan(2);
+        expect(Math.abs(light.lastLight - shift - minutesOf(last))).toBeLessThan(2);
+        checked += 2;
+      }
+    }
+    expect(checked).toBe(48);
+  });
+});
+
 describe('clock time at the place', () => {
   it('has no daylight saving in Queensland', () => {
     expect(utcOffsetMinutes('Australia/Brisbane', midsummer)).toBe(600);
