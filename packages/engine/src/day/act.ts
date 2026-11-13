@@ -337,18 +337,23 @@ function doWhole(
     travel += driveMinutes(farm, at, site);
     at = site;
   }
+  // Finished, the job leaves the player at `endAt`. Stopped part-way, it
+  // leaves them at the last place visited. The light kept back for the
+  // drive home is from wherever that is.
   const endAt = spec.endAt ?? at;
-  const home = homeReserve(farm, [endAt]);
+  const homeDone = homeReserve(farm, [endAt]);
+  const homePart = homeReserve(farm, [at]);
+  const finished = need <= light.left - travel - homeDone + NO_TIME;
+  const home = finished ? homeDone : homePart;
   const room = light.left - travel - home;
   if (room < -NO_TIME || (need > NO_TIME && room <= NO_TIME)) return tooFar(light, travel, home);
-  if (spec.oneDay && need > room + NO_TIME) {
+  if (spec.oneDay && !finished) {
     return refuse(
       'not-enough-daylight',
       `A trip to the saleyards takes ${durationText(need)}. There is ${durationText(light.left)} of light left today.`,
     );
   }
-  const finished = need <= room + NO_TIME;
-  const worked = finished ? need : Math.max(0, room);
+  const worked = finished ? need : Math.min(need, Math.max(0, room));
   const start = light.now;
   const end = start + travel + worked;
   const cost = farm.cash - trial.farm.cash;
@@ -401,7 +406,7 @@ function doWhole(
       };
       next.jobs.push(mine);
     }
-    mine.part = Math.min(1 - 1e-12, part0 + worked / total);
+    mine.part = total > 0 ? Math.min(1 - 1e-12, part0 + worked / total) : 0;
     mine.workedMin += worked;
     mine.travelMin += travel;
     jobId = mine.id;

@@ -4,7 +4,7 @@ import { across, busyFarm, cell, down, setUp, work } from '../../test-support/wo
 import type { Action } from '../actions/types';
 import { GRID_W } from '../grid';
 import { homesteadPoint } from '../sim/clock';
-import type { FarmState } from '../sim/state';
+import { cloneFarm, type FarmState } from '../sim/state';
 import { previewAction } from './act';
 import { endDay } from './days';
 import { clockView } from './look';
@@ -199,5 +199,54 @@ describe('the drive home', () => {
     expect(later.workRules).toEqual({ travel: true, driveHome: 'after-last-light' });
     expect(clockView(later).workRules).toEqual(later.workRules);
     expect(clockView(later).travelKmH).toBe(25);
+  });
+});
+
+describe('home by last light', () => {
+  it('whatever the job and however late it starts, the player can still drive home in the light left', () => {
+    const b = busyFarm({ size: 4160 });
+    // The steers start in the far paddock, so a move towards the homestead begins further out than it ends.
+    const far = setUp(b.farm, { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } });
+    const jobs: { farm: FarmState; action: Action }[] = [
+      { farm: far, action: { type: 'moveMob', mob: b.steers, to: { cell: b.steerCell } } },
+      { farm: b.farm, action: { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } } },
+      { farm: b.farm, action: { type: 'wean', mob: b.cows } },
+      { farm: b.farm, action: { type: 'placeTrough', cell: b.pipedCell } },
+      { farm: b.farm, action: { type: 'movePortable', port: b.port, cell: b.openCell } },
+      {
+        farm: b.farm,
+        action: { type: 'movePortable', port: b.port, cell: b.farm.buildings.yards },
+      },
+      {
+        farm: b.farm,
+        action: { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' },
+      },
+      { farm: b.farm, action: { type: 'buildFence', edges: down(36, 1, 24), fence: 'electric' } },
+      { farm: b.farm, action: { type: 'rollUpTape', edge: b.tape } },
+      { farm: b.farm, action: { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 } },
+    ];
+    let done = 0;
+    let part = 0;
+    for (const { farm, action } of jobs) {
+      for (const left of [6, 9, 12, 15, 20, 30, 45, 90, 400]) {
+        const late = cloneFarm(farm);
+        late.clock.used = late.clock.lastLight - late.clock.firstLight - left;
+        const out = previewAction(late, action);
+        if (!out.ok) continue;
+        const after = work(late, action);
+        const lightLeft = after.job.dayMin - after.farm.clock.used;
+        const home = driveMinutes(after.farm, after.farm.clock.at, homesteadPoint(after.farm));
+        expect(home, action.type + ' with ' + left + ' m left').toBeLessThanOrEqual(
+          lightLeft + 1e-6,
+        );
+        // The card gives that drive home.
+        expect(after.job.homeMin).toBeCloseTo(home, 9);
+        if (after.job.outcome === 'part') part++;
+        else done++;
+      }
+    }
+    // Both ways a job can come out were tried many times.
+    expect(done).toBeGreaterThan(10);
+    expect(part).toBeGreaterThan(10);
   });
 });

@@ -567,6 +567,87 @@ After the realism check (same milestone, before the push):
 - More questions for Claudia, all written up in CALIBRATION.md (real years, CHECK 8 to 10) and DATA.md: how a farm's data version should work once Daily Farm fetches data every day; which quarter "today's dollars" should be; whether a farm starting in 1997 can pay its way; and how the 1 July "new season" message should read on a real-year farm, where it reports the 12 months just gone.
 - Known gap, older than this change: the lint rule that keeps the engine out of browser code covers `apps/web/components` and `packages/render`, not `apps/web/app`. Nothing in `apps/web` imports the engine today. It is closed properly in milestone 3.2, when the browser build is tested to hold no engine.
 
+### 14 Nov 2026: milestone 1.5a, the clock
+
+Engine 0.7.0. Engine work only, no screens. Branch `m1.5a-the-clock`, on top of `m1.4c-real-years-wiring`. The first of three parts of milestone 1.5 ("The working day"). The next two are moving stock through gates with yard work, then feed on hand, grazing plans and the long play test.
+
+Built, all in `packages/engine`:
+
+- **The farm clock** (`sim/clock.ts`). Every day runs from first light to last light for the district town, on the date the game reports (the real date on a real-year farm). The farm keeps today's first and last light, the light used and where the player is. Looking never moves it. With the light used up no job starts, and the refusal says so.
+- **Job times** (`data/jobTimes.ts`): one table of every figure in PRD 5.4, each marked Decided, Proposed or Builder in the code and in DATA.md. Every action that exists has a time.
+- **Travel** (`day/travel.ts`): each job includes the drive from where the player is, in a straight line at 25 km/h over the farm's real size. The day ends with the drive home, which must fit inside daylight (one switch).
+- **One path for the job card and the job** (`day/act.ts`, `day/spec.ts`). `previewAction` gives the card and `applyAction` does the job. Both run the same function, so they can't disagree.
+- **Jobs too big for today** are done in part. Fence, tape and pipe are built piece by piece in the order drawn and stop where the day is used up, part-way along a segment if need be. Any other job takes effect when its last minute is done. The rest is a job in progress on the farm, which can be carried on or given up. Money is charged as things are built.
+- **Contractors:** sowing and harvest are booked, done at first light three days on, and charged then.
+- **Next day and skips** (`day/days.ts`): `endDay`, and `skipDays` for a week, a month, a year or a number of days. Each day has its own light, jobs in progress carry on oldest first, and a skip stops for everything the MVP stopped its clock for. Both return a summary of facts.
+- **Looking** (`day/look.ts`): the clock for the daylight bar, the jobs in progress for the map and the jobs list, the bookings, and today's jobs with their times.
+- **The time of day** is on every job in the action log, on a `job-worked` event, on a mob's arrival and on each inbox message from a job.
+- **The instant path:** `ActionEnv.instant`, set only by `test-support/instant.ts`, for the calibration suites and the MVP comparisons.
+- **Saves:** format 3. Older saves load at first light with no jobs.
+- Three actions were added (carry on a job, give one up, call off a booking): 32 in all.
+
+What was not changed: no grass, cattle, crop or price formula or figure. The daily tick has one new last step (the clock goes back to first light). How a mob grazes is untouched.
+
+How it was tested:
+
+- 1,545 tests pass in 70 files: the 1,424 from before with no change to an expected figure, and 121 new ones in seven files under `packages/engine/src/day/`. Type check, lint, format check and the speed test pass (3.61 ms a day with 4,895 head, limit 5).
+- **Calibration and the MVP comparisons are unchanged.** They act through the instant path. The only edit to those files is the name of the function they call.
+- **The clock:** a winter day in Western Victoria (10 h 42 m on 1 June) has less working light than a summer day in Central Queensland (14 h 18 m on 1 December), and the same pipe job on the same size of farm gets 4,160 m done on the first against 5,596 m on the second. A real-year farm in order from 2025 takes its light from 1 January 1997 on day 365, not from the farm calendar's 2026.
+- **Looking:** previews of 13 actions, every view and summary, and doing a job on a copy, leave the farm's hash and its saved text unchanged.
+- **Job times:** every figure in the table is written out in a test, and each action's time is checked against figures written in the test, on farms with travel switched off so the time is the work alone.
+- **A long permanent fence:** 1,800 m takes four days at 500, 500, 500 and 300 m, stops each day where the light ran out, and ends up the same fence, ledger and cost as one built at once. Tape and electric put the same line up in 36 minutes and 1 h 48 m.
+- **Travel:** 1 km is 2.4 minutes. Two jobs side by side cost less than each from the homestead. With the drive home inside daylight, a job stops in time, and across 10 kinds of job started with 6 to 400 minutes of light left the player can always drive home in the light that is left.
+- **The card and the job agree:** for all 32 kinds of action (40 cases), the preview equals the card that comes back from doing it, the clock and the money move by what the card said, and a refusal is the same refusal.
+- **Skips:** jobs in progress finish over the right number of days, oldest first. A skip stops for a mob with no water (before and during), a portable trough low (before) and dry (during), a crop ready, the year's end, and game over at the bank and from feed.
+- **Saves:** save, load and carry on after every step of a 14-day run equals running straight through. A format 2 save loads at first light with no jobs.
+- **The same seed and the same actions give the same farm**, hash for hash and byte for byte in the saved text.
+- **Break-it checks** (change a figure or a rule, run the working-day tests, restore it): 53 changes were tried and 53 failed a test. 21 were figures in the job times table, and each failed a test of what the job does as well as the two tests of the table itself. 32 were rules: the pace of permanent fence, the straight-line drive, both switches, starting after last light, the order a line is built, the tape fee, the bank, the saleyard trip, what weaning counts, each thing that stops a skip, the order of jobs in a skip, the day contractors come, the real date, old saves, the times in the log, and the instant flag. None was missed, which is a warning as much as a comfort: the changes were chosen by the builder who wrote the tests. One real fault was found by reading the code, not by a test (LESSONS D2). A test was then written that fails without the fix.
+
+PRD defaults used (section 21):
+
+| Row | Topic | What was built |
+|---|---|---|
+| 4 | Travel time | Included, at 25 km/h, behind a switch on the farm (`workRules.travel`) |
+| 5 | Job times | The table in 5.4, all in one data file and in DATA.md |
+| 13 | Working hours | First light to last light |
+| 14 | Electric and tape rates | 1 km an hour and 3 km an hour |
+| 16 | Gate time | The proper gate's hour, for today's one gate. The three kinds are in the table for the next part |
+| 34 | Fences longer than a day | The line stops at what fits today. The rest is a job in progress |
+
+Figures and rules the builder chose are listed in DATA.md, "Job times" (two figures marked Builder, and 18 rules). The biggest three are what "500 m a working day" means, that the drive home must fit inside daylight, and that a job done in one piece can carry over to the next day.
+
+Not done, or not verified:
+
+- **No screens.** Nothing here was looked at on a phone. The figures a daylight bar, a job card and a jobs list need are there, but no screen has used them.
+- **The `realism-guardian` agent was not run** on this change, and there was no Lighthouse run (no page changed). Both are the lead's steps before a pull request.
+- **A mob's grazing is not split at the time of a move.** By the brief: the times are recorded for the next part.
+- **Moves do not follow a route.** No walking time, no "no gate, no move", and weaners walk to their paddock in no time.
+- **Buying is still straight into a paddock** after the day at the saleyard, on any day. Sale days, delivery to the yards and booking stock onto a sale are the next part.
+- **Daily Farm:** nothing specific was built (opening part-way through a real day, missed days). The clock only moves when a job is done, which is what Daily Farm needs.
+- **Farm hands and contractor fencing** are Stage 2. Room was left for them (MODEL.md, section 9), but nothing was built or tested.
+- **The cost of a job card was measured once, not held by a test:** on a farm with 4,500 head a job card took about 9 ms for a fence line and 2 ms for a trough, and a skip with a job in progress ran at about 15 ms a day against 3.5 ms for the tick alone, because each day's work on a job copies the farm two or three times. One run, on a busy PC.
+- First and last light as clock times lean on the machine's time zone database (as the daylight code did already). The minutes of light in a day do not.
+- CALIBRATION.md has no new run logged, because no model formula or figure changed and the suites pass as they were.
+
+Questions for Claudia:
+
+1. **"500 m a working day."** Built: a working day is that day's light, so a whole day on the fence is 500 m in June and in December, and driving or other jobs come off it. Or is it a pace by the hour (which would build more on a long summer day)?
+2. **The drive home.** Built: it must fit inside daylight, so the last job of the day stops early enough to get home. Or should jobs run to last light with the drive home free?
+3. **Electric fence pace.** PRD 5.4 has single-wire electric at about 1 km an hour, and that is what was built. The build mockup's job card shows "650 m electric, 2 wire: 4 h 20 m", which is 150 m an hour. Which is it, and is there to be more than one kind of electric fence?
+4. **Taking things out.** The PRD has no times. Built: as long as putting in (a gate 1 h, a trough or hub 3 h, fence at its building pace, so 500 m of permanent fence is a day to pull down). Moving a fixed trough: 3 h.
+5. **Opening or shutting a gate** takes the drive and no more. Right?
+6. **Weaning's "0.5 min per head":** every head in the mob (built), or each calf?
+7. **Selling's "1 min per 10 head":** calves at foot counted (built)? And each mob that has cattle going is mustered.
+8. **Musters longer than a day.** At 30 min plus an hour per 200 ha, a 2,000 ha paddock takes 10 h 30 m and a 4,000 ha paddock 20 h 30 m. Built: the muster carries over to the next day and the job (wean, mark, sell) happens when it is finished. Is that right for big country, or is the muster figure for one person too slow there?
+9. **Any job can carry over** except the saleyard trip. A trough started with an hour of light left is finished the next morning. Right, or should some jobs have to fit in one day?
+10. **Contractors:** 3 days after booking, the same every time, paid when the work is done. Right? Should the wait vary?
+11. **The bank** must cover the whole job before it starts, though it is paid for as it is built. And giving a job up gives nothing back. Right?
+12. **Next day** does not carry on jobs in progress by itself. A skip does. Should Next day ask?
+13. **A job that waits on the bank does not stop a skip.** The summary says it waited and why. Should it stop?
+14. **A year's skip started part-way through a year stops at the year's end** (the MVP stopped its clock there). A month is 30 days and a year 365. Right?
+15. **Driving is a straight line**, through fences. Good enough, or should vehicles go by the gates?
+16. **Putting a mob on a supplement** now takes 30 minutes and the drive. Taking them off takes none. Lick as stock on hand comes later in this milestone.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
