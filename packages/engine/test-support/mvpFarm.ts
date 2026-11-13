@@ -243,9 +243,13 @@ export interface LoadedMvpFarm {
   setRandom(next: () => number): void;
 }
 
-/** Load a fresh copy of the MVP with its farm functions reachable. */
-export function loadMvpFarm(): LoadedMvpFarm {
-  const loaded = loadMvp(FARM_HOOK);
+/**
+ * Load a fresh copy of the MVP with its farm functions reachable.
+ * `extraHook` is more script text added after the farm hook, in memory only
+ * (see mvpWhole.ts).
+ */
+export function loadMvpFarm(extraHook = ''): LoadedMvpFarm {
+  const loaded = loadMvp(FARM_HOOK + extraHook);
   return { mvp: loaded.mvp as unknown as MvpFarm, setRandom: loaded.setRandom };
 }
 

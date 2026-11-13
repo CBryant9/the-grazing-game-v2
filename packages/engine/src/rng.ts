@@ -85,7 +85,9 @@ export function rngFromState(saved: RngState): Rng {
       const v = next();
       return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
     },
-    state: () => [a, b, c, d] as const,
+    // `a` is the result of an exclusive-or, which JavaScript gives as a signed
+    // number. Written unsigned, the same state is always the same four words.
+    state: () => [a >>> 0, b, c, d] as const,
   };
   return rng;
 }
