@@ -52,7 +52,8 @@ export default tseslint.config(
   {
     // The engine must be repeatable from a seed: no unseeded randomness, no clock.
     files: ['packages/engine/src/**/*.ts'],
-    ignores: ['**/*.test.ts'],
+    // Tests, and the timed speed benchmark (pnpm test:speed), are not engine code.
+    ignores: ['**/*.test.ts', '**/*.timed.ts'],
     rules: {
       'no-restricted-properties': [
         'error',

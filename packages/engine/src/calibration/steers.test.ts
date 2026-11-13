@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AVERAGE_YEAR, steerRun, type SteerCase, type SteerRun } from './runs';
+import {
+  AVERAGE_YEAR,
+  steerRun,
+  type SteerCase,
+  type SteerRun,
+} from '../../test-support/calibration';
 
 /*
  * Steer gain a head a year, by district (docs/CALIBRATION.md, Benchmarks).

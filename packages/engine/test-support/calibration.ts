@@ -2,20 +2,22 @@
  * The calibration runs (docs/CALIBRATION.md).
  *
  * These are the MVP's `tests/calibrate.js` suites, run on the engine with
- * fixed seeds so the same run always gives the same figures. Only the
- * calibration tests use this file.
+ * fixed seeds so the same run always gives the same figures.
+ *
+ * Test use only. Nothing in `src` but the calibration tests may import this
+ * file: it times runs with the clock, which engine code never reads.
  */
 
 import type { DistrictId } from '@gg/shared';
-import { applyAction } from '../actions/apply';
-import type { Action } from '../actions/types';
-import type { Supplement } from '../data/feed';
-import { carryingCapacityAE } from '../money/costs';
-import { createFarm } from '../sim/create';
-import type { GrowthFactorSource } from '../season/factors';
-import { seasonsOf } from '../sim/derived';
-import type { FarmState } from '../sim/state';
-import { stepDay } from '../sim/tick';
+import { applyAction } from '../src/actions/apply';
+import type { Action } from '../src/actions/types';
+import type { Supplement } from '../src/data/feed';
+import { carryingCapacityAE } from '../src/money/costs';
+import { createFarm } from '../src/sim/create';
+import type { GrowthFactorSource } from '../src/season/factors';
+import { seasonsOf } from '../src/sim/derived';
+import type { FarmState } from '../src/sim/state';
+import { stepDay } from '../src/sim/tick';
 
 /** The seasons a run went through: the one it started in, and the one drawn on 1 July. */
 export interface RunSeasons {

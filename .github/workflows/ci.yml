@@ -30,6 +30,13 @@ jobs:
         run: pnpm lint
       - name: Unit and engine tests
         run: pnpm test
+      - name: Speed of the daily tick
+        # The target is 5 ms a day with 4,000+ head on a developer machine
+        # (docs/CALIBRATION.md). Shared CI machines are slower, so the limit
+        # here is looser. It still catches a tick that has become slow.
+        run: pnpm test:speed
+        env:
+          GG_SPEED_LIMIT_MS: 15
       - name: Build
         run: pnpm build
       - name: Lighthouse (mobile) on the main pages
