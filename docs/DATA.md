@@ -26,6 +26,21 @@ The rebuild carries the four launch districts (cq, nsw, cw, wv) in `packages/eng
 
 (Month indexes in code are 0-based: `head:[1,2,3]` = Feb–Apr.)
 
+## District towns, for daylight
+
+First light and last light are worked out for each district's town (PRD 14.4), using the standard NOAA solar equations for civil dawn and dusk (sun 6 degrees below the horizon). Coordinates are the Bureau of Meteorology station for each town, read from the Bureau's climate statistics pages on 13 Nov 2026 (`https://www.bom.gov.au/climate/averages/tables/cw_<station number>.shtml`).
+
+| District | Town | Station | Latitude | Longitude | Time zone |
+|---|---|---|---|---|---|
+| cq | Emerald | Emerald Airport (035264) | 23.57 S | 148.18 E | Australia/Brisbane (no daylight saving) |
+| nsw | Armidale | Armidale Airport AWS (056238) | 30.53 S | 151.62 E | Australia/Sydney |
+| cw | Dubbo | Dubbo Airport AWS (065070) | 32.22 S | 148.58 E | Australia/Sydney |
+| wv | Hamilton | Hamilton Airport (090173) | 37.65 S | 142.06 E | Australia/Melbourne |
+
+Daylight saving comes from the time zone database, so past real years use the rules of their day.
+
+**Not yet checked:** the calculated times have not been compared with a published twilight table (for example Geoscience Australia's). To do in milestone 1.5.
+
 ## Farm sizes (`FARMS`, ha: small / medium / large)
 
 | cq | nt | nsw | cw | wv |
