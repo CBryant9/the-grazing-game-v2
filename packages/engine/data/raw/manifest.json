@@ -87,6 +87,26 @@
       "rows": 8390
     },
     {
+      "path": "mla/national/heavy-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Lamb Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=8&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-16",
+      "last": "2026-11-12",
+      "rows": 10650
+    },
+    {
       "path": "mla/national/heavy-steer.csv",
       "source": "mla",
       "kind": "indicator",
@@ -107,6 +127,66 @@
       "rows": 10916
     },
     {
+      "path": "mla/national/light-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Light Lamb Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=6&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-12",
+      "last": "2026-11-12",
+      "rows": 10902
+    },
+    {
+      "path": "mla/national/merino-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Merino Lamb Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=9&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-12-11",
+      "last": "2026-11-12",
+      "rows": 10677
+    },
+    {
+      "path": "mla/national/mutton.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Mutton Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=11&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-12",
+      "last": "2026-11-12",
+      "rows": 10902
+    },
+    {
       "path": "mla/national/processor-cow.csv",
       "source": "mla",
       "kind": "indicator",
@@ -125,6 +205,26 @@
       "first": "1996-07-12",
       "last": "2026-11-12",
       "rows": 10916
+    },
+    {
+      "path": "mla/national/restocker-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Lamb Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=10&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-12-05",
+      "last": "2026-11-12",
+      "rows": 10749
     },
     {
       "path": "mla/national/restocker-yearling-heifer.csv",
@@ -167,6 +267,46 @@
       "rows": 10770
     },
     {
+      "path": "mla/national/trade-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Trade Lamb Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=7&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-12",
+      "last": "2026-11-12",
+      "rows": 10902
+    },
+    {
+      "path": "mla/national/young-cattle.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Young Cattle Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=14&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-10-21",
+      "last": "2026-11-12",
+      "rows": 10845
+    },
+    {
       "path": "mla/sales/ARM-cattle.csv",
       "source": "mla",
       "kind": "sales",
@@ -179,7 +319,7 @@
       "units": {
         "head": "head yarded that day"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1996-09-05",
       "last": "2026-11-05",
       "rows": 1301
@@ -197,10 +337,28 @@
       "units": {
         "head": "head yarded that day"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1996-07-15",
       "last": "2026-11-12",
       "rows": 2474
+    },
+    {
+      "path": "mla/sales/DUB-sheep.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days Dubbo (NSW) held a sheep sale, with the head yarded. Worked out from mla/yardings/DUB-sheep.csv and mla/yardings/DUB-lamb.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Sheep|Lamb}&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-08",
+      "last": "2026-11-09",
+      "rows": 1938
     },
     {
       "path": "mla/sales/GME-cattle.csv",
@@ -215,10 +373,28 @@
       "units": {
         "head": "head yarded that day"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1999-11-08",
       "last": "2026-11-11",
       "rows": 788
+    },
+    {
+      "path": "mla/sales/HAM-sheep.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days Hamilton (VIC) held a sheep sale, with the head yarded. Worked out from mla/yardings/HAM-sheep.csv and mla/yardings/HAM-lamb.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Sheep|Lamb}&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-11",
+      "rows": 1970
     },
     {
       "path": "mla/sales/MTL-cattle.csv",
@@ -233,7 +409,7 @@
       "units": {
         "head": "head yarded that day"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "2018-01-29",
       "last": "2026-11-12",
       "rows": 499
@@ -252,7 +428,7 @@
       "units": {
         "head": "head yarded"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1996-09-05",
       "last": "2026-11-05",
       "rows": 1301
@@ -271,10 +447,48 @@
       "units": {
         "head": "head yarded"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1996-07-15",
       "last": "2026-11-12",
       "rows": 2477
+    },
+    {
+      "path": "mla/yardings/DUB-lamb.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Lamb yardings at Dubbo (NSW) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Lamb&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-12-16",
+      "last": "2026-11-09",
+      "rows": 1899
+    },
+    {
+      "path": "mla/yardings/DUB-sheep.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Sheep yardings at Dubbo (NSW) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Sheep&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-08",
+      "last": "2026-11-09",
+      "rows": 1938
     },
     {
       "path": "mla/yardings/GME-cattle.csv",
@@ -290,10 +504,48 @@
       "units": {
         "head": "head yarded"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "1999-11-08",
       "last": "2026-11-11",
       "rows": 788
+    },
+    {
+      "path": "mla/yardings/HAM-lamb.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Lamb yardings at Hamilton (VIC) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Lamb&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-11",
+      "rows": 1567
+    },
+    {
+      "path": "mla/yardings/HAM-sheep.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Sheep yardings at Hamilton (VIC) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Sheep&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-11",
+      "rows": 1970
     },
     {
       "path": "mla/yardings/MTL-cattle.csv",
@@ -309,10 +561,130 @@
       "units": {
         "head": "head yarded"
       },
-      "pulled": "2026-11-13",
+      "pulled": "2026-11-14",
       "first": "2018-01-29",
       "last": "2026-11-12",
       "rows": 500
+    },
+    {
+      "path": "mla/yards/ARM/eastern-young-cattle.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "Eastern Young Cattle Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=0&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-09-05",
+      "last": "2026-11-11",
+      "rows": 8970
+    },
+    {
+      "path": "mla/yards/ARM/feeder-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Heifer Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=17&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-07-24",
+      "last": "2026-11-11",
+      "rows": 5344
+    },
+    {
+      "path": "mla/yards/ARM/feeder-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Steer Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=3&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-06-19",
+      "last": "2026-11-11",
+      "rows": 5981
+    },
+    {
+      "path": "mla/yards/ARM/heavy-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Steer Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=4&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-09-05",
+      "last": "2026-11-11",
+      "rows": 8389
+    },
+    {
+      "path": "mla/yards/ARM/processor-cow.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Processor Cow Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=13&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-09-05",
+      "last": "2026-11-11",
+      "rows": 8970
+    },
+    {
+      "path": "mla/yards/ARM/restocker-yearling-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Heifer Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=12&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1997-01-30",
+      "last": "2026-11-11",
+      "rows": 7245
     },
     {
       "path": "mla/yards/ARM/restocker-yearling-steer.csv",
@@ -335,6 +707,226 @@
       "rows": 8701
     },
     {
+      "path": "mla/yards/DUB/eastern-young-cattle.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "Eastern Young Cattle Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=0&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 10412
+    },
+    {
+      "path": "mla/yards/DUB/feeder-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Heifer Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=17&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-06-16",
+      "last": "2026-11-12",
+      "rows": 7853
+    },
+    {
+      "path": "mla/yards/DUB/feeder-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Steer Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=3&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-06-16",
+      "last": "2026-11-12",
+      "rows": 7962
+    },
+    {
+      "path": "mla/yards/DUB/heavy-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Lamb Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=8&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-10-03",
+      "last": "2026-11-12",
+      "rows": 8525
+    },
+    {
+      "path": "mla/yards/DUB/heavy-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Steer Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=4&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 10385
+    },
+    {
+      "path": "mla/yards/DUB/light-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Light Lamb Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=6&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-21",
+      "last": "2026-11-12",
+      "rows": 10185
+    },
+    {
+      "path": "mla/yards/DUB/merino-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Merino Lamb Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=9&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-01-13",
+      "last": "2026-11-12",
+      "rows": 9849
+    },
+    {
+      "path": "mla/yards/DUB/mutton.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Mutton Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=11&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-21",
+      "last": "2026-11-12",
+      "rows": 10030
+    },
+    {
+      "path": "mla/yards/DUB/processor-cow.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Processor Cow Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=13&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 10405
+    },
+    {
+      "path": "mla/yards/DUB/restocker-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Lamb Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=10&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-01-09",
+      "last": "2026-11-12",
+      "rows": 9736
+    },
+    {
+      "path": "mla/yards/DUB/restocker-yearling-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Heifer Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=12&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1997-01-06",
+      "last": "2026-11-12",
+      "rows": 8714
+    },
+    {
       "path": "mla/yards/DUB/restocker-yearling-steer.csv",
       "source": "mla",
       "kind": "indicator",
@@ -355,6 +947,126 @@
       "rows": 9378
     },
     {
+      "path": "mla/yards/DUB/trade-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Trade Lamb Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=7&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1996-07-21",
+      "last": "2026-11-12",
+      "rows": 10167
+    },
+    {
+      "path": "mla/yards/GME/feeder-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Heifer Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=17&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2014-10-10",
+      "last": "2026-11-12",
+      "rows": 3808
+    },
+    {
+      "path": "mla/yards/GME/feeder-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Steer Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=3&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2014-10-10",
+      "last": "2026-11-12",
+      "rows": 3808
+    },
+    {
+      "path": "mla/yards/GME/heavy-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Steer Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=4&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1999-11-08",
+      "last": "2026-11-12",
+      "rows": 5270
+    },
+    {
+      "path": "mla/yards/GME/processor-cow.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Processor Cow Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=13&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1999-11-08",
+      "last": "2026-11-12",
+      "rows": 5368
+    },
+    {
+      "path": "mla/yards/GME/restocker-yearling-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Heifer Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=12&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2014-10-10",
+      "last": "2026-11-12",
+      "rows": 3810
+    },
+    {
       "path": "mla/yards/GME/restocker-yearling-steer.csv",
       "source": "mla",
       "kind": "indicator",
@@ -373,6 +1085,226 @@
       "first": "2014-10-10",
       "last": "2026-11-12",
       "rows": 3810
+    },
+    {
+      "path": "mla/yards/HAM/heavy-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Lamb Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=8&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-11-26",
+      "last": "2026-11-12",
+      "rows": 6382
+    },
+    {
+      "path": "mla/yards/HAM/light-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Light Lamb Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=6&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-12",
+      "rows": 10276
+    },
+    {
+      "path": "mla/yards/HAM/merino-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Merino Lamb Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=9&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-05-28",
+      "last": "2026-11-12",
+      "rows": 6179
+    },
+    {
+      "path": "mla/yards/HAM/mutton.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Mutton Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=11&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-12",
+      "rows": 10161
+    },
+    {
+      "path": "mla/yards/HAM/restocker-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Lamb Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=10&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-12",
+      "rows": 9337
+    },
+    {
+      "path": "mla/yards/HAM/trade-lamb.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Trade Lamb Indicator at Hamilton (VIC), district yard (sheep) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=7&saleyardID=HAM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "1997-04-30",
+      "last": "2026-11-12",
+      "rows": 10156
+    },
+    {
+      "path": "mla/yards/MTL/feeder-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Heifer Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=17&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 2657
+    },
+    {
+      "path": "mla/yards/MTL/feeder-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Steer Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=3&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 2629
+    },
+    {
+      "path": "mla/yards/MTL/heavy-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Steer Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=4&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 2783
+    },
+    {
+      "path": "mla/yards/MTL/processor-cow.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Processor Cow Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=13&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 2825
+    },
+    {
+      "path": "mla/yards/MTL/restocker-yearling-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Heifer Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=12&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-14",
+      "first": "2018-01-29",
+      "last": "2026-05-24",
+      "rows": 1218
     },
     {
       "path": "mla/yards/MTL/restocker-yearling-steer.csv",

@@ -93,7 +93,7 @@ These tables are server-side engine data. Browser code must never import them (r
 - **Source:** Meat & Livestock Australia's public statistics service, which carries the National Livestock Reporting Service figures. `https://api-mlastatistics.mla.com.au`, no key. Documentation: `https://app.nlrsreports.mla.com.au/statistics/documentation`.
 - **Credit line** (wherever these prices are shown): "Reproduced courtesy of Meat & Livestock Australia Limited – www.mla.com.au".
 - **Terms:** every answer from the service points to MLA's Market Report and Information Terms of Use. Claudia emails MLA for written confirmation of commercial use before launch (PRD 5.14).
-- **Pulled:** 13 Nov 2026, up to 12 Nov 2026. About 1,300 requests over about 105 minutes, one at a time: 1,207 answers kept in the cache, about 90 tries that failed on MLA's side, and about 17 test requests made by hand. The script's own tally (1,046 requests, 69 failed) is lower because it misses three runs that were stopped by hand. **The pull is not finished.** What is left is listed below.
+- **Pulled:** 13 and 14 Nov 2026, up to 12 Nov 2026, in two goes. All runs together made 5,032 requests, one at a time. The second go (the rest of the national indicators, then every indicator, yarding and sale day for the five main yards) made about 3,960 requests and met 5 failures on MLA's side, each of which worked on a later try. The first go: About 1,300 requests over about 105 minutes, one at a time: 1,207 answers kept in the cache, about 90 tries that failed on MLA's side, and about 17 test requests made by hand. The script's own tally (1,046 requests, 69 failed) is lower because it misses three runs that were stopped by hand. **The pull is not finished.** What is left is listed below.
 - **Checked on the day:** the indicator IDs against the service's `/indicator` list and the yard IDs against `/saleyard`. For every series pulled, the row count matches the count the service gives for the whole range.
 - **Changed in form only:** one file per series, values rounded to 2 decimal places, head counts to whole numbers. Rows are as served.
 
@@ -110,6 +110,13 @@ These tables are server-side engine data. Browser code must never import them (r
 | `mla/national/heavy-steer.csv` | National Heavy Steer (4) | c/kg lwt | 12 Jul 1996 | 12 Nov 2026 | 10,916 |
 | `mla/national/processor-cow.csv` | National Processor Cow (13) | c/kg lwt | 12 Jul 1996 | 12 Nov 2026 | 10,916 |
 | `mla/national/eastern-young-cattle.csv` | Eastern Young Cattle Indicator (0) | c/kg cwt | 15 Jul 1996 | 12 Nov 2026 | 10,882 |
+| `mla/national/young-cattle.csv` | National Young Cattle (14) | c/kg lwt | 21 Oct 1996 | 12 Nov 2026 | 10,845 |
+| `mla/national/light-lamb.csv` | National Light Lamb (6) | c/kg cwt | 12 Jul 1996 | 12 Nov 2026 | 10,902 |
+| `mla/national/trade-lamb.csv` | National Trade Lamb (7) | c/kg cwt | 12 Jul 1996 | 12 Nov 2026 | 10,902 |
+| `mla/national/heavy-lamb.csv` | National Heavy Lamb (8) | c/kg cwt | 16 Jul 1996 | 12 Nov 2026 | 10,650 |
+| `mla/national/merino-lamb.csv` | National Merino Lamb (9) | c/kg cwt | 11 Dec 1996 | 12 Nov 2026 | 10,677 |
+| `mla/national/restocker-lamb.csv` | National Restocker Lamb (10) | c/kg cwt | 5 Dec 1996 | 12 Nov 2026 | 10,749 |
+| `mla/national/mutton.csv` | National Mutton (11) | c/kg cwt | 12 Jul 1996 | 12 Nov 2026 | 10,902 |
 
 Gaps (days with no row):
 
@@ -119,35 +126,39 @@ Gaps (days with no row):
 - The other five tables have no gaps outside Christmas and New Year.
 - Feeder steers and heifers start in June 2003, so the 1997 to 2003 game years need another indicator to stand in for them.
 
-**Yard indicators pulled.** Only the restocker yearling steer indicator, at each district's cattle yard:
-
-| File | Yard | First | Last | Rows | Gaps to know about |
-|---|---|---|---|---|---|
-| `mla/yards/GME/restocker-yearling-steer.csv` | CQLX Gracemere (cq) | 10 Oct 2014 | 12 Nov 2026 | 3,810 | Nothing before October 2014 |
-| `mla/yards/ARM/restocker-yearling-steer.csv` | Armidale (nsw) | 23 Jan 1997 | 11 Nov 2026 | 8,701 | No rows from 11 Jun to 4 Nov 2026, though the yard held 10 sales in that time. Fewer rows from 2020, when sales went fortnightly |
-| `mla/yards/DUB/restocker-yearling-steer.csv` | Dubbo (cw) | 6 Mar 1997 | 12 Nov 2026 | 9,378 | Thin in 1997 and 1998 (50 and 25 rows). The longest gap is 4 May 1997 to 23 Apr 1998 |
-| `mla/yards/MTL/restocker-yearling-steer.csv` | Mortlake (wv) | 29 Jan 2018 | 8 Mar 2026 | 1,141 | Nothing before 2018. None in 2023, and one week a year in 2024, 2025 and 2026 |
-
-Where a yard's own history is short or thin, the national indicator or a nearby yard fills in (BUILD_PLAN section 3). The rule for that is milestone 1.4 work.
-
-**What each district yard has on the service** (first date and row count, from one request per series on 13 Nov 2026):
+**Yard indicators pulled.** Every cattle indicator the service gives at each district's cattle yard, and every sheep indicator at Dubbo and Hamilton. First date and row count for each (to 11 or 12 Nov 2026 unless a last date is shown):
 
 | Indicator | Gracemere `GME` | Armidale `ARM` | Dubbo `DUB` | Mortlake `MTL` |
 |---|---|---|---|---|
-| Restocker yearling steer | Oct 2014, 3,810 (pulled) | Jan 1997, 8,701 (pulled) | Mar 1997, 9,378 (pulled) | Jan 2018, 1,141 (pulled) |
-| Restocker yearling heifer | Oct 2014, 3,810 | Jan 1997, 7,245 | Jan 1997, 8,714 | Jan 2018, 1,218 |
-| Feeder steer | Oct 2014, 3,808 | Jun 2003, 5,981 | Jun 2003, 7,962 | Jan 2018, 2,629 |
-| Feeder heifer | Oct 2014, 3,808 | Jul 2003, 5,344 | Jun 2003, 7,853 | Jan 2018, 2,657 |
-| Heavy steer | Nov 1999, 5,270 | Sep 1996, 8,389 | Jul 1996, 10,385 | Jan 2018, 2,783 |
-| Processor cow | Nov 1999, 5,368 | Sep 1996, 8,970 | Jul 1996, 10,405 | Jan 2018, 2,825 |
-| Eastern Young Cattle Indicator | nothing served | Sep 1996, 8,970 | Jul 1996, 10,412 | nothing served |
+| Restocker yearling steer | 10 Oct 2014, 3,810 rows | 23 Jan 1997, 8,701 rows | 6 Mar 1997, 9,378 rows | 29 Jan 2018, 1,141 rows, last 8 Mar 2026 |
+| Restocker yearling heifer | 10 Oct 2014, 3,810 rows | 30 Jan 1997, 7,245 rows | 6 Jan 1997, 8,714 rows | 29 Jan 2018, 1,218 rows, last 24 May 2026 |
+| Feeder steer | 10 Oct 2014, 3,808 rows | 19 Jun 2003, 5,981 rows | 16 Jun 2003, 7,962 rows | 29 Jan 2018, 2,629 rows |
+| Feeder heifer | 10 Oct 2014, 3,808 rows | 24 Jul 2003, 5,344 rows | 16 Jun 2003, 7,853 rows | 29 Jan 2018, 2,657 rows |
+| Heavy steer | 8 Nov 1999, 5,270 rows | 5 Sep 1996, 8,389 rows | 15 Jul 1996, 10,385 rows | 29 Jan 2018, 2,783 rows |
+| Processor cow | 8 Nov 1999, 5,368 rows | 5 Sep 1996, 8,970 rows | 15 Jul 1996, 10,405 rows | 29 Jan 2018, 2,825 rows |
+| Eastern Young Cattle Indicator | nothing served | 5 Sep 1996, 8,970 rows | 15 Jul 1996, 10,412 rows | nothing served |
 | National Young Cattle (14) | not given by yard | not given by yard | not given by yard | not given by yard |
 
-The service will not give the National Young Cattle Indicator by yard. Its answer: "Indicators that contain online livestock sales data are not available via the Indicators by Saleyard endpoint."
+| Indicator (all c/kg cwt) | Dubbo `DUB` | Hamilton `HAM` |
+|---|---|---|
+| Light lamb | 21 Jul 1996, 10,185 rows | 30 Apr 1997, 10,276 rows |
+| Trade lamb | 21 Jul 1996, 10,167 rows | 30 Apr 1997, 10,156 rows |
+| Heavy lamb | 3 Oct 1996, 8,525 rows | 26 Nov 1997, 6,382 rows |
+| Merino lamb | 13 Jan 1997, 9,849 rows | 28 May 1997, 6,179 rows |
+| Restocker lamb | 9 Jan 1997, 9,736 rows | 30 Apr 1997, 9,337 rows |
+| Mutton | 21 Jul 1996, 10,030 rows | 30 Apr 1997, 10,161 rows |
 
-Sheep, sized but not pulled: Dubbo has all six sheep indicators (light, trade, heavy, Merino and restocker lamb, and mutton) from between July 1996 and January 1997, 8,525 to 10,185 rows each. Hamilton `HAM` has the same six from between April and November 1997, 6,179 to 10,276 rows each.
+- The service will not give the National Young Cattle Indicator by yard. Its answer: "Indicators that contain online livestock sales data are not available via the Indicators by Saleyard endpoint."
+- It serves nothing for the Eastern Young Cattle Indicator at Gracemere or Mortlake.
+- **Gracemere** has nothing before October 2014 for the restocker and feeder indicators, and nothing before November 1999 for heavy steers and cows.
+- **Armidale** restocker steers: no rows from 11 Jun to 4 Nov 2026, though the yard held 10 sales in that time. Fewer rows from 2020, when sales went fortnightly.
+- **Dubbo** restocker steers are thin in 1997 and 1998 (50 and 25 rows). The longest gap is 4 May 1997 to 23 Apr 1998.
+- **Mortlake** has nothing before 2018. Its restocker steers have none in 2023 and one week a year in 2024, 2025 and 2026.
+- **Odd rows, kept as served.** Hamilton Merino lamb reads 11.95 c/kg on 27 and 28 Nov 2006 and **-6.67 c/kg from 6 to 12 Dec 2006** (37 and 46 head in the indicator). Hamilton mutton reads 12.82 c/kg from 18 to 24 Oct 2006 (3,994 head). Every other price row is between 20 and 3,000 c/kg. The price mapping in milestone 1.4 must not pass a negative price to the game. A test pins these 16 rows, so a new odd row fails the build.
 
-**Sale days pulled** (from the service's yardings report, cattle):
+Where a yard's own history is short or thin, the national indicator or a nearby yard fills in (BUILD_PLAN section 3). The rule for that is milestone 1.4 work.
+
+**Sale days pulled** (from the service's yardings report, cattle and sheep):
 
 | File | Yard | First | Last | Sale days | Pattern in the data |
 |---|---|---|---|---|---|
@@ -155,23 +166,20 @@ Sheep, sized but not pulled: Dubbo has all six sheep indicators (light, trade, h
 | `mla/sales/ARM-cattle.csv` | Armidale | 5 Sep 1996 | 5 Nov 2026 | 1,301 | Thursdays. About weekly to 2019 (38 to 52 a year), about fortnightly from 2020 (24 to 31 a year). A few store sales on Fridays |
 | `mla/sales/DUB-cattle.csv` | Dubbo | 15 Jul 1996 | 12 Nov 2026 | 2,474 | Prime sales on Mondays and Thursdays to 2004, Thursdays only from 2005. Store sales on Fridays from 2001 (about 30 a year to 2017, fewer since) |
 | `mla/sales/MTL-cattle.csv` | Mortlake | 29 Jan 2018 | 12 Nov 2026 | 499 | Prime sales on Mondays. Store sales on Thursdays from 2023 (20 to 25 a year). **Nothing before 2018** |
+| `mla/sales/DUB-sheep.csv` | Dubbo, sheep and lambs | 8 Jul 1996 | 9 Nov 2026 | 1,938 | Not yet looked at day by day |
+| `mla/sales/HAM-sheep.csv` | Hamilton, sheep and lambs | 30 Apr 1997 | 11 Nov 2026 | 1,970 | Not yet looked at day by day. On 502 of the 1,970 sale days no sheep were yarded, only lambs: the sheep yardings file has a 0 for those days, as served |
 
 - `mla/sales/*.csv` is `date,head`: each day the yard held a sale and the head yarded, every sale type that day added together.
-- `mla/yardings/*.csv` is the report as served, `date,type,head`, with `type` Prime or Store.
+- `mla/yardings/*.csv` is the report as served, `date,type,head`, with `type` Prime or Store. Sheep and lambs are separate files: `DUB-sheep` (1,938 rows), `DUB-lamb` (1,899), `HAM-sheep` (1,970) and `HAM-lamb` (1,567). A sheep sale day is any day in either file.
 - How the sale days were found: straight from the yardings report, which is small (500 to 2,477 rows a yard). As a check, 547 of the 554 changes in Gracemere's restocker steer indicator fall on a sale day in the yardings table.
 - **Sale days missing from the service** need a stand-in in milestone 1.4: Gracemere from 1997 to 7 Nov 1999 and from 17 Aug 2004 to 9 Oct 2014, and Mortlake before 29 Jan 2018.
 - **Fill-in yards are proposed, not agreed.** The milestone brief named Emerald (for Gracemere), IRLX Inverell (for Armidale) and CVLX Ballarat (for Mortlake and Hamilton) as nearby yards to cover short histories. They are not in the PRD or the build plan, and none has been pulled. Armidale's own history turns out to be long, so Inverell may not be needed. **A question for Claudia** before any of them is used.
 
-**Not pulled yet** (the scripts carry on from the cache, so nothing above is fetched again):
+**Not pulled** (the scripts carry on from the cache, so nothing above is fetched again):
 
 | What | Size |
 |---|---|
-| National Young Cattle Indicator (14), from 21 Oct 1996 | about 110 requests |
-| Six national sheep indicators: Light Lamb (6), Trade Lamb (7), Heavy Lamb (8), Merino Lamb (9), Restocker Lamb (10), Mutton (11), all from mid to late 1996 | about 670 requests |
-| The other cattle indicators at Gracemere, Armidale, Dubbo and Mortlake (table above) | about 1,730 requests |
-| Sheep indicators at Dubbo and Hamilton | about 1,320 requests |
-| Sheep and lamb yardings and sale days at Dubbo and Hamilton | not sized, small |
-| Proposed fill-in yards, if Claudia agrees: Emerald `EME`, IRLX Inverell `INV`, CVLX Ballarat `BAL` (indicators, yardings, sale days) | not sized |
+| Proposed fill-in yards, if Claudia agrees: Emerald `EME`, IRLX Inverell `INV`, CVLX Ballarat `BAL` (indicators, yardings, sale days) | about 3,300 requests, around four hours |
 
 To carry on: `pnpm data:mla`, or a stage at a time, for example `node scripts/data/pull-mla.mjs --only=national --species=Sheep`.
 
