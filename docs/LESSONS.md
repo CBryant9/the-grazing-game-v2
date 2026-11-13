@@ -63,6 +63,15 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 11. **Publishing from a new session:** read the artifact first, then publish with its `url`.
 12. **Big file edits:** use patch scripts that assert each target string exists exactly once before replacing.
 
+## The rebuild
+
+| # | Symptom | Cause | Fix / rule |
+|---|---|---|---|
+| R1 | The landing shell scored 97 to 100 for Lighthouse Performance, not a steady 100, and shipped 141 KB of JavaScript against a 100 KB budget | The Next.js App Router runtime is about that size before any of our code | **Open, milestone 5.4.** Keep website pages free of client components where possible and measure the budget in CI. Do not claim 100 until it holds |
+| R2 | Lighthouse Performance swung from 74 to 100 on the same page | Lighthouse was run on a busy PC with the server on the same machine | Judge performance on the median of several runs, and on CI, not on one local run |
+| R3 | The newest TypeScript (7) could not be used | `typescript-eslint` supports TypeScript below 6.1 | Check that tools support each other before taking the newest version. TypeScript is pinned to 6.0 |
+| R4 | A model doc and the MVP code disagreed in 15 places | The docs were written after the code | Port from the code, correct the doc in the same change (BUILD_PLAN 2.4) |
+
 ## Process lessons
 
 - **Re-test after every fix that touches the model, even "small" ones.** The spin-up floor (0.85) went in at the same time the hook was removed and wasn't re-simulated until 13 Nov 2026.

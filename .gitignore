@@ -35,3 +35,10 @@ desktop.ini
 
 # scratch
 tmp/
+
+# lighthouse reports
+.lighthouseci/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

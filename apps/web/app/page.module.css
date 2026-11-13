@@ -1,0 +1,60 @@
+.hero {
+  padding: clamp(28px, 7vw, 72px) 0 clamp(24px, 5vw, 48px);
+  background: linear-gradient(var(--panel2), var(--bg));
+  border-bottom: 1px solid var(--line);
+}
+.title {
+  font-size: clamp(3.5rem, 17vw, 9rem);
+  text-transform: uppercase;
+}
+.coral {
+  color: var(--coral-text);
+  display: block;
+}
+.tagline {
+  margin-top: 14px;
+  color: var(--coral-text);
+  font-size: clamp(1rem, 3.4vw, 1.125rem);
+}
+.cta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.note {
+  margin-top: 14px;
+  font-size: 0.8125rem;
+}
+.h2 {
+  font-size: 1rem;
+  color: var(--accent-text);
+  margin: 28px 0 12px;
+}
+.cards {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.cardItem {
+  padding: 14px;
+}
+.cardItem h3 {
+  font-size: 0.875rem;
+  margin-bottom: 4px;
+}
+.districts {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer {
+  margin-top: 40px;
+  padding: 20px 0 28px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+}

@@ -1,0 +1,41 @@
+.header {
+  background: var(--webhdr);
+  border-bottom: 1px solid var(--line);
+}
+.inner {
+  max-width: 1500px;
+  margin: 0 auto;
+  min-height: 60px;
+  padding: 8px var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--accent-text);
+  flex: none;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}

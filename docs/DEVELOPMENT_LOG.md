@@ -109,6 +109,34 @@ Also added:
 - a `game` local server config
 - the `realism-guardian` project agent
 
+## The rebuild (this repo)
+
+### 13 Nov 2026: planning
+
+- `BUILD_PLAN.md` written, then widened with Claudia: four districts (Top End removed for now), the simulation on the server for both modes, real years with MLA prices and SILO weather, new job times, farm hands, contractor fencing, sheep, a homestead and yards, gate types, feed as stock, plans in both modes, one-off purchases. PRD moved to v1.1.
+- A line-by-line check of `MODEL.md` and `DATA.md` against the MVP code found 15 mismatches and several MVP faults (BUILD_PLAN 2.4).
+
+### 13 Nov 2026: milestone 1.0, scaffold
+
+Built:
+
+- pnpm monorepo: `apps/web` (Next.js 16, App Router), `packages/engine`, `packages/render`, `packages/shared`. Strict TypeScript 6.0, ESLint 10, Prettier, Vitest 5, Lighthouse CI, a GitHub Actions workflow.
+- Design tokens, the three fonts (self-hosted), buttons, chips, badges and cards from the mockups, in light and dark. The theme follows the device and a choice is remembered.
+- Landing page shell and `/play` shell, with the separate website and game headers.
+- Seeded random numbers with named streams, and 8 tests.
+- Lint rules that stop browser code importing the engine, and stop the engine using unseeded randomness, the clock or the DOM.
+- Security headers, no source maps, manifest, robots and sitemap.
+
+Tested: type check, lint, 8 unit tests and the production build pass. Checked in the browser at 375 x 812 and 812 x 375 in both themes: no sideways scroll, fonts load, the theme toggle works, no console errors.
+
+Lighthouse (mobile, local): Accessibility 100, Best Practices 100, SEO 100 on both pages in every run. Performance 97 to 100 in clean runs, with two outliers (74 and 84) when this PC was busy.
+
+Not done, and why:
+
+- Performance is not a steady 100 on the landing shell. First-load JavaScript is 141 KB compressed, over the PRD's 100 KB budget for website pages. Most of it is the framework's own runtime. To be dealt with in milestone 5.4 (LESSONS R1).
+- TypeScript is held at 6.0, because the lint tooling does not support 7 yet.
+- Playwright end-to-end tests come with the game screens (1.7).
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
