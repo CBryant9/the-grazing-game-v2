@@ -1,36 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PLENTY, openFarm, twoPaddockFarm } from '../../test-support/wholeFarm';
-import {
-  across,
-  atLastLight,
-  busyFarm,
-  setUp,
-  turnedDown,
-  withLightLeft,
-  work,
-} from '../../test-support/workingDay';
-import { SPECIES } from '../data/species';
-import { GRID_N } from '../grid';
-import { LAND } from '../pasture/state';
+import { across, busyFarm, setUp, turnedDown, work } from '../../test-support/workingDay';
 import { farmHash } from '../save/save';
-import { createFarm } from '../sim/create';
 import { lightOn } from '../sim/clock';
+import { createFarm } from '../sim/create';
 import { dateOn, surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
-import { previewAction } from './act';
 import { endDay, skipDays, stopsIn, waterCheck } from './days';
-import { bookingsView, clockView, jobsInProgress } from './look';
+import { clockView } from './look';
 
 /*
- * Next day and skips (PRD 5.3): each day has its own light, jobs in
- * progress carry on in turn, and a skip stops early for everything the
- * MVP stopped its clock for.
+ * Next day and skips (PRD 5.3): each day has its own light, nothing
+ * carries over from one day to the next, and a skip stops early for
+ * everything the MVP stopped its clock for.
  */
 
 vi.setConfig({ testTimeout: 600_000 });
-
-const NO_TRAVEL = { work: { travel: false } } as const;
 
 const mixedFarm = (): FarmState =>
   createFarm({
@@ -43,12 +29,6 @@ const mixedFarm = (): FarmState =>
     difficulty: 'easy',
     money: { ...PLENTY },
   });
-
-const fallowOf = (farm: FarmState): number[] => {
-  const out: number[] = [];
-  for (let i = 0; i < GRID_N; i++) if (farm.pasture.land[i] === LAND.fallow) out.push(i);
-  return out;
-};
 
 /** A farm with steers in a paddock that has no water. */
 function dryMob(): { farm: FarmState; mob: number; area: string } {
@@ -65,20 +45,22 @@ function dryMob(): { farm: FarmState; mob: number; area: string } {
 }
 
 describe('Next day', () => {
-  it('runs the daily tick and starts a new day at first light, with the player at the homestead', () => {
+  it('runs the daily tick and starts a new day at first light', () => {
     const b = busyFarm();
     const out = work(b.farm, { type: 'refillPortable', port: b.port }).farm;
+    expect(out.clock.used).toBe(30);
     const next = endDay(out);
     expect(next.farm.day).toBe(1);
     expect(next.day.day).toBe(0);
     expect(next.day.ran).toBe(true);
     expect(next.farm.clock.used).toBe(0);
-    expect(next.farm.clock.at).toEqual(clockView(b.farm).at);
     // The new day has its own first light.
     expect(next.farm.clock.firstLight).not.toBe(out.clock.firstLight);
+    expect(next.farm.clock.firstLight).toBe(lightOn(out, 1).firstLight);
     expect(dateOn(next.farm)).toEqual({ year: 2023, month: 8, date: 2 });
     // The farm passed in is not changed.
     expect(out.day).toBe(0);
+    expect(out.clock.used).toBe(30);
   });
 
   it('is exactly the daily tick: the same farm as stepping the day directly', () => {
@@ -91,21 +73,21 @@ describe('Next day', () => {
     expect(next.day.events).toEqual(result.events);
   });
 
-  it('reports the light left unused and the drive home', () => {
+  it('reports the light left unused', () => {
     const b = busyFarm();
     const out = work(b.farm, { type: 'refillPortable', port: b.port });
     const next = endDay(out.farm);
-    expect(next.lightLeftMin).toBeCloseTo(out.job.leftAfterMin, 9);
-    expect(next.homeMin).toBeCloseTo(out.job.homeMin, 9);
-    expect(next.homeMin).toBeGreaterThan(0);
+    expect(next.lightLeftMin).toBe(out.job.leftAfterMin);
+    expect(next.lightLeftMin).toBeCloseTo(out.job.dayMin - 30, 9);
   });
 
-  it('does not work jobs in progress: they wait for the player, or a skip', () => {
-    const farm = openFarm('nsw', NO_TRAVEL);
+  it('builds nothing: the part of a line that did not fit yesterday is not carried on', () => {
+    const farm = openFarm('nsw');
     const day1 = work(farm, { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' });
+    expect(day1.job.line!.fits.metres).toBe(500);
     const next = endDay(endDay(day1.farm).farm).farm;
-    expect(next.jobs[0]!.piecesDone).toBe(10);
-    expect(jobsInProgress(next)[0]!.doneShare).toBeCloseTo(10 / 36, 9);
+    expect(next.year.infra).toBe(day1.farm.year.infra);
+    expect(Array.from(next.layout.fences.hE)).toEqual(Array.from(day1.farm.layout.fences.hE));
   });
 
   it('sums the day up as facts and figures', () => {
@@ -155,7 +137,7 @@ describe('skips', () => {
     expect(farm.day).toBe(0);
   });
 
-  it('is the same as Next day that many times, on a farm with no jobs in progress', () => {
+  it('is the same as Next day that many times', () => {
     const b = busyFarm();
     let byDay = b.farm;
     for (let i = 0; i < 7; i++) byDay = endDay(byDay).farm;
@@ -171,103 +153,24 @@ describe('skips', () => {
     expect(year.stops).toEqual([{ type: 'year-end', year: 1 }]);
   });
 
-  it('each day still has its own light', () => {
-    const farm = openFarm('wv', { size: 260, start: { year: 2023, month: 8 }, ...NO_TRAVEL });
-    // 3,000 m of permanent fence: six days. Each day's work starts at that day's first light.
-    const edges = [...across(8, 5, 34), ...across(14, 5, 34)];
-    const day1 = work(farm, { type: 'buildFence', edges, fence: 'permanent' });
+  it('each day still has its own light, and the day after a skip starts at first light', () => {
+    const farm = openFarm('wv', { size: 260, start: { year: 2023, month: 8 } });
+    const used = work(farm, { type: 'placePortable', cell: 5 }).farm;
+    const week = skipDays(used, 'week');
+    const c = clockView(week.farm);
+    expect(c.usedMin).toBe(0);
+    expect(c.firstLight).toBe(lightOn(farm, 7).firstLight);
+    // September in Western Victoria: the days are getting longer.
+    expect(c.dayMin).toBeGreaterThan(clockView(farm).dayMin + 10);
+  });
+
+  it('builds nothing: a line cut short before a skip is as it was after it', () => {
+    const farm = openFarm('nsw');
+    const day1 = work(farm, { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' });
     const week = skipDays(day1.farm, 'week');
-    const worked = week.farm.inbox.filter((m) => m.event.type === 'job-worked').slice(1);
-    expect(worked.length).toBe(5);
-    const starts = worked.map((m) => (m.event.type === 'job-worked' ? m.event.start : 0));
-    // September in Western Victoria: first light is earlier each day.
-    for (let i = 1; i < starts.length; i++) expect(starts[i]).toBeLessThan(starts[i - 1]!);
-    // Each day's work starts at that day's first light and runs the whole of its light.
-    for (const m of worked) {
-      if (m.event.type !== 'job-worked') continue;
-      const light = lightOn(farm, m.day);
-      expect(m.event.start).toBe(light.firstLight);
-      expect(m.event.workMin).toBeCloseTo(light.minutes, 6);
-      expect(m.at).toBe(m.event.end);
-    }
-  });
-});
-
-describe('jobs in progress during a skip', () => {
-  it('finish over the right number of days', () => {
-    // 1,800 m of permanent fence: 500 m on the first day, then three more days.
-    const farm = openFarm('nsw', NO_TRAVEL);
-    const day1 = work(farm, { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' });
-    expect(day1.job.moreDays).toBe(3);
-    // Two more days are not enough.
-    const two = skipDays(day1.farm, 2);
-    expect(two.farm.jobs.length).toBe(1);
-    expect(two.farm.jobs[0]!.piecesDone).toBe(20);
-    expect(two.summary.jobs).toEqual([
-      expect.objectContaining({ jobId: 1, action: 'buildFence', finished: false }),
-    ]);
-    // The first day's part was done before the skip. The skip's first day is the day
-    // it was started on, when the light is already gone.
-    expect(two.summary.jobs[0]!.doneShare.before).toBeCloseTo(10 / 36, 9);
-    expect(two.summary.jobs[0]!.doneShare.after).toBeCloseTo(20 / 36, 9);
-    // Four days from the start of day 0 finish it: days 1, 2 and 3.
-    const four = skipDays(day1.farm, 4);
-    expect(four.farm.jobs).toEqual([]);
-    expect(four.summary.jobs[0]).toMatchObject({ finished: true, doneShare: { after: 1 } });
-    // The work is in the log as the days it was done on.
-    const days = four.farm.actionLog
-      .filter((a) => a.action.type === 'continueJob')
-      .map((a) => a.day);
-    expect(days).toEqual([1, 2, 3]);
-    // And the cost came off as it was built: 36 squares at $350.
-    expect(four.summary.money.infra).toBe(26 * 350);
-  });
-
-  it('carry on oldest first, each using what is left of the day in turn', () => {
-    const farm = openFarm('nsw', NO_TRAVEL);
-    // Job 1: 750 m. Job 2: 1,000 m. Both started, 500 m of the first built.
-    const a = work(farm, { type: 'buildFence', edges: across(8, 2, 16), fence: 'permanent' });
-    let f = endDay(a.farm).farm;
-    const b = work(withLightLeft(f, 1), {
-      type: 'buildFence',
-      edges: across(16, 2, 21),
-      fence: 'permanent',
-    });
-    f = b.farm;
-    expect(f.jobs.map((j) => j.id)).toEqual([1, 2]);
-    // One day of the skip: job 1 takes the half day it needs (250 m), job 2 gets the other half.
-    const one = skipDays(endDay(f).farm, 1);
-    expect(one.farm.jobs.map((j) => j.id)).toEqual([2]);
-    const p1 = one.summary.jobs.find((j) => j.jobId === 1)!;
-    const p2 = one.summary.jobs.find((j) => j.jobId === 2)!;
-    expect(p1.finished).toBe(true);
-    expect(p2.finished).toBe(false);
-    // Job 2 got half a day: 250 m of its 1,000 m, on top of the sliver from its first minute.
-    expect(p2.doneShare.after - p2.doneShare.before).toBeCloseTo(0.25, 6);
-    // In the log, job 1 was worked before job 2 that day.
-    const order = one.farm.actionLog
-      .filter((x) => x.day === 2 && x.action.type === 'continueJob')
-      .map((x) => (x.action.type === 'continueJob' ? x.action.job : 0));
-    expect(order).toEqual([1, 2]);
-  });
-
-  it('a job the bank will not cover waits, and the summary says why', () => {
-    const farm = openFarm('nsw', NO_TRAVEL);
-    const day1 = work(farm, { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' });
-    const poor = cloneFarm(day1.farm);
-    poor.cash = poor.overdraft + 5000;
-    const week = skipDays(poor, 'week');
     expect(week.daysRun).toBe(7);
-    expect(week.farm.jobs[0]!.piecesDone).toBe(10);
-    expect(week.summary.jobs).toEqual([]);
-    expect(week.summary.jobsWaiting).toEqual([
-      {
-        jobId: 1,
-        action: 'buildFence',
-        reason: 'bank-limit',
-        message: expect.stringMatching(/^The bank won't lend that much for fencing\./),
-      },
-    ]);
+    expect(week.summary.money.infra).toBe(0);
+    expect(Array.from(week.farm.layout.fences.hE)).toEqual(Array.from(day1.farm.layout.fences.hE));
   });
 });
 
@@ -292,6 +195,7 @@ describe('what stops a skip', () => {
     expect(week.daysRun).toBe(1);
     expect(week.stops).toEqual([{ type: 'no-water', when: 'during', mob, mobName: 'Mob 1', area }]);
     expect(endDay(farm).stops).toEqual(week.stops);
+    expect(stopsIn(week.days[0]!)).toEqual(week.stops);
     // Run anyway again and it goes on to day 4, when everything dies.
     const on = skipDays(week.farm, 'week', {}, { anyway: true });
     expect(on.daysRun).toBe(7);
@@ -408,191 +312,5 @@ describe('what stops a skip', () => {
     expect(month.daysRun).toBe(30);
     expect(month.stops).toEqual([]);
     expect(Object.keys(month.summary.events).length).toBeGreaterThan(0);
-  });
-});
-
-describe('contractors: sowing and harvest', () => {
-  it('sowing is booked: no time from the player, done at first light three days on, and paid for then', () => {
-    const farm = mixedFarm();
-    const fallow = fallowOf(farm);
-    const cost = fallow.length * farm.layout.scale.haPerSquare * SPECIES.barley.cost;
-    const booked = work(farm, { type: 'sow', species: 'barley', cells: fallow });
-    expect(booked.job.outcome).toBe('booked');
-    expect(booked.job.workMin).toBe(0);
-    expect(booked.job.travelMin).toBe(0);
-    expect(booked.job.dueDay).toBe(3);
-    expect(booked.job.cost).toBeCloseTo(cost, 6);
-    expect(booked.job.costToday).toBe(0);
-    // Nothing is sown, nothing is paid, and the clock has not moved.
-    expect(booked.farm.cash).toBe(farm.cash);
-    expect(booked.farm.clock.used).toBe(0);
-    expect(booked.farm.crops.fields.length).toBe(farm.crops.fields.length);
-    expect(booked.events).toEqual([
-      { type: 'booking-made', bookingId: 1, action: 'sow', dueDay: 3, quote: booked.job.cost },
-    ]);
-    expect(bookingsView(booked.farm)).toEqual([
-      expect.objectContaining({ id: 1, type: 'sow', bookedDay: 0, dueDay: 3, daysToGo: 3 }),
-    ]);
-
-    // Two days on, still nothing.
-    const two = skipDays(booked.farm, 2);
-    expect(two.farm.crops.fields.length).toBe(farm.crops.fields.length);
-    expect(two.dawn).toEqual([]);
-    expect(bookingsView(two.farm)[0]!.daysToGo).toBe(1);
-    // The third day's first light: sown, and charged.
-    const third = endDay(two.farm);
-    expect(third.farm.day).toBe(3);
-    expect(third.dawn.map((e) => e.type)).toEqual(['booking-done', 'sown']);
-    expect(third.farm.crops.fields.length).toBe(farm.crops.fields.length + 1);
-    expect(third.farm.bookings).toEqual([]);
-    expect(third.farm.year.crops - two.farm.year.crops).toBeCloseTo(cost, 6);
-    expect(third.summary.bookingsDone).toBe(1);
-    // The clock is still at first light: it took none of the player's day.
-    expect(third.farm.clock.used).toBe(0);
-    // The message is in the inbox, at first light on the day it was done.
-    const msg = third.farm.inbox.find((m) => m.event.type === 'sown')!;
-    expect(msg.day).toBe(3);
-    expect(msg.at).toBe(third.farm.clock.firstLight);
-  });
-
-  it('a contractor can be booked after last light, and called off before the work is done', () => {
-    const farm = atLastLight(mixedFarm());
-    const booked = work(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
-    expect(booked.job.outcome).toBe('booked');
-    const off = work(booked.farm, { type: 'cancelBooking', booking: 1 });
-    expect(off.farm.bookings).toEqual([]);
-    expect(off.events).toEqual([{ type: 'booking-cancelled', bookingId: 1, action: 'sow' }]);
-    expect(turnedDown(off.farm, { type: 'cancelBooking', booking: 1 }).reason).toBe(
-      'no-such-booking',
-    );
-    const later = skipDays(off.farm, 5);
-    expect(later.farm.crops.fields.length).toBe(farm.crops.fields.length);
-    expect(later.farm.cash).toBeGreaterThan(farm.cash - 1000);
-  });
-
-  it('a booking is refused on the spot for the reasons sowing is refused', () => {
-    const farm = mixedFarm();
-    const before = farmHash(farm);
-    // With no squares picked, or without the money, it is refused when it is asked for.
-    const no = turnedDown(farm, { type: 'sow', species: 'barley', cells: [] });
-    expect(no.message.length).toBeGreaterThan(10);
-    const poor = cloneFarm(farm);
-    poor.cash = poor.overdraft + 10;
-    expect(turnedDown(poor, { type: 'sow', species: 'barley', cells: fallowOf(farm) }).reason).toBe(
-      'bank-limit',
-    );
-    expect(farmHash(farm)).toBe(before);
-  });
-
-  it('if the bank will not lend on the day, the work is not done and the reason is given', () => {
-    const farm = mixedFarm();
-    const booked = work(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) }).farm;
-    const poor = cloneFarm(booked);
-    poor.cash = poor.overdraft + 10;
-    const run = skipDays(poor, 3);
-    expect(run.dawn).toEqual([
-      {
-        day: 3,
-        events: [
-          {
-            type: 'booking-failed',
-            bookingId: 1,
-            action: 'sow',
-            reason: 'bank-limit',
-            message: expect.stringMatching(/^The bank won't lend that much for sowing\./),
-          },
-        ],
-      },
-    ]);
-    expect(run.farm.bookings).toEqual([]);
-    expect(run.farm.crops.fields.length).toBe(farm.crops.fields.length);
-    expect(run.summary.bookingsFailed).toBe(1);
-  });
-
-  it('harvest is booked the same way: the grain is banked three days on', () => {
-    const start = mixedFarm();
-    const ready = skipDays(start, 'year');
-    const stop = ready.stops[0]!;
-    if (stop.type !== 'harvest-ready') throw new Error('expected a crop to come ready');
-    const booked = work(ready.farm, { type: 'harvest', field: stop.fieldId });
-    expect(booked.job.outcome).toBe('booked');
-    expect(booked.job.dueDay).toBe(ready.farm.day + 3);
-    // The quote is harvest costs less the grain: money in, so it is negative.
-    expect(booked.job.cost).toBeLessThan(0);
-    expect(booked.farm.year.grain).toBe(ready.farm.year.grain);
-    /** Three Next days, with what happened at each first light. */
-    const threeDays = (from: FarmState): { farm: FarmState; dawn: string[] } => {
-      let farm = from;
-      const dawn: string[] = [];
-      for (let i = 0; i < 3; i++) {
-        const next = endDay(farm);
-        farm = next.farm;
-        dawn.push(...next.dawn.map((e) => e.type));
-      }
-      return { farm, dawn };
-    };
-    const done = threeDays(booked.farm);
-    expect(done.dawn).toEqual(['booking-done', 'harvested']);
-    expect(done.farm.year.grain).toBeGreaterThan(ready.farm.year.grain);
-    expect(done.farm.bookings).toEqual([]);
-    // A crop can't be harvested twice: a second booking for it fails on the day.
-    const twice = work(booked.farm, { type: 'harvest', field: stop.fieldId });
-    expect(threeDays(twice.farm).dawn).toEqual(['booking-done', 'harvested', 'booking-failed']);
-  });
-});
-
-describe('a contractor booked late in the sowing window', () => {
-  // Barley is sown in May and June in Central West. The farm starts on 1 June,
-  // and a contractor comes 3 days after the booking.
-  const onDay = (day: number): FarmState => {
-    let farm = mixedFarm();
-    for (let i = 0; i < day; i++) farm = endDay(farm).farm;
-    return farm;
-  };
-
-  it('booked on 27 June the contractor comes on 30 June, and the barley is sown', () => {
-    const farm = onDay(26);
-    expect(dateOn(farm)).toEqual({ year: 2022, month: 5, date: 27 });
-    const booked = work(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
-    expect(booked.job.dueDay).toBe(29);
-    let f = booked.farm;
-    const dawn: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const next = endDay(f);
-      f = next.farm;
-      dawn.push(...next.dawn.map((e) => e.type));
-    }
-    expect(dateOn(f)).toEqual({ year: 2022, month: 5, date: 30 });
-    expect(dawn).toEqual(['booking-done', 'sown']);
-  });
-
-  it('booked on 28 June the contractor would come on 1 July: refused then, with the last day to book', () => {
-    for (const [day, date] of [
-      [27, 28],
-      [28, 29],
-      [29, 30],
-    ] as const) {
-      const farm = onDay(day);
-      expect(dateOn(farm)).toEqual({ year: 2022, month: 5, date });
-      const before = farmHash(farm);
-      const no = turnedDown(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
-      expect(no.reason).toBe('contractor-too-late');
-      expect(no.message).toBe(
-        `A contractor takes 3 days to come, and Barley (grain) can't be sown on ${date + 3 - 30} July. The last day to book it was 27 June.`,
-      );
-      // The job card says the same, and nothing was booked.
-      expect(
-        previewAction(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) }),
-      ).toEqual(no);
-      expect(farmHash(farm)).toBe(before);
-    }
-  });
-
-  it('once the window has shut, the refusal is the usual one', () => {
-    const farm = onDay(30);
-    expect(dateOn(farm)).toEqual({ year: 2022, month: 6, date: 1 });
-    const no = turnedDown(farm, { type: 'sow', species: 'barley', cells: fallowOf(farm) });
-    expect(no.reason).toBe('out-of-window');
-    expect(no.message).toBe("Barley (grain) can't be sown at this time of year.");
   });
 });

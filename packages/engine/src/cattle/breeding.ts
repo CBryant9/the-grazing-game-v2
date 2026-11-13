@@ -42,6 +42,8 @@ export const FEMALES_PER_BULL = 40;
 export const YOUNG_BULL_SHARE = 0.6;
 /** Calves this old, in days, are weaned when the drop is weaned. */
 export const WEAN_MIN_AGE = 90;
+/** Bull calves this old, in days, and not yet marked, are noted for marking. */
+export const MARK_NOTE_MIN_AGE = 60;
 /** The drop is weaned once a calf reaches this age in days. */
 export const WEAN_TRIGGER_AGE = 280;
 
@@ -246,7 +248,9 @@ export function breedingNotes(
   const preg = fem.filter((a) => a.preg >= 0).length;
   const ready = fem.filter((a) => a.preg < 0 && !a.barren && cycling(a));
   // Bull calves due for marking.
-  const toMark = m.animals.filter((a) => a.sex === 'M' && a.kind === 'calf' && a.age >= 60).length;
+  const toMark = m.animals.filter(
+    (a) => a.sex === 'M' && a.kind === 'calf' && a.age >= MARK_NOTE_MIN_AGE,
+  ).length;
   if (toMark && (m.markNote ?? -999) < day - 45) {
     m.markNote = day;
     notes.push({ type: 'toMark', count: toMark });

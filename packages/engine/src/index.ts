@@ -550,50 +550,24 @@ export type {
 export { farmHash, fromBase64, loadFarm, saveFarm, toBase64 } from './save/save';
 export type { SavedFarm } from './save/save';
 
-// Milestone 1.5a: the working day (the farm clock, job times, travel, jobs
-// in progress, contractors' bookings, Next day and skips).
-export {
-  DEFAULT_WORK_RULES,
-  JOB_TIMES,
-  SKIP_DAYS,
-  gateMinutes,
-  metresPerMinute,
-  musterMinutes,
-} from './data/jobTimes';
-export type { FigureStatus, GateKind, JobFigure, Pace, SkipLength } from './data/jobTimes';
-export {
-  dayMinutes,
-  homesteadPoint,
-  lightLeft,
-  lightOn,
-  squareCentre,
-  startDay,
-  timeNow,
-} from './sim/clock';
-export type {
-  Booking,
-  ClockSpan,
-  FarmClock,
-  JobInProgress,
-  JobPiece,
-  MapPoint,
-  WorkRules,
-} from './sim/state';
+// Milestone 1.5a: the working day (the farm clock, job times, Next day and
+// skips, what needs doing).
+export { JOB_TIMES, SKIP_DAYS, metresPerMinute, musterMinutes } from './data/jobTimes';
+export type { FigureStatus, JobFigure, Pace, SkipLength } from './data/jobTimes';
+export { dayMinutes, lightLeft, lightOn, startDay, timeNow } from './sim/clock';
+export type { ClockSpan, FarmClock } from './sim/state';
 export type { WorkEvent } from './sim/events';
-export type { JobCard, JobPreview, JobWorkPart } from './actions/types';
-export { applyAction, jobShare, previewAction } from './day/act';
+export type { JobCard, JobPiece, JobPreview, JobWorkPart } from './actions/types';
+export { NOT_TODAY, applyAction, previewAction } from './day/act';
 export { TROUGH_LOW_DAYS, endDay, skipDays, stopsIn, waterCheck } from './day/days';
 export type {
   Change,
   DayEnd,
   DayEnv,
-  JobProgress,
-  JobWaiting,
   PeriodSummary,
   SkipOptions,
   SkipResult,
   SkipStop,
 } from './day/days';
-export { bookingsView, clockView, jobsInProgress, jobsToday } from './day/look';
-export type { BookingView, ClockView, JobView } from './day/look';
-export { driveMinutes, metresBetween } from './day/travel';
+export { SHORTEST_JOB_MIN, clockView, jobsToday, thingsToDo } from './day/look';
+export type { ClockView, ThingToDo } from './day/look';

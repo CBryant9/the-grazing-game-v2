@@ -9,7 +9,6 @@
  */
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
-import { DEFAULT_WORK_RULES } from '../data/jobTimes';
 import { GRID_N } from '../grid';
 import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
@@ -276,15 +275,18 @@ function upgrade(f: Record<string, unknown>): void {
     farm.layout.water.nextPortId ??=
       farm.layout.water.ports.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   }
-  // The working day (format 3). A farm saved before it had no clock: it
-  // loads at first light with the player at the homestead, no jobs in
-  // progress and nothing booked, on the default switches.
-  farm.workRules = { ...DEFAULT_WORK_RULES, ...(farm.workRules ?? {}) };
-  farm.jobs ??= [];
-  farm.nextJobId ??= farm.jobs.reduce((m, j) => Math.max(m, j.id), 0) + 1;
-  farm.bookings ??= [];
-  farm.nextBookingId ??= farm.bookings.reduce((m, b) => Math.max(m, b.id), 0) + 1;
+  // The working day (format 4). A farm saved before it had no clock: it
+  // loads at first light.
   if (!farm.clock) startDay(farm as FarmState);
+  // What the first cut of the working day kept and Claudia took out on
+  // 14 Nov 2026: the homestead, the player's place, the travel switches,
+  // jobs in progress and contractors' bookings. A save that has any of
+  // them loads without them. The stock yards stay, and a mob in the yards
+  // stays there.
+  if (farm.buildings) delete (farm.buildings as unknown as Record<string, unknown>).homestead;
+  delete (farm.clock as unknown as Record<string, unknown>).at;
+  for (const key of ['workRules', 'jobs', 'nextJobId', 'bookings', 'nextBookingId']) delete f[key];
+  for (const entry of farm.actionLog) delete (entry as unknown as Record<string, unknown>).job;
 }
 
 /**

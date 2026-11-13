@@ -952,7 +952,7 @@ describe('stock held in the yards (a stand-in until yard work is built)', () => 
     expect(farm.pasture.lastG[yards]).toBeGreaterThanOrEqual(0);
     const mass = (i: number): number => farm.pasture.G[i]! + farm.pasture.D[i]!;
     expect(mass(yards)).toBeLessThan(450);
-    expect(mass(farm.buildings.homestead)).toBeGreaterThan(2 * mass(yards));
+    expect(mass(farm.layout.water.bore)).toBeGreaterThan(2 * mass(yards));
     expectOneMobPerArea(farm);
     // One square is not enough for 60 steers: they are short of feed.
     expect(m.st!.f).toBeLessThan(0.5);

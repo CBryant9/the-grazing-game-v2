@@ -30,7 +30,7 @@ export type MobWhere =
   | { kind: 'paddock'; anchor: number }
   /** In the feedlot, on the ration. */
   | { kind: 'lot' }
-  /** In the stock yards (deliveries and yard work, milestone 1.5). */
+  /** In the stock yards, where bought cattle arrive. They have water. The player moves stock out to a paddock. */
   | { kind: 'yards' };
 
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
@@ -228,25 +228,12 @@ export interface LoggedAction {
    * farm clock (calibration and tests).
    */
   at?: ClockSpan;
-  /** The job in progress this action started or carried on, when it was not finished that day. */
-  job?: number;
 }
 
 /** A start and a finish, in minutes after midnight on the district town's clock. */
 export interface ClockSpan {
   start: number;
   end: number;
-}
-
-/**
- * A place on the farm, in squares from the top left corner of the map.
- * The middle of square `i` is `(i % 40 + 0.5, floor(i / 40) + 0.5)`. A
- * fence corner is a whole number each way. Multiply a distance by the side
- * of a square for metres.
- */
-export interface MapPoint {
-  x: number;
-  y: number;
 }
 
 /**
@@ -260,72 +247,6 @@ export interface FarmClock {
   lastLight: number;
   /** Minutes of today's light used so far. 0 at first light. */
   used: number;
-  /** Where the player is: the homestead at first light, then where the last job ended. */
-  at: MapPoint;
-}
-
-/** The switches for the working day (PRD 21, row 4). A farm keeps the ones it started with. */
-export interface WorkRules {
-  /** True if driving on the farm takes time. */
-  travel: boolean;
-  /**
-   * `inside-daylight`: a job must leave enough light to drive home.
-   * `after-last-light`: jobs can run to last light and the drive home is free.
-   */
-  driveHome: 'inside-daylight' | 'after-last-light';
-}
-
-/** One piece of a job that is built piece by piece: a fence segment or a square of pipe. */
-export type JobPiece = { edge: { line: 'h' | 'v'; index: number } } | { cell: number };
-
-/**
- * A job too big for the day it was started (PRD 5.1). What fitted was
- * done. The rest carries on when the player next spends daylight on it.
- */
-export interface JobInProgress {
-  /** Unique on the farm. Never reused. */
-  id: number;
-  /** The action as it was asked for. */
-  action: Action;
-  /** The farm day it was started. */
-  startedDay: number;
-  /**
-   * `line`: fence or pipe, built piece by piece in the order it was drawn.
-   * `whole`: a job that takes effect when its last minute is done.
-   */
-  kind: 'line' | 'whole';
-  /** `line` only: the pieces still to do, in order. The first is where the line stopped. */
-  left: JobPiece[];
-  /**
-   * The share already done of the next piece (`line`) or of the whole job
-   * (`whole`): 0 to under 1.
-   */
-  part: number;
-  /** `line` only: where the last finished piece ended, so the next one carries on from there. */
-  lastEnd: MapPoint | null;
-  /** `line` only: pieces finished so far, and pieces in the job when it started. */
-  piecesDone: number;
-  pieces: number;
-  /** Dollars charged so far. */
-  spent: number;
-  /** Minutes worked and minutes driven so far, over every day. */
-  workedMin: number;
-  travelMin: number;
-  /** True once the $10 fee for running tape off the roll, or rolling it up, has been paid on this job. */
-  tapeFeePaid: boolean;
-}
-
-/** Work booked with a contractor (PRD 5.4): money, no time from the player, done a few days on. */
-export interface Booking {
-  /** Unique on the farm. Never reused. */
-  id: number;
-  action: Action;
-  /** The farm day it was booked. */
-  bookedDay: number;
-  /** The farm day it is done, at first light. */
-  dueDay: number;
-  /** What the job would have cost on the day it was booked, dollars. It is charged when it is done. */
-  quote: number;
 }
 
 export type GameOverReason =
@@ -399,18 +320,8 @@ export interface FarmState {
   /** Every action taken on the farm, in order. */
   actionLog: LoggedAction[];
 
-  /** The farm clock: how far through today the player is, and where they are. */
+  /** The farm clock: how far through today the player is. */
   clock: FarmClock;
-  /** The switches for the working day. */
-  workRules: WorkRules;
-  /** Jobs too big for the day they were started, oldest first. */
-  jobs: JobInProgress[];
-  /** The id the next job in progress gets. */
-  nextJobId: number;
-  /** Work booked with a contractor and not yet done, oldest first. */
-  bookings: Booking[];
-  /** The id the next booking gets. */
-  nextBookingId: number;
 }
 
 /** The MVP's price chart kept 31 days. */

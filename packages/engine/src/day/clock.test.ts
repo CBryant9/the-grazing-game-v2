@@ -13,24 +13,23 @@ import {
 import type { Action } from '../actions/types';
 import { daylightFor } from '../daylight/daylight';
 import { DISTRICT_PLACES } from '../daylight/places';
-import { GRID_W } from '../grid';
 import * as engine from '../index';
 import { farmHash, saveFarm } from '../save/save';
 import { loadRealData } from '../server';
-import { homesteadPoint, lightOn } from '../sim/clock';
+import { lightOn } from '../sim/clock';
 import { createFarm } from '../sim/create';
-import { dateOn, pricesOf, surveyOf } from '../sim/derived';
+import { dateOn } from '../sim/derived';
 import type { FarmState } from '../sim/state';
-import { calibrationView, farmTotals, mobSummaries, paddockSummaries } from '../sim/summary';
+import { mobSummaries } from '../sim/summary';
 import { stepDay } from '../sim/tick';
 import { applyAction, previewAction } from './act';
-import { endDay, skipDays, waterCheck } from './days';
-import { bookingsView, clockView, jobsInProgress, jobsToday } from './look';
+import { endDay, skipDays } from './days';
+import { clockView, jobsToday } from './look';
 
 /*
  * The farm clock (PRD 5.1): every day runs from first light to last light,
  * looking is free, doing takes time, and when the light is gone no more
- * jobs can start.
+ * jobs can start. A job's time is its work only: there is no driving.
  */
 
 vi.setConfig({ testTimeout: 600_000 });
@@ -38,7 +37,7 @@ vi.setConfig({ testTimeout: 600_000 });
 const DISTRICTS = ['cq', 'nsw', 'cw', 'wv'] as const;
 
 describe('the day runs from first light to last light', () => {
-  it('a new farm is at first light, with nothing used and the player at the homestead', () => {
+  it('a new farm is at first light, with nothing used', () => {
     for (const district of DISTRICTS) {
       const farm = openFarm(district);
       const c = clockView(farm);
@@ -47,10 +46,9 @@ describe('the day runs from first light to last light', () => {
       expect(c.leftMin).toBe(c.dayMin);
       expect(c.dayMin).toBe(c.lastLight - c.firstLight);
       expect(c.canStartJobs).toBe(true);
-      // The middle of the homestead's square.
-      const h = farm.buildings.homestead;
-      expect(c.at).toEqual({ x: (h % GRID_W) + 0.5, y: Math.floor(h / GRID_W) + 0.5 });
-      expect(c.homeMin).toBe(0);
+      expect(c.evening).toBe(false);
+      // The clock is the light and how much is used. There is no place the player has to be.
+      expect(Object.keys(farm.clock).sort()).toEqual(['firstLight', 'lastLight', 'used']);
     }
   });
 
@@ -82,7 +80,8 @@ describe('the day runs from first light to last light', () => {
 
   it('and a farm there fits less work into it', () => {
     // The same job on two farms of the same size: 76 squares of pipe,
-    // along one row and back along the next. Pipe is laid at 400 m an hour.
+    // along one row and back along the next. Pipe is laid at 400 m an hour,
+    // and a square on a 2,000 ha farm is 138.7 m.
     const cells: number[] = [];
     for (let x = 1; x <= 38; x++) cells.push(cell(x, 5));
     for (let x = 38; x >= 1; x--) cells.push(cell(x, 6));
@@ -93,18 +92,14 @@ describe('the day runs from first light to last light', () => {
     const inSummer = work(cq, job).job;
     expect(inWinter.outcome).toBe('part');
     expect(inSummer.outcome).toBe('part');
-    // Under 10 h 42 m at 400 m an hour is under 4,280 m. Under 14 h 18 m is under 5,720 m.
-    expect(inWinter.line!.metresToday).toBeGreaterThan(3600);
-    expect(inWinter.line!.metresToday).toBeLessThan(4280);
-    expect(inSummer.line!.metresToday).toBeGreaterThan(5000);
-    expect(inSummer.line!.metresToday).toBeLessThan(5720);
-    expect(inSummer.line!.metresToday - inWinter.line!.metresToday).toBeGreaterThan(1200);
-    // Both worked until the light was used up, less the drive home: what
-    // is spare is under a minute, not enough to start the next square.
-    for (const c of [inWinter, inSummer]) {
-      expect(c.leftAfterMin - c.homeMin).toBeGreaterThan(-1e-6);
-      expect(c.leftAfterMin - c.homeMin).toBeLessThan(1);
-    }
+    // 10 h 42 m at 400 m an hour is 4,277 m: 30 whole squares. 14 h 18 m is 5,722 m: 41 squares.
+    expect(inWinter.line!.fits.pieces.length).toBe(30);
+    expect(inSummer.line!.fits.pieces.length).toBe(41);
+    expect(inWinter.line!.fits.metres).toBeCloseTo(30 * 138.675, 1);
+    expect(inSummer.line!.fits.metres).toBeCloseTo(41 * 138.675, 1);
+    expect(inSummer.line!.fits.metres - inWinter.line!.fits.metres).toBeGreaterThan(1500);
+    // Each used all the light a whole square could use: under one square's worth is left.
+    for (const c of [inWinter, inSummer]) expect(c.leftAfterMin).toBeLessThan(138.675 / (400 / 60));
   });
 
   it('every day of a year has its own light, shortest in June and longest in December', () => {
@@ -185,64 +180,10 @@ describe('the clock on a real-year farm', () => {
     expect(next.day.date).toEqual({ year: 2006, month: 8, date: 1 });
     const week = skipDays(next.farm, 'week', { data });
     expect(week.daysRun).toBe(7);
-    expect(week.summary.jobs[0]!.doneShare.after).toBeGreaterThan(done.job.doneShare);
   });
 });
 
 describe('looking is free', () => {
-  it('previews, summaries and every other read leave the farm exactly as it was', () => {
-    // A farm with a job in progress, a booking, and a job done today.
-    const b = busyFarm();
-    let farm = work(b.farm, {
-      type: 'buildFence',
-      edges: across(12, 2, 37),
-      fence: 'permanent',
-    }).farm;
-    farm = endDay(farm).farm;
-    farm = work(farm, { type: 'refillPortable', port: b.port }).farm;
-    expect(farm.jobs.length).toBe(1);
-    const before = farmHash(farm);
-    const saved = JSON.stringify(saveFarm(farm));
-
-    const looks: Action[] = [
-      { type: 'continueJob', job: farm.jobs[0]!.id },
-      { type: 'cancelJob', job: farm.jobs[0]!.id },
-      { type: 'buildFence', edges: across(13, 2, 37), fence: 'electric' },
-      { type: 'buildFence', edges: across(13, 2, 37), fence: 'permanent' },
-      { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } },
-      { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 },
-      { type: 'buyCattle', cls: 'yearSteer', qty: 5, to: { cell: b.emptyCell } },
-      { type: 'wean', mob: b.cows },
-      { type: 'markCalves', mob: b.cows },
-      { type: 'placeTrough', cell: b.pipedCell },
-      { type: 'rollUpTape', edge: b.tape },
-      { type: 'setSupplement', mob: b.steers, supp: 'none' },
-      { type: 'moveMob', mob: 999, to: 'lot' },
-    ];
-    for (const action of looks) previewAction(farm, action);
-    clockView(farm);
-    jobsInProgress(farm);
-    bookingsView(farm);
-    jobsToday(farm);
-    waterCheck(farm);
-    mobSummaries(farm);
-    paddockSummaries(farm);
-    farmTotals(farm);
-    calibrationView(farm);
-    surveyOf(farm);
-    pricesOf(farm);
-    dateOn(farm);
-    lightOn(farm, farm.day + 40);
-    homesteadPoint(farm);
-    // Doing something returns a new farm and leaves this one alone, too.
-    applyAction(farm, { type: 'continueJob', job: farm.jobs[0]!.id });
-    endDay(farm);
-    skipDays(farm, 'week', {}, { anyway: true });
-
-    expect(farmHash(farm)).toBe(before);
-    expect(JSON.stringify(saveFarm(farm))).toBe(saved);
-  });
-
   it('every function the engine exports that takes a farm is known as a read or a change, and no read changes the farm', () => {
     // A job to ask about, and what each read needs besides the farm.
     const job: Action = { type: 'buildFence', edges: across(13, 2, 37), fence: 'permanent' };
@@ -274,7 +215,6 @@ describe('looking is free', () => {
       farmHash: (f) => engine.farmHash(f),
       saveFarm: (f) => engine.saveFarm(f),
       dayMinutes: (f) => engine.dayMinutes(f),
-      homesteadPoint: (f) => engine.homesteadPoint(f),
       lightLeft: (f) => engine.lightLeft(f),
       lightOn: (f) => engine.lightOn(f, f.day + 30),
       timeNow: (f) => engine.timeNow(f),
@@ -284,12 +224,9 @@ describe('looking is free', () => {
       endDay: (f, env) => engine.endDay(f, env),
       skipDays: (f, env) => engine.skipDays(f, 3, env, { anyway: true }),
       waterCheck: (f) => engine.waterCheck(f),
-      bookingsView: (f) => engine.bookingsView(f),
       clockView: (f) => engine.clockView(f),
-      jobsInProgress: (f, env) => engine.jobsInProgress(f, env),
       jobsToday: (f) => engine.jobsToday(f),
-      driveMinutes: (f) => engine.driveMinutes(f, f.clock.at, { x: 20, y: 13 }),
-      metresBetween: (f) => engine.metresBetween(f, f.clock.at, { x: 20, y: 13 }),
+      thingsToDo: (f) => engine.thingsToDo(f),
     };
     // These change the farm they are given. That is their job: the tick, and its helpers.
     const CHANGES = [
@@ -316,15 +253,9 @@ describe('looking is free', () => {
     // A new one must be put in one list or the other before this passes.
     expect(takesFarm).toEqual([...Object.keys(READS), ...CHANGES].sort());
 
-    // A farm with stock, a job in progress and a job done today, on random seasons and on real years.
+    // A farm with stock and a job done today, on random seasons and on real years.
     const b = busyFarm();
-    let random = work(b.farm, {
-      type: 'buildFence',
-      edges: across(12, 2, 37),
-      fence: 'permanent',
-    }).farm;
-    random = endDay(random).farm;
-    random = work(random, { type: 'refillPortable', port: b.port }).farm;
+    const random = work(b.farm, { type: 'refillPortable', port: b.port }).farm;
     const data = loadRealData();
     let real = createFarm(
       {
@@ -341,10 +272,9 @@ describe('looking is free', () => {
     );
     real = work(
       real,
-      { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' },
+      { type: 'buildFence', edges: across(12, 2, 37), fence: 'tape' },
       { data },
     ).farm;
-    real = endDay(real, { data }).farm;
     expect(real.mobs.length).toBeGreaterThan(0);
 
     const worked = new Set<string>();
@@ -391,19 +321,20 @@ describe('looking is free', () => {
 });
 
 describe('doing takes time', () => {
-  it('a job moves the clock on by its drive and its work, and nothing else does', () => {
+  it('a job moves the clock on by its work, and nothing else does', () => {
     const farm = openFarm('nsw');
     const done = work(farm, { type: 'placePortable', cell: cell(20, 10) });
     const card = done.job;
     expect(card.startsAt).toBe(farm.clock.firstLight);
-    expect(card.travelMin).toBeGreaterThan(0);
-    // A portable trough takes 30 minutes to set up.
+    // A portable trough takes 30 minutes to set up, wherever it is on the farm.
     expect(card.workMin).toBe(30);
-    expect(card.endsAt).toBeCloseTo(card.startsAt + card.travelMin + 30, 9);
-    expect(done.farm.clock.used).toBeCloseTo(card.travelMin + 30, 9);
-    expect(clockView(done.farm).now).toBeCloseTo(card.endsAt, 9);
-    expect(card.leftAfterMin).toBeCloseTo(card.dayMin - card.travelMin - 30, 9);
+    expect(card.endsAt).toBe(card.startsAt + 30);
+    expect(done.farm.clock.used).toBe(30);
+    expect(clockView(done.farm).now).toBe(card.endsAt);
+    expect(card.leftAfterMin).toBeCloseTo(card.dayMin - 30, 9);
     expect(card.usedBeforeMin).toBe(0);
+    // The same job in the far corner takes the same time: there is no driving.
+    expect(work(farm, { type: 'placePortable', cell: cell(38, 1) }).job.workMin).toBe(30);
     // The farm that was passed in has not moved.
     expect(farm.clock.used).toBe(0);
   });
@@ -413,33 +344,35 @@ describe('doing takes time', () => {
     const first = work(b.farm, { type: 'refillPortable', port: b.port });
     const second = work(first.farm, { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } });
     const log = second.farm.actionLog.slice(-2);
-    expect(log[0]!.action.type).toBe('refillPortable');
-    expect(log[0]!.at).toEqual({ start: first.job.startsAt, end: first.job.endsAt });
+    expect(log[0]).toEqual({
+      day: 0,
+      action: { type: 'refillPortable', port: b.port },
+      at: { start: first.job.startsAt, end: first.job.endsAt },
+    });
     expect(log[1]!.at).toEqual({ start: second.job.startsAt, end: second.job.endsAt });
     // The second job starts when the first one finished.
     expect(log[1]!.at!.start).toBe(log[0]!.at!.end);
     expect(jobsToday(second.farm).map((e) => e.action.type)).toEqual(['refillPortable', 'moveMob']);
 
-    const worked = second.events[0]!;
-    expect(worked).toMatchObject({
+    expect(second.events[0]).toEqual({
       type: 'job-worked',
       action: 'moveMob',
-      jobId: null,
       start: second.job.startsAt,
       end: second.job.endsAt,
+      workMin: second.job.workMin,
       finished: true,
     });
     // The move says what time the mob arrived, for splitting its day of grazing later.
     const moved = second.events.find((e) => e.type === 'mob-moved');
     expect(moved).toMatchObject({ at: second.job.endsAt });
     // And the inbox keeps the time with each message.
-    const last = second.farm.inbox.at(-1)!;
-    expect(last.at).toBe(second.job.endsAt);
-    // Nothing the daily tick reports has a time of day.
+    expect(second.farm.inbox.at(-1)!.at).toBe(second.job.endsAt);
+    // Nothing the daily tick reports has a time of day, and the next day's list starts empty.
     const next = endDay(second.farm).farm;
     for (const m of next.inbox.filter((x) => x.day === 0 && x.event.type === 'cattle')) {
       expect(m.at).toBeUndefined();
     }
+    expect(jobsToday(next)).toEqual([]);
   });
 });
 
@@ -455,7 +388,6 @@ describe('when the light is used up', () => {
       { type: 'placeTrough', cell: b.pipedCell },
       { type: 'setGate', edge: b.gate, open: true },
       { type: 'refillPortable', port: b.port },
-      { type: 'buyCattle', cls: 'yearSteer', qty: 5, to: { cell: b.emptyCell } },
       { type: 'markCalves', mob: b.cows },
       { type: 'setSupplement', mob: b.steers, supp: 'hay' },
     ];
@@ -468,42 +400,32 @@ describe('when the light is used up', () => {
     }
   });
 
-  it('a second before last light is still too late to start', () => {
+  it('a moment before last light is still too late to start', () => {
     const b = busyFarm();
     const farm = withLightLeft(b.farm, 1e-7);
-    expect(turnedDown(farm, { type: 'refillPortable', port: b.port }).reason).toBe('no-daylight');
-  });
-
-  it('looking, calling off a job and taking a mob off its supplement are still allowed', () => {
-    const b = busyFarm();
-    let farm = work(b.farm, {
-      type: 'buildFence',
-      edges: across(12, 2, 37),
-      fence: 'permanent',
-    }).farm;
-    farm = atLastLight(farm);
-    expect(previewAction(farm, { type: 'cancelJob', job: 1 }).ok).toBe(true);
-    // Taking a mob off its supplement is a decision, not a job.
-    const fed = setUp(farm, { type: 'setSupplement', mob: b.steers, supp: 'hay' });
-    expect(work(fed, { type: 'setSupplement', mob: b.steers, supp: 'none' }).job.outcome).toBe(
-      'free',
+    expect(turnedDown(farm, { type: 'setGate', edge: b.gate, open: true }).reason).toBe(
+      'no-daylight',
     );
-    expect(work(farm, { type: 'cancelJob', job: 1 }).farm.jobs).toEqual([]);
-    expect(mobSummaries(farm).length).toBe(2);
   });
 
-  it('with light left but not enough to get there and home, the refusal gives the drive times', () => {
-    const farm = withLightLeft(openFarm('nsw', { size: 6000 }), 20);
-    // The corner of a 6,000 ha farm furthest from the homestead is over 15 minutes away.
-    const h = farm.buildings.homestead;
-    const far = cell(h % GRID_W < 20 ? 38 : 1, Math.floor(h / GRID_W) < 13 ? 24 : 1);
-    const no = turnedDown(farm, { type: 'placePortable', cell: far });
-    expect(no.reason).toBe('not-enough-daylight');
-    expect(no.message).toMatch(/^There is not enough light left today to get to that job\./);
-    expect(no.message).toMatch(/The drive out takes \d+ m and the drive home \d+ m\./);
-    expect(no.message).toMatch(/There is 20 m of light left\.$/);
-    // A job beside the homestead still fits.
-    expect(work(farm, { type: 'placePortable', cell: h }).job.outcome).toBe('part');
+  it('looking, and the things that take none of the day, are still allowed', () => {
+    const b = busyFarm();
+    const farm = atLastLight(b.farm);
+    expect(mobSummaries(farm).length).toBe(2);
+    expect(engine.thingsToDo(farm).length).toBeGreaterThan(0);
+    // Taking a mob off its supplement, and buying, are decisions, not jobs.
+    const fed = setUp(farm, { type: 'setSupplement', mob: b.steers, supp: 'hay' });
+    const off = work(fed, { type: 'setSupplement', mob: b.steers, supp: 'none' });
+    expect(off.job.outcome).toBe('free');
+    expect(off.job.workMin).toBe(0);
+    const bought = work(farm, {
+      type: 'buyCattle',
+      cls: 'yearSteer',
+      qty: 5,
+      to: { cell: b.emptyCell },
+    });
+    expect(bought.job.outcome).toBe('free');
+    expect(bought.farm.clock.used).toBe(farm.clock.used);
   });
 
   it('the next day starts at first light again', () => {
@@ -512,5 +434,36 @@ describe('when the light is used up', () => {
     expect(next.clock.used).toBe(0);
     expect(clockView(next).canStartJobs).toBe(true);
     expect(work(next, { type: 'placePortable', cell: cell(20, 10) }).job.outcome).toBe('done');
+  });
+});
+
+describe('evening', () => {
+  it('the clock says when no more jobs fit today: less light is left than the shortest job needs', () => {
+    const farm = openFarm('nsw');
+    // The shortest job that takes time and is done in one go is moving a mob: 15 minutes.
+    expect(clockView(farm).shortestJobMin).toBe(15);
+    expect(clockView(withLightLeft(farm, 300)).evening).toBe(false);
+    expect(clockView(withLightLeft(farm, 15)).evening).toBe(false);
+    const dusk = clockView(withLightLeft(farm, 14.9));
+    expect(dusk.evening).toBe(true);
+    // There is still a little light: a gate can be opened. Looking is free.
+    expect(dusk.canStartJobs).toBe(true);
+    expect(dusk.leftMin).toBeCloseTo(14.9, 9);
+    const dark = clockView(atLastLight(farm));
+    expect(dark.evening).toBe(true);
+    expect(dark.canStartJobs).toBe(false);
+    expect(dark.leftMin).toBe(0);
+    // Next day, it is morning again.
+    expect(clockView(endDay(atLastLight(farm)).farm).evening).toBe(false);
+  });
+
+  it('with under 15 minutes left a mob can not be moved, and the reason is the light', () => {
+    const b = busyFarm();
+    const no = turnedDown(withLightLeft(b.farm, 14.9), {
+      type: 'moveMob',
+      mob: b.steers,
+      to: { cell: b.emptyCell },
+    });
+    expect(no.reason).toBe('not-enough-daylight');
   });
 });

@@ -75,17 +75,10 @@ export type Action =
   /** Sell a portable trough back for half its price. */
   | { type: 'removePortable'; port: number }
   // ---- Crops and pastures
-  /** Book a contractor to sow. It costs money and none of the player's time, and is done a few days on. */
+  /** Sow. It costs money, happens at once and takes none of the player's day. */
   | { type: 'sow'; species: SpeciesId; cells: number[] }
-  /** Book a contractor to harvest, the same way. */
-  | { type: 'harvest'; field: number }
-  // ---- Jobs in progress and bookings (the working day)
-  /** Spend what is left of today's light on a job in progress. */
-  | { type: 'continueJob'; job: number }
-  /** Give up a job in progress. What was built stays. Takes no time. */
-  | { type: 'cancelJob'; job: number }
-  /** Call off work booked with a contractor, before it is done. Takes no time. */
-  | { type: 'cancelBooking'; booking: number };
+  /** Harvest, the same way. */
+  | { type: 'harvest'; field: number };
 
 export type ActionType = Action['type'];
 
@@ -107,12 +100,8 @@ export type ActionRefusalReason =
   | 'nothing-to-mark'
   /** Today's light is used up. No more jobs can start until tomorrow. */
   | 'no-daylight'
-  /** There is light left, but not enough to get to the job and home, or for a job that has to be done in one day. */
-  | 'not-enough-daylight'
-  /** A contractor would come after the sowing window has shut. */
-  | 'contractor-too-late'
-  | 'no-such-job'
-  | 'no-such-booking';
+  /** There is light left, but not enough for this job, or for the first piece of this line. */
+  | 'not-enough-daylight';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {
@@ -148,84 +137,70 @@ export interface JobWorkPart {
     | 'muster'
     | 'settle'
     | 'head'
-    /** Walking a mob along its route. 0 until moves follow a route through gates. */
-    | 'walk'
     | 'feed-out'
-    | 'yard-work'
-    | 'saleyard';
+    /** Drafting and loading, done where the mob is. */
+    | 'draft-and-load';
   minutes: number;
 }
+
+/** One piece of a line: a fence segment or a square of pipe. */
+export type JobPiece = { edge: { line: 'h' | 'v'; index: number } } | { cell: number };
 
 /**
  * What a job takes: the figures on the job card (PRD 5.1). `previewAction`
  * gives it before the job, and `applyAction` gives the same figures back
  * when the job is done. Times of day are minutes after midnight on the
- * district town's clock. Lengths of time are minutes.
+ * district town's clock. Lengths of time are minutes. A job's time is its
+ * work: there is no driving.
  */
 export interface JobCard {
   action: ActionType;
   /**
-   * `done`: the whole job is done today. `part`: what fits is done today
-   * and the rest is a job in progress. `booked`: a contractor is booked.
-   * `free`: it takes no time.
+   * `done`: all of it is done today. `part`: a line too long for today:
+   * the pieces that fit are built and the rest are not. `free`: it takes
+   * none of the day.
    */
-  outcome: 'done' | 'part' | 'booked' | 'free';
-  /** When the job starts and when it stops for today. */
+  outcome: 'done' | 'part' | 'free';
+  /** When the job starts and when it finishes. */
   startsAt: number;
   endsAt: number;
-  /** Driving to the job, and working on it, today. */
-  travelMin: number;
+  /** Minutes of today's light the job uses. */
   workMin: number;
-  /**
-   * The drive home from where the job leaves the player. Where the drive
-   * home must fit inside daylight this much light is kept back, so what
-   * is free for other jobs is `leftAfterMin` less this. 0 when the drive
-   * home is free.
-   */
-  homeMin: number;
   /** Today's light, how much was used before the job, and how much is left after it. */
   dayMin: number;
   usedBeforeMin: number;
   leftAfterMin: number;
-  /**
-   * Light free for other jobs after this one: what is left less the drive
-   * home (where the drive home must fit inside daylight).
-   */
-  spareMin: number;
-  /** True if the whole job is done today. */
+  /** True if all of it is done today. */
   fitsToday: boolean;
   /**
-   * True if this job takes the rest of the day: it stops because today's
-   * light ran out, or it finishes with nothing to spare. The screen warns
-   * that this is the full day, and that doing anything else as well means
-   * doing less of this.
+   * True if this job uses up the rest of today's light: it finishes with
+   * none to spare, or it is a line cut short (what is left is less than
+   * its next piece needs). The screen says "this would use up your full
+   * day".
    */
   usesRestOfDay: boolean;
-  /**
-   * For a job that is not finished today: why it stopped, as a code and
-   * in plain words. `drive-home`: the rest of today's light is kept for
-   * the drive home. `light-used-up`: today's light ran out.
-   */
-  unfinished?: { why: 'drive-home' | 'light-used-up'; message: string };
-  /** The work in the whole job (what is left of it, for a job in progress), at today's pace. */
+  /** The work in the whole job as it was asked for, at today's pace. More than `workMin` for a line cut short. */
   totalWorkMin: number;
   /** How the work is made up. */
   parts: JobWorkPart[];
-  /** The share of the whole job done once today's part is in, 0 to 1. */
-  doneShare: number;
-  /** More days the job needs after today, if each is spent on it from first light. 0 when it fits. */
-  moreDays: number;
-  /** Dollars for the whole job (what is left of it, for a job in progress). Negative for money in. */
+  /** Dollars for the whole job as it was asked for. Negative for money in. */
   cost: number;
-  /** Dollars charged today. */
+  /** Dollars charged today: for a line cut short, the part that was built. */
   costToday: number;
-  /** Fence, tape and pipe: metres in the job (what is left of it), and metres done today. */
-  line?: { metres: number; metresToday: number; pieces: number; piecesToday: number };
-  /** The job in progress, when the job does not fit today. */
-  jobId?: number;
-  /** The booking, and the farm day the contractor does the work. */
-  bookingId?: number;
-  dueDay?: number;
+  /**
+   * Fence, tape and pipe: the pieces that fit today, in the order drawn,
+   * and the pieces that do not, with the metres of each. A screen draws
+   * the first in the line's own colour and the rest in red.
+   */
+  line?: {
+    fits: { pieces: JobPiece[]; metres: number };
+    doesNotFit: { pieces: JobPiece[]; metres: number };
+  };
+  /**
+   * For a line cut short: the reason the rest was not built, in plain
+   * words. It is not remembered. The player draws it again another day.
+   */
+  notToday?: { reason: 'not-enough-daylight'; message: string };
 }
 
 /** What `previewAction` returns: the job card, or why the job can't be done. Nothing changes. */

@@ -6,8 +6,8 @@
  * nothing changed. So a server can check every action before it saves.
  *
  * This file knows nothing about time. The working day (../day) decides
- * when a job can start, how long it takes and how much of it fits today,
- * and calls `tryAction` for what the work does. The player's way in is
+ * whether a job fits in today's light and how much of a line fits, and
+ * calls `tryAction` for what the work does. The player's way in is
  * `applyAction` in ../day/act.ts. `applyInstant` here does a whole action
  * at once without the clock: it is for calibration and tests only, and is
  * not part of the engine's public API.
@@ -151,11 +151,9 @@ const edgeKey = (e: EdgeRef): string => e.line + e.index;
  */
 export type ActionEnv = SourceEnv;
 
-/** What a part of a bigger job tells the rules about the job it belongs to. */
+/** What the part of a line that fits today tells the rules about the job it belongs to. */
 export interface PartOptions {
-  /** True if the $10 tape fee has already been paid on this job. */
-  tapeFeePaid?: boolean;
-  /** The job name to report, when the part is done by another action (rolling up tape piece by piece). */
+  /** The job name to report, when the part is done by another action (rolling up part of a run of tape). */
   label?: string;
 }
 
@@ -589,9 +587,8 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   let fee = 0;
   let energiser = false;
   if (a.fence === 'tape') {
-    // New tape by the metre. Running out tape that was on the roll costs a
-    // small fee, once for the job however many days it takes.
-    fee = out.tapeFromRoll > 0 && !j.part.tapeFeePaid ? COSTS.tapeRoll : 0;
+    // New tape by the metre. Running out tape that was on the roll costs a small fee.
+    fee = out.tapeFromRoll > 0 ? COSTS.tapeRoll : 0;
     cost = out.tapeNew * each + fee;
   } else {
     cost = out.segments * each;
@@ -642,8 +639,8 @@ function doRemoveFence(j: Job, edges: readonly EdgeRef[], job: string): Out {
   const out = removeFence(farm.layout, edges);
   if (!out.ok) return out;
   let cost = 0;
-  if (out.tapeToRoll > 0 && !j.part.tapeFeePaid) {
-    // Rolling tape up costs a small fee, once for the job. It comes straight off the account.
+  if (out.tapeToRoll > 0) {
+    // Rolling tape up costs a small fee. It comes straight off the account.
     cost = COSTS.tapeRoll;
     farm.cash -= cost;
     farm.year.running += cost;
@@ -1031,11 +1028,6 @@ function run(j: Job, a: Action): Out {
       return doSow(j, a);
     case 'harvest':
       return doHarvest(j, a);
-    case 'continueJob':
-    case 'cancelJob':
-    case 'cancelBooking':
-      // These act on the working day, which this file knows nothing about.
-      return refuse('bad-request', 'Jobs in progress and bookings are worked on the farm clock.');
     default:
       return refuse('bad-request', 'That is not something that can be done on a farm.');
   }
@@ -1094,21 +1086,17 @@ export function recordAction(
   farm: FarmState,
   action: Action,
   events: readonly FarmEvent[],
-  when?: { at: ClockSpan; job?: number },
+  when?: { at: ClockSpan },
 ): void {
   const entry: LoggedAction = { day: farm.day, action: deepCopy(action) };
-  if (when) {
-    entry.at = { start: when.at.start, end: when.at.end };
-    if (when.job !== undefined) entry.job = when.job;
-  }
+  if (when) entry.at = { start: when.at.start, end: when.at.end };
   farm.actionLog.push(entry);
   toInbox(farm, farm.day, events, when?.at.end);
 }
 
 /**
  * FOR CALIBRATION AND TESTS ONLY. Do a whole action at once with no farm
- * clock: no drive, no job time, no daylight limit, nothing left in
- * progress, and sowing and harvest on the spot. The calibration suites and
+ * clock: no job time and no daylight limit. The calibration suites and
  * the MVP comparisons drive farms this way so their figures stay what they
  * were before jobs took time (docs/MODEL.md, section 9).
  *

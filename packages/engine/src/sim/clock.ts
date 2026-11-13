@@ -3,27 +3,17 @@
  *
  * Every farm day starts at first light and ends at last light for the
  * farm's district town, on the date the game reports (the real date on a
- * real-year farm). The farm keeps today's first and last light, how many
- * minutes of that light have been used, and where the player is.
+ * real-year farm). The farm keeps today's first and last light and how
+ * many minutes of that light have been used. There is no place on the
+ * farm the player has to be: a job's time is its work only.
  *
  * Nothing here reads a real clock. The date always comes from the farm.
  */
 
 import { daylightFor, type Daylight } from '../daylight/daylight';
 import { DISTRICT_PLACES } from '../daylight/places';
-import { GRID_W } from '../grid';
 import { dateOn } from './derived';
-import type { FarmState, MapPoint } from './state';
-
-/** The middle of a square. */
-export const squareCentre = (cell: number): MapPoint => ({
-  x: (cell % GRID_W) + 0.5,
-  y: Math.floor(cell / GRID_W) + 0.5,
-});
-
-/** Where the homestead is. */
-export const homesteadPoint = (farm: Pick<FarmState, 'buildings'>): MapPoint =>
-  squareCentre(farm.buildings.homestead);
+import type { FarmState } from './state';
 
 // First and last light for a district and a date never change, so each is
 // worked out once.
@@ -41,14 +31,13 @@ export function lightOn(farm: FarmState, day: number = farm.day): Daylight {
   return light;
 }
 
-/** Start the farm's day: first light, nothing used, the player at the homestead. */
+/** Start the farm's day: first light, nothing used. */
 export function startDay(farm: FarmState): void {
   const light = lightOn(farm);
   farm.clock = {
     firstLight: light.firstLight,
     lastLight: light.lastLight,
     used: 0,
-    at: homesteadPoint(farm),
   };
 }
 

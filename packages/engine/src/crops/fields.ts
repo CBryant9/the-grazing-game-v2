@@ -482,13 +482,9 @@ export function sowInfo(
     ha,
     convHa: conv * ctx.haPerSquare,
     cost: ha * sp.cost + conv * ctx.haPerSquare * CONVERT_COST_PER_HA,
-    now: canSowOn(ctx, key, day),
+    now: sp.sow.includes(dateAt(ctx.start, day).month),
   };
 }
-
-/** True if a farm day is in a species' sowing window: its month is one of the species' sowing months. */
-export const canSowOn = (ctx: CropContext, key: SpeciesId, day: number): boolean =>
-  SPECIES[key].sow.includes(dateAt(ctx.start, day).month);
 
 export interface Sown extends SowInfo {
   ok: true;

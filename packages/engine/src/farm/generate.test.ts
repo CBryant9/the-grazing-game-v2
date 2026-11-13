@@ -896,9 +896,8 @@ describe('generating a farm from its seed', () => {
           expect(pasture.land.every((v) => v === LAND.native)).toBe(true);
         }
 
-        // The homestead touches the boundary. The yards are within two squares
-        // of it, two to five squares from the homestead. Both are clear of the
-        // bore and of every trough.
+        // The yards are within two squares of the boundary, clear of the bore
+        // and of every trough. There is no homestead (Claudia, 14 Nov 2026).
         const depth = (i: number): number =>
           Math.min(
             i % GRID_W,
@@ -911,14 +910,12 @@ describe('generating a farm from its seed', () => {
             Math.abs((a % GRID_W) - (b % GRID_W)),
             Math.abs(((a / GRID_W) | 0) - ((b / GRID_W) | 0)),
           );
-        expect(depth(buildings.homestead), `homestead ${where}`).toBe(0);
+        expect(Object.keys(buildings)).toEqual(['yards']);
         expect(depth(buildings.yards), `yards ${where}`).toBeLessThanOrEqual(1);
-        expect(apart(buildings.homestead, buildings.yards)).toBeGreaterThanOrEqual(2);
-        expect(apart(buildings.homestead, buildings.yards)).toBeLessThanOrEqual(5);
-        for (const b of [buildings.homestead, buildings.yards]) {
-          expect(apart(b, layout.water.bore)).toBeGreaterThanOrEqual(BUILDING_CLEAR_OF_BORE);
-          expect(layout.water.troughs).not.toContain(b);
-        }
+        expect(apart(buildings.yards, layout.water.bore)).toBeGreaterThanOrEqual(
+          BUILDING_CLEAR_OF_BORE,
+        );
+        expect(layout.water.troughs).not.toContain(buildings.yards);
       }
       expect(paddocks).toBeGreaterThan(startType === 'running' ? 130 : 60);
     },
@@ -943,32 +940,58 @@ describe('generating a farm from its seed', () => {
     return water;
   };
 
-  it('the buildings keep off a trough that sits on the boundary', () => {
+  // The yards were first placed two to five squares from a homestead on the
+  // boundary. The homestead is gone. Its square is still drawn, so the yards
+  // stand where they did, and these placements are as they were.
+  it('the yards keep off a trough that sits on the boundary', () => {
     const open = [5, 7, GRID_W + 6];
     const water = crowded(13 * GRID_W + 20, open);
     for (let k = 0; k < 20; k++) {
       const b = placeBuildings(rngStream(k, 'crowded'), water);
-      expect([5, 7]).toContain(b.homestead);
-      expect(open).toContain(b.yards);
-      expect(b.yards).not.toBe(b.homestead);
+      // Squares 5 and 7 are the only two open squares on the boundary, two
+      // apart: one was the homestead's and the other is the yards'.
+      expect([5, 7]).toContain(b.yards);
+      expect(b).toEqual({ yards: b.yards });
     }
   });
 
-  it('the buildings can stand three squares from the bore, and the yards two from the homestead', () => {
+  it('the yards can stand three squares from the bore', () => {
     // The bore is four squares in from the top-left corner. The only open
     // squares are (3, 0) on the boundary and (1, 1), which is three squares
     // from the bore and two from (3, 0).
     const water = crowded(4 * GRID_W + 4, [3, GRID_W + 1]);
     for (let k = 0; k < 5; k++) {
-      expect(placeBuildings(rngStream(k, 'near-bore'), water)).toEqual({
-        homestead: 3,
-        yards: GRID_W + 1,
-      });
+      expect(placeBuildings(rngStream(k, 'near-bore'), water)).toEqual({ yards: GRID_W + 1 });
     }
-    // Six squares apart is too far for the yards.
+    // With the only two open squares six apart, there is nowhere for the yards.
     const far = crowded(13 * GRID_W + 20, [3, 9]);
     expect(() => placeBuildings(rngStream(1, 'too-far'), far)).toThrow();
     const five = placeBuildings(rngStream(1, 'far-enough'), crowded(13 * GRID_W + 20, [3, 8]));
-    expect([five.homestead, five.yards].sort((a, b) => a - b)).toEqual([3, 8]);
+    expect([3, 8]).toContain(five.yards);
+  });
+
+  it('taking the homestead out moved no yards: these are the squares from before it went', () => {
+    // Read off the generator as it was before the homestead was removed
+    // (commit e13f305): seed, then the yards' square. The same for every
+    // district and start, because the yards have their own stream.
+    const before: [number, number][] = [
+      [1, 1039],
+      [2, 801],
+      [3, 1039],
+    ];
+    for (const [seed, yards] of before) {
+      for (const district of ['cq', 'nsw', 'wv'] as const) {
+        for (const startType of ['scratch', 'running'] as const) {
+          const farm = generateFarm({
+            seed,
+            district,
+            farmHa: 1000,
+            start: { year: 2023, month: 8 },
+            startType,
+          });
+          expect(farm.buildings, `${district} ${startType} seed ${seed}`).toEqual({ yards });
+        }
+      }
+    }
   });
 });
