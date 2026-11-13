@@ -5,12 +5,14 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./sward": "./src/sward.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@gg/shared": "workspace:*"
+    "@gg/shared": "workspace:*",
+    "pixi.js": "^8.23.0"
   }
 }

@@ -9,4 +9,5 @@ art
 *.md
 .data-cache
 packages/engine/data/raw
+apps/web/dev-fixtures
 .claude

@@ -1,0 +1,167 @@
+/* The map test page: the map first, the controls beside it on a wide screen and under it on a phone. */
+.page {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100dvh;
+  background: var(--frame);
+}
+.bare {
+  height: 100dvh;
+  display: grid;
+  background: var(--frame);
+}
+.stage {
+  position: relative;
+  min-width: 0;
+  height: 70dvh;
+  min-height: 280px;
+}
+.bare .stage {
+  height: 100dvh;
+}
+.map {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.panel {
+  padding: var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--panel);
+  border-top: 2px solid var(--line);
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    height: 100dvh;
+  }
+  .stage {
+    height: 100dvh;
+  }
+  .panel {
+    border-top: 0;
+    border-left: 2px solid var(--line);
+    overflow-y: auto;
+  }
+}
+.h1 {
+  font-size: 1rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field select,
+.field input[type='range'] {
+  width: 100%;
+  min-height: var(--tap);
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+}
+.field input[type='range'] {
+  padding: 0;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px 10px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.group legend {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  padding: 0 4px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.error {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  top: var(--gutter);
+  padding: 10px 12px;
+  background: var(--hud);
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.benchline {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 6px 8px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  pointer-events: none;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.table caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+.table th,
+.table td {
+  text-align: right;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.table th[scope='row'] {
+  text-align: left;
+  font-weight: 400;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pics {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pic {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  min-width: 0;
+}
+.pic canvas {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}

@@ -331,7 +331,7 @@ const FIXTURES = [
       farm = act(farm, {
         type: 'buyCattle',
         cls: 'yearSteer',
-        qty: 300,
+        qty: 120,
         to: { cell: cellAt(x0 + 1, y0 + 3) },
       });
       // A gate into the box, and an electric fence with two gates beside it.
@@ -351,6 +351,13 @@ const FIXTURES = [
       const pipe = [1, 2, 3, 4].map((k) => cellAt(bx + dir * k, by));
       farm = act(farm, { type: 'layPipe', cells: pipe });
       farm = act(farm, { type: 'placeTrough', cell: pipe[3] });
+      // A short fence over the pipe, with a water hub on it.
+      const hubRun = [1, 2, 3, 4].map((k) => hEdge(by, bx + dir * k));
+      farm = act(farm, { type: 'buildFence', edges: hubRun, fence: 'electric' });
+      farm = act(farm, {
+        type: 'placeFenceHub',
+        vertex: by * (W + 1) + bx + dir * 2 + (dir < 0 ? 1 : 0),
+      });
       // A second, dry box with a small mob in it: the "no water" case.
       const dryX = x0 < W / 2 ? x0 + 12 : x0 - 8;
       farm = act(farm, {
@@ -361,7 +368,8 @@ const FIXTURES = [
       farm = act(farm, { type: 'buyCattle', cls: 'dryCow', qty: 24, to: { cell: bore } });
       const cows = farm.mobs[farm.mobs.length - 1];
       farm = act(farm, { type: 'moveMob', mob: cows.id, to: { cell: cellAt(dryX + 1, y0 + 13) } });
-      run(farm, 2);
+      // One day: the steers drink the portable trough down, and the cows go a day without water.
+      run(farm, 1);
       // One length of the middle tape lying down.
       const down = knockDownTape(farm.layout, vEdge(y0 + 2, x0 + 6));
       if (down.ok) farm = { ...farm, layout: down.layout };

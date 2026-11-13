@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@gg/render": "workspace:*",
     "@gg/shared": "workspace:*",
     "next": "^16.4.6",
     "react": "^19.3.1",
