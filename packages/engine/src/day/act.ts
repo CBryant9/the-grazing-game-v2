@@ -55,7 +55,6 @@ import { dayMinutes, homesteadPoint, lightOn, timeNow } from '../sim/clock';
 import type { FarmEvent } from '../sim/events';
 import { deepCopy, type FarmState, type JobInProgress, type MapPoint } from '../sim/state';
 import {
-  isLineAction,
   lineWhat,
   linePieces,
   orientPieces,
@@ -831,6 +830,3 @@ export function previewAction(farm: FarmState, action: Action, env: ActionEnv = 
   if (!done.ok) return done;
   return { ok: true, card: done.card };
 }
-
-/** True for the actions built piece by piece (fence, tape, pipe). */
-export { isLineAction };

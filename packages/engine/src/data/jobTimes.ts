@@ -13,6 +13,10 @@
  * The figures are the PRD's own. None is a looked-up real-world figure.
  * A change to any of them is a change to the game: record it in
  * docs/DATA.md.
+ *
+ * The PRD has no figure for taking things out. The builder's rule, in
+ * ../day/spec.ts and for Claudia to check: pulling a fence down, or taking
+ * out a gate, a trough or a water hub, takes as long as putting it in.
  */
 
 export type FigureStatus = 'decided' | 'proposed' | 'builder';
@@ -102,14 +106,6 @@ export type GateKind = keyof typeof JOB_TIMES.gateMin;
 
 /** How long a gate of a kind takes to hang, minutes. */
 export const gateMinutes = (kind: GateKind): number => JOB_TIMES.gateMin[kind].value;
-
-/**
- * The builder's rule for taking things out, which the PRD does not cover:
- * pulling a fence down, or taking out a gate, a trough or a water hub,
- * takes as long as putting it in. Moving a fixed trough takes as long as
- * fitting one. A question for Claudia.
- */
-export const REMOVAL_TAKES_AS_LONG_AS_BUILDING = true;
 
 /** What sets the pace of a length of work. */
 export type Pace = 'permanent' | 'electric' | 'tape' | 'pipe';

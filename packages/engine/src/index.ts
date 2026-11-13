@@ -555,7 +555,6 @@ export type { SavedFarm } from './save/save';
 export {
   DEFAULT_WORK_RULES,
   JOB_TIMES,
-  REMOVAL_TAKES_AS_LONG_AS_BUILDING,
   SKIP_DAYS,
   gateMinutes,
   metresPerMinute,

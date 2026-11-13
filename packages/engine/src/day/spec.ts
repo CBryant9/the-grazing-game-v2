@@ -201,9 +201,6 @@ const LINE_WHAT: Partial<Record<Action['type'], JobWorkPart['what']>> = {
   layPipe: 'pipe',
 };
 
-/** True for the actions that are built piece by piece. */
-export const isLineAction = (action: Action): boolean => action.type in LINE_WHAT;
-
 /** What a line job's time is for. */
 export const lineWhat = (action: Action): JobWorkPart['what'] => LINE_WHAT[action.type] ?? 'build';
 
