@@ -1,0 +1,681 @@
+{
+  "note": "Real price and weather history, pulled once by scripts/data and kept here so the game needs no live connection for past years. Server-side engine data: never import it into browser code. Do not edit by hand; re-run the scripts.",
+  "sources": {
+    "silo": {
+      "name": "SILO Data Drill, Queensland Government (Long Paddock)",
+      "credit": "Climate data: SILO, Queensland Government (© State of Queensland), CC BY 4.0, built from Bureau of Meteorology observations. The data has been reformatted.",
+      "licence": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "docs": "https://www.longpaddock.qld.gov.au/silo/api-documentation/reference/",
+      "variables": "https://www.longpaddock.qld.gov.au/silo/about/climate-variables/",
+      "sourceCodesPage": "https://www.longpaddock.qld.gov.au/silo/about/about-data/",
+      "sourceCodeMeanings": {
+        "25": "Interpolated from daily observations for that date.",
+        "26": "Synthetic Class A pan evaporation, calculated from temperatures, radiation and vapour pressure. Every FAO-56 value in this pull carries this code.",
+        "42": "Satellite radiation estimate from BoM.",
+        "75": "Interpolated from the long term averages of daily observations for that day of year. Seen on the last few days before a pull, until the observations arrive."
+      },
+      "note": "Reformatted: one file per district, six variables, source-code columns counted in this manifest and then dropped. Values as served. Data Drill values are interpolated to a 0.05 degree grid, so they are not a single station."
+    },
+    "mla": {
+      "name": "Meat & Livestock Australia, National Livestock Reporting Service, public statistics service",
+      "credit": "Reproduced courtesy of Meat & Livestock Australia Limited – www.mla.com.au",
+      "terms": "https://www.mla.com.au/globalassets/mla-corporate/prices--markets/documents/minlrs-information-brochures-etc/mla-market-reports-data-and-information-terms-of-use.pdf",
+      "docs": "https://app.nlrsreports.mla.com.au/statistics/documentation",
+      "baseUrl": "https://api-mlastatistics.mla.com.au",
+      "note": "Reformatted: values rounded to 2 decimal places, head to whole numbers, one file per series. Daily rows as served. An indicator row holds the last 7 days of sales, so a value repeats until the next sale."
+    }
+  },
+  "files": [
+    {
+      "path": "mla/national/eastern-young-cattle.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "Eastern Young Cattle Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=0&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg cwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 10882
+    },
+    {
+      "path": "mla/national/feeder-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Heifer Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=17&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-06-16",
+      "last": "2026-11-12",
+      "rows": 8379
+    },
+    {
+      "path": "mla/national/feeder-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Feeder Steer Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=3&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "2003-06-16",
+      "last": "2026-11-12",
+      "rows": 8390
+    },
+    {
+      "path": "mla/national/heavy-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Heavy Steer Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=4&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-12",
+      "last": "2026-11-12",
+      "rows": 10916
+    },
+    {
+      "path": "mla/national/processor-cow.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Processor Cow Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=13&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-12",
+      "last": "2026-11-12",
+      "rows": 10916
+    },
+    {
+      "path": "mla/national/restocker-yearling-heifer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Heifer Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=12&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-12-02",
+      "last": "2026-11-12",
+      "rows": 10736
+    },
+    {
+      "path": "mla/national/restocker-yearling-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Steer Indicator, all contributing yards",
+      "url": "https://api-mlastatistics.mla.com.au/report/5?indicatorID=2&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-10-21",
+      "last": "2026-11-12",
+      "rows": 10770
+    },
+    {
+      "path": "mla/sales/ARM-cattle.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days Armidale (NSW) held a cattle sale, with the head yarded. Worked out from mla/yardings/ARM-cattle.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Cattle}&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-09-05",
+      "last": "2026-11-05",
+      "rows": 1301
+    },
+    {
+      "path": "mla/sales/DUB-cattle.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days Dubbo (NSW) held a cattle sale, with the head yarded. Worked out from mla/yardings/DUB-cattle.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Cattle}&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 2474
+    },
+    {
+      "path": "mla/sales/GME-cattle.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days CQLX Gracemere (QLD) held a cattle sale, with the head yarded. Worked out from mla/yardings/GME-cattle.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Cattle}&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-13",
+      "first": "1999-11-08",
+      "last": "2026-11-11",
+      "rows": 788
+    },
+    {
+      "path": "mla/sales/MTL-cattle.csv",
+      "source": "mla",
+      "kind": "sales",
+      "what": "Days Mortlake (VIC) held a cattle sale, with the head yarded. Worked out from mla/yardings/MTL-cattle.csv: every sale type that day added together.",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category={Cattle}&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded that day"
+      },
+      "pulled": "2026-11-13",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 499
+    },
+    {
+      "path": "mla/yardings/ARM-cattle.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Cattle yardings at Armidale (NSW) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Cattle&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-09-05",
+      "last": "2026-11-05",
+      "rows": 1301
+    },
+    {
+      "path": "mla/yardings/DUB-cattle.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Cattle yardings at Dubbo (NSW) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Cattle&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-13",
+      "first": "1996-07-15",
+      "last": "2026-11-12",
+      "rows": 2477
+    },
+    {
+      "path": "mla/yardings/GME-cattle.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Cattle yardings at CQLX Gracemere (QLD) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Cattle&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-13",
+      "first": "1999-11-08",
+      "last": "2026-11-11",
+      "rows": 788
+    },
+    {
+      "path": "mla/yardings/MTL-cattle.csv",
+      "source": "mla",
+      "kind": "yardings",
+      "what": "Cattle yardings at Mortlake (VIC) as served, one row per sale and sale type",
+      "url": "https://api-mlastatistics.mla.com.au/report/4?category=Cattle&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "type",
+        "head"
+      ],
+      "units": {
+        "head": "head yarded"
+      },
+      "pulled": "2026-11-13",
+      "first": "2018-01-29",
+      "last": "2026-11-12",
+      "rows": 500
+    },
+    {
+      "path": "mla/yards/ARM/restocker-yearling-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Steer Indicator at Armidale (NSW), district yard for nsw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=2&saleyardID=ARM&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1997-01-23",
+      "last": "2026-11-11",
+      "rows": 8701
+    },
+    {
+      "path": "mla/yards/DUB/restocker-yearling-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Steer Indicator at Dubbo (NSW), district yard for cw",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=2&saleyardID=DUB&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "1997-03-06",
+      "last": "2026-11-12",
+      "rows": 9378
+    },
+    {
+      "path": "mla/yards/GME/restocker-yearling-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Steer Indicator at CQLX Gracemere (QLD), district yard for cq",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=2&saleyardID=GME&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2014-10-10",
+      "last": "2026-11-12",
+      "rows": 3810
+    },
+    {
+      "path": "mla/yards/MTL/restocker-yearling-steer.csv",
+      "source": "mla",
+      "kind": "indicator",
+      "what": "National Restocker Yearling Steer Indicator at Mortlake (VIC), district yard (cattle) for wv",
+      "url": "https://api-mlastatistics.mla.com.au/report/6?indicatorID=2&saleyardID=MTL&fromDate={from}&toDate={to}",
+      "columns": [
+        "date",
+        "value",
+        "head"
+      ],
+      "units": {
+        "value": "c/kg lwt",
+        "head": "head in the indicator at this yard"
+      },
+      "pulled": "2026-11-13",
+      "first": "2018-01-29",
+      "last": "2026-03-08",
+      "rows": 1141
+    },
+    {
+      "path": "silo/cq.csv",
+      "source": "silo",
+      "kind": "weather",
+      "what": "Daily weather at the SILO grid point for Emerald, Qld",
+      "url": "https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php?lat=-23.55&lon=148.20&start={from}&finish={to}&format=csv&comment=RXNJCF&username={SILO_CONTACT_EMAIL}&password=apirequest",
+      "point": {
+        "lat": -23.55,
+        "lon": 148.2
+      },
+      "columns": [
+        "date",
+        "rain",
+        "tmax",
+        "tmin",
+        "rad",
+        "evap",
+        "et0"
+      ],
+      "units": {
+        "rain": "mm",
+        "tmax": "°C",
+        "tmin": "°C",
+        "rad": "MJ/m²",
+        "evap": "mm (Class A pan)",
+        "et0": "mm (FAO-56 short crop)"
+      },
+      "siloVariables": {
+        "rain": "R (daily_rain)",
+        "tmax": "X (max_temp)",
+        "tmin": "N (min_temp)",
+        "rad": "J (radiation)",
+        "evap": "C (evap_comb)",
+        "et0": "F (et_short_crop)"
+      },
+      "sourceCodes": {
+        "rain": {
+          "25": 13465
+        },
+        "tmax": {
+          "25": 13464,
+          "75": 1
+        },
+        "tmin": {
+          "25": 13465
+        },
+        "rad": {
+          "25": 421,
+          "42": 13044
+        },
+        "evap": {
+          "25": 13462,
+          "75": 3
+        },
+        "et0": {
+          "26": 13465
+        }
+      },
+      "siloNotes": [
+        "elevation= 182.3 m",
+        "reference=RXNJCF",
+        "extracted=20261113",
+        "dataset=BoM Only",
+        "Please read our web site for information about the meanings of the codes, and other information"
+      ],
+      "first": "1990-01-01",
+      "last": "2026-11-12",
+      "rows": 13465,
+      "pulled": "2026-11-13"
+    },
+    {
+      "path": "silo/cw.csv",
+      "source": "silo",
+      "kind": "weather",
+      "what": "Daily weather at the SILO grid point for Dubbo, NSW",
+      "url": "https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php?lat=-32.20&lon=148.60&start={from}&finish={to}&format=csv&comment=RXNJCF&username={SILO_CONTACT_EMAIL}&password=apirequest",
+      "point": {
+        "lat": -32.2,
+        "lon": 148.6
+      },
+      "columns": [
+        "date",
+        "rain",
+        "tmax",
+        "tmin",
+        "rad",
+        "evap",
+        "et0"
+      ],
+      "units": {
+        "rain": "mm",
+        "tmax": "°C",
+        "tmin": "°C",
+        "rad": "MJ/m²",
+        "evap": "mm (Class A pan)",
+        "et0": "mm (FAO-56 short crop)"
+      },
+      "siloVariables": {
+        "rain": "R (daily_rain)",
+        "tmax": "X (max_temp)",
+        "tmin": "N (min_temp)",
+        "rad": "J (radiation)",
+        "evap": "C (evap_comb)",
+        "et0": "F (et_short_crop)"
+      },
+      "sourceCodes": {
+        "rain": {
+          "25": 13465
+        },
+        "tmax": {
+          "25": 13464,
+          "75": 1
+        },
+        "tmin": {
+          "25": 13465
+        },
+        "rad": {
+          "25": 421,
+          "42": 13035,
+          "75": 9
+        },
+        "evap": {
+          "25": 13462,
+          "75": 3
+        },
+        "et0": {
+          "26": 13465
+        }
+      },
+      "siloNotes": [
+        "elevation= 265.0 m",
+        "reference=RXNJCF",
+        "extracted=20261113",
+        "dataset=BoM Only",
+        "Please read our web site for information about the meanings of the codes, and other information"
+      ],
+      "first": "1990-01-01",
+      "last": "2026-11-12",
+      "rows": 13465,
+      "pulled": "2026-11-13"
+    },
+    {
+      "path": "silo/nsw.csv",
+      "source": "silo",
+      "kind": "weather",
+      "what": "Daily weather at the SILO grid point for Armidale, NSW (grid point nearest the airport)",
+      "url": "https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php?lat=-30.55&lon=151.60&start={from}&finish={to}&format=csv&comment=RXNJCF&username={SILO_CONTACT_EMAIL}&password=apirequest",
+      "point": {
+        "lat": -30.55,
+        "lon": 151.6
+      },
+      "columns": [
+        "date",
+        "rain",
+        "tmax",
+        "tmin",
+        "rad",
+        "evap",
+        "et0"
+      ],
+      "units": {
+        "rain": "mm",
+        "tmax": "°C",
+        "tmin": "°C",
+        "rad": "MJ/m²",
+        "evap": "mm (Class A pan)",
+        "et0": "mm (FAO-56 short crop)"
+      },
+      "siloVariables": {
+        "rain": "R (daily_rain)",
+        "tmax": "X (max_temp)",
+        "tmin": "N (min_temp)",
+        "rad": "J (radiation)",
+        "evap": "C (evap_comb)",
+        "et0": "F (et_short_crop)"
+      },
+      "sourceCodes": {
+        "rain": {
+          "25": 13465
+        },
+        "tmax": {
+          "25": 13464,
+          "75": 1
+        },
+        "tmin": {
+          "25": 13465
+        },
+        "rad": {
+          "25": 421,
+          "42": 13042,
+          "75": 2
+        },
+        "evap": {
+          "25": 13462,
+          "75": 3
+        },
+        "et0": {
+          "26": 13465
+        }
+      },
+      "siloNotes": [
+        "elevation=1045.0 m",
+        "reference=RXNJCF",
+        "extracted=20261113",
+        "dataset=BoM Only",
+        "Please read our web site for information about the meanings of the codes, and other information"
+      ],
+      "first": "1990-01-01",
+      "last": "2026-11-12",
+      "rows": 13465,
+      "pulled": "2026-11-13"
+    },
+    {
+      "path": "silo/wv.csv",
+      "source": "silo",
+      "kind": "weather",
+      "what": "Daily weather at the SILO grid point for Hamilton, Vic",
+      "url": "https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php?lat=-37.65&lon=142.05&start={from}&finish={to}&format=csv&comment=RXNJCF&username={SILO_CONTACT_EMAIL}&password=apirequest",
+      "point": {
+        "lat": -37.65,
+        "lon": 142.05
+      },
+      "columns": [
+        "date",
+        "rain",
+        "tmax",
+        "tmin",
+        "rad",
+        "evap",
+        "et0"
+      ],
+      "units": {
+        "rain": "mm",
+        "tmax": "°C",
+        "tmin": "°C",
+        "rad": "MJ/m²",
+        "evap": "mm (Class A pan)",
+        "et0": "mm (FAO-56 short crop)"
+      },
+      "siloVariables": {
+        "rain": "R (daily_rain)",
+        "tmax": "X (max_temp)",
+        "tmin": "N (min_temp)",
+        "rad": "J (radiation)",
+        "evap": "C (evap_comb)",
+        "et0": "F (et_short_crop)"
+      },
+      "sourceCodes": {
+        "rain": {
+          "25": 13465
+        },
+        "tmax": {
+          "25": 13464,
+          "75": 1
+        },
+        "tmin": {
+          "25": 13465
+        },
+        "rad": {
+          "25": 421,
+          "42": 13024,
+          "75": 20
+        },
+        "evap": {
+          "25": 13462,
+          "75": 3
+        },
+        "et0": {
+          "26": 13465
+        }
+      },
+      "siloNotes": [
+        "elevation= 233.9 m",
+        "reference=RXNJCF",
+        "extracted=20261113",
+        "dataset=BoM Only",
+        "Please read our web site for information about the meanings of the codes, and other information"
+      ],
+      "first": "1990-01-01",
+      "last": "2026-11-12",
+      "rows": 13465,
+      "pulled": "2026-11-13"
+    }
+  ]
+}

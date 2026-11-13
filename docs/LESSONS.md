@@ -18,7 +18,7 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | 10 | Fallow appeared at random after +1 week; a finished barley crop regrew; warnings came after harvest | Land-use state transitions were loose | Fallow only after a crop ends (or rotation blocks at start); finished crops become stubble with no growth; no warnings after harvest. **Rule: "things only happen for a reason".** |
 | 11 | Cattle broke out with no reason and through several fences | Breakout chance not tied to hunger | Needs f < 0.85 or no water, a 21-day cooldown, one tape edge. Tape only. |
 | 12 | Market chart showed "feeder steers" that couldn't be bought | Class names were defined in two places | One class list feeds both the chart and the saleyard |
-| 13 | The 2019–2025 price series was written from memory | No data source on hand | **Still open:** replace with real MLA restocker indicator data and record the source in DATA.md |
+| 13 | The 2019–2025 price series was written from memory | No data source on hand | **Half done.** The real MLA series are pulled and recorded in DATA.md ("Real data sources"). The engine still reads the old series until milestone 1.4 wires the real one in |
 
 ## Wording and design
 
@@ -71,6 +71,9 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | R2 | Lighthouse Performance swung from 74 to 100 on the same page | Lighthouse was run on a busy PC with the server on the same machine | Judge performance on the median of several runs, and on CI, not on one local run |
 | R3 | The newest TypeScript (7) could not be used | `typescript-eslint` supports TypeScript below 6.1 | Check that tools support each other before taking the newest version. TypeScript is pinned to 6.0 |
 | R4 | A model doc and the MVP code disagreed in 15 places | The docs were written after the code | Port from the code, correct the doc in the same change (BUILD_PLAN 2.4) |
+| R5 | Page 60 of a 30-year MLA price request timed out | The MLA service gives 100 rows a page, has no bulk download, and gets slower the deeper the page | Ask for fixed 100-day windows, one page each. **Rule: test the last page of a paged service before planning a pull around it** |
+| R6 | The first plan for the MLA pull was about an hour for everything. The full list is 6 to 10 hours | A yard's indicator has a row for every day, each sale repeated for seven days, so a yard costs about as many requests as a national series. And about 7 requests in 100 failed on MLA's side and had to wait | Size every series with one request before starting. Pull in priority order, cache every answer, and make the script able to stop and carry on |
+| R7 | The first page of MLA yardings looked like the start of the history but was not | Yardings pages come back in no date order (indicator pages are in date order) | Never take a first date from page one unless the page is checked to be in order. Yardings are walked window by window from 1996 |
 
 ## Process lessons
 
