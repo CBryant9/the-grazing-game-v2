@@ -61,6 +61,7 @@ An **admin back end** shows the analytics, manages ads and sponsors, connects St
 | 13 Nov 2026 | Ads sit in a different spot on each page so it never feels spammy (section 10.1). Farm view: left rail only. |
 | 13 Nov 2026 | On PC the website header and the game header are separate bars. Website pages get big page headings and generous spacing. |
 | 13 Nov 2026 | Light and dark themes. |
+| 13 Nov 2026 | Render style: S5 "clear map with detail on zoom" (confirmed by Claudia). Zoomed out, clean paddock fields and one marker per mob; zoomed in, individual cattle and grass clumps in the S3 clean illustrated style. |
 
 ## 3. Goals, non-goals and measures
 
@@ -301,7 +302,7 @@ References in [reference/](reference/):
 Requirements:
 - **[Decided]** Keep the retro feel in the interface (display font, chunky bevelled buttons, chips, colours), which Claudia likes.
 - **[Decided]** The map art must stay **readable with big mobs and lots of grass**. In the first mockups the pixel style blurred together. Cattle must never blur into the grass.
-- **[Open]** Render style. The mockups' "Render styles" tab shows the same scene in five styles, zoomed out and zoomed in: S1 current pixel, S2 hi-bit pixel, S3 clean illustrated, S4 soft painted, S5 clear map with detail on zoom. **Recommended: S3 art with S5 behaviour:**
+- **[Decided]** Render style: **S5, clear map with detail on zoom**, with the zoomed-in detail drawn in the S3 clean illustrated style (confirmed by Claudia, 13 Nov 2026). For reference, the mockups' "Render styles" tab shows the same scene in five styles, zoomed out and zoomed in: S1 current pixel, S2 hi-bit pixel, S3 clean illustrated, S4 soft painted, S5 clear map with detail on zoom. The chosen style:
   - Smooth, crisp illustrated sprites (not pixels), drawn at high resolution and scaled smoothly.
   - Cattle have an outline and a soft shadow so they stand out from any grass. Breeds read clearly (black Angus, red and white Hereford, grey Brahman). Condition shows in body shape.
   - **Level of detail:** zoomed out, paddocks are clean colour fields with subtle texture by pasture state, and each mob is one marker (cow icon, head count, and a soft footprint showing where they're grazing). Zoomed in, individual cattle and grass clumps appear.
@@ -798,7 +799,7 @@ Everything is built before launch; switches control what players see.
 | 8 | Art source | Build with placeholder art drawn in code in the S3 style from the mockups, structured so real art can replace it sprite by sprite |
 | 9 | Minimum account age | 13+ for accounts, guests any age. Under 16s get no community |
 | 10 | Grazing plans in Daily Farm | Not available in Daily Farm |
-| 11 | Render style | S3 clean illustrated art with S5 level of detail (Claudia was happy with the mockups in this style on 13 Nov 2026) |
+| 11 | Render style | **Decided:** S5 clear map with detail on zoom, zoomed-in detail in the S3 style. No longer open |
 | 12 | Feedlot | Kept as an option inside Herd (send a mob to a feedlot for a daily fee, as in the MVP), never drawn on the map |
 
 Original wording of the questions, for context:

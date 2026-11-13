@@ -158,3 +158,4 @@ These came from planning the phone and PC rebuild. Full detail and open question
 - [ ] Ads in different spots on different pages "so it doesn't feel too spammy"; on the farm view, ads on the left.
 - [ ] On PC the game header sits at the top of the game and the website header at the top of the site; they must not blend together. Community and other pages get big headings and sensible spacing.
 - [ ] Light and dark versions.
+- [ ] Map style: the "clear map with detail on zoom" (S5 in the mockups). Clean paddocks and one marker per mob when zoomed out, individual cattle and grass when zoomed in.
