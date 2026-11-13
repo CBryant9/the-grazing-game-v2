@@ -62,6 +62,37 @@ function valueRange(unit: string): [number, number] {
   throw new Error(`No range set for unit "${unit}"`);
 }
 
+/**
+ * Price rows outside the sane range, as MLA served them. All are thin
+ * Hamilton sheep figures from late 2006. One is negative. Whatever reads
+ * these tables must allow for them (docs/DATA.md).
+ */
+const ODD_PRICES: Record<string, string[]> = {
+  'mla/yards/HAM/merino-lamb.csv': [
+    '2006-11-27 11.95',
+    '2006-11-28 11.95',
+    '2006-12-06 -6.67',
+    '2006-12-07 -6.67',
+    '2006-12-08 -6.67',
+    '2006-12-09 -6.67',
+    '2006-12-10 -6.67',
+    '2006-12-11 -6.67',
+    '2006-12-12 -6.67',
+  ],
+  'mla/yards/HAM/mutton.csv': [
+    '2006-10-18 12.82',
+    '2006-10-19 12.82',
+    '2006-10-20 12.82',
+    '2006-10-21 12.82',
+    '2006-10-22 12.82',
+    '2006-10-23 12.82',
+    '2006-10-24 12.82',
+  ],
+};
+
+/** Yardings rows with no head: Hamilton sale days with lambs and no sheep. */
+const EMPTY_YARDINGS: Record<string, number> = { 'mla/yardings/HAM-sheep.csv': 502 };
+
 const WEATHER_RANGES: Record<string, [number, number]> = {
   rain: [0, 600],
   tmax: [-15, 55],
@@ -144,13 +175,17 @@ describe('real data tables', () => {
     if (file.kind === 'indicator') {
       it('has prices and head counts in a sane range', () => {
         const [lo, hi] = valueRange(file.units.value ?? '');
+        const odd: string[] = [];
         let bad = 0;
-        for (const [, value, head] of table.rows) {
+        for (const [date, value, head] of table.rows) {
           const v = Number(value);
           const h = Number(head);
-          if (value === '' || !(v >= lo && v <= hi)) bad++;
+          if (value === '' || !(v >= lo && v <= hi)) odd.push(`${date} ${value}`);
           if (head === '' || !Number.isInteger(h) || h < 0 || h > 2_000_000) bad++;
         }
+        // The tables are as served. The odd prices that are known are
+        // listed, so a new one fails here (docs/DATA.md).
+        expect(odd).toEqual(ODD_PRICES[file.path] ?? []);
         expect(bad).toBe(0);
       });
     }
@@ -158,11 +193,16 @@ describe('real data tables', () => {
     if (file.kind === 'yardings' || file.kind === 'sales') {
       it('has whole head counts in a sane range', () => {
         let bad = 0;
+        let none = 0;
         for (const row of table.rows) {
           const h = Number(row.at(-1));
-          if (row.at(-1) === '' || !Number.isInteger(h) || h < 1 || h > 200_000) bad++;
+          if (row.at(-1) === '' || !Number.isInteger(h) || h < 0 || h > 200_000) bad++;
+          if (h === 0) none++;
         }
         expect(bad).toBe(0);
+        // A sale day always has stock. A yardings row can be 0: the day's
+        // sale had none of that kind (lambs but no sheep, at Hamilton).
+        expect(none).toBe(file.kind === 'sales' ? 0 : (EMPTY_YARDINGS[file.path] ?? 0));
       });
     }
 
