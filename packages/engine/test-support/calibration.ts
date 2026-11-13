@@ -14,7 +14,7 @@ import type { Action } from '../src/actions/types';
 import type { Supplement } from '../src/data/feed';
 import { carryingCapacityAE } from '../src/money/costs';
 import { createFarm } from '../src/sim/create';
-import type { GrowthFactorSource } from '../src/season/factors';
+import { averageYear, type GrowthFactorSource } from '../src/season/factors';
 import { seasonsOf } from '../src/sim/derived';
 import type { FarmState } from '../src/sim/state';
 import { stepDay } from '../src/sim/tick';
@@ -52,9 +52,7 @@ function seasonsOver(farm: FarmState, days: number): RunSeasons {
 }
 
 /** The average year: every day grows at the district curve, with no good or poor months. */
-export const AVERAGE_YEAR: GrowthFactorSource = {
-  factorsOn: () => ({ seasonF: 1, monthF: 1, label: 'Average' }),
-};
+export const AVERAGE_YEAR: GrowthFactorSource = averageYear;
 
 /** Run a farm for a number of days and return the time each day took, ms. */
 export function runDays(farm: FarmState, days: number, seasons?: GrowthFactorSource): number {

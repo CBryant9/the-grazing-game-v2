@@ -13,6 +13,11 @@ export { GRID_H, GRID_N, GRID_W, haPerSquare } from './grid';
 export { dateAt, monthIndex } from './calendar';
 export type { CalendarDate, FarmStart } from './calendar';
 
+// First light and last light for a place and a date (milestone 1.5).
+export { clockText, daylightFor, durationText, utcOffsetMinutes } from './daylight/daylight';
+export type { Daylight, Place } from './daylight/daylight';
+export { DISTRICT_PLACES } from './daylight/places';
+
 export { DISTRICTS } from './data/districts';
 export type { District } from './data/districts';
 

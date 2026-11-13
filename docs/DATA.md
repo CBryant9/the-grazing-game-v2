@@ -28,6 +28,21 @@ The rebuild carries the four launch districts (cq, nsw, cw, wv) in `packages/eng
 
 **Central West `DMD max` is .68 in the rebuild. The MVP had .70.** It was tuned down in milestone 1.3 (14 Nov 2026) because Central West steers gained 154 kg a head in an average year against a benchmark of 115 to 130. At .68 they gain 128. It is a tuning value with no outside source. It sits between Central Queensland (.66) and the Northern Tablelands (.70). The other levers that were tried, and why they did not work, are in CALIBRATION.md. For Claudia to confirm.
 
+## District towns, for daylight
+
+First light and last light are worked out for each district's town (PRD 14.4), using the standard NOAA solar equations for civil dawn and dusk (sun 6 degrees below the horizon). Coordinates are the Bureau of Meteorology station for each town, read from the Bureau's climate statistics pages on 13 Nov 2026 (`https://www.bom.gov.au/climate/averages/tables/cw_<station number>.shtml`).
+
+| District | Town | Station | Latitude | Longitude | Time zone |
+|---|---|---|---|---|---|
+| cq | Emerald | Emerald Airport (035264) | 23.57 S | 148.18 E | Australia/Brisbane (no daylight saving) |
+| nsw | Armidale | Armidale Airport AWS (056238) | 30.53 S | 151.62 E | Australia/Sydney |
+| cw | Dubbo | Dubbo Airport AWS (065070) | 32.22 S | 148.58 E | Australia/Sydney |
+| wv | Hamilton | Hamilton Airport (090173) | 37.65 S | 142.06 E | Australia/Melbourne |
+
+Daylight saving comes from the time zone database, so past real years use the rules of their day.
+
+**Checked against a published table (13 Nov 2026).** The calculated times were compared with the US Naval Observatory's civil twilight times for the same coordinates (`https://aa.usno.navy.mil/api/rstt/oneday?date=<date>&coords=<lat>,<lon>&tz=10`, read 13 Nov 2026). Six dates for each of the four towns: 20 Mar, 21 Jun, 23 Sep and 21 Dec 2026, 15 Jan 1997 and 4 Jul 2010. The published times are rounded to the minute. The biggest difference in 48 times was 1.2 minutes, and 46 of the 48 were under one minute. The published times are kept in `packages/engine/src/daylight/daylight.test.ts`, and the test fails if any calculated time is more than 2 minutes out.
+
 ## Farm sizes (`FARMS`, ha: small / medium / large)
 
 | cq | nt | nsw | cw | wv |
