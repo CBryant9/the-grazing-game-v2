@@ -9,7 +9,7 @@
 
 import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
 export interface DateParts {
   year: number;
@@ -455,7 +455,58 @@ export interface Snapshot {
   inbox: InboxWire[];
   /** Messages the player has not opened, counting the ones past those shown. */
   inboxUnread: number;
-  over: { text: string } | null;
+  /** The live year so far: its number and its score if it closed today. */
+  score: { year: number; total: number };
+  over: OverWire | null;
+}
+
+/** What the game over screen shows. */
+export interface OverWire {
+  /** Why the game ended, in words. */
+  text: string;
+  /** Days the farm ran. */
+  days: number;
+  /** Each year's score, the year under way last. */
+  years: { n: number; total: number }[];
+  /** The scores added up. */
+  total: number;
+  /** Net worth at the end, dollars. */
+  worth: number;
+}
+
+/** One part of a year's score, in points. */
+export interface ScorePartWire {
+  key: 'profit' | 'gain' | 'util' | 'cover' | 'death';
+  label: string;
+  pts: number;
+}
+
+/** A farm year, finished or under way, as words and figures. */
+export interface YearView {
+  n: number;
+  title: string;
+  total: number;
+  parts: ScorePartWire[];
+  /** Plain sentences from the year's figures. */
+  facts: string[];
+  /** Money in (positive) and out (negative) for the year. Rows that are zero are left out. */
+  money: { label: string; dollars: number }[];
+}
+
+/** One day in the diary. The days are kept by the server, newest 400 only. */
+export interface DiaryDay {
+  day: number;
+  date: DateParts;
+  lines: string[];
+}
+
+/** The Scores and Diary panels' data. `earlier` is the `before` to send for older diary days, or null. */
+export interface RecordResponse {
+  soFar: YearView;
+  /** Finished years, newest first. */
+  years: YearView[];
+  diary: DiaryDay[];
+  earlier: number | null;
 }
 
 /** The job card: time, cost and light left, from the engine's own figures. */
@@ -557,6 +608,10 @@ export interface DayResponse {
   ok: true;
   snapshot: Snapshot;
   summary: SummaryWire;
+  /** The last year that closed during this day or skip, or null. */
+  yearEnd: YearView | null;
+  /** How many years closed during it. */
+  yearsClosed: number;
 }
 
 export interface FarmResponse {

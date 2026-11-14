@@ -37,7 +37,8 @@ import { marketWire } from './market';
 import { buildMobs } from './mobs';
 import { plansWire, planForm } from './plans';
 import { movedText } from './planwords';
-import { NO_WATER_WHY, causeWord, gameOverWord, stopWord, todoWire } from './words';
+import { NO_WATER_WHY, causeWord, stopWord, todoWire } from './words';
+import { liveScore, overWire } from './years';
 
 /** Messages the snapshot carries. The browser shows these; older ones stay on the server. */
 export const INBOX_SHOWN = 40;
@@ -47,7 +48,11 @@ const round = (n: number, places = 0): number => {
   return Math.round(n * k) / k;
 };
 
-const dateParts = (d: CalendarDate): DateParts => ({ year: d.year, month: d.month, date: d.date });
+export const dateParts = (d: CalendarDate): DateParts => ({
+  year: d.year,
+  month: d.month,
+  date: d.date,
+});
 
 const change = (c: { before: number; after: number }, places = 0): ChangeWire => ({
   before: round(c.before, places),
@@ -185,7 +190,8 @@ export function buildSnapshot(
     build: buildWire(materialsOnHand(farm)),
     inbox,
     inboxUnread,
-    over: farm.over ? { text: gameOverWord(farm.over.reason) } : null,
+    score: liveScore(farm),
+    over: farm.over ? overWire(farm, farm.over) : null,
   };
 }
 

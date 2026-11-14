@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   act: vi.fn(),
   day: vi.fn(),
   skip: vi.fn(),
+  record: vi.fn(),
 }));
 vi.mock('./api', () => {
   class ApiError extends Error {}
@@ -58,6 +59,9 @@ beforeEach(() => {
     paddockId: null,
     mobId: null,
     summary: null,
+    yearEnd: null,
+    morePage: 'menu',
+    record: null,
     jobs: {},
     acts: {},
     move: null,
@@ -92,6 +96,8 @@ describe('the game store', () => {
       ok: true,
       snapshot: snap({ day: 1 }),
       summary,
+      yearEnd: null,
+      yearsClosed: 0,
     } satisfies DayResponse);
     await useGame.getState().nextDay();
     const s = useGame.getState();
@@ -110,7 +116,7 @@ describe('the game store', () => {
     expect(useGame.getState().busy).toBe(1);
     await useGame.getState().nextDay();
     expect(api.day).toHaveBeenCalledTimes(1);
-    release({ ok: true, snapshot: snap({ day: 1 }), summary });
+    release({ ok: true, snapshot: snap({ day: 1 }), summary, yearEnd: null, yearsClosed: 0 });
     await first;
     expect(useGame.getState().busy).toBe(0);
   });
@@ -488,5 +494,90 @@ describe('the game store', () => {
       expect(useGame.getState().phase).toBe('broken');
       expect(useGame.getState().notice?.message).toBe('Your farm could not be opened.');
     });
+  });
+});
+
+describe('the year end card and the record panels', () => {
+  const year = {
+    n: 3,
+    title: 'Year 3',
+    total: 1200,
+    parts: [],
+    facts: [],
+    money: [],
+  };
+  const rec = (diary: { day: number }[] = [], earlier: number | null = null) => ({
+    soFar: year,
+    years: [],
+    diary: diary.map((d) => ({ ...d, date: { year: 1997, month: 8, date: 1 }, lines: ['x'] })),
+    earlier,
+  });
+
+  it('keeps the year that closed beside the summary, and closing it leaves the summary', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap() });
+    api.skip.mockResolvedValueOnce({
+      ok: true,
+      snapshot: snap({ day: 365 }),
+      summary,
+      yearEnd: year,
+      yearsClosed: 2,
+    } satisfies DayResponse);
+    await useGame.getState().skip('year');
+    let s = useGame.getState();
+    expect(s.yearEnd).toEqual({ view: year, closed: 2 });
+    expect(s.summary).toEqual(summary);
+    s.dismissYearEnd();
+    s = useGame.getState();
+    expect(s.yearEnd).toBeNull();
+    expect(s.summary).toEqual(summary);
+  });
+
+  it('fetches only when Scores or Diary is opened, and again after a day while one is open', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap(), tab: 'more' });
+    api.record.mockResolvedValue(rec([{ day: 1 }]));
+    api.day.mockResolvedValue({
+      ok: true,
+      snapshot: snap({ day: 1 }),
+      summary,
+      yearEnd: null,
+      yearsClosed: 0,
+    } satisfies DayResponse);
+    await useGame.getState().nextDay();
+    expect(api.record).not.toHaveBeenCalled();
+    useGame.getState().openMore('diary');
+    await vi.waitFor(() => expect(useGame.getState().record?.status).toBe('ready'));
+    expect(api.record).toHaveBeenCalledTimes(1);
+    await useGame.getState().nextDay();
+    await vi.waitFor(() => expect(api.record).toHaveBeenCalledTimes(2));
+    // Back at the menu, a day fetches nothing.
+    useGame.getState().openMore('menu');
+    await useGame.getState().nextDay();
+    expect(api.record).toHaveBeenCalledTimes(2);
+  });
+
+  it('adds older diary days to the end, and stops when there are none', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap(), tab: 'more' });
+    api.record.mockResolvedValueOnce(rec([{ day: 9 }, { day: 8 }], 8));
+    useGame.getState().openMore('diary');
+    await vi.waitFor(() => expect(useGame.getState().record?.status).toBe('ready'));
+    api.record.mockResolvedValueOnce(rec([{ day: 7 }], null));
+    await useGame.getState().loadEarlier();
+    expect(api.record).toHaveBeenLastCalledWith(8);
+    const r = useGame.getState().record!;
+    expect(r.diary.map((d) => d.day)).toEqual([9, 8, 7]);
+    expect(r.earlier).toBeNull();
+    await useGame.getState().loadEarlier();
+    expect(api.record).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a plain message with a retry when the record can not be fetched', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap(), tab: 'more' });
+    api.record.mockRejectedValueOnce(new ApiError('The game could not be reached.'));
+    useGame.getState().openMore('scores');
+    await vi.waitFor(() => expect(useGame.getState().record?.status).toBe('failed'));
+    expect(useGame.getState().record?.message).toBe('The game could not be reached.');
+    api.record.mockResolvedValueOnce(rec());
+    await useGame.getState().loadRecord();
+    expect(useGame.getState().record?.status).toBe('ready');
   });
 });

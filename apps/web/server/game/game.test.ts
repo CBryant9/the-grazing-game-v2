@@ -432,14 +432,15 @@ describe('the snapshot keeps the rules hidden', () => {
     }
     farm = endDay(farm).farm;
     expect(farmTotals(farm).head).toBeGreaterThan(4000);
-    const stored: StoredFarm = {
+    // A format 2 farm: it has no diary yet, and still loads.
+    const stored = {
       format: 2,
       version: 'abc123',
       done: [],
       name: 'Big Run',
       setup: choices({ district: 'cq' }),
       saved: saveFarm(farm),
-    };
+    } as unknown as StoredFarm;
     const store = new MemoryFarmStore();
     await store.put(farmIdFor(A), stored);
     const game = new GameServer({ store });

@@ -28,6 +28,17 @@ export function parseVersion(body: unknown): string {
   return v;
 }
 
+/** The `before` of a diary request: a farm day, a whole number from 0, or left out. Anything else is refused. */
+export function parseBefore(params: URLSearchParams): number | undefined {
+  const all = params.getAll('before');
+  if (all.length === 0) return undefined;
+  const v = all[0]!;
+  if (all.length > 1 || !/^\d{1,9}$/.test(v)) {
+    throw new GameError(400, 'That diary page is not valid.');
+  }
+  return Number(v);
+}
+
 /** The one-use id the browser made for an act request. */
 export function parseRequestId(body: unknown): string {
   const v = field(body, 'requestId');

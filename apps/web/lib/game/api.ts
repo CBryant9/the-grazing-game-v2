@@ -5,6 +5,7 @@ import type {
   DayResponse,
   FarmResponse,
   PreviewResponse,
+  RecordResponse,
   SetupChoices,
   SetupOptions,
   SkipRequestLength,
@@ -57,6 +58,8 @@ export const api = {
   preview: (req: ActionRequest) => request<PreviewResponse>('preview', 'POST', req),
   act: (req: ActRequest) => request<ActResponse>('act', 'POST', req),
   day: (version: string) => request<DayResponse | StaleResponse>('day', 'POST', { version }),
+  record: (before?: number) =>
+    request<RecordResponse>(`record${before === undefined ? '' : `?before=${before}`}`, 'GET'),
   inboxRead: (upTo: number) => request<FarmResponse>('inbox', 'POST', { upTo }),
   skip: (length: SkipRequestLength, anyway: boolean, version: string) =>
     request<DayResponse | StaleResponse>('skip', 'POST', { length, anyway, version }),

@@ -1043,6 +1043,37 @@ Calls made by the coordinator, for Claudia to confirm:
 2. The profit marker (not built) must not use red on the map when it is built (VISUALS).
 3. A cow booked for sale in "Cows" who reaches 50 days in calf by sale day is paid the PTIC premium, more than a figure worked out at booking. The sale pays by the record on the day.
 
+### 14 Nov 2026: m1.7g Scores and Diary
+
+Branch `m1.7g-scores-diary`, from `m1.7f-review-fixes`. No engine rule or number changed.
+
+What was built:
+
+- **Year view** (`apps/web/server/game/years.ts`): a year as `{ n, title, total, parts, facts, money }`, worked out and rounded on the server. The five parts are Profit, Weight gain, Pasture use, Ground cover and Deaths, in whole points. The facts are plain sentences from the year's figures. The money rows are cattle sales, cattle bought, supplements, grain, crops, infrastructure, running costs and interest, with zero rows left out.
+- **Wire:** snapshot version 1 to 2. The snapshot gains `score: { year, total }` (the year so far). Day and skip replies gain `yearEnd` (the last year that closed, or null) and `yearsClosed`. `over` is now `{ text, days, years, total, worth }`.
+- **`GET /api/game/record`:** `{ soFar, years, diary, earlier }`, with `?before=<day>` for older diary days, 30 days a page. Same session, cookie renewal and limits as the farm route. A bad `before` is refused with a 400.
+- **The diary** (`diary.ts`), kept in the farm file beside the engine save. Stored format 2 to 3. A format 2 file loads with an empty diary. The last 400 days are kept, 12 lines a day, then "and N more". Lines come from a job's result line, a day or skip's inbox messages (filed under the day each carries), and the money lines of the day or skip (filed under the last day that ran).
+- **Screens:** the year end card ("Year 3 done", the Year score, a bar for each part, the facts, "Start year 4"), the Scores panel and the Diary panel (both from More), and the game over card. Next day and the skips are refused by the server once the game is over (409 with a plain message), as well as being switched off on screen. The old strip at the foot of the map is gone.
+- The browser fetches the record only when Scores or Diary is opened, and again after a day or skip while one is open.
+
+How it was tested: new tests for the diary lists (the 400 day cap, the 12 line limit, paging), a skip of 30 days filing under the right days, a format 2 farm loading with an empty diary, the year end for a year skip (random and real years), the game over refusals, the record route (paging, bad input, limits, cookie), the client store (year card beside the summary, fetching, paging, failure), and the key lists for every new field. Then `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm test:speed`, `pnpm build` and `pnpm check:browser-bundle`.
+
+Calls for Claudia (what, why, how to change it):
+
+1. **The headline is "Year score".** It is the engine's existing year score and its five parts. The PRD's "Grazier Score" (5.8) has no agreed weights, so it is not shown. It comes with the leaderboards in Stage 4. To change: rename the label in `YearScore` in `YearBlocks.tsx` and the line in `MorePanel.tsx`.
+2. **No video or ad on the year end card.** Ads are Stage 5.
+3. **The Diary is a list of days, newest first, with "Show earlier days".** The drag timeline and "view the farm on a past day" need a stored snapshot for every day, which waits for the database in Stage 3.
+4. **The Diary keeps the last 400 days for each farm.** To change: `DIARY_DAYS` in `diary.ts`.
+5. **The snapshot version went from 1 to 2, not the map's farm view version (4).** The map's view did not change, only the snapshot and the day and skip replies. `FARM_VIEW_VERSION` is unchanged.
+6. **The day number in the Diary counts from Day 1.** The farm's own day count starts at 0 on the first day, so the diary shows that day as Day 1. The paging value `before` is the farm's own day.
+7. **A real-years farm titles a year "Year 3 · 1997".** The real year is the one the game year began in (September). A random-seasons farm says "Year 3".
+8. **The diary leaves out births and deaths from the day's summary.** The inbox messages already say each one, by mob and cause, so saying them again would double the lines. The summary adds only the money lines. A long skip files each message under the day it happened. The inbox keeps 120 messages, so on a skip of a whole year only the last 120 are filed.
+9. **A job's own inbox messages are not filed.** The job's result line is filed instead, once.
+10. **The game over card counts the year under way** as a last year, so the total adds every score the farm earned. The part year's score is its score as if it closed that day.
+11. **The part scores are rounded one by one,** so the five numbers can differ from the total by a point.
+12. **The money rows on a year are signed:** money in is shown with a plus, money out with a minus. Interest keeps the engine's sign (paid is negative).
+13. **Once the game is over the game over card covers the screen** with one way on, a new farm, behind the same "this farm will be gone" confirm as the More tab.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

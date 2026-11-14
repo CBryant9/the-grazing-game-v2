@@ -21,7 +21,9 @@ import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
 import { PlanFlow } from './PlanFlow';
 import { PlansPanel } from './PlansPanel';
+import { GameOverCard } from './GameOverCard';
 import { SummaryCard } from './SummaryCard';
+import { YearEndCard } from './YearEndCard';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
 import { TopBar } from './TopBar';
 import styles from './play.module.css';
@@ -46,28 +48,6 @@ function NoticeBar() {
           Dismiss
         </button>
       </div>
-    </div>
-  );
-}
-
-function GameOver() {
-  const restart = useGame((s) => s.restart);
-  const busy = useGame((s) => s.busy > 0);
-  const over = useGame((s) => s.snapshot?.over);
-  if (!over) return null;
-  return (
-    <div className={styles.gameover} role="status">
-      <p>{over.text}</p>
-      <button
-        type="button"
-        className="btn sm"
-        disabled={busy}
-        onClick={() => {
-          if (window.confirm('Start a new farm? This farm will be gone.')) void restart();
-        }}
-      >
-        Start a new farm
-      </button>
     </div>
   );
 }
@@ -145,6 +125,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const openPaddock = useGame((s) => s.openPaddock);
   const moveTargetPicked = useGame((s) => s.moveTargetPicked);
   const summary = useGame((s) => s.summary);
+  const yearEnd = useGame((s) => s.yearEnd);
   const build = useGame((s) => s.build);
   const buildDrag = useGame((s) => s.buildDrag);
   const buildTap = useGame((s) => s.buildTap);
@@ -278,7 +259,6 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             onFenceTap={(e) => void startFix(e.edge)}
           />
           <NoticeBar />
-          <GameOver />
           {!pc && tab === 'farm' && !sheetOpen && !build && <TodoBanner snapshot={snapshot} />}
           {sheetOpen && <Opened snapshot={snapshot} />}
           {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
@@ -292,7 +272,9 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         </main>
         {!pc && <Nav />}
       </div>
-      {summary && <SummaryCard summary={summary} />}
+      {yearEnd && <YearEndCard end={yearEnd} />}
+      {summary && !yearEnd && <SummaryCard summary={summary} />}
+      {snapshot.over && !yearEnd && !summary && <GameOverCard over={snapshot.over} />}
     </div>
   );
 }

@@ -303,6 +303,12 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
   - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
 - [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
 
+## 14 Nov 2026: build it all, with a list of calls at the end
+
+Her words (as typed): "ok yeah hook in- I would like them all done and would prefer a list of clals at the ends that yu explain and i could say if i wnated something diffferent - let sjust focu son getting this done, maybe you should open some chats unde ryou to get it done faster pleas"
+
+- [ ] Every stage is built without stopping for decisions. Each call is logged with its reason. Claudia gets one explained list at the end, and can change any of them.
+
 ## 14 Nov 2026: pregnancy on the record, no preg test
 
 Her words: "I think we're probably not going to pretest the mobs or need that animal husbandry, but we obviously do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the kind of general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry, I guess. I guess what they're considered is dry until they are progested. That's fine. What you pay in the calf sale premium is only for cows known to be... You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows. That's correct." (dictated; 'pretest' and 'progested' mean preg test and preg tested)

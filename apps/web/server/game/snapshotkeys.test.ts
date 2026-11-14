@@ -32,6 +32,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'paddocks',
     'planForm',
     'plans',
+    'score',
     'season',
     'todo',
     'totals',
@@ -145,7 +146,8 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'mobs[].classes[]': ['calf', 'cs', 'head', 'id', 'label', 'weightKg'],
   'mobs[].sellGroups[]': ['head', 'id', 'name'],
   'mobs[].suppOptions[]': ['id', 'label', 'perDay'],
-  over: ['text'],
+  over: ['days', 'text', 'total', 'worth', 'years'],
+  'over.years[]': ['n', 'total'],
   'paddocks[]': [
     'ae',
     'aePerHa',
@@ -186,6 +188,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'roundsMax',
     'timesADayMax',
   ],
+  score: ['total', 'year'],
   'plans[]': ['after', 'afterText', 'editable', 'id', 'legs', 'mobs', 'name'],
   'plans[].legs[]': ['rounds', 'roundsText', 'ruleText', 'stops', 'trigger'],
   'plans[].legs[].stops[]': ['cell', 'hasWater', 'name', 'paddock'],
@@ -230,7 +233,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'usesRestOfDay',
     'workMin',
   ],
-  day: ['message', 'ok', 'reason', 'snapshot', 'summary'],
+  day: ['message', 'ok', 'reason', 'snapshot', 'summary', 'yearEnd', 'yearsClosed'],
   'day.summary': [
     'arrived',
     'births',
@@ -287,7 +290,19 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'preview.card.line.doesNotFit': ['cells', 'edges', 'metres'],
   'preview.card.line.fits': ['cells', 'edges', 'metres'],
   'preview.card.line.fits.edges[]': ['index', 'line'],
-  skip: ['ok', 'snapshot', 'summary'],
+  skip: ['ok', 'snapshot', 'summary', 'yearEnd', 'yearsClosed'],
+  'skip.yearEnd': ['facts', 'money', 'n', 'parts', 'title', 'total'],
+  'skip.yearEnd.money[]': ['dollars', 'label'],
+  'skip.yearEnd.parts[]': ['key', 'label', 'pts'],
+  record: ['diary', 'earlier', 'soFar', 'years'],
+  'record.diary[]': ['date', 'day', 'lines'],
+  'record.diary[].date': ['date', 'month', 'year'],
+  'record.soFar': ['facts', 'money', 'n', 'parts', 'title', 'total'],
+  'record.soFar.money[]': ['dollars', 'label'],
+  'record.soFar.parts[]': ['key', 'label', 'pts'],
+  'record.years[]': ['facts', 'money', 'n', 'parts', 'title', 'total'],
+  'record.years[].money[]': ['dollars', 'label'],
+  'record.years[].parts[]': ['key', 'label', 'pts'],
   'skip.summary': [
     'arrived',
     'births',
@@ -403,7 +418,13 @@ async function serverFixtures(): Promise<{
     difficulty: 'medium',
     name: 'Keys',
   });
-  const replies: Record<string, unknown[]> = { preview: [], act: [], day: [], skip: [] };
+  const replies: Record<string, unknown[]> = {
+    preview: [],
+    act: [],
+    day: [],
+    skip: [],
+    record: [],
+  };
   const skipped = await game.skip(A, 'year');
   replies.skip!.push(skipped);
   let snap: Snapshot = skipped.snapshot;
@@ -438,6 +459,12 @@ async function serverFixtures(): Promise<{
       },
     }),
   );
+  // Skips go on until a year closes, so the year end card's keys are seen.
+  for (let i = 0; i < 8; i++) {
+    const more = await game.skip(A, 'year');
+    replies.skip!.push(more);
+    if (more.yearEnd) break;
+  }
   const week = await game.skip(A, 'week');
   replies.skip!.push(week);
   snap = week.snapshot;
@@ -461,6 +488,7 @@ async function serverFixtures(): Promise<{
   replies.act!.push(await game.act(A, { action: { type: 'markCalves', mob: 9999 } }));
   replies.preview!.push(await game.preview(A, { action: { type: 'markCalves', mob: 9999 } }));
   replies.day!.push(await game.endDay(A, 'abc'));
+  replies.record!.push(await game.record(A));
   const last = await game.snapshot(A);
   return { snaps: [snap, last!], replies };
 }
