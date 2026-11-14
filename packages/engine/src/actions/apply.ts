@@ -113,6 +113,7 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
+import { toldBought } from '../sim/told';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
@@ -327,6 +328,8 @@ function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   const total = price + units * HEAD_FEE + (unitFreight ? units * unitFreight : 0);
   const no = j.bankSays(total, 'cattle');
   if (no) return no;
+  // Cows sold as PTIC (pregnancy-tested in calf): the player knows they are in calf.
+  toldBought(farm, list);
   if (clocked) {
     // Paid for now, in the yards at first light tomorrow. Not on any ground until then.
     const arriveDay = farm.day + 1;

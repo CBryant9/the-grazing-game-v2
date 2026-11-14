@@ -20,7 +20,7 @@ import { DISTRICTS } from '../data/districts';
 import type { Rng } from '../rng';
 import { areaIdOf, placeAnchor } from './derived';
 import type { FarmEvent } from './events';
-import type { FarmMob, FarmState, MobWhere } from './state';
+import { deepCopy, type FarmMob, type FarmState, type MobWhere } from './state';
 
 /** Central Queensland runs a dry-season lick, so mobs there start on it. */
 export const defaultSupplement = (district: DistrictId): Supplement =>
@@ -77,6 +77,8 @@ export function mergeShared(farm: FarmState, survey: Survey, events?: FarmEvent[
       if (t.supp === 'none' && o.supp !== 'none') t.supp = o.supp;
       // A mob that joins keeps its plan if the biggest has none, as in the old game.
       if (!t.plan && o.plan) t.plan = o.plan;
+      // And its joining report and preg test, the same way (display state only).
+      if (!t.reports && o.reports) t.reports = o.reports;
       events?.push({
         type: 'mobs-joined',
         from: o.id,
@@ -206,6 +208,8 @@ export function splitMobs(
         t.supp = m.supp;
         t.dry = m.dry;
         t.lastBreak = m.lastBreak;
+        // The strays had the mob's joining report and preg test too (display state only).
+        if (m.reports) t.reports = deepCopy(m.reports);
         t.animals = g;
       }
       report.push({ mob: t.id, mobName: t.name, area: r.name, head: g.length });

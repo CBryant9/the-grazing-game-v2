@@ -57,7 +57,12 @@ export function centsPerKg(a: Priced, prices: Prices): number {
   return c;
 }
 
-/** What an animal makes at the saleyards, dollars, before selling costs. */
+/**
+ * What an animal makes at the saleyards, dollars, before selling costs.
+ * It carries the pregnancy premium from a female's 50th day in calf, tested
+ * or not, so a figure from it on a player's screen can give a pregnancy
+ * away (docs/MODEL.md, section 3, "What the player is told").
+ */
 export function saleValue(a: Priced, prices: Prices): number {
   let v = (a.wt * centsPerKg(a, prices)) / 100;
   if ((a.kind === 'cow' || a.kind === 'heifer') && a.preg >= PREG_PREMIUM.fromDays) {

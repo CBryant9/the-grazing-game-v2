@@ -91,7 +91,12 @@ export function makeSaleBatch(ids: AnimalIds, rng: Rng, key: SaleClassId, qty: n
   return list;
 }
 
-/** The class an animal is listed under in the herd list and the stock book. */
+/**
+ * The class an animal is listed under in the herd list and the stock book.
+ * NOT FOR THE PLAYER'S SCREENS on its own: it says PTIC from the day a
+ * female conceives. Screens use `knownClassOf` (sim/told.ts) or
+ * `breedingReports`, which say PTIC only once the player has been told.
+ */
 export function classOf(a: Animal): CattleClassId {
   switch (a.kind) {
     case 'steer':
@@ -113,10 +118,14 @@ export function classOf(a: Animal): CattleClassId {
   }
 }
 
-/** The name of an animal's class, for example "Yearling steer". */
+/** The name of an animal's class, for example "Yearling steer". Not for the player's screens: see `classOf`. */
 export const label = (a: Animal): string => CLASS_LABELS[classOf(a)];
 
-/** The group an animal is drafted and counted in. */
+/**
+ * The group an animal is drafted and counted in. Not for the player's
+ * screens: like `classOf` it puts a female in the PTIC group from the day
+ * she conceives.
+ */
 export function groupKey(a: Animal): GroupId {
   if (a.kind === 'heifer') return a.preg >= 0 ? 'heiferP' : 'heifer';
   if (a.kind === 'cow') return a.preg >= 0 ? 'cowP' : 'cowE';

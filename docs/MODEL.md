@@ -378,6 +378,24 @@ Details from the code (milestone 1.2a):
 - A calf is a bull calf or a heifer calf, 50:50. About 4% of heifer calves are barren.
 - Joining reports every 3 weeks; a preg test at 9 weeks compares against the expected rate and leaves out recently calved cows.
 
+### What the player is told (rebuild, 14 Nov 2026)
+
+A grazier can't see which cows are in calf. The engine tells the player, as notes in the day's events:
+
+- **When a joining starts** (a bull with the females): the adult bulls, the females ready to get in calf, and females per bull.
+- **A joining report at 3 and 6 weeks** (`JOINING_REPORT_DAYS = 21`), when any female got in calf in those 3 weeks: the weeks, the head that got in calf in the 3 weeks, the head in calf now, and the females old and heavy enough to join.
+- **The preg test** at the end of the joining (`JOINING_DAYS = 63`, 9 weeks), or when the bull comes out after 3 weeks or more: in calf, females counted, the rate, the rate expected at their condition, the dry, their average condition and the recently calved left out as too soon to tell. While the bull stays, the next joining starts the same day.
+- **A slipped calf** (no cow named), a calf lost at birth, calving starting, and births.
+- **Cattle bought PTIC** (pregnancy-tested in calf), including the PTIC cows a running farm starts with, are in calf by what the saleyard says. A cow with a calf at foot can be seen.
+
+`breedingReports(farm)` is the one read of pregnancy for the player's screens. For each mob it gives the latest joining report and the latest preg test, each with the farm day it was made, the head **known** in calf (cows and heifers: bought PTIC, or in calf at a preg test since, until they calve, slip the calf, die or are sold), and the class table as the player knows it (a female counts as PTIC only when known). On a day with no report or test it changes only by calving, a slip (reported), death, sale or a move of stock. Screens say how long a joining runs from `JOINING_DAYS` and `JOINING_REPORT_DAYS`. The farm view's `classes` for each mob are the same known classes.
+
+What is kept for this is display state only: the tag numbers known in calf (`farm.knownInCalf`) and each mob's latest reports (`mob.reports`). No formula, price or chance reads either; a test runs a farm with both wiped every day and gets the same farm. A mob that joins another keeps the bigger mob's reports, or takes the other's if it has none (as a plan does); strays keep the mob's reports; a new mob made by weaning or by moving part of a mob starts with none. A save from before this loads with no female known in calf and each mob's latest reports read back from the inbox.
+
+**Fields that show live pregnancy, kept for tests and calibration and marked "not for the player's screens":** `mobSummaries(...).classes` and `.saleValue`, `classOf`, `label`, `groupKey`, and an animal's `preg`.
+
+**The pregnancy premium (not changed; a question for Claudia).** An animal's sale value adds $320 at an indicator of 400c/kg (scaled with the indicator) from a female's **50th day in calf**, tested or not. It does not move on the day she conceives. But on her 50th day it lifts her net sale value by about $304 at 400c (after 5% commission), and with it her mob's `saleValue` in the mob summaries, the stock part of net worth (`netWorth`, `netWorthParts`, `farmTotals`) and the year's running score. A player who watches the mob's sale value or net worth from one day to the next can see a step that weight and price don't explain, and count the cows that reached 50 days in calf: for a cow that conceived on the first day of a joining that is 13 days before the preg test. Late pregnancy shows the same way at 190 days in AE (× 1.1), well after the test. The options: leave it, or apply the premium only to cows known to be PTIC. Selling the "Cows (PTIC)" group by `sellGroup` also picks cows by live pregnancy.
+
 ### Deaths
 
 - Base 0.004% a day.

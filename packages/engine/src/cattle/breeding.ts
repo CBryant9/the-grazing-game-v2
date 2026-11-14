@@ -46,6 +46,15 @@ export const WEAN_MIN_AGE = 90;
 export const MARK_NOTE_MIN_AGE = 60;
 /** The drop is weaned once a calf reaches this age in days. */
 export const WEAN_TRIGGER_AGE = 280;
+/**
+ * A joining runs this many days (9 weeks, three cycles) from when a bull is
+ * first with the females. The preg test is at its end. While the bull stays,
+ * the next joining starts that day. For screens: say how long a joining runs
+ * from this, never a number of their own.
+ */
+export const JOINING_DAYS = 63;
+/** A joining report comes every this many days (3 weeks) through a joining, before the preg test. */
+export const JOINING_REPORT_DAYS = 21;
 
 /** Chance of conceiving in one cycle, by condition score. */
 export function condConc(c: number): number {
@@ -166,9 +175,30 @@ export function weaningDue(m: CattleMob, byId: AnimalLookup): boolean {
  * dried off too. (The MVP only looked in the calf's own mob.)
  */
 export function weanMob(m: CattleMob, byId: AnimalLookup): Animal[] {
-  const calves = m.animals.filter((a) => a.kind === 'calf' && a.age >= WEAN_MIN_AGE);
+  const calves = weanable(m);
   for (const c of calves) weanOne(c, byId);
   return calves;
+}
+
+/** The calves in the mob old enough to wean: 90 days or more. `weanMob` weans these. */
+export function weanable(m: Pick<CattleMob, 'animals'>): Animal[] {
+  return m.animals.filter((a) => a.kind === 'calf' && a.age >= WEAN_MIN_AGE);
+}
+
+/** The bull calves and unmarked young bulls in the mob. `markCalves` marks these. */
+export function markable(m: Pick<CattleMob, 'animals'>): Animal[] {
+  return m.animals.filter((a) => a.sex === 'M' && (a.kind === 'calf' || a.young));
+}
+
+/**
+ * The females a joining counts: cows and heifers old and heavy enough to
+ * cycle (400 days and 270 kg). The joining reports and the preg test count
+ * these.
+ */
+export function joiningFemales(m: Pick<CattleMob, 'animals'>): Animal[] {
+  return m.animals.filter(
+    (a) => (a.kind === 'cow' || a.kind === 'heifer') && a.age >= PUBERTY.age && a.wt >= PUBERTY.wt,
+  );
 }
 
 /** What marking a mob did. */
@@ -185,7 +215,7 @@ export interface MarkResult {
  * weight.
  */
 export function markCalves(m: CattleMob): MarkResult {
-  const list = m.animals.filter((a) => a.sex === 'M' && (a.kind === 'calf' || a.young));
+  const list = markable(m);
   let cost = 0;
   for (const a of list) {
     const old = a.kind !== 'calf';
@@ -208,7 +238,7 @@ export function markCalves(m: CattleMob): MarkResult {
  */
 export function joinReport(fem0: readonly Animal[], preg: number): CattleNote {
   const fem = fem0.filter(
-    (a) => a.preg >= 0 || (cycling(a) && (a.lact < 0 || a.lact >= anoDays(a) + 63)),
+    (a) => a.preg >= 0 || (cycling(a) && (a.lact < 0 || a.lact >= anoDays(a) + JOINING_DAYS)),
   );
   const soon = fem0.length - fem.length;
   const cs = fem.reduce((s, a) => s + a.cond, 0) / Math.max(1, fem.length);
@@ -242,9 +272,7 @@ export function breedingNotes(
   day: number,
   notes: CattleNote[],
 ): void {
-  const fem = m.animals.filter(
-    (a) => (a.kind === 'cow' || a.kind === 'heifer') && a.age >= PUBERTY.age && a.wt >= PUBERTY.wt,
-  );
+  const fem = joiningFemales(m);
   const preg = fem.filter((a) => a.preg >= 0).length;
   const ready = fem.filter((a) => a.preg < 0 && !a.barren && cycling(a));
   // Bull calves due for marking.
@@ -274,7 +302,12 @@ export function breedingNotes(
       });
     }
     const days = day - m.join.start;
-    if (days > 0 && days % 21 === 0 && days < 63 && m.join.conc > m.join.last) {
+    if (
+      days > 0 &&
+      days % JOINING_REPORT_DAYS === 0 &&
+      days < JOINING_DAYS &&
+      m.join.conc > m.join.last
+    ) {
       notes.push({
         type: 'joiningProgress',
         weeks: days / 7,
@@ -284,12 +317,12 @@ export function breedingNotes(
       });
       m.join.last = m.join.conc;
     }
-    if (days > 0 && days % 63 === 0) {
+    if (days > 0 && days % JOINING_DAYS === 0) {
       if (m.join.elig > 0 || m.join.conc > 0) notes.push(joinReport(fem, preg));
       m.join = { start: day, conc: 0, last: 0, elig: ready.length };
     }
   } else if (m.join) {
-    if (day - m.join.start >= 21 && (m.join.elig > 0 || m.join.conc > 0)) {
+    if (day - m.join.start >= JOINING_REPORT_DAYS && (m.join.elig > 0 || m.join.conc > 0)) {
       notes.push(joinReport(fem, preg));
     }
     m.join = null;

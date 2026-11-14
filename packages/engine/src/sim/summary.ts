@@ -27,7 +27,15 @@ import {
   type SourceEnv,
 } from './derived';
 import type { FarmEvent } from './events';
-import type { FarmState, MobWhere, YearRecord, YearTotals } from './state';
+import type {
+  FarmState,
+  JoiningReport,
+  MobWhere,
+  PregTestReport,
+  YearRecord,
+  YearTotals,
+} from './state';
+import { knownClassOf, knownInCalfSet } from './told';
 
 export interface MobSummary {
   id: number;
@@ -44,19 +52,33 @@ export interface MobSummary {
   /** Adult equivalents, and dry sheep equivalents (AE x 8). */
   ae: number;
   dse: number;
-  /** Head in each class. */
+  /**
+   * Head in each class. NOT FOR THE PLAYER'S SCREENS: it counts a female as
+   * PTIC from the day she conceives, which a grazier can't know. It is for
+   * tests and calibration. Screens use `breedingReports` (classes as the
+   * player knows them).
+   */
   classes: Partial<Record<CattleClassId, number>>;
   /** Days in a row without water. Everything dies on day 4. */
   dryDays: number;
   /** The mob's figures from its last day: weight, CS, gain, diet ME and CP, intake. Null before its first day. */
   day: MobDay | null;
-  /** What the mob would put in the bank if sold today, dollars. */
+  /**
+   * What the mob would put in the bank if sold today, dollars. NOT FOR THE
+   * PLAYER'S SCREENS as it stands: it carries the pregnancy premium from a
+   * female's 50th day in calf, before any preg test (docs/MODEL.md, section
+   * 3, "What the player is told").
+   */
   saleValue: number;
   /** Head in the mob (calves at foot included) that are booked onto a sale, so a screen can mark them. */
   booked: number;
 }
 
-/** Every mob's figures, in the farm's order. */
+/**
+ * Every mob's figures, in the farm's order. Built for tests and calibration:
+ * `classes` and `saleValue` show live pregnancy and are not for the player's
+ * screens (see each field).
+ */
 export function mobSummaries(farm: FarmState): MobSummary[] {
   const survey = surveyOf(farm);
   const prices = pricesOf(farm);
@@ -93,6 +115,60 @@ export function mobSummaries(farm: FarmState): MobSummary[] {
       day: m.st,
       saleValue,
       booked: m.animals.reduce((n, a) => n + (booked.has(a.id) ? 1 : 0), 0),
+    };
+  });
+}
+
+/** One mob's breeding, as the player has been told it. */
+export interface MobBreedingReport {
+  mob: number;
+  name: string;
+  /** The latest three-weekly joining report, with the farm day it was made, or null. */
+  joining: JoiningReport | null;
+  /** The latest preg test result, with the farm day it was made, or null. */
+  pregTest: PregTestReport | null;
+  /**
+   * Head the player knows are in calf: bought PTIC, or in calf at a preg
+   * test since, until they calve (or slip the calf, which is reported).
+   */
+  knownInCalf: { cows: number; heifers: number };
+  /**
+   * Head in each class as the player knows it: the herd list, except that a
+   * female counts as PTIC only when she is known to be in calf. Like the
+   * herd list it follows weight, age and calves at foot.
+   */
+  classes: Partial<Record<CattleClassId, number>>;
+}
+
+/**
+ * What each mob's joining has told the player, in the farm's order: the
+ * latest joining report and preg test, and the head known in calf. The only
+ * read of pregnancy for the player's screens. On a day with no report or
+ * test, the reports and the known head change only by calving, a slipped
+ * calf (reported), death, sale or a move of stock. How long a joining runs
+ * is `JOINING_DAYS`, and the reports come every `JOINING_REPORT_DAYS`.
+ */
+export function breedingReports(farm: FarmState): MobBreedingReport[] {
+  const known = knownInCalfSet(farm);
+  return farm.mobs.map((m) => {
+    let cows = 0;
+    let heifers = 0;
+    const classes: Partial<Record<CattleClassId, number>> = {};
+    for (const a of m.animals) {
+      if (a.preg >= 0 && known.has(a.id)) {
+        if (a.kind === 'cow') cows++;
+        else if (a.kind === 'heifer') heifers++;
+      }
+      const c = knownClassOf(a, known);
+      classes[c] = (classes[c] ?? 0) + 1;
+    }
+    return {
+      mob: m.id,
+      name: m.name,
+      joining: m.reports?.joining ? { ...m.reports.joining } : null,
+      pregTest: m.reports?.pregTest ? { ...m.reports.pregTest } : null,
+      knownInCalf: { cows, heifers },
+      classes,
     };
   });
 }

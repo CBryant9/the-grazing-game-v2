@@ -63,6 +63,10 @@ export const ENGINE_VERSION = '0.10.0';
  *
  * 7: engine rules after the screens review (14 Nov 2026). A farm's layout
  * has `fenceOnHand` (permanent and electric fence materials kept, in
- * segments). An older save loads with none on hand.
+ * segments). A farm has `knownInCalf` (the females the player knows are in
+ * calf) and a mob may have `reports` (its latest joining report and preg
+ * test), both display state only. An older save loads with nothing on hand,
+ * no female known in calf, and each mob's latest reports read back from
+ * the inbox.
  */
 export const SAVE_FORMAT_VERSION = 7;

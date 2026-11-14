@@ -153,6 +153,8 @@ export {
   CYCLE_DAYS,
   FEMALES_PER_BULL,
   GESTATION_DAYS,
+  JOINING_DAYS,
+  JOINING_REPORT_DAYS,
   LACTATING_CONCEPTION,
   PUBERTY,
   WEAN_MIN_AGE,
@@ -166,8 +168,11 @@ export {
   cycling,
   expectedRate,
   joinReport,
+  joiningFemales,
   markCalves,
+  markable,
   weanMob,
+  weanable,
   weanOne,
   weaningDue,
 } from './cattle/breeding';
@@ -492,8 +497,10 @@ export type {
   GameOverReason,
   InboxMessage,
   InfraLedger,
+  JoiningReport,
   LoggedAction,
   MarketState,
+  MobReports,
   MobWhere,
   PlanLeg,
   PlanRule,
@@ -501,6 +508,7 @@ export type {
   PlanTemplate,
   PlanWaitReason,
   PlayStream,
+  PregTestReport,
   PriceDay,
   RealYearsSpec,
   SaleBooking,
@@ -537,6 +545,8 @@ export {
 } from './sim/derived';
 export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
+// What the player has been told about breeding (14 Nov 2026). Display state only.
+export { knownClassOf } from './sim/told';
 export { perDay, plansView, positionOf, stepOf, stepsIn, stopsToday } from './sim/plans';
 export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
 export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
@@ -552,6 +562,7 @@ export {
 } from './sim/tick';
 export type { DayResult, TickEnv } from './sim/tick';
 export {
+  breedingReports,
   calibrationView,
   farmTotals,
   materialsOnHand,
@@ -562,6 +573,7 @@ export {
 export type {
   CalibrationView,
   FarmTotals,
+  MobBreedingReport,
   MaterialsOnHand,
   MobSummary,
   PaddockView,

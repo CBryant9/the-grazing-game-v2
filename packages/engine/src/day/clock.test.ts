@@ -213,6 +213,7 @@ describe('looking is free', () => {
       farmTotals: (f, env) => engine.farmTotals(f, env),
       mobSummaries: (f) => engine.mobSummaries(f),
       materialsOnHand: (f) => engine.materialsOnHand(f),
+      breedingReports: (f) => engine.breedingReports(f),
       paddockSummaries: (f, env) => engine.paddockSummaries(f, env),
       farmHash: (f) => engine.farmHash(f),
       saveFarm: (f) => engine.saveFarm(f),
