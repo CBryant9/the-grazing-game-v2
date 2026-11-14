@@ -100,6 +100,10 @@ describe('a farm with no hands and no contractors is unchanged', () => {
   });
 });
 
-// Taken on engine 0.12.1, before labour existed.
-const NO_HANDS_RANDOM = '119de6c1e6862bb2';
-const NO_HANDS_REAL = 'a52568e82c5f4cdf';
+// Taken on engine 0.12.1, before labour existed: '119de6c1e6862bb2' and
+// 'a52568e82c5f4cdf'. Taken again on engine 0.14.0 (m2.5), because the
+// cattle model changed on purpose: stock under 200 kg pay the measured cost
+// for a kg of gain (docs/CALIBRATION.md, the m2.5 calf growth entry). Labour
+// did not change. The farms are the same; only the cattle figures moved.
+const NO_HANDS_RANDOM = '036ce92cfab0d0a3';
+const NO_HANDS_REAL = 'd17af7448c544195';

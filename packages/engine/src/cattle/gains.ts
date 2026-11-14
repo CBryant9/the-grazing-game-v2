@@ -6,7 +6,7 @@
  * every warning can say why (CLAUDE.md, rule 5) in wording the screens own.
  */
 
-import type { CattleClassId } from '../data/cattle';
+import { YOUNG_GAIN_COST, type CattleClassId } from '../data/cattle';
 import type { Supplement } from '../data/feed';
 import { clamp } from '../num';
 import { meFromDmd } from '../pasture/quality';
@@ -25,6 +25,23 @@ export function milkMJ(a: Animal, me: number): number {
   );
 }
 
+/**
+ * MJ of ME for each kg an animal of this live weight gains (YOUNG_GAIN_COST).
+ * From 200 kg it is the MVP's 20 + 0.045 x LW for every animal. Lighter
+ * animals pay the measured calf figure, moving to the grown figure in a
+ * straight line from 100 to 200 kg. The MVP charged a 60 kg calf the grown
+ * figure, about twice what was measured (BUILD_PLAN 2.4: fixed, not copied).
+ */
+export function mjPerKgGain(wt: number): number {
+  const grown = 20 + 0.045 * wt;
+  if (wt >= YOUNG_GAIN_COST.grownFromKg) return grown;
+  const young = YOUNG_GAIN_COST.mjPerKg075 * Math.pow(wt, 0.75);
+  if (wt <= YOUNG_GAIN_COST.youngToKg) return young;
+  const t =
+    (wt - YOUNG_GAIN_COST.youngToKg) / (YOUNG_GAIN_COST.grownFromKg - YOUNG_GAIN_COST.youngToKg);
+  return young + (grown - young) * t;
+}
+
 /** Expected weight change, kg a day, for one animal on a diet with its fill of feed. */
 export function gainOn(a: Animal, diet: Diet, supp: Supplement): number {
   const it = intakeOf(a, diet, supp, false);
@@ -35,7 +52,7 @@ export function gainOn(a: Animal, diet: Diet, supp: Supplement): number {
   if (a.lact >= 0 && a.calf) req += milkMJ(a, meFromDmd(diet.dmd)) / 0.65;
   const cap = a.kind === 'steer' ? 1.6 : a.kind === 'bull' ? 1.4 : 1.1;
   const bal = mei - req;
-  return clamp(bal > 0 ? bal / (20 + 0.045 * a.wt) : bal / 22, -1.5, cap);
+  return clamp(bal > 0 ? bal / mjPerKgGain(a.wt) : bal / 22, -1.5, cap);
 }
 
 /** Up to two reasons an animal is not gaining on this feed, most basic first. */

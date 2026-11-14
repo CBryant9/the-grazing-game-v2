@@ -17,7 +17,9 @@
  * and after the last mob: settleDeaths(mobs, deaths, byId, totals).
  *
  * MVP faults fixed here (BUILD_PLAN 2.4): the no-water count clears in the
- * feedlot, and a cow whose calf dies is dried off.
+ * feedlot, a cow whose calf dies is dried off, and stock under 200 kg pay
+ * the measured cost for a kg of gain, not the grown animal's
+ * (`mjPerKgGain`, engine 0.14.0).
  */
 
 import type { Supplement } from '../data/feed';
@@ -35,7 +37,7 @@ import {
   cycling,
   weanOne,
 } from './breeding';
-import { milkMJ, predictGains } from './gains';
+import { milkMJ, mjPerKgGain, predictGains } from './gains';
 import { LOT_DIET, dietOf, grazeAlloc, intakeOf, type Diet, type PlantingGraze } from './graze';
 import type { CattleNote } from './notes';
 import type {
@@ -263,7 +265,8 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
       if (dam && !dam.dead) mei += dam.milk;
     }
     const bal = mei - req;
-    let gain = bal > 0 ? bal / (20 + 0.045 * W_) : bal / 22;
+    // Light stock pay the measured calf cost for a kg of gain (mjPerKgGain).
+    let gain = bal > 0 ? bal / mjPerKgGain(W_) : bal / 22;
     const cap = a.kind === 'steer' ? 1.6 : a.kind === 'bull' ? 1.4 : a.kind === 'calf' ? 1.15 : 1.1;
     gain = clamp(gain, -1.5, cap);
     // No water: fast weight loss.

@@ -185,6 +185,46 @@ export interface PregTest {
   females: number;
 }
 
+/** A calf born on the farm during a run, weighed on the day it reached 200 days old. */
+export interface CalfAt200 {
+  /** Weight on the day it was born, kg. */
+  birthKg: number;
+  /** Weight on the day it reached 200 days, kg, weaned or not. */
+  kg: number;
+}
+
+/**
+ * Watches the calves born on the farm: call `day` after each `stepDay`.
+ * Bought calves at foot are left out (they never appear at 0 days).
+ */
+export class CalfWatch {
+  private readonly born = new Map<number, number>();
+  private readonly weanedIds = new Set<number>();
+  readonly at200: CalfAt200[] = [];
+  /** Calves born on the farm, on the day they were weaned: age in days and kg. */
+  readonly weaned: { age: number; kg: number }[] = [];
+
+  day(farm: FarmState): void {
+    for (const m of farm.mobs) {
+      for (const a of m.animals) {
+        if (a.dead) continue;
+        if (a.kind === 'calf' && a.age === 0 && !this.born.has(a.id)) this.born.set(a.id, a.wt);
+        else if (this.born.has(a.id)) {
+          if (a.age === CALF_WEIGH_AGE)
+            this.at200.push({ birthKg: this.born.get(a.id)!, kg: a.wt });
+          if (a.kind !== 'calf' && !this.weanedIds.has(a.id)) {
+            this.weanedIds.add(a.id);
+            this.weaned.push({ age: a.age, kg: a.wt });
+          }
+        }
+      }
+    }
+  }
+}
+
+/** The age the calf benchmarks weigh at: MLA tool 5.05 reads weights at 200 days. */
+export const CALF_WEIGH_AGE = 200;
+
 export interface HerdRun {
   seed: number;
   /** Head on the farm at the start, not counting calves. */
@@ -196,6 +236,8 @@ export interface HerdRun {
   pregTests: PregTest[];
   seasons: RunSeasons;
   msPerDay: number;
+  /** Calves born in the run that reached 200 days in it. */
+  calves: CalfAt200[];
 }
 
 /**
@@ -226,15 +268,20 @@ export function herdRun(
   );
   const h0 = headOf(farm);
   const pregTests: PregTest[] = [];
-  const t0 = performance.now();
+  const calves = new CalfWatch();
+  let ms = 0;
   for (let d = 0; d < 365; d++) {
-    for (const e of stepDay(farm, env).events) {
+    const t0 = performance.now();
+    const events = stepDay(farm, env).events;
+    ms += performance.now() - t0;
+    for (const e of events) {
       if (e.type === 'cattle' && e.note.type === 'pregTest') {
         pregTests.push({ rate: e.note.rate, expected: e.note.expected, females: e.note.females });
       }
     }
+    calves.day(farm);
   }
-  const msPerDay = (performance.now() - t0) / 365;
+  const msPerDay = ms / 365;
   const year0 = farm.years[0] ?? farm.year;
   return {
     seed,
@@ -244,5 +291,6 @@ export function herdRun(
     pregTests,
     seasons: seasonsOver(farm, 365, env),
     msPerDay,
+    calves: calves.at200,
   };
 }

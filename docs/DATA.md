@@ -831,9 +831,9 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 
 All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.
 
-## Calf growth to weaning (m2.5, 15 Nov 2026, sourced, not yet used by the model)
+## Calf growth to weaning (m2.5, 15 Nov 2026)
 
-Looked up for the calf growth benchmark. None of these figures is in the engine yet: the model change they point to is waiting on Claudia (CALIBRATION.md, the m2.5 entry). "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
+Looked up for the calf growth benchmark (CALIBRATION.md, the m2.5 entry). In the engine: `YOUNG_GAIN_COST` (`data/cattle.ts`) is 0.52 MJ per kg LW^0.75 for each kg of gain up to 100 kg, moving in a straight line to the grown figure (20 + 0.045 × LW) by 200 kg: from Sekine and Asahida below (510 to 520 kJ for calves under 100 kg; the 200 kg end is where their data stop, at 195 kg). To change it, change the three numbers there. The weaning figures are the benchmark bands in `calibration/herds.test.ts`. "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
 
 **Growth to weaning and weaning weight**
 

@@ -113,6 +113,23 @@ export type SaleClassId = keyof typeof SALE_CLASSES;
 /** Chance a female is barren: she never gets in calf. */
 export const BARREN_CHANCE = 0.04;
 
+/**
+ * The energy a young animal needs for each kg it gains (docs/MODEL.md,
+ * section 3; docs/DATA.md, "Calf growth to weaning").
+ *
+ * Up to `youngToKg` a kg of gain costs `mjPerKg075` MJ of ME for each kg of
+ * live weight to the power 0.75: Sekine and Asahida (JARQ 1990, 24:141-148)
+ * measured 510 to 520 kJ per kg LW^0.75 for calves under 100 kg. From
+ * `grownFromKg` it costs the grown-animal figure, 20 + 0.045 x LW MJ, which
+ * the steer benchmarks hold. Between the two the cost moves in a straight
+ * line, so there is no step at weaning or at any weight. The same paper
+ * measured 575 and 483 kJ for calves of 100-149 and 150-195 kg (still under
+ * the grown figure), and its data stop at 195 kg, so the move to the
+ * grown-animal cost is finished by 200 kg. Weight, not age or kind, decides
+ * it: a weaner of 150 kg pays what a calf of 150 kg pays.
+ */
+export const YOUNG_GAIN_COST = { mjPerKg075: 0.52, youngToKg: 100, grownFromKg: 200 } as const;
+
 /** A calf at foot bought with its dam weighs this at birth, plus the gain a day below. */
 export const BOUGHT_CALF = { birthKg: 36, kgPerDay: 0.8 } as const;
 

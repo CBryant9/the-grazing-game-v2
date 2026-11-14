@@ -58,8 +58,15 @@
  * cattle, crop, season or price formula changed. A farm with no hands and
  * no contract fencing plays exactly as it did on 0.12.1 (a test holds its
  * digest).
+ *
+ * 0.14.0 (m2.5, calf growth): stock under 200 kg pay the measured energy
+ * cost for a kg of gain (Sekine and Asahida 1990), moving to the grown
+ * animal's cost in a straight line from 100 to 200 kg (`mjPerKgGain`). A
+ * deliberate cattle model change: calves grow faster. Logged in
+ * docs/CALIBRATION.md (the m2.5 entry); the no-hands digests were taken
+ * again. No stored field changed, so the save format stays 9.
  */
-export const ENGINE_VERSION = '0.13.0';
+export const ENGINE_VERSION = '0.14.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
