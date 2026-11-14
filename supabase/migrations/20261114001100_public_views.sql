@@ -19,7 +19,8 @@ select
   p.user_id,
   p.username,
   p.display_name,
-  p.avatar_path,
+  -- A photo shows only once the image check has passed on it.
+  case when p.avatar_status = 'approved' or p.user_id = app.uid() then p.avatar_path end as avatar_path,
   app.can_see_profile(p.user_id) as details_visible,
   case when app.can_see_profile(p.user_id) then p.bio end as bio,
   case when app.can_see_profile(p.user_id) then p.town end as town,
@@ -38,9 +39,10 @@ from public.profiles p
 where app.can_find_profile(p.user_id);
 
 -- Leaderboard rows (9.8, 8.3). Anyone may read them while the leaderboards
--- switch is on (the public leaderboard pages). Under 16: username and
--- district only, no photo, no profile link, no farm name. Rows across a
--- block are left out. A deleted account shows as "Former player".
+-- switch is on (the public leaderboard pages). Under 16, or a private
+-- profile: username and district only, no photo, no account id, no farm
+-- name. A deleted, banned or suspended account shows as "Former player".
+-- Rows across a block are left out.
 create view public.leaderboard_rows
 with (security_barrier = true)
 as
@@ -59,11 +61,19 @@ select
   e.score,
   e.days,
   e.continued,
-  coalesce(p.username, 'Former player') as username,
-  case when app.is_member(e.user_id) then e.user_id end as user_id,
-  case when app.is_member(e.user_id) then p.avatar_path end as avatar_path,
-  case when app.is_member(e.user_id) then e.farm_name end as farm_name,
-  coalesce(e.user_id = auth.uid(), false) as is_mine
+  case when p.user_id is null or app.is_restricted(e.user_id) then 'Former player'
+       else p.username end as username,
+  case when e.user_id = app.uid()
+         or (app.is_member(e.user_id) and p.privacy_profile <> 'private')
+       then e.user_id end as user_id,
+  case when (e.user_id = app.uid()
+         or (app.is_member(e.user_id) and p.privacy_profile <> 'private'))
+         and p.avatar_status = 'approved'
+       then p.avatar_path end as avatar_path,
+  case when e.user_id = app.uid()
+         or (app.is_member(e.user_id) and p.privacy_profile <> 'private')
+       then e.farm_name end as farm_name,
+  coalesce(e.user_id = app.uid(), false) as is_mine
 from public.leaderboard_entries e
 left join public.profiles p on p.user_id = e.user_id
 where (app.feature_on('leaderboards') or app.is_admin())
@@ -74,9 +84,9 @@ where (app.feature_on('leaderboards') or app.is_admin())
   )
   and (
     e.user_id is null
-    or auth.uid() is null
-    or e.user_id = auth.uid()
-    or not app.blocked_between(auth.uid(), e.user_id)
+    or app.uid() is null
+    or e.user_id = app.uid()
+    or not app.blocked_between(app.uid(), e.user_id)
   );
 
 -- Farms other people may look at, read-only (9.5). The map itself comes from
@@ -97,8 +107,8 @@ select
   f.started_at
 from public.farms f
 where f.owner_id is not null
-  and f.owner_id <> coalesce(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid)
-  and app.can_view_farm_for(auth.uid(), f.id);
+  and f.owner_id <> coalesce(app.uid(), '00000000-0000-0000-0000-000000000000'::uuid)
+  and app.can_view_farm(f.id);
 
 grant select on public.public_profiles, public.public_farms to authenticated;
 grant select on public.leaderboard_rows to anon, authenticated;

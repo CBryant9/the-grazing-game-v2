@@ -3,7 +3,7 @@
 --
 -- Two kinds, each granted on purpose (nothing in `public` is callable by
 -- default, see the foundation migration):
---   * Player calls (authenticated): act only for auth.uid().
+--   * Player calls (authenticated): act only for app.uid().
 --   * Server calls (service_role only): the game server, the rollover job and
 --     the Stripe webhook. Where a function needs the time it takes p_now with
 --     a default of now(), the database's clock. The server never passes it;
@@ -13,25 +13,39 @@
 -- ------------------------------------------------------------ player calls
 
 -- Sign-up (PRD 8.2, 8.3): username and date of birth, 14 or over. Makes the
--- profile, the private row, the status row and default notification settings.
+-- profile, the private row, the status row and default notification settings,
+-- and returns 'signed_up'. Under 14 it returns 'too_young' and records the
+-- refusal against this sign-in, so trying again with an older date of birth
+-- is refused too. An email with a ban still running (ban_records) is refused.
 create or replace function public.complete_sign_up(
   p_username text,
   p_date_of_birth date,
   p_display_name text default null
 )
-returns void
+returns text
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_user uuid := auth.uid();
+  v_user uuid := app.uid();
+  v_email text;
 begin
+  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'An anonymous session can not make an account.' using errcode = '42501';
+  end if;
   if v_user is null then
     raise exception 'Sign in first.' using errcode = '42501';
   end if;
-  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
-    raise exception 'An anonymous session can not make an account.' using errcode = '42501';
+  if exists (select 1 from public.signup_refusals r where r.user_id = v_user) then
+    return 'too_young';
+  end if;
+  select u.email into v_email from auth.users u where u.id = v_user;
+  if v_email is not null and exists (
+    select 1 from public.ban_records b
+    where b.email_hash = app.email_hash(v_email) and (b.banned_until is null or b.banned_until > now())
+  ) then
+    raise exception 'banned' using errcode = 'P0001', hint = 'banned';
   end if;
   if not app.feature_on('signups_open') then
     raise exception 'signups_closed' using errcode = 'P0001', hint = 'signups_closed';
@@ -43,7 +57,9 @@ begin
     raise exception 'bad_date_of_birth' using errcode = '22023', hint = 'bad_date_of_birth';
   end if;
   if app.age_on(p_date_of_birth, app.today_sydney()) < 14 then
-    raise exception 'too_young' using errcode = 'P0001', hint = 'too_young';
+    insert into public.signup_refusals (user_id, reason) values (v_user, 'too_young')
+      on conflict (user_id) do nothing;
+    return 'too_young';
   end if;
   if not app.take_rate('sign_up', v_user::text) then
     raise exception 'rate_limited: sign_up' using errcode = 'P0001', hint = 'rate_limited';
@@ -55,6 +71,7 @@ begin
     values (v_user, p_date_of_birth, now());
   insert into public.account_status (user_id) values (v_user);
   insert into public.notification_settings (user_id) values (v_user);
+  return 'signed_up';
 end;
 $$;
 grant execute on function public.complete_sign_up(text, date, text) to authenticated;
@@ -68,11 +85,11 @@ security definer
 set search_path = ''
 as $$
   select m.mode,
-         app.farm_limit(auth.uid(), null, m.mode),
+         app.farm_limit(app.uid(), null, m.mode),
          (select count(*)::integer from public.farms f
-           where f.owner_id = auth.uid() and f.mode = m.mode and f.status = 'active')
+           where f.owner_id = app.uid() and f.mode = m.mode and f.status = 'active')
   from (values ('daily'), ('fast')) as m (mode)
-  where auth.uid() is not null
+  where app.uid() is not null
 $$;
 grant execute on function public.my_farm_limits() to authenticated;
 
@@ -95,7 +112,7 @@ begin
   if not found then
     raise exception 'No such group.' using errcode = 'P0002';
   end if;
-  if app.blocked_between(auth.uid(), g.owner_id) then
+  if app.blocked_between(app.uid(), g.owner_id) then
     raise exception 'No such group.' using errcode = 'P0002';
   end if;
   if g.visibility = 'private' and (p_code is null or p_code <> g.invite_code) then
@@ -106,7 +123,7 @@ begin
     raise exception 'group_full' using errcode = 'P0001', hint = 'group_full';
   end if;
   insert into public.group_members (group_id, user_id, role)
-    values (p_group, auth.uid(), 'member')
+    values (p_group, app.uid(), 'member')
     on conflict (group_id, user_id) do nothing;
 end;
 $$;
@@ -121,7 +138,7 @@ security definer
 set search_path = ''
 as $$
   select g.invite_code from public.groups g
-  where g.id = p_group and g.owner_id = auth.uid() and app.can_use_community('groups')
+  where g.id = p_group and g.owner_id = app.uid() and app.can_use_community('groups')
 $$;
 grant execute on function public.group_invite_code(uuid) to authenticated;
 
@@ -133,7 +150,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not (app.can_use_community('groups') and app.is_group_owner(p_group, auth.uid())) then
+  if not (app.can_use_community('groups') and app.is_group_owner(p_group, app.uid())) then
     raise exception 'Only the owner can hand over a group.' using errcode = '42501';
   end if;
   if not app.is_group_member(p_group, p_new_owner) or not app.is_member(p_new_owner) then
@@ -157,7 +174,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_user uuid := auth.uid();
+  v_user uuid := app.uid();
 begin
   if v_user is null then
     raise exception 'Sign in first.' using errcode = '42501';
@@ -199,7 +216,13 @@ begin
       from public.push_subscriptions x where x.user_id = v_user),
     'purchases', (select coalesce(jsonb_agg(to_jsonb(x) - 'stripe_checkout_session_id' - 'stripe_payment_intent_id'), '[]')
       from public.purchases x where x.user_id = v_user),
-    'entitlements', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from public.account_entitlements x where x.user_id = v_user)
+    'entitlements', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from public.account_entitlements x where x.user_id = v_user),
+    'activity', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from public.activity_events x where x.user_id = v_user),
+    'leaderboard_rows', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from public.leaderboard_entries x where x.user_id = v_user),
+    'challenge_entries', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from public.challenge_entries x where x.user_id = v_user),
+    'ad_events', (select coalesce(jsonb_agg(jsonb_build_object(
+        'slot_id', x.slot_id, 'kind', x.kind, 'campaign_id', x.campaign_id, 'created_at', x.created_at)), '[]')
+      from public.ad_events x where x.user_id = v_user)
   );
 end;
 $$;
@@ -241,6 +264,8 @@ as $$
 declare
   v_moved integer;
 begin
+  -- Lock the session row, so two conversions at once can't both win.
+  perform 1 from public.guest_sessions g where g.id = p_guest for update;
   if not exists (select 1 from public.guest_sessions g where g.id = p_guest and g.converted_at is null) then
     raise exception 'No such guest session, or it has already moved.' using errcode = 'P0002';
   end if;
@@ -381,9 +406,11 @@ as $$
   select app.can_view_farm_for(p_viewer, p_farm)
 $$;
 
--- Files to remove from Storage before an account is deleted (21a). The
--- server removes these, then deletes the auth user; the database's cascades
--- remove the rest, and leaderboard rows stay with no account.
+-- Files to remove from Storage before an account is deleted (21a): every
+-- file in a folder named for the account in any bucket (linked to a row or
+-- not), the farms' map snapshots, and the photos of groups that go with the
+-- account (where the player is the only member). The server removes these,
+-- then deletes the Auth user; the cascades remove the rest.
 create or replace function public.account_storage_paths(p_user uuid)
 returns table (bucket text, path text)
 language sql
@@ -391,16 +418,15 @@ stable
 security definer
 set search_path = ''
 as $$
-  select 'avatars', p.avatar_path from public.profiles p
-    where p.user_id = p_user and p.avatar_path is not null
-  union all
-  select 'post-photos', ph.storage_path from public.post_photos ph
-    join public.posts po on po.id = ph.post_id where po.author_id = p_user
-  union all
-  select 'post-photos', s.storage_path from public.farm_showcase_photos s where s.user_id = p_user
-  union all
-  select 'snapshots', sn.storage_path from public.farm_snapshots sn
-    join public.farms f on f.id = sn.farm_id where f.owner_id = p_user
+  select distinct o.bucket_id::text, o.name::text from storage.objects o
+  where (storage.foldername(o.name))[1] = p_user::text
+     or (o.bucket_id = 'snapshots' and (storage.foldername(o.name))[1] in (
+           select f.id::text from public.farms f where f.owner_id = p_user))
+     or (o.bucket_id = 'group-photos' and (storage.foldername(o.name))[1] in (
+           select g.id::text from public.groups g
+           where g.owner_id = p_user
+             and not exists (select 1 from public.group_members m
+                             where m.group_id = g.id and m.user_id <> p_user)))
 $$;
 
 -- Roll one day's ad events into ad_daily, then remove raw events older than

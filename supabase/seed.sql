@@ -8,7 +8,8 @@
 --   ...0002  ben_paddock  adult, owns the farm pack      (player B in tests)
 --   ...0003  kid_cattle   15 years old: no community      (under 16 in tests)
 --   ...0004  cara_cropper adult; Ben has blocked her
--- Every feature switch stays off, as the reference data leaves it.
+--   ...000b  gg_moderator moderator, adult
+-- The feature switches stay at the launch defaults the reference data sets.
 --
 -- The sample weather, price and count rows are made-up placeholders for
 -- tests, not real figures.
@@ -19,7 +20,8 @@ values
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now()),
   ('00000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now()),
   ('00000000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now()),
-  ('00000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now());
+  ('00000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now()),
+  ('00000000-0000-4000-8000-00000000000b', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', null, '{}', '{}', now(), now());
 
 insert into public.profiles (user_id, username, display_name, bio, town, district, state, farms, enterprise,
   farm_size_band, privacy_profile, privacy_farm_view, ticker_opt_in, created_at)
@@ -28,7 +30,8 @@ values
   ('00000000-0000-4000-8000-000000000001', 'ava_grazier', 'Ava', 'Breeders on the Tablelands.', 'Armidale', 'nsw', 'NSW', true, 'Beef breeding', '500_2000', 'public', 'public', true, now() - interval '60 days'),
   ('00000000-0000-4000-8000-000000000002', 'ben_paddock', 'Ben', 'Trading steers out west.', 'Dubbo', 'cw', 'NSW', true, 'Steer trading', '2000_10000', 'public', 'followers', true, now() - interval '60 days'),
   ('00000000-0000-4000-8000-000000000003', 'kid_cattle', 'Kid', 'Year 10, helps on the family place.', 'Emerald', 'cq', 'QLD', true, null, null, 'public', 'public', true, now() - interval '60 days'),
-  ('00000000-0000-4000-8000-000000000004', 'cara_cropper', 'Cara', 'Wheat and sheep near Hamilton.', 'Hamilton', 'wv', 'VIC', true, 'Mixed farming', '500_2000', 'public', 'public', false, now() - interval '60 days');
+  ('00000000-0000-4000-8000-000000000004', 'cara_cropper', 'Cara', 'Wheat and sheep near Hamilton.', 'Hamilton', 'wv', 'VIC', true, 'Mixed farming', '500_2000', 'public', 'public', false, now() - interval '60 days'),
+  ('00000000-0000-4000-8000-00000000000b', 'gg_moderator', 'Moderator', null, null, 'nsw', 'NSW', null, null, null, 'private', 'off', false, now() - interval '60 days');
 
 insert into public.account_private (user_id, date_of_birth, terms_accepted_at) values
   ('00000000-0000-4000-8000-00000000000a', '1985-03-01', now()),
@@ -36,14 +39,16 @@ insert into public.account_private (user_id, date_of_birth, terms_accepted_at) v
   ('00000000-0000-4000-8000-000000000002', '1978-11-02', now()),
   -- Always 15 years and 2 months old, whatever day the seed runs.
   ('00000000-0000-4000-8000-000000000003', ((now() at time zone 'Australia/Sydney')::date - interval '15 years 2 months')::date, now()),
-  ('00000000-0000-4000-8000-000000000004', '1995-09-20', now());
+  ('00000000-0000-4000-8000-000000000004', '1995-09-20', now()),
+  ('00000000-0000-4000-8000-00000000000b', '1988-01-10', now());
 
 insert into public.account_status (user_id, role) values
   ('00000000-0000-4000-8000-00000000000a', 'admin'),
   ('00000000-0000-4000-8000-000000000001', 'player'),
   ('00000000-0000-4000-8000-000000000002', 'player'),
   ('00000000-0000-4000-8000-000000000003', 'player'),
-  ('00000000-0000-4000-8000-000000000004', 'player');
+  ('00000000-0000-4000-8000-000000000004', 'player'),
+  ('00000000-0000-4000-8000-00000000000b', 'moderator');
 
 insert into public.profile_links (user_id, kind, url) values
   ('00000000-0000-4000-8000-000000000001', 'website', 'https://example.org/ava');
@@ -51,6 +56,19 @@ insert into public.profile_experience (user_id, role, enterprise, place, from_ye
   ('00000000-0000-4000-8000-000000000001', 'Manager', 'Beef breeding', 'New England', 2012);
 insert into public.profile_education (user_id, course_name, provider, year) values
   ('00000000-0000-4000-8000-000000000001', 'Grazing for Profit', 'RCS', 2015);
+-- The files the sample photos point at (metadata only; no image is stored).
+-- A photo can be approved only once its file is there.
+insert into storage.objects (bucket_id, name) values
+  ('post-photos', '00000000-0000-4000-8000-000000000001/yards.jpg'),
+  ('post-photos', '00000000-0000-4000-8000-000000000001/rain.jpg'),
+  ('post-photos', '00000000-0000-4000-8000-000000000001/gauge.jpg'),
+  ('avatars', '00000000-0000-4000-8000-000000000001/me.png'),
+  ('avatars', '00000000-0000-4000-8000-000000000003/me.png');
+update public.profiles set avatar_path = user_id::text || '/me.png'
+  where user_id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
+update public.profiles set avatar_status = 'approved'
+  where user_id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
+
 insert into public.farm_showcase_photos (user_id, storage_path, caption, moderation_status) values
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001/yards.jpg', 'The yards', 'approved');
 
@@ -66,8 +84,8 @@ insert into public.account_entitlements (user_id, entitlement, purchase_id) valu
   ('00000000-0000-4000-8000-000000000002', 'supporter_badge', '00000000-0000-4000-8000-0000000000c1');
 insert into public.stripe_customers (user_id, stripe_customer_id) values
   ('00000000-0000-4000-8000-000000000002', 'cus_TESTseed0001');
-insert into public.stripe_events (id, type, payload, processed_at) values
-  ('evt_TESTseed0001', 'checkout.session.completed', '{"sample": true}', now());
+insert into public.stripe_events (id, type, object_id, stripe_customer_id, processed_at) values
+  ('evt_TESTseed0001', 'checkout.session.completed', 'cs_test_seed0001', 'cus_TESTseed0001', now());
 
 -- Farms. Ava: one Fast, one Daily. Ben: one Fast. Kid: one Fast. The guest: one Fast.
 insert into public.farms (id, owner_id, guest_session_id, mode, name, district, size, size_ha, enterprise,
@@ -165,11 +183,12 @@ insert into public.notification_settings (user_id) values
   ('00000000-0000-4000-8000-00000000000a'),
   ('00000000-0000-4000-8000-000000000001'),
   ('00000000-0000-4000-8000-000000000002'),
-  ('00000000-0000-4000-8000-000000000003');
+  ('00000000-0000-4000-8000-000000000003'),
+  ('00000000-0000-4000-8000-00000000000b');
 insert into public.notification_prefs (user_id, kind, push, email) values
   ('00000000-0000-4000-8000-000000000001', 'farm_alert', true, false);
 insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret, device) values
-  ('00000000-0000-4000-8000-000000000001', 'https://push.example.org/seed-ava', 'sample-p256dh', 'sample-auth', 'Phone');
+  ('00000000-0000-4000-8000-000000000001', 'https://web.push.apple.com/seed-ava', 'sample-p256dh', 'sample-auth', 'Phone');
 
 -- Admin: a sponsor, a house ad and one view.
 insert into public.sponsors (id, name, contact, notes) values

@@ -33,7 +33,14 @@ create trigger blocks_touch before update on public.blocks
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 3 and 60),
+  -- A path in the `group-photos` bucket, in the group's own folder (checked below).
   photo_path text check (char_length(photo_path) <= 300),
+  -- As avatars: never shown before the image check passes on that exact file.
+  photo_status text not null default 'none'
+    check (photo_status in ('none', 'pending', 'approved', 'rejected')),
+  photo_object_id uuid,
+  photo_object_updated_at timestamptz,
+  photo_checked_at timestamptz,
   description text check (char_length(description) <= 1000),
   visibility text not null default 'private' check (visibility in ('public', 'private')),
   owner_id uuid not null references public.profiles (user_id) on delete cascade,
@@ -43,7 +50,9 @@ create table public.groups (
   -- 9.6: up to 100 members [Proposed].
   member_limit smallint not null default 100 check (member_limit between 2 and 1000),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (photo_path is null or photo_path like id::text || '/%'),
+  check (photo_status <> 'approved' or photo_object_id is not null)
 );
 alter table public.groups enable row level security;
 create index groups_owner on public.groups (owner_id);
@@ -106,9 +115,14 @@ create table public.post_photos (
   moderation_status text not null default 'pending'
     check (moderation_status in ('pending', 'approved', 'rejected')),
   checked_at timestamptz,
+  -- The exact file the image check passed. Others read the file only when
+  -- its storage id and change time still match (20261114001200_storage.sql).
+  storage_object_id uuid,
+  storage_object_updated_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (post_id, position)
+  unique (post_id, position),
+  check (moderation_status <> 'approved' or storage_object_id is not null)
 );
 alter table public.post_photos enable row level security;
 create index post_photos_pending on public.post_photos (created_at) where moderation_status = 'pending';

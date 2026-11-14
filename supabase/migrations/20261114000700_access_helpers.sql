@@ -5,6 +5,21 @@
 -- over?" without the caller ever being able to read a date of birth. Every
 -- one sets search_path to '' and names its tables in full.
 
+-- The signed-in account every rule and helper uses. A Supabase anonymous
+-- sign-in (a token with is_anonymous set) counts as not signed in, so it gets
+-- nothing a player gets. Anonymous sign-ins stay off in the project anyway.
+create or replace function app.uid()
+returns uuid
+language sql
+stable
+set search_path = ''
+as $$
+  select case
+    when coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then null
+    else auth.uid()
+  end
+$$;
+
 -- Is this request from a browser (a player's or a visitor's token), rather
 -- than the server or a migration? Read from the request's token, because
 -- inside a security definer function current_user is the function's owner.
@@ -38,7 +53,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select app.is_admin_user(auth.uid())
+  select app.is_admin_user(app.uid())
 $$;
 
 create or replace function app.is_staff()
@@ -50,7 +65,7 @@ set search_path = ''
 as $$
   select exists (
     select 1 from public.account_status s
-    where s.user_id = auth.uid() and s.role in ('admin', 'moderator')
+    where s.user_id = app.uid() and s.role in ('admin', 'moderator')
   )
 $$;
 
@@ -87,6 +102,21 @@ as $$
   )
 $$;
 
+-- Banned, or suspended right now (9.9).
+create or replace function app.is_restricted(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.account_status s
+    where s.user_id = p_user
+      and (s.banned_at is not null or (s.suspended_until is not null and s.suspended_until > now()))
+  )
+$$;
+
 -- May this account use the community (or one part of it) right now? The
 -- community switch, and the part's own switch, must be on. Admins may use it
 -- with the switches off, to check it before launch.
@@ -112,7 +142,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select app.community_ok(auth.uid(), p_part)
+  select app.community_ok(app.uid(), p_part)
 $$;
 
 -- Has either blocked the other? Blocks hide both ways (9.2).
@@ -169,7 +199,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select app.can_find_profile_for(auth.uid(), p_owner)
+  select app.can_find_profile_for(app.uid(), p_owner)
     or (app.is_staff() and p_owner is not null)
 $$;
 
@@ -183,16 +213,16 @@ security definer
 set search_path = ''
 as $$
   select case
-    when auth.uid() is null or p_owner is null then false
-    when p_owner = auth.uid() then true
+    when app.uid() is null or p_owner is null then false
+    when p_owner = app.uid() then true
     when app.is_staff() then true
-    else app.can_find_profile_for(auth.uid(), p_owner)
+    else app.can_find_profile_for(app.uid(), p_owner)
       and exists (
         select 1 from public.profiles p
         where p.user_id = p_owner
           and (
             p.privacy_profile = 'public'
-            or (p.privacy_profile = 'followers' and app.follows_accepted(auth.uid(), p_owner))
+            or (p.privacy_profile = 'followers' and app.follows_accepted(app.uid(), p_owner))
           )
       )
   end
@@ -234,8 +264,8 @@ as $$
       and exists (
         select 1 from public.groups g
         where g.id = p_group
-          and (g.visibility = 'public' or app.is_group_member(g.id, auth.uid()))
-          and not app.blocked_between(auth.uid(), g.owner_id)
+          and (g.visibility = 'public' or app.is_group_member(g.id, app.uid()))
+          and not app.blocked_between(app.uid(), g.owner_id)
       )
     )
 $$;
@@ -256,17 +286,17 @@ security definer
 set search_path = ''
 as $$
   select case
-    when auth.uid() is null then false
+    when app.uid() is null then false
     when app.is_staff() then true
     when not app.can_use_community('feed_posts') then false
-    when p_author = auth.uid() then true
+    when p_author = app.uid() then true
     when p_removed_at is not null then false
     when not app.is_member(p_author) then false
-    when app.blocked_between(auth.uid(), p_author) then false
+    when app.blocked_between(app.uid(), p_author) then false
     when p_group is not null then
-      app.can_use_community('groups') and app.is_group_member(p_group, auth.uid())
+      app.can_use_community('groups') and app.is_group_member(p_group, app.uid())
     when p_visibility = 'public' then true
-    else app.follows_accepted(auth.uid(), p_author)
+    else app.follows_accepted(app.uid(), p_author)
   end
 $$;
 
@@ -304,11 +334,11 @@ as $$
   select coalesce(
     (select app.post_visible(c.post_id)
         and (
-          c.author_id = auth.uid()
+          c.author_id = app.uid()
           or app.is_staff()
           or (c.removed_at is null
               and app.is_member(c.author_id)
-              and not app.blocked_between(auth.uid(), c.author_id))
+              and not app.blocked_between(app.uid(), c.author_id))
         )
        from public.comments c where c.id = p_comment),
     false
@@ -335,11 +365,11 @@ security definer
 set search_path = ''
 as $$
   select case
-    when auth.uid() is null then false
+    when app.uid() is null then false
     when not app.can_use_community('activity_ticker') then false
-    when p_user = auth.uid() then true
+    when p_user = app.uid() then true
     else app.is_member(p_user)
-      and not app.blocked_between(auth.uid(), p_user)
+      and not app.blocked_between(app.uid(), p_user)
       and exists (select 1 from public.profiles p where p.user_id = p_user and p.ticker_opt_in)
   end
 $$;
@@ -373,6 +403,48 @@ as $$
   ), false)
 $$;
 
+create or replace function app.can_view_farm(p_farm uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select app.can_view_farm_for(app.uid(), p_farm)
+$$;
+
+-- May the caller read this stored file? Only when a row they may see points
+-- at this exact file (its storage id and its change time) and the image
+-- check passed on it. A path is not an identity: a file swapped in under the
+-- same name has a new id or a new change time, and no longer matches.
+create or replace function app.photo_file_visible(p_bucket text, p_object uuid, p_updated timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_bucket
+    when 'avatars' then exists (
+      select 1 from public.profiles p
+      where p.avatar_object_id = p_object and p.avatar_object_updated_at = p_updated
+        and p.avatar_status = 'approved' and app.can_find_profile(p.user_id))
+    when 'group-photos' then exists (
+      select 1 from public.groups g
+      where g.photo_object_id = p_object and g.photo_object_updated_at = p_updated
+        and g.photo_status = 'approved' and app.can_see_group(g.id))
+    when 'post-photos' then exists (
+      select 1 from public.post_photos ph
+      where ph.storage_object_id = p_object and ph.storage_object_updated_at = p_updated
+        and ph.moderation_status = 'approved' and app.post_visible(ph.post_id))
+      or exists (
+      select 1 from public.farm_showcase_photos s
+      where s.storage_object_id = p_object and s.storage_object_updated_at = p_updated
+        and s.moderation_status = 'approved' and app.can_see_profile(s.user_id))
+    else false
+  end
+$$;
+
 create or replace function app.owns_farm(p_farm uuid)
 returns boolean
 language sql
@@ -380,7 +452,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (select 1 from public.farms f where f.id = p_farm and f.owner_id = auth.uid())
+  select exists (select 1 from public.farms f where f.id = p_farm and f.owner_id = app.uid())
 $$;
 
 -- A text that holds a blocked word? Usernames are checked letter by letter
@@ -466,6 +538,4 @@ begin
 end;
 $$;
 
--- Each helper the access rules call must be callable by the browser roles.
--- (They are not reachable through the Data API: `app` is not exposed.)
-grant execute on all functions in schema app to anon, authenticated, service_role;
+-- Who may call which helper is set once, at the end (20261114001500_app_grants.sql).

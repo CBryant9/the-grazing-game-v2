@@ -717,20 +717,18 @@ describe('storage', () => {
     as(db, who, `insert into storage.objects (bucket_id, name) values ('${bucket}', '${path}')`);
 
   it('a player uploads only into their own folder', async () => {
-    expect(passed(await put('a', 'avatars', `${ID.a}/me.png`))).toBe(true);
+    expect(passed(await put('a', 'avatars', `${ID.a}/other.png`))).toBe(true);
     expect(passed(await put('a', 'avatars', `${ID.b}/me.png`))).toBe(false);
     expect(passed(await put('a', 'post-photos', `${ID.a}/p.jpg`))).toBe(true);
     expect(passed(await put('u16', 'post-photos', `${ID.u16}/p.jpg`))).toBe(false);
     expect(passed(await put('a', 'snapshots', `${ID.a}/s.json`))).toBe(false);
-    expect(passed(await put('anon', 'avatars', `${ID.a}/me.png`))).toBe(false);
+    expect(passed(await put('anon', 'avatars', `${ID.a}/other.png`))).toBe(false);
   });
 
   it('a photo file shows to others only once its row is approved and visible', async () => {
-    const files = `insert into storage.objects (bucket_id, name) values
-      ('post-photos', '${ID.a}/rain.jpg'), ('post-photos', '${ID.a}/gauge.jpg'),
-      ('avatars', '${ID.a}/me.png'), ('avatars', '${ID.u16}/me.png');`;
+    // The seed has these files, with rain.jpg and both avatars approved.
     const see = (who: Who, name: string) =>
-      as(db, who, `select 1 from storage.objects where name = '${name}'`, files);
+      as(db, who, `select 1 from storage.objects where name = '${name}'`);
     expect(count(await see('b', `${ID.a}/rain.jpg`))).toBe(1);
     expect(count(await see('b', `${ID.a}/gauge.jpg`))).toBe(0);
     expect(count(await see('a', `${ID.a}/gauge.jpg`))).toBe(1);
@@ -739,7 +737,7 @@ describe('storage', () => {
     expect(count(await see('u16', `${ID.a}/me.png`))).toBe(0);
   });
 
-  it('makes the four buckets', async () => {
+  it('makes the five buckets', async () => {
     const b = await rows<{ id: string; public: boolean }>(
       db,
       `select id, public from storage.buckets order by id`,
@@ -747,6 +745,7 @@ describe('storage', () => {
     expect(b).toEqual([
       { id: 'ad-media', public: true },
       { id: 'avatars', public: false },
+      { id: 'group-photos', public: false },
       { id: 'post-photos', public: false },
       { id: 'snapshots', public: false },
     ]);

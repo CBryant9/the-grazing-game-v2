@@ -274,6 +274,7 @@ create trigger groups_add_owner after insert on public.groups
 create or replace function app.photo_status_guard()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -289,4 +290,3 @@ create trigger post_photos_status before insert or update on public.post_photos
 create trigger farm_showcase_photos_status before insert or update on public.farm_showcase_photos
   for each row execute function app.photo_status_guard();
 
-grant execute on all functions in schema app to anon, authenticated, service_role;

@@ -30,6 +30,9 @@ const SERVER_ONLY = [
   'price_daily',
   'stripe_customers',
   'stripe_events',
+  'signup_refusals',
+  'ban_records',
+  'push_service_hosts',
 ];
 
 /** What a visitor with no account may read. Nothing else, and never a write. */
@@ -51,6 +54,94 @@ const PLAYER_FUNCTIONS = [
   'join_group',
   'my_farm_limits',
 ];
+
+/**
+ * The app helpers the browser roles may run: exactly those a policy, a view
+ * or a storage rule calls with their rights. Nothing that answers about
+ * another account by id, no rate limiter, no farm limit, no trigger function.
+ */
+const BROWSER_HELPERS = [
+  'blocked_between',
+  'can_find_profile',
+  'can_see_group',
+  'can_see_profile',
+  'can_use_community',
+  'can_view_farm',
+  'comment_author',
+  'comment_visible',
+  'feature_on',
+  'is_admin',
+  'is_group_member',
+  'is_group_owner',
+  'is_member',
+  'is_restricted',
+  'is_staff',
+  'owns_farm',
+  'photo_file_visible',
+  'post_author',
+  'post_row_visible',
+  'post_visible',
+  'ticker_visible',
+  'try_uuid',
+  'uid',
+];
+
+/** The exact columns of each view: a new column must be added here on purpose. */
+const VIEW_COLUMNS: Record<string, string[]> = {
+  leaderboard_rows: [
+    'id',
+    'board',
+    'period',
+    'period_key',
+    'real_year',
+    'challenge_id',
+    'mode',
+    'district',
+    'size',
+    'start_type',
+    'enterprise',
+    'score',
+    'days',
+    'continued',
+    'username',
+    'user_id',
+    'avatar_path',
+    'farm_name',
+    'is_mine',
+  ],
+  public_farms: [
+    'farm_id',
+    'owner_id',
+    'name',
+    'mode',
+    'district',
+    'size',
+    'current_day',
+    'game_date',
+    'status',
+    'started_at',
+  ],
+  public_profiles: [
+    'user_id',
+    'username',
+    'display_name',
+    'avatar_path',
+    'details_visible',
+    'bio',
+    'town',
+    'district',
+    'state',
+    'farms',
+    'enterprise',
+    'farm_size_band',
+    'farm_size_ha',
+    'real_farm_name',
+    'years_farming',
+    'farm_role',
+    'privacy_profile',
+    'created_at',
+  ],
+};
 
 const SERVER_FUNCTIONS = [
   'account_storage_paths',
@@ -176,6 +267,20 @@ describe('views', () => {
     for (const o of opts) expect(o.options ?? []).toContain('security_barrier=true');
   });
 
+  it('have exactly the columns listed, in order', async () => {
+    for (const [view, want] of Object.entries(VIEW_COLUMNS)) {
+      const cols = await rows<{ column_name: string }>(
+        db,
+        `select column_name from information_schema.columns
+          where table_schema = 'public' and table_name = '${view}' order by ordinal_position`,
+      );
+      expect(
+        cols.map((c) => c.column_name),
+        view,
+      ).toEqual(want);
+    }
+  });
+
   it('never show a date of birth, an email or a role', async () => {
     const cols = await rows<{ column_name: string }>(
       db,
@@ -229,6 +334,20 @@ describe('functions', () => {
     expect(loose).toEqual([]);
   });
 
+  it('the browser roles may run only the helpers the rules need', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      const got = await rows<{ name: string }>(
+        db,
+        `select distinct p.proname as name from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'app' and has_function_privilege('${role}', p.oid, 'EXECUTE') order by 1`,
+      );
+      expect(
+        got.map((r) => r.name),
+        role,
+      ).toEqual(BROWSER_HELPERS);
+    }
+  });
+
   it('the app schema is not callable through PUBLIC', async () => {
     const [r] = await rows<{ usage: boolean }>(
       db,
@@ -239,13 +358,13 @@ describe('functions', () => {
 });
 
 describe('the reference data matches packages/shared', () => {
-  it('feature switches: every key, all off', async () => {
+  it('feature switches: every key, at the shared launch defaults (PRD 11.7)', async () => {
     const got = await rows<{ key: string; enabled: boolean }>(
       db,
       `select key, enabled from public.feature_switches order by key`,
     );
-    expect(got.map((r) => r.key)).toEqual(Object.keys(FEATURE_SWITCHES).sort());
-    expect(got.filter((r) => r.enabled)).toEqual([]);
+    const asObject = Object.fromEntries(got.map((r) => [r.key, r.enabled]));
+    expect(asObject).toEqual({ ...FEATURE_SWITCHES });
   });
 
   it('ad slots: every slot, all off', async () => {

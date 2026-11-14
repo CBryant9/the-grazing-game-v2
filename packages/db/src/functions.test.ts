@@ -85,15 +85,15 @@ describe('sign-up (PRD 8.2, 8.3)', () => {
 
   it('refuses anyone under 14, and takes a 14-year-old', async () => {
     const day = await asFresh(
-      [`select public.complete_sign_up('young_one', ${yearsAgo(14, 1)})`],
+      [`select public.complete_sign_up('young_one', ${yearsAgo(14, 1)}) as r`],
       signUpsOpen,
     );
-    expect(errorOf(day[0]!)).toMatch(/too_young/);
+    expect(first(day[0]!)).toEqual({ r: 'too_young' });
     const ok = await asFresh(
-      [`select public.complete_sign_up('young_one', ${yearsAgo(14)})`],
+      [`select public.complete_sign_up('young_one', ${yearsAgo(14)}) as r`],
       signUpsOpen,
     );
-    expect(ok[0]!.ok).toBe(true);
+    expect(first(ok[0]!)).toEqual({ r: 'signed_up' });
   });
 
   it('a 15-year-old gets an account but no community', async () => {
@@ -111,7 +111,10 @@ describe('sign-up (PRD 8.2, 8.3)', () => {
   });
 
   it('is closed while the sign-ups switch is off', async () => {
-    const o = await asFresh([`select public.complete_sign_up('new_grazier', '1992-04-01')`]);
+    const o = await asFresh(
+      [`select public.complete_sign_up('new_grazier', '1992-04-01')`],
+      switchesSql(['signups_open'], false),
+    );
     expect(errorOf(o[0]!)).toMatch(/signups_closed/);
   });
 
@@ -457,12 +460,12 @@ describe('deleting an account (21a "Your data")', () => {
       'service',
       `select bucket, path from public.account_storage_paths('${ID.a}') order by bucket, path`,
     );
+    // Ava's avatar and her three photos (the snapshots have no stored file in the seed).
     expect(o.ok && o.rows.map((r) => r.bucket)).toEqual([
+      'avatars',
       'post-photos',
       'post-photos',
       'post-photos',
-      'snapshots',
-      'snapshots',
     ]);
   });
 
@@ -485,8 +488,8 @@ describe('deleting an account (21a "Your data")', () => {
     );
     expect(first(o[0]!)).toEqual({ left_over: 0 });
     expect(first(o[1]!)).toEqual({ n: 2 });
-    // Ava owned the group, so it goes with her.
-    expect(first(o[2]!)).toEqual({ n: 0 });
+    // Ava owned the group; it goes on to Ben, its other member.
+    expect(first(o[2]!)).toEqual({ n: 1 });
   });
 
   it('deleting an admin keeps their audit log rows, with no admin', async () => {

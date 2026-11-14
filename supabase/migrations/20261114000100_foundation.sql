@@ -49,13 +49,22 @@ $$;
 
 -- Today's date in Sydney, from the server's clock. Ages (14 to join, 16 for
 -- the community) are worked out on this date.
+create or replace function app.sydney_date(p_at timestamptz)
+returns date
+language sql
+stable
+set search_path = ''
+as $$
+  select (p_at at time zone 'Australia/Sydney')::date
+$$;
+
 create or replace function app.today_sydney()
 returns date
 language sql
 stable
 set search_path = ''
 as $$
-  select (now() at time zone 'Australia/Sydney')::date
+  select app.sydney_date(now())
 $$;
 
 -- Whole years old on a given date.
@@ -69,5 +78,3 @@ as $$
 $$;
 
 grant execute on function app.touch_updated_at() to service_role;
-grant execute on function app.today_sydney() to anon, authenticated, service_role;
-grant execute on function app.age_on(date, date) to anon, authenticated, service_role;

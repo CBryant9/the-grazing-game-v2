@@ -32,6 +32,8 @@ export function migrationFiles(): string[] {
 /** The seed accounts, farms and rows the tests use (supabase/seed.sql). */
 export const ID = {
   admin: '00000000-0000-4000-8000-00000000000a',
+  /** gg_moderator, a moderator. */
+  mod: '00000000-0000-4000-8000-00000000000b',
   a: '00000000-0000-4000-8000-000000000001',
   b: '00000000-0000-4000-8000-000000000002',
   u16: '00000000-0000-4000-8000-000000000003',
@@ -61,11 +63,17 @@ export const ID = {
 } as const;
 
 /** Who a check runs as. */
-export type Who = 'anon' | 'a' | 'b' | 'u16' | 'admin' | 'service';
+export type Who = 'anon' | 'a' | 'b' | 'u16' | 'admin' | 'service' | 'c' | 'mod';
 export const EVERYONE: readonly Who[] = ['anon', 'a', 'b', 'u16', 'admin', 'service'];
 
-/** The account id each one acts for. A visitor has none; its id slot is used to try to act as A. */
+/**
+ * The account id each one acts for. A visitor has none; its id slot is used
+ * to try to act as A. Cara (c) and the moderator (mod) are not in the full
+ * matrix; the tests that need them use them by name.
+ */
 export const ME: Record<Who, string> = {
+  c: ID.c,
+  mod: ID.mod,
   anon: ID.a,
   a: ID.a,
   b: ID.b,

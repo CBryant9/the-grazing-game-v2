@@ -1,27 +1,38 @@
 -- m3.1 Database: the rows every database needs, local, preview and production.
 
--- Feature switches (PRD 11.7), every key in FEATURE_SWITCHES (packages/shared).
--- All start OFF in the database, so a new database shows nothing until
--- Claudia turns it on in admin. The launch defaults in PRD 11.7 (sign-ups,
--- both modes, leaderboards and push on) are set by her before launch.
-insert into public.feature_switches (key, enabled, note) values
-  ('signups_open', false, 'PRD 11.7 launch default: on'),
-  ('daily_farm', false, 'PRD 11.7 launch default: on'),
-  ('fast_farm', false, 'PRD 11.7 launch default: on'),
-  ('community', false, 'Master switch for section 9'),
-  ('feed_posts', false, null),
-  ('groups', false, null),
-  ('activity_ticker', false, null),
-  ('farm_viewing', false, null),
-  ('leaderboards', false, 'PRD 11.7 launch default: on'),
-  ('ads', false, 'Master switch for section 10.1'),
-  ('video_ads', false, null),
-  ('banner_ads', false, null),
-  ('adsense', false, null),
-  ('purchases', false, null),
-  ('push_notifications', false, 'PRD 11.7 launch default: on'),
-  ('maintenance_mode', false, null)
+-- Feature switches (PRD 11.7), every key in FEATURE_SWITCHES (packages/shared),
+-- at the launch defaults in PRD 11.7 and FEATURE_SWITCHES (a test checks they
+-- match key for key): sign-ups, both modes, leaderboards and push on; the
+-- community, ads, purchases and maintenance mode off until Claudia turns them on.
+insert into public.feature_switches (key, enabled) values
+  ('signups_open', true),
+  ('daily_farm', true),
+  ('fast_farm', true),
+  ('community', false),
+  ('feed_posts', false),
+  ('groups', false),
+  ('activity_ticker', false),
+  ('farm_viewing', false),
+  ('leaderboards', true),
+  ('ads', false),
+  ('video_ads', false),
+  ('banner_ads', false),
+  ('adsense', false),
+  ('purchases', false),
+  ('push_notifications', true),
+  ('maintenance_mode', false)
 on conflict (key) do nothing;
+
+-- Web push services a subscription may point at. Only hosts read in the
+-- vendor's own documents are listed, with the page each came from. Chrome
+-- (Firebase Cloud Messaging) and Edge (Windows Push Notification Services)
+-- are not listed yet: their hosts could not be read in a vendor document on
+-- 15 Nov 2026. Add each with its source before push goes live (milestone 3.4).
+insert into public.push_service_hosts (host, include_subdomains, source_url) values
+  ('push.apple.com', true,
+    'https://developer.apple.com/documentation/usernotifications/sending-web-push-notifications-in-web-apps-and-browsers'),
+  ('updates.push.services.mozilla.com', false, 'https://mozilla-services.github.io/autopush-rs/')
+on conflict (host) do nothing;
 
 -- Ad slots (PRD 10.1), every id in AD_SLOTS (packages/shared), all off.
 insert into public.ad_slots (slot_id, settings) values

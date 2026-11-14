@@ -38,7 +38,10 @@ create table public.admin_audit_log (
   action text not null check (char_length(action) between 1 and 80),
   target_type text check (char_length(target_type) <= 40),
   target_id text check (char_length(target_id) <= 80),
-  details jsonb not null default '{}'::jsonb,
+  -- Ids and action names only, never personal details (no names, emails or
+  -- free text about a person): the log outlives deleted accounts. A trigger
+  -- refuses anything that looks like an email address.
+  details jsonb not null default '{}'::jsonb check (jsonb_typeof(details) = 'object'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -102,7 +105,8 @@ create table public.notifications (
   ),
   title text not null check (char_length(title) between 1 and 120),
   body text check (char_length(body) <= 500),
-  link text check (link ~ '^/' and char_length(link) <= 300),
+  -- A path on this site: one slash, then not another slash or a backslash (so never //host).
+  link text check (link ~ '^/([^/\\]|$)' and char_length(link) <= 300),
   farm_id uuid references public.farms (id) on delete cascade,
   read_at timestamptz,
   created_at timestamptz not null default now(),
@@ -145,6 +149,21 @@ create table public.notification_prefs (
 );
 alter table public.notification_prefs enable row level security;
 create trigger notification_prefs_touch before update on public.notification_prefs
+  for each row execute function app.touch_updated_at();
+
+-- The web push services a subscription may point at, kept in this one place.
+-- Only hosts read in a vendor's own documents are listed (docs/DATA.md style:
+-- the source is kept on each row). include_subdomains also allows any host
+-- under it. Server only.
+create table public.push_service_hosts (
+  host text primary key check (host ~ '^[a-z0-9.-]+$'),
+  include_subdomains boolean not null default false,
+  source_url text not null check (source_url ~ '^https://'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.push_service_hosts enable row level security;
+create trigger push_service_hosts_touch before update on public.push_service_hosts
   for each row execute function app.touch_updated_at();
 
 create table public.push_subscriptions (

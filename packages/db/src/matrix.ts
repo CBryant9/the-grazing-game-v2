@@ -185,6 +185,20 @@ export const MATRIX: Record<string, TableSpec> = {
     `insert into public.guest_sessions (token_hash) values ('${'cd'.repeat(32)}')`,
     'last_seen_at = now()',
   ),
+  signup_refusals: serverOnly(
+    'signup_refusals',
+    `user_id = '${ID.c}'`,
+    (me) => `insert into public.signup_refusals (user_id, reason) values ('${me}', 'too_young')`,
+    'updated_at = now()',
+    `insert into public.signup_refusals (user_id, reason) values ('${ID.c}', 'too_young');`,
+  ),
+  ban_records: serverOnly(
+    'ban_records',
+    `email_hash = '${'ef'.repeat(32)}'`,
+    `insert into public.ban_records (email_hash) values ('${'ab'.repeat(32)}')`,
+    'banned_until = now()',
+    `insert into public.ban_records (email_hash) values ('${'ef'.repeat(32)}');`,
+  ),
   farm_limits: {
     select: { sql: `select 1 from public.farm_limits where tier = 'free'`, pass: ALL },
     insert: {
@@ -258,12 +272,20 @@ export const MATRIX: Record<string, TableSpec> = {
       pass: SERVER,
     },
   },
-  farm_actions: serverOnly(
-    'farm_actions',
-    `farm_id = '${ID.farmA}'`,
-    `insert into public.farm_actions (farm_id, seq, game_day, action, ok) values ('${ID.farmA}', 2, 1, '{}', true)`,
-    'ok = false',
-  ),
+  // Append only, for the server too: written once, never changed or removed.
+  farm_actions: {
+    ...serverOnly(
+      'farm_actions',
+      `farm_id = '${ID.farmA}'`,
+      `insert into public.farm_actions (farm_id, seq, game_day, action, ok) values ('${ID.farmA}', 2, 1, '{}', true)`,
+      'ok = false',
+    ),
+    update: {
+      sql: `update public.farm_actions set ok = false where farm_id = '${ID.farmA}'`,
+      pass: [],
+    },
+    delete: { sql: `delete from public.farm_actions where farm_id = '${ID.farmA}'`, pass: [] },
+  },
   farm_scores: {
     select: {
       sql: `select 1 from public.farm_scores where farm_id = '${ID.farmA}'`,
@@ -640,7 +662,7 @@ export const MATRIX: Record<string, TableSpec> = {
     },
     insert: {
       sql: (me, who) =>
-        `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret) values ('${me}', 'https://push.example.org/${who}', 'k', 'a')`,
+        `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret) values ('${me}', 'https://web.push.apple.com/${who}', 'k', 'a')`,
       pass: PLAYERS_AND_SERVER,
     },
     update: {
@@ -649,6 +671,12 @@ export const MATRIX: Record<string, TableSpec> = {
     },
     delete: { sql: `delete from public.push_subscriptions where user_id = '${ID.a}'`, pass: OWNER },
   },
+  push_service_hosts: serverOnly(
+    'push_service_hosts',
+    `host = 'push.apple.com'`,
+    `insert into public.push_service_hosts (host, source_url) values ('push.example.org', 'https://example.org/')`,
+    'include_subdomains = false',
+  ),
   weather_daily: serverOnly(
     'weather_daily',
     `district = 'nsw'`,
@@ -777,7 +805,7 @@ export const MATRIX: Record<string, TableSpec> = {
   stripe_events: serverOnly(
     'stripe_events',
     `id = 'evt_TESTseed0001'`,
-    `insert into public.stripe_events (id, type, payload) values ('evt_TESTnew', 'x', '{}')`,
+    `insert into public.stripe_events (id, type, object_id) values ('evt_TESTnew', 'x', 'cs_test_new')`,
     'processed_at = now()',
   ),
 };

@@ -191,11 +191,16 @@ alter table public.stripe_customers enable row level security;
 create trigger stripe_customers_touch before update on public.stripe_customers
   for each row execute function app.touch_updated_at();
 
--- Every Stripe webhook event, once (the id makes a repeat a no-op).
+-- Every Stripe webhook event, once (the id makes a repeat a no-op). Only the
+-- ids the server needs are kept, never the raw payload: a Checkout event
+-- carries the buyer's email and name.
 create table public.stripe_events (
   id text primary key check (id ~ '^evt_[A-Za-z0-9]+$'),
   type text not null check (char_length(type) <= 100),
-  payload jsonb not null,
+  -- The Checkout session (cs_...), payment intent (pi_...) or charge the event is about.
+  object_id text check (object_id ~ '^[a-z]{2,6}_[A-Za-z0-9_]+$'),
+  stripe_customer_id text check (stripe_customer_id ~ '^cus_[A-Za-z0-9]+$'),
+  payment_intent_id text check (payment_intent_id ~ '^pi_[A-Za-z0-9_]+$'),
   received_at timestamptz not null default now(),
   processed_at timestamptz,
   error text check (char_length(error) <= 2000),

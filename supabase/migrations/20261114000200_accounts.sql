@@ -41,8 +41,16 @@ create table public.profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
   username text not null check (username ~ '^[A-Za-z0-9_]{3,20}$'),
   display_name text check (char_length(display_name) between 1 and 50),
-  -- A path in the `avatars` storage bucket, never an outside address.
+  -- A path in the `avatars` storage bucket, inside the player's own folder.
   avatar_path text check (char_length(avatar_path) <= 300),
+  -- A photo never shows before it has been checked. 'none' with no photo;
+  -- 'pending' from the moment the path or the file changes; 'approved' only
+  -- by the server's image check, which records the exact file it checked.
+  avatar_status text not null default 'none'
+    check (avatar_status in ('none', 'pending', 'approved', 'rejected')),
+  avatar_object_id uuid,
+  avatar_object_updated_at timestamptz,
+  avatar_checked_at timestamptz,
   bio text check (char_length(bio) <= 500),
   town text check (char_length(town) <= 60),
   district text check (district in ('cq', 'nsw', 'cw', 'wv')),
@@ -64,7 +72,10 @@ create table public.profiles (
     check (privacy_farm_view in ('public', 'followers', 'off')),
   ticker_opt_in boolean not null default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- A path is not an identity: it must sit in the player's own folder.
+  constraint profiles_avatar_own_folder check (avatar_path is null or avatar_path like user_id::text || '/%'),
+  constraint profiles_avatar_checked check (avatar_status <> 'approved' or avatar_object_id is not null)
 );
 alter table public.profiles enable row level security;
 create unique index profiles_username_lower on public.profiles (lower(username));
@@ -129,8 +140,14 @@ create table public.farm_showcase_photos (
   -- A photo never shows to anyone else before it has been checked (BUILD_PLAN 4.3).
   moderation_status text not null default 'pending'
     check (moderation_status in ('pending', 'approved', 'rejected')),
+  -- The exact file the image check passed (its storage id and change time).
+  storage_object_id uuid,
+  storage_object_updated_at timestamptz,
+  checked_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (storage_path like user_id::text || '/%'),
+  check (moderation_status <> 'approved' or storage_object_id is not null)
 );
 alter table public.farm_showcase_photos enable row level security;
 create index farm_showcase_photos_user on public.farm_showcase_photos (user_id);
@@ -154,6 +171,36 @@ create table public.guest_sessions (
 alter table public.guest_sessions enable row level security;
 create index guest_sessions_last_seen on public.guest_sessions (last_seen_at);
 create trigger guest_sessions_touch before update on public.guest_sessions
+  for each row execute function app.touch_updated_at();
+
+-- A sign-up refused as under 14 (PRD 8.3). The same sign-in can't try again
+-- with an older date of birth. Server only. A fresh email address is a fresh
+-- sign-in and gets a fresh try: the database can't tell it is the same person.
+create table public.signup_refusals (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  reason text not null check (reason in ('too_young')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.signup_refusals enable row level security;
+create trigger signup_refusals_touch before update on public.signup_refusals
+  for each row execute function app.touch_updated_at();
+
+-- A ban or suspension that outlives a deleted account (9.9), so a banned
+-- player can't delete and come straight back. No personal data but a one-way
+-- hash (SHA-256) of the sign-in email, used only to refuse a new sign-up
+-- while the ban runs. Server only.
+create table public.ban_records (
+  id uuid primary key default gen_random_uuid(),
+  email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),
+  -- Null for a ban with no end.
+  banned_until timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.ban_records enable row level security;
+create index ban_records_hash on public.ban_records (email_hash);
+create trigger ban_records_touch before update on public.ban_records
   for each row execute function app.touch_updated_at();
 
 -- Farms each kind of account may have going at once (PRD 5.5). Kept as rows

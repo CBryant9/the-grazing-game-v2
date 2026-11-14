@@ -81,6 +81,16 @@ create table storage.objects (
   unique (bucket_id, name)
 );
 alter table storage.objects enable row level security;
+-- Storage moves updated_at on every change (an upsert keeps the id). The
+-- clock time, so two changes in one test transaction still differ.
+create function storage.touch_object() returns trigger language plpgsql as $$
+begin
+  new.updated_at := clock_timestamp();
+  return new;
+end;
+$$;
+create trigger touch_object before update on storage.objects
+  for each row execute function storage.touch_object();
 create function storage.foldername(name text) returns text[] language plpgsql immutable as $$
 declare
   _parts text[];

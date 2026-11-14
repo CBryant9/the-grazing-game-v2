@@ -19,7 +19,9 @@ Supabase (Postgres) for accounts, farms, the community, ads and purchases. Built
 7. **Blocks hide both ways**, in every community rule and in the views.
 8. **Leaderboards and scores are written by the server only.** Players read them through `leaderboard_rows`.
 9. **Admin-only data is read by role; every admin change goes through the server**, which checks the role on each request and writes the audit log. The audit log is append only, for the server too.
-10. **Security definer functions** sit in the `app` schema (not exposed by the Data API) or, for the few the browser or server calls, in `public` with an exact grant. Every one sets `search_path = ''`.
+10. **Security definer functions** sit in the `app` schema (not exposed by the Data API) or, for the few the browser or server calls, in `public` with an exact grant. Every one sets `search_path = ''`. The browser roles may run only the `app` helpers a policy, view or storage rule calls (`20261114001500_app_grants.sql`); helpers that answer about another account by id, the rate limiter and the farm limit are server only.
+11. **A photo is approved by its file, not its name.** The image check records the exact file (its storage id and change time) on the row. Others read a photo only when the row they may see still points at that file. Changing the path, or adding, changing or removing the file, sends the row back to pending. Avatars and group photos follow the same rule and must sit in their owner's (or group's) folder.
+12. **An anonymous sign-in counts as not signed in.** Every rule asks `app.uid()`, which is null for a token with `is_anonymous` set. Anonymous sign-ins must also stay off in the project settings.
 
 ## Tables and who can do what
 
@@ -34,6 +36,8 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `account_status` | Role (player, moderator, admin), suspension, ban | S own | Never | S all |
 | `profile_links`, `profile_experience`, `profile_education`, `farm_showcase_photos` | Profile extras (9.1) | S, I, U, D own while in the community | S when the profile's details are visible; showcase photos only once approved | S |
 | `guest_sessions` | Guest cookie hashes | Server only | | |
+| `signup_refusals` | Sign-ins refused as under 14, so they can't retry with an older date | Server only | | |
+| `ban_records` | A running ban that outlived its account: a SHA-256 of the sign-in email and an end date, nothing else | Server only | | |
 | `farm_limits` | Farms at once by tier and mode (PRD 5.5) | S | S (visitors too) | S |
 
 ### Game
@@ -72,11 +76,12 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 |---|---|---|---|
 | `feature_switches` | S key and state | S key and state | S; the server writes |
 | `site_settings` | S public rows | S public rows | S all |
-| `admin_audit_log` | | | S. Nobody changes or removes a row |
+| `admin_audit_log` | | | S. Nobody changes or removes a row. It takes ids and action names only, never personal details (a trigger refuses anything like an email address), because it outlives deleted accounts |
+| `push_service_hosts` | Server only: the web push services a subscription may point at, each with the vendor page it was read from | | |
 | `rate_limit_rules`, `rate_limit_hits` | Server only | | |
 | `notifications` | S own, mark read, D own | | |
 | `notification_settings`, `notification_prefs` | Everything on own rows | | |
-| `push_subscriptions` | S, I, D own | | |
+| `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts` | | |
 | `weather_daily`, `price_daily` | Server only (engine data) | | |
 | `daily_counts` | | | S |
 | `ad_slots` | S (id, on or off, settings) | S | S |
@@ -84,7 +89,7 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `products` | S active ones | S active ones | S all |
 | `purchases` | S own (not the Stripe ids) | | S |
 | `account_entitlements` | S own | | S |
-| `stripe_customers`, `stripe_events` | Server only | | |
+| `stripe_customers`, `stripe_events` | Server only. A Stripe event keeps its id, type and the Stripe ids the server needs, never the raw payload (a Checkout event carries the buyer's email and name) | | |
 
 ### Views
 
@@ -92,8 +97,8 @@ They run with their owner's rights on purpose, pick safe columns only and filter
 
 | View | Who | Shows |
 |---|---|---|
-| `public_profiles` | Signed in | A member's card (username, display name, photo, district) to other members with no block between them. The details only when privacy allows. Never an under-16 account |
-| `leaderboard_rows` | Anyone, while the leaderboards switch is on | Board rows. Under 16: username and district only (no photo, no profile link, no farm name). Rows across a block left out. A deleted account shows as "Former player" |
+| `public_profiles` | Signed in | A member's card (username, display name, district, and the photo once it is checked) to other members with no block between them. The details only when privacy allows. Never an under-16 account |
+| `leaderboard_rows` | Anyone, while the leaderboards switch is on | Board rows. Under 16, or a private profile: username and district only (no photo, no account id, no farm name). A deleted, banned or suspended account shows as "Former player". Rows across a block left out |
 | `public_farms` | Signed in | Daily Farms the viewer may look at, by the owner's farm view setting, with farm viewing on |
 
 The Supabase database linter flags owner-rights views (lint 0010). That is expected for these three and only these three.
@@ -102,7 +107,7 @@ The Supabase database linter flags owner-rights views (lint 0010). That is expec
 
 | Function | Who calls it | What it does |
 |---|---|---|
-| `complete_sign_up(username, date_of_birth, display_name)` | A signed-in player with no profile | Checks sign-ups are open, the date of birth, 14 or over, a rate limit and the word filter. Makes the profile, private row, status row and notification settings. Refuses an anonymous session |
+| `complete_sign_up(username, date_of_birth, display_name)` | A signed-in player with no profile | Checks sign-ups are open, the date of birth, 14 or over, a rate limit, the word filter and running bans. Makes the profile, private row, status row and notification settings, and returns `signed_up`. Under 14 it returns `too_young` and records the refusal, so the same sign-in can't try again with an older date. A fresh email address is a fresh sign-in and does get a fresh try: the database can't tell it is the same person. Refuses an anonymous session |
 | `my_farm_limits()` | Player | Limit and farms going, by mode |
 | `join_group`, `group_invite_code`, `hand_over_group` | Player | Groups (9.6) |
 | `export_my_data()` | Player | Everything kept about them, as JSON, except the engine save and the action log (they hold the hidden rules) |
@@ -110,7 +115,7 @@ The Supabase database linter flags owner-rights views (lint 0010). That is expec
 | `daily_days_owed`, `daily_claim_due`, `daily_finish`, `change_farm_timezone` | Server (the rollover) | The Daily Farm clock, below |
 | `can_view_farm(viewer, farm)` | Server | Before it builds a farm view for someone else |
 | `take_rate_limit(action, subject)` | Server | Rate limits for jobs, farm starts and the ticker |
-| `account_storage_paths(user)` | Server | Files to remove before deleting an account |
+| `account_storage_paths(user)` | Server | Every file to remove before deleting an account: each bucket's `<account id>/` folder (linked to a row or not), the farms' snapshots, and the photos of groups that go with the account |
 | `rollup_ad_events(day)`, `prune_housekeeping()` | pg_cron, nightly | Ad roll-up; old rate-limit windows and stale guests |
 
 Guards that hold for every writer, the server included: the farm limit (`farms_guard`, with a lock so two requests can't both squeeze in), a real time zone for a Daily Farm, the word filter on usernames, names, posts, comments and groups, follow approval, one level of replies, a block removing follows, photo status set only by the image check, rate limits on posts, comments, likes, follows, reports and new groups (tighter for an account under 7 days old).
@@ -138,25 +143,29 @@ A guest plays one Fast Farm through a session the server makes (PRD 8.1, 5.16):
 ## Deleting an account and downloading data
 
 - **Download:** the player calls `export_my_data()`.
-- **Delete:** the server lists the files with `account_storage_paths`, removes them from Storage, then deletes the Auth user (`auth.admin.deleteUser`). The cascades remove the profile, private rows, farms and saves, posts, comments, likes, follows, groups they own, notifications and push devices. Leaderboard rows stay with no account and no farm ("Former player"). Audit log rows stay with no admin. Purchases stay with no account (records for the accounts).
+- **Delete:** the server lists the files with `account_storage_paths`, removes them from Storage, then deletes the Auth user (`auth.admin.deleteUser`). A trigger on `auth.users` runs first: each group the player owns goes to its longest-standing other member (a community member first), and goes only when the player was its only member; what they wrote in reports is cleared; a ban or suspension still running leaves a `ban_records` row holding only a SHA-256 of the sign-in email and the end date, so the same email can't sign up again while it runs. Then the cascades remove the profile, private rows, farms and saves (the action log goes with its farm), posts, comments, likes, follows, notifications, push devices and the moderation history. Leaderboard rows stay with no account and no farm ("Former player"). Audit log rows stay with no admin (they hold ids and action names only). Purchases stay with no account (records for the accounts). Stripe events hold ids only.
 
 ## Storage
 
 | Bucket | Public | Rules |
 |---|---|---|
-| `avatars` | No | The owner writes their own folder (named for their account id). Others read when they may find the profile, so never an under-16 photo |
-| `post-photos` | No | The author uploads to their own folder while in the community. Others read a file only through a `post_photos` or showcase row they may see, which is only once it is approved |
+| `avatars` | No | The owner writes their own folder (named for their account id). Others read only the checked file, and only when they may find the profile, so never an under-16 photo |
+| `group-photos` | No | The group's owner writes the group's folder (named for the group id). Others read only the checked file, when they may see the group |
+| `post-photos` | No | The author uploads to their own folder while in the community. Others read a file only when a `post_photos` or showcase row they may see was approved on that exact file (its storage id and change time) |
 | `snapshots` | No | Server only |
-| `ad-media` | Yes | Server writes. Read by its public address so ads load fast |
+| `ad-media` | Yes | Server writes. Read by its public address so ads load fast. No SVG (a public SVG can carry script) |
+
+A trigger on `storage.objects` sends a photo row back to pending whenever a file at its path is added, changed or removed. If a project will not let the migration role add that trigger, the migration warns and goes on; the id and change-time match still keeps a swapped file hidden. Re-running the bucket setup brings an existing bucket's limits and file types up to date.
 
 ## The tests
 
-`pnpm test` runs `packages/db/src/*.test.ts` (about 390 tests, about 20 seconds):
+`pnpm test` runs `packages/db/src/*.test.ts` (445 tests, under a minute on this PC):
 
 - `matrix.test.ts`: every table, as a visitor, player A, player B, the under-16 player, an admin and the server, for select, insert, update and delete. Each must pass or be refused exactly as `matrix.ts` says. Plus B trying to write each row as A.
 - `coverage.test.ts`: fails if a table has row level security off or is missing from the matrix; checks what a visitor can read, that server-only tables have no browser grant, which functions each role can call, that every security definer function pins its search path, and that the switches, ad slots and farm limits match `packages/shared`.
 - `rules.test.ts`: each private field, the save, leaderboards, the under-16 rule on every community table and view, blocks, follows, photos, the switches, farm viewing and storage.
 - `functions.test.ts`: sign-up and the age rules, farm limits, guests, the Daily Farm clock, groups, deleting an account.
+- `review.test.ts`: each hole the security review found, tried as the role that would attack it: photo swaps, avatar and group photo ownership, groups on deletion, pending follows, under-14 retries, banned accounts, removed posts, the data download, personal data after deletion, the moderator, ages on leap days and the Sydney date, push hosts, notification links, private profiles on the boards, anonymous sign-ins, bucket limits.
 
 ### What the tests stand on
 
@@ -177,7 +186,7 @@ Claudia makes the project (BUILD_PLAN section 8). Then, from a machine with the 
 1. `supabase init` (once, makes `supabase/config.toml`), then `supabase link --project-ref <the project ref>`.
 2. `supabase db push` applies every migration in `supabase/migrations` in order. Or `supabase db push --db-url "$SUPABASE_DB_URL"`.
 3. For a local or preview database only: `supabase db reset` applies the migrations and then `supabase/seed.sql`. Never seed production.
-4. In the dashboard: Data API exposes `public` only (not `app`); anonymous sign-ins stay off; turn on email link and Google sign-in.
+4. In the dashboard: Data API exposes `public` only (not `app`); **anonymous sign-ins must stay off** (Authentication, Sign In / Providers); turn on email link and Google sign-in.
 5. Turn on the switches in admin (or `update public.feature_switches set enabled = true where key = '...'`) when each part is ready.
 
 ## Still owed against a real Supabase project
@@ -189,3 +198,5 @@ Claudia makes the project (BUILD_PLAN section 8). Then, from a machine with the 
 5. Confirm Storage enforces the bucket sizes and file types, and serve post photos and avatars through signed links.
 6. Measure the rules at real volumes. The community rules call helper functions per row; leaderboard reads may want a materialised view (PRD 15) in 4.1.
 7. Supabase runs Postgres 15 or 17; the tests run on 18. Nothing newer than 15 is used (`unique nulls not distinct` is 15).
+8. Confirm the migration role may add the trigger on `storage.objects` and the trigger on `auth.users` (the migration warns if the Storage one is refused).
+9. Add the Chrome (Firebase Cloud Messaging) and Edge (Windows Push Notification Services) push hosts to `push_service_hosts`, each with the vendor page it was read from, before push goes live (3.4). Until then only Safari and Firefox subscriptions are accepted.
