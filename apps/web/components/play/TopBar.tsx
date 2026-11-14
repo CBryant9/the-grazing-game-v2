@@ -4,6 +4,7 @@ import type { Snapshot } from '@/lib/game/types';
 import { clockText, dateText, lightNote, money, num } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { HelpButton } from './HelpPanel';
 import styles from './play.module.css';
 
 /** The daylight bar: slim, with a short note. Light, not a countdown. */
@@ -84,7 +85,10 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
         <TimeButtons />
       </div>
       <div className={styles.topextra}>
-        <ThemeToggle />
+        <HelpButton />
+        <span className={styles.themeslot}>
+          <ThemeToggle />
+        </span>
       </div>
       {busy && <span className={styles.busybar} role="status" aria-label="Working" />}
     </header>

@@ -93,7 +93,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 ## Controls and screens
 
-- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen.
+- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen. *(Built in 1.7e: the Help button in the top bar and a Help part in More, ten topics and the terms. Review fix after 1.8: on a phone it opens in the same bottom sheet as the paddock, so the map stays above it; on a phone on its side it is the whole-screen sheet, as the paddock is; on a PC it is the side panel.)*
 - [ ] The Paddocks tab shows the quick list first (with water ✓/✗), and details and sorting on demand.
 - [ ] Tools snap back to Look after each build.
 - [ ] Clicking the map opens the paddock, never a cow ("I don't want to be able to click on the cows at this point").
@@ -322,5 +322,7 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 
 ### For the game screens milestone
 
-- [ ] An information panel explains how the day works.
-- [ ] Onboarding and a tour show how things work, with help available at any time.
+- [ ] An information panel explains how the day works. *(Built in 1.7e: the first help topic, "How the day works".)*
+- [ ] Onboarding and a tour show how things work, with help available at any time. *(Built in 1.7e: the guided first day, with Skip this step, Skip the tour and Show the tour again, and the Help button always in the top bar. Tour progress is kept in the browser, not yet per player.)*
+- [ ] A short guided first day: open a paddock, move cattle, build a short fence and watch the daylight bar, open the market, end the day. It can be skipped and replayed from More. *(Built in 1.7e.)*
+- [ ] Empty states with one clear next step. *(Built in 1.7e for Herd, Plans, Paddocks, the inbox and Sell. The no farms, no posts and no followers states come with accounts and the community.)*

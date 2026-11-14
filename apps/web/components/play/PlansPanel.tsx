@@ -6,6 +6,7 @@ import { mobsWithoutPlan } from '@/lib/game/plans';
 import { useGame } from '@/lib/game/store';
 import type { PlanMobWire, PlanWire, Snapshot } from '@/lib/game/types';
 import { ActJob } from './ActJob';
+import { EmptyState } from './EmptyState';
 import styles from './play.module.css';
 
 function status(m: PlanMobWire): { text: string; kind: 'run' | 'paused' | 'wait' } {
@@ -162,6 +163,8 @@ function PlanCard({ plan }: { plan: PlanWire }) {
  */
 export function PlansPanel({ snapshot }: { snapshot: Snapshot }) {
   const startPlan = useGame((s) => s.startPlan);
+  const setTab = useGame((s) => s.setTab);
+  const selectTool = useGame((s) => s.selectTool);
   const free = mobsWithoutPlan(snapshot);
   return (
     <section className={styles.listpanel} aria-label="Plans">
@@ -170,18 +173,42 @@ export function PlansPanel({ snapshot }: { snapshot: Snapshot }) {
         A grazing plan moves a mob round the paddocks by itself each day. Moving the mob by hand
         pauses its plan.
       </p>
-      <div className={styles.jobbtns}>
-        <button
-          type="button"
-          className="btn coral"
-          disabled={snapshot.mobs.length === 0 || snapshot.paddocks.length === 0}
-          onClick={() => startPlan({})}
-        >
-          Make a plan
-        </button>
-      </div>
+      {snapshot.plans.length > 0 && (
+        <div className={styles.jobbtns}>
+          <button
+            type="button"
+            className="btn coral"
+            disabled={snapshot.mobs.length === 0 || snapshot.paddocks.length === 0}
+            onClick={() => startPlan({})}
+          >
+            Make a plan
+          </button>
+        </div>
+      )}
       {snapshot.plans.length === 0 ? (
-        <p className="muted">No grazing plans yet.</p>
+        snapshot.mobs.length === 0 ? (
+          <EmptyState action="Go to the Market" onAction={() => setTab('market')}>
+            {snapshot.paddocks.length === 0
+              ? 'No grazing plans yet. A plan needs a mob to move and paddocks to move it through. There are no cattle and no paddocks on the farm.'
+              : 'No grazing plans yet. A plan needs a mob to move, and there are no cattle on the farm.'}{' '}
+            {snapshot.market.saleLine}
+          </EmptyState>
+        ) : snapshot.paddocks.length === 0 ? (
+          <EmptyState
+            action="Build a fence"
+            onAction={() => {
+              setTab('farm');
+              selectTool('fence');
+            }}
+          >
+            No grazing plans yet. A plan moves a mob through paddocks, and this farm has no paddocks
+            yet. A fence round some land makes one.
+          </EmptyState>
+        ) : (
+          <EmptyState action="Make a plan" onAction={() => startPlan({})}>
+            No grazing plans yet. A plan moves a mob round the paddocks by itself.
+          </EmptyState>
+        )
       ) : (
         <ul className={styles.rows}>
           {snapshot.plans.map((p) => (

@@ -1076,6 +1076,80 @@ Calls for Claudia (what, why, how to change it):
 12. **The money rows on a year are signed:** money in is shown with a plus, money out with a minus. Interest keeps the engine's sign (paid is negative).
 13. **Once the game is over the game over card covers the screen** with two ways on: look around the finished farm (a strip with Show the result and Start a new farm), or a new farm, behind the same "this farm will be gone" confirm as the More tab.
 14. **The year score shows each part's points beside its facts, as the mockup does, so a player could work the weights back (for example dollars per profit point).** Kept for now. To be revisited when the Grazier Score and leaderboards are set in Stage 4.
+### 14 Nov 2026: milestone 1.7e, help, the guided first day and empty states
+
+What Claudia asked for (REQUIREMENTS, "Controls and screens" and "For the game screens milestone"; PRD 21a, "First-time experience"): help hidden behind a help button, in an info section that can be reopened, never covering the map on a small screen; an information panel that explains how the day works; onboarding and a tour with help available at any time; a short guided first day (open a paddock, move cattle, build a short fence and watch the daylight bar move, open the market, end the day) that can be skipped and replayed from More; empty states with one clear next step.
+
+What was built:
+
+1. **Help.** A Help button with its word in the top bar (on every layout) and a Help part in the More tab. It opens a help screen: a full-screen panel on a phone (like the other tabs, with its own Close help button and Escape), and the side panel on a PC. It is never a layer over the map: on a phone it takes the place of the map's panel the way Herd and Market do. Ten topics, each a heading that opens on a tap (How the day works is open first): the day, moving cattle, building (and what red means), water, buying and selling, husbandry (the banner and the one button, no preg testing, PTIC by itself), grazing plans, lick and feed, crops, reading a paddock; and What the terms mean (AE, DSE, CS, PTIC, ME, CP, kg DM/ha). The words are in `components/play/helptopics.ts`. Each line was checked against the game on this branch (the components, `words.ts`, `mobwords.ts`, `buildwords.ts`, `marketwords.ts`). It says what the player sees and can do, never how a number is worked out, and quotes no real-world figure. A test keeps the topic list, the terms and the plain writing (no em dashes, no judging words) from drifting.
+2. **The guided first day.** A coach strip of two lines and two buttons (Skip this step, Skip the tour) sits in the page flow between the top bar and the map, so it never covers the map (it takes 49 px on a phone on its side and on a PC, 112 px on a phone held upright, where the map is still 60% of the screen). Each step finishes when the player does it, read from the game's state: a paddock opened, a move that is done, a fence built (the fence tool's job done), the Market tab opened, and the farm's day gone past the day the tour began (Next day or a skip). A step done early counts. A farm with no cattle has no move step ("Step 1 of 4"). When every step is done or skipped the strip says so with Close the tour. Where it is up to is kept in `localStorage` under `gg-tour` (in try/catch: the page works without it, and the tour then lasts for the visit). A new farm starts a new tour; throwing a farm away clears it; a farm with no saved tour that has not seen a day gets one; an older farm gets none. Show the tour again (in More and at the top of the help screen) begins it again from the day the farm is on. The step logic is pure (`lib/game/tour.ts`, 26 tests); `lib/game/helpstore.ts` is a small separate store that watches the game's store.
+3. **Empty states.** `EmptyState` is one plain line and one button with a text label. Herd with no cattle gives when the next sale is and Go to the Market. Plans with no plan: with cattle, Make a plan; with none, the sale line and Go to the Market. Paddocks with none: Build a fence. The inbox with no messages: Back to the farm. The Market's Sell with nothing free to sell: See what is for sale (the Buy view).
+
+Calls made where the spec was open (also in the stage report): the tour's strip sits above the map rather than over it; a step done early counts; the move step is dropped on a farm with no cattle right now (so cattle bought later bring it back); Help is a full-screen panel on a phone like the other tabs; the help topics are collapsed lists with the first open; the tour ends with a closing line the player dismisses; an existing farm with a day or more behind it gets no tour until replayed.
+
+How it was tested: unit tests for the tour logic and the help words; `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` and `pnpm check:browser-bundle`. In a real browser (the pane, `next dev`, a Central Queensland farm, then a farm from scratch): the whole tour played start to finish at 390 by 844, with the strip's step changing as each thing was done and the daylight bar moving after a fence was built; skip a step, skip the tour, replay from the help screen, and a reload with the tour kept off; Help and More at 390 by 844 in light and dark, at 844 by 390 and at 1280 by 800; no sideways scroll at any of them; the buttons measured 44 px or more on touch. On a scratch farm the tour had four steps and the empty Herd, Plans and Sell lists showed their line and button.
+
+Not done or not looked at: the Paddocks and inbox empty states are in the code and the tests cannot reach them on screen (a farm always has a paddock and a first message); the help text says "A cow goes on the record as PTIC by herself", which is the newer ruling and needs the engine change from the other session to be true on screen; the mob card still has code for a preg test line that the engine no longer needs to send. In the landscape layout the closed Build button is drawn as a tall white bar in the middle of the map (not changed here and not looked into; a bug for whoever owns the build bar). Lighthouse was not run.
+
+### 14 Nov 2026: milestone 1.8, Stage 1 wrap (install, offline, errors, speed budgets, cost)
+
+Branch `claude/m1-8-stage1-wrap-eafda9`. Part of 1.8 only: the Stage 1 report and Claudia's real-phone play are not in this entry. New packages: `@serwist/turbopack`, `serwist` and `esbuild` (to build the service worker). No outside service, no art from outside the repo.
+
+**Install to the home screen.**
+
+- The manifest (`app/manifest.ts`) lists the SVG and three PNG icons. The icons are made by `scripts/make-icons.mjs` (`pnpm icons`): the pixel glyph already in `icon.svg`, lime on the frame colour from `globals.css`, with a small PNG writer in the script. `icon-maskable-512.png` keeps the glyph inside the safe circle that a launcher mask leaves. `apple-icon.png` is for iPhone.
+- The service worker is `app/sw.ts`. Next.js 16 builds with Turbopack, which `@serwist/next` does not support, so `app/serwist/[path]/route.ts` (`@serwist/turbopack`) builds it when the site is built and serves it at `/serwist/sw.js`. It keeps the build's scripts, styles, fonts and the public files (58 files, 1.6 MB) and the pages `/` and `/play`. `/api` is never stored (a network-only rule). No source map is published for it.
+- It is started from `/play` only, 8 seconds after the page has loaded, so the 1.6 MB it saves never competes with the farm's first load. It is not started on `next dev`.
+- The More tab has an Install entry (`components/shell/InstallEntry.tsx`, one line in `MorePanel.tsx`). It shows only when the browser has offered install (an Install button) or on an iPhone or iPad in a browser (the two steps: tap Share, tap Add to Home Screen). Nothing shows once installed. No pop-up.
+
+**Looking at the farm offline.**
+
+- `lib/game/offline.ts` keeps the last snapshot in `localStorage` (about 50 KB for a 1,000 ha farm), checked for shape and format on the way back. Every storage call is wrapped. If the snapshot does not fit, the old copy is dropped so a stale farm is never shown.
+- `lib/game/offlineWatch.ts` (started by `components/shell/PlayOffline.tsx`) keeps the copy fresh (after each snapshot, 0.4 s later, and when the page is hidden), shows it when `/play` can not reach the game, and holds every action off. The play components already switch Next day, skips and every job button off while the store's `busy` count is above zero, so being offline holds that count up by one. Looking (the map, paddocks, mobs, tabs) keeps working. One plain line shows above the play screen: "You are offline. This is the farm as you last saw it." A check every 15 seconds, and one when the browser says it is online, brings the live farm back and releases the buttons. If the farm was thrown away elsewhere, the normal screens take over.
+- `lib/game/store.ts` was not changed. `lib/game/api.ts` exports the "could not be reached" message as `UNREACHABLE`, so the watch can tell it from a server error.
+- Not available offline: setup, jobs, the market, the inbox being marked read. They need the connection.
+
+**Error screens.** `app/error.tsx`, `app/global-error.tsx` (brings its own html and a plain link home), `app/not-found.tsx`, and `PlayBoundary` around the play screen (Try again clears what was open and starts from the farm tab; Home page). Plain words, no stack, no code; the error goes to the console until Sentry in Stage 3. `/dev/crash?where=page|client|play` shows them (404 on a live build, like the other `/dev` pages).
+
+**Speed budgets in CI** (PRD 14.10). `pnpm test:speed` was already in CI (15 ms limit for the shared machine; 5 ms is held on the build PC). Added: `pnpm check:js-budget` (`scripts/check-js-budget.mjs`, with a test): the compressed size of the scripts each page asks for in its own HTML, `/` under 150 KB (the PRD target is 100 KB: React and the Next.js client are about 120 KB, so it is held at today's 141 KB and says so) and `/play` under 250 KB (184 KB). Lighthouse (`lighthouserc.json`, one set of assertions for each page): performance 0.95 median, Accessibility, Best Practices and SEO 1, LCP 2.0 s, CLS 0.05; TBT 200 ms as a warning (local runs swing between 60 and 630 ms with other work on the PC). On `/play` the LCP is a warning too (below). Nothing existing was loosened.
+
+**Lighthouse, run here** (mobile, `next start`, three runs each, the PC was shared with other work):
+
+| Page | Performance (median) | Accessibility | Best Practices | SEO | LCP | CLS |
+|---|---|---|---|---|---|---|
+| `/` | 0.95 (runs 0.84, 0.99, 0.95; an earlier set 0.98, 1.00, 0.99) | 1 | 1 | 1 | 0.9 s | 0 |
+| `/play` | 0.89 (runs 0.89, 0.91, 0.88) | 1 | 1 | 1 | 3.3 s | 0 |
+
+`/play` does not reach the 0.95 target, and did not before this change: the same build without it scored 0.87. The largest paint is the setup form's first heading ("Where is your farm?"), which waits for the page's scripts, then the farm request, then the setup request, one after the other. Fixing that means changing what the play page draws first (`PlayApp`, `SetupFlow`) and is not in this piece. The first paint is at 0.9 s.
+
+**Cost measurement** (`pnpm build`, then `pnpm measure:cost`; the script starts the built server on its own port with its own empty farm folder). Farm of 3,000 ha (Northern Tablelands NSW, large), 959 head at the start, Windows laptop, Node 24, with other work running, round trip on this machine:
+
+| What the player does | Runs | Median | Worst | Answer |
+|---|---|---|---|---|
+| Start the farm | 1 | 979 ms | | 52 KB |
+| Open the farm | 5 | 29 ms | 38 ms | 52 KB |
+| Next day | 10 | 86 ms | 182 ms | 53 KB |
+| +1 week skip | 1 | 175 ms | | 54 KB |
+| +1 year skip | 3 | 1,673 ms | 1,831 ms | 63 KB |
+
+A year skip ran 359 days on average: 4.7 ms a simulated day, in line with the engine's own 2 to 3 ms a day. A Next day is 86 ms, so most of it is the request, the save and the snapshot, not the simulation.
+
+The stored farm is one JSON file: 191 KB when started (67 KB compressed), 339 KB after about a year and a half of play (146 KB compressed). It grows as history is kept. BUILD_PLAN 5.2 says a farm at rest is "a few tens of KB": the stored file is several times that, and the snapshot sent to the browser is 52 KB. Worth looking at before Stage 3 sets storage limits.
+
+**How it was tested.** `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` 2,283 tests in 120 files, 16 of them new; one earlier full run had two files fail while the PC was busy with other work and they passed on the next run, so those two were not looked into, `pnpm build` and `pnpm check:browser-bundle` pass. Tests: the offline storage (round trip, bad data, no storage, no room), iPhone detection, the JavaScript budget check (pass, over, polyfills, missing file). In the pane's browser on a production build: at 390 by 844 (light) and 844 by 390 (dark), with the server stopped and the page reloaded, the farm opened from the service worker's copy with the line above it, Next day and the three skips disabled, the map drawn, and no sideways scroll. Reconnecting (the page's game requests blocked, then let through) took the line away and enabled the buttons; the server itself was not restarted under an open page. The 404 and the page error (390 by 844, light), and the play screen's error (both sizes, both themes) showed two buttons with no sideways scroll; the last-resort error showed its words and buttons (its width was not measured). The Install entry was hidden, appeared when a `beforeinstallprompt` event was sent, and asked the browser to install when tapped. `/api` was not in any cache.
+
+Not done or not checked: a real phone (install, the iPhone steps, offline in airplane mode, the Android install bar), the iPhone status bar in an installed app, and going offline while a request is in flight.
+
+**Calls for Claudia** (from the review of this branch).
+
+- The home page JavaScript is held at 142 KB (the check's limit is now 142 KB, so it can only go down) against the PRD 14.10 target of 100 KB. React and the Next.js client are about 120 KB (LESSONS, 1.8 W4 and R1). It reaches 100 KB when the website pages are built in Stage 5, or the target moves.
+- `/play` Lighthouse performance was measured at 0.89 (runs 0.89, 0.91, 0.88) against the 0.95 the CI asks for. The CI rule is not loosened, so CI fails on this until the page is made lighter. The cause is the setup form heading waiting on the scripts, then two requests one after the other (LESSONS, 1.8 W5). The fix is in `PlayApp` and `SetupFlow`.
+- The service worker starts 8 seconds after `/play` has loaded, so its 1.6 MB of saved files never competes with the farm's first load. Say if a player should get offline sooner.
+- The stored farm file is 191 KB when started and 339 KB after about a year and a half of play. BUILD_PLAN 5.2 says "a few tens of KB". Worth a decision before Stage 3 sets storage limits.
+- Help opens in the same bottom sheet as the paddock on a phone, so the map stays visible above it (REQUIREMENTS: help never covers the map on a small screen). On a phone on its side it is the whole-screen sheet, as the paddock is. This replaces the full-screen panel described in the 1.7e entry.
+- The last-farm copy (offline viewing) and the tour progress are kept per browser, not per player, until accounts arrive in Stage 3. A second player on the same browser sees the first player's last farm copy and tour progress.
+- The service worker now keeps only `/` and `/play`. Every other page (admin, sign-in callbacks, account pages) and everything under `/api` goes to the network and is never stored.
 
 ## Ideas raised but not built yet
 

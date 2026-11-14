@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { InstallEntry } from '@/components/shell/InstallEntry';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { num, shortDate } from '@/lib/game/format';
 import { kindName, setupFacts, unreadSeqs, unreadWord } from '@/lib/game/more';
 import { useGame } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
 import { DiaryPanel } from './DiaryPanel';
+import { EmptyState } from './EmptyState';
+import { HelpSection } from './HelpPanel';
 import { Icon } from './Icon';
 import { ScoresPanel } from './ScoresPanel';
 import styles from './play.module.css';
@@ -15,6 +18,7 @@ import styles from './play.module.css';
 /** The farm's messages, newest first. A message that was new when the inbox opened keeps its New mark until the player leaves. */
 function Inbox({ snapshot }: { snapshot: Snapshot }) {
   const markRead = useGame((s) => s.markInboxRead);
+  const setTab = useGame((s) => s.setTab);
   const [fresh] = useState(() => unreadSeqs(snapshot.inbox));
   useEffect(() => {
     void markRead();
@@ -26,7 +30,9 @@ function Inbox({ snapshot }: { snapshot: Snapshot }) {
         Inbox
       </h3>
       {messages.length === 0 ? (
-        <p className="muted">No messages yet.</p>
+        <EmptyState action="Back to the farm" onAction={() => setTab('farm')}>
+          No messages yet. News about your cattle, sales, crops and water collects here.
+        </EmptyState>
       ) : (
         <ul className={styles.inbox}>
           {messages.map((m) => (
@@ -169,6 +175,7 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
         {unreadWord(snapshot.inboxUnread) || 'No unread messages.'}
       </p>
       <Inbox snapshot={snapshot} />
+      <HelpSection />
       <Farm snapshot={snapshot} />
       <section aria-labelledby="look-title" className={styles.stack}>
         <h3 id="look-title" className={`px ${styles.minihead}`}>
@@ -180,6 +187,7 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
             Back to the home page
           </Link>
         </div>
+        <InstallEntry />
       </section>
     </section>
   );
