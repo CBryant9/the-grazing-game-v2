@@ -2,19 +2,27 @@ import 'server-only';
 import { createHash, randomInt } from 'node:crypto';
 import {
   applyAction,
+  CLASS_LABELS,
   GRID_N,
+  SUPPLEMENTS,
+  areaIdOf,
   createFarm,
   endDay,
   loadFarm,
+  marketView,
   previewAction,
   saveFarm,
   skipDays,
+  surveyOf,
   thingsToDo,
   type Action,
+  type CattleClassId,
   type CreateFarmOptions,
   type FarmState,
+  type GroupId,
   type JobCard,
   type SourceEnv,
+  type Supplement,
 } from '@gg/engine';
 import { loadRealData } from '@gg/engine/server';
 import type {
@@ -28,6 +36,8 @@ import type {
   SkipRequestLength,
   Snapshot,
 } from '../../lib/game/types';
+import { buildMobs } from './mobs';
+import { moveNotes } from './mobwords';
 import { buildSnapshot, buildSummary } from './snapshot';
 import { FileFarmStore, type FarmStore, type StoredFarm } from './store';
 import { dateText, doneWord, todoKey } from './words';
@@ -101,12 +111,51 @@ const envFor = (c: SetupChoices): SourceEnv => (realYears(c) ? { data: loadRealD
 const int = (v: unknown, min: number, max: number): number | null =>
   typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null;
 
-/** Check an action the browser named. Only simple actions are allowed for now; the engine checks the rest. */
-export function parseAction(body: unknown): Action | null {
+const SELL_GROUPS: readonly string[] = ['steer', 'heifer', 'heiferP', 'cowP', 'cowE', 'bull'];
+const MOVE_PICKS_MAX = 20;
+const HEAD_MAX = 100_000;
+
+/**
+ * Check an action the browser named. Only simple actions are allowed for
+ * now; the engine checks the rest. A sale booked for a mob names the mob
+ * only: the server finds the booked animals from the farm.
+ */
+export function parseAction(body: unknown, farm?: FarmState): Action | null {
   if (typeof body !== 'object' || body === null) return null;
   const a = body as Record<string, unknown>;
   const mob = int(a.mob, 1, 1e6);
   switch (a.type) {
+    case 'sellGroup': {
+      const qty = int(a.qty, 1, HEAD_MAX);
+      if (mob === null || qty === null || !SELL_GROUPS.includes(a.group as string)) return null;
+      return { type: 'sellGroup', mob, group: a.group as GroupId, qty };
+    }
+    case 'setSupplement':
+      if (mob === null || !SUPPLEMENTS.includes(a.supp as Supplement)) return null;
+      return { type: 'setSupplement', mob, supp: a.supp as Supplement };
+    case 'cancelSale': {
+      const m = farm?.mobs.find((x) => x.id === mob);
+      if (!farm || !m) return null;
+      const booked = new Set<number>();
+      for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
+      const ids = m.animals.filter((x) => booked.has(x.id)).map((x) => x.id);
+      return ids.length ? { type: 'cancelSale', ids } : null;
+    }
+    case 'moveCattle': {
+      const cell = int(a.cell, 0, GRID_N - 1);
+      if (cell === null || !Array.isArray(a.picks)) return null;
+      if (a.picks.length < 1 || a.picks.length > MOVE_PICKS_MAX) return null;
+      const picks: { mob: number; cls: CattleClassId; qty: number }[] = [];
+      for (const raw of a.picks as unknown[]) {
+        const p = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+        const pm = int(p.mob, 1, 1e6);
+        const qty = int(p.qty, 1, HEAD_MAX);
+        if (pm === null || qty === null) return null;
+        if (typeof p.cls !== 'string' || !Object.hasOwn(CLASS_LABELS, p.cls)) return null;
+        picks.push({ mob: pm, cls: p.cls as CattleClassId, qty });
+      }
+      return { type: 'moveCattle', picks, to: { cell } };
+    }
     case 'markCalves':
     case 'wean':
     case 'pausePlan':
@@ -129,8 +178,29 @@ export function parseAction(body: unknown): Action | null {
   }
 }
 
-function cardWire(card: JobCard): JobCardWire {
-  const notes: string[] = [];
+/**
+ * What a move will do, as plain notes: a paddock with no water, and a mob
+ * already in it (the two join, one mob to a paddock). Read from the farm as
+ * it stands before the move.
+ */
+export function moveNotesFor(farm: FarmState, action: Action): string[] {
+  if (action.type !== 'moveMob' && action.type !== 'moveCattle') return [];
+  if (typeof action.to !== 'object') return [];
+  const survey = surveyOf(farm);
+  const areaId = survey.topology.areaOf[action.to.cell];
+  const area = areaId === undefined ? undefined : survey.topology.areas[areaId];
+  if (areaId === undefined || !area) return [];
+  const moving = new Set(action.type === 'moveMob' ? [action.mob] : action.picks.map((p) => p.mob));
+  const others = farm.mobs
+    .filter(
+      (m) => m.where.kind === 'paddock' && areaIdOf(survey, m) === areaId && !moving.has(m.id),
+    )
+    .map((m) => ({ name: m.name, head: m.animals.filter((a) => a.kind !== 'calf').length }));
+  return moveNotes(area.name, survey.points.areaTroughs[areaId]!.length > 0, others);
+}
+
+function cardWire(card: JobCard, extra: string[] = [], perDay: number | null = null): JobCardWire {
+  const notes: string[] = [...extra];
   if (card.booking) {
     const b = card.booking;
     notes.push(
@@ -161,6 +231,7 @@ function cardWire(card: JobCard): JobCardWire {
     fitsToday: card.fitsToday,
     cost: Math.round(card.cost),
     costToday: Math.round(card.costToday),
+    perDay,
     notes,
   };
 }
@@ -281,9 +352,30 @@ export class GameServer {
       }
       return item.action;
     }
-    const action = 'action' in req ? parseAction(req.action as SimpleAction) : null;
-    if (!action) throw new GameError(400, 'That job is not one the game can do yet.');
+    const simple = 'action' in req ? (req.action as SimpleAction) : null;
+    const action = simple ? parseAction(simple, farm) : null;
+    if (!action) {
+      if (simple?.type === 'cancelSale') {
+        throw new GameError(409, 'Nothing from this mob is booked onto a sale.');
+      }
+      throw new GameError(400, 'That job is not one the game can do yet.');
+    }
     return action;
+  }
+
+  /** The notes and daily price a job card carries beyond the engine's own. */
+  private extras(
+    farm: FarmState,
+    stored: StoredFarm,
+    action: Action,
+  ): { notes: string[]; perDay: number | null } {
+    if (action.type === 'setSupplement') {
+      const market = marketView(farm, envFor(stored.setup));
+      const mob = buildMobs(farm, envFor(stored.setup), market).find((m) => m.id === action.mob);
+      const option = mob?.suppOptions.find((o) => o.id === action.supp);
+      return { notes: [], perDay: option ? option.perDay : null };
+    }
+    return { notes: moveNotesFor(farm, action), perDay: null };
   }
 
   /** The job card for an action: time, cost and light left. Nothing changes. */
@@ -291,9 +383,11 @@ export class GameServer {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const { farm, stored } = await this.need(id);
-      const result = previewAction(farm, this.resolve(farm, req), envFor(stored.setup));
+      const action = this.resolve(farm, req);
+      const result = previewAction(farm, action, envFor(stored.setup));
       if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
-      return { ok: true, card: cardWire(result.card) };
+      const x = this.extras(farm, stored, action);
+      return { ok: true, card: cardWire(result.card, x.notes, x.perDay) };
     });
   }
 
@@ -302,17 +396,15 @@ export class GameServer {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
-      const result = applyAction(
-        held.farm,
-        this.resolve(held.farm, req),
-        envFor(held.stored.setup),
-      );
+      const action = this.resolve(held.farm, req);
+      const x = this.extras(held.farm, held.stored, action);
+      const result = applyAction(held.farm, action, envFor(held.stored.setup));
       if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
       const next = await this.save(id, held, result.farm);
       return {
         ok: true,
         message: doneWord(result.events),
-        card: result.job ? cardWire(result.job) : null,
+        card: result.job ? cardWire(result.job, x.notes, x.perDay) : null,
         snapshot: this.snapshotOf(next),
       };
     });

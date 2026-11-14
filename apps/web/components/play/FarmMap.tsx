@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FarmView } from '@gg/shared';
 // Types only: these lines load nothing. The renderer (and PixiJS with it) is
 // loaded below, once the page is on screen, so it is not in the first load.
-import type { FarmMap as FarmMapHandle } from '@gg/render';
+import type { FarmMap as FarmMapHandle, PickablePaddock } from '@gg/render';
 import type { ThemeName } from '@/lib/game/hooks';
 import styles from './play.module.css';
 
@@ -18,6 +18,7 @@ export function FarmMap({
   theme,
   minutes,
   selected,
+  pickable,
   reduceMotion,
   onTapPaddock,
 }: {
@@ -26,6 +27,8 @@ export function FarmMap({
   /** The time of day to light the map for, minutes after midnight. */
   minutes: number;
   selected: number | null;
+  /** Paddocks a tool can pick (the move tool), outlined lightly, red where there is no water. Null when none. */
+  pickable: readonly PickablePaddock[] | null;
   reduceMotion: boolean;
   onTapPaddock: (paddock: number) => void;
 }) {
@@ -95,6 +98,9 @@ export function FarmMap({
   useEffect(() => {
     if (ready) mapRef.current?.setHighlight(selected);
   }, [ready, selected]);
+  useEffect(() => {
+    if (ready) mapRef.current?.setPickable(pickable);
+  }, [ready, pickable]);
   useEffect(() => {
     if (ready) mapRef.current?.setReduceMotion(reduceMotion);
   }, [ready, reduceMotion]);

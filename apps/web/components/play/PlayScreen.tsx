@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
+import { pickable } from '@/lib/game/lists';
 import { useLayout, useReducedMotion, useTheme } from '@/lib/game/hooks';
-import { useGame } from '@/lib/game/store';
+import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
 import { FarmMap } from './FarmMap';
+import { HerdList, PaddockList } from './Lists';
+import { MobCard } from './MobCard';
+import { MoveFlow } from './MoveFlow';
 import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
 import { SummaryCard } from './SummaryCard';
@@ -59,12 +63,34 @@ function GameOver() {
   );
 }
 
-/** The farm side panel on a PC: things to do, or the paddock that was tapped. */
-function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
+/** What opens from the farm: the move tool, a mob card, or a paddock sheet. Null when nothing is open. */
+function Opened({ snapshot }: { snapshot: Snapshot }) {
   const paddockId = useGame((s) => s.paddockId);
-  const close = useGame((s) => s.closePaddock);
-  if (paddockId !== null)
-    return <PaddockSheet snapshot={snapshot} paddockId={paddockId} onClose={close} />;
+  const mobId = useGame((s) => s.mobId);
+  const move = useGame((s) => s.move);
+  const closePaddock = useGame((s) => s.closePaddock);
+  const closeMob = useGame((s) => s.closeMob);
+  if (move) return <MoveFlow snapshot={snapshot} />;
+  if (mobId !== null) {
+    return <MobCard key={`mob-${mobId}`} snapshot={snapshot} mobId={mobId} onClose={closeMob} />;
+  }
+  if (paddockId !== null) {
+    return (
+      <PaddockSheet
+        key={`paddock-${paddockId}`}
+        snapshot={snapshot}
+        paddockId={paddockId}
+        onClose={closePaddock}
+      />
+    );
+  }
+  return null;
+}
+
+/** The farm side panel on a PC: what is open, or things to do. */
+function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
+  const open = useGame((s) => s.move !== null || s.mobId !== null || s.paddockId !== null);
+  if (open) return <Opened snapshot={snapshot} />;
   return (
     <div className={styles.sidebody}>
       <h2 className={`px ${styles.minihead}`}>Things to do</h2>
@@ -73,6 +99,13 @@ function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
       <PaddockChips snapshot={snapshot} />
     </div>
   );
+}
+
+/** A tab other than Farm: the lists for Herd and Paddocks, and Coming soon for the rest. */
+function TabPanel({ tab, snapshot }: { tab: Tab; snapshot: Snapshot }) {
+  if (tab === 'herd') return <HerdList snapshot={snapshot} />;
+  if (tab === 'paddocks') return <PaddockList snapshot={snapshot} />;
+  return <ComingSoon tab={tab} />;
 }
 
 /**
@@ -86,8 +119,10 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const reduceMotion = useReducedMotion();
   const tab = useGame((s) => s.tab);
   const paddockId = useGame((s) => s.paddockId);
+  const mobId = useGame((s) => s.mobId);
+  const move = useGame((s) => s.move);
   const openPaddock = useGame((s) => s.openPaddock);
-  const closePaddock = useGame((s) => s.closePaddock);
+  const moveTargetPicked = useGame((s) => s.moveTargetPicked);
   const summary = useGame((s) => s.summary);
 
   const { clock } = snapshot;
@@ -103,7 +138,24 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   }, []);
 
   const pc = layout === 'pc';
-  const showPaddockSheet = paddockId !== null && tab === 'farm' && !pc;
+  const sheetOpen =
+    tab === 'farm' && !pc && (move !== null || mobId !== null || paddockId !== null);
+
+  // While the move tool asks for a paddock, a tap picks it. Otherwise a tap opens it.
+  const picking = move !== null && move.mobId !== null && move.phase !== 'done';
+  const mover = move && move.mobId !== null ? snapshot.mobs.find((m) => m.id === move.mobId) : null;
+  const pickables = useMemo(
+    () =>
+      picking &&
+      move &&
+      (move.phase === 'pick' || move.phase === 'refused' || move.phase === 'confirm')
+        ? pickable(snapshot.paddocks, snapshot.mobs, mover ?? null).map((r) => ({
+            paddock: r.paddock.id,
+            dry: r.dry,
+          }))
+        : null,
+    [picking, move, snapshot.paddocks, snapshot.mobs, mover],
+  );
 
   return (
     <div className={styles.screen} data-layout={layout} data-evening={clock.evening}>
@@ -117,7 +169,11 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         {pc && (
           <aside className={styles.side} aria-label="Farm panel">
             <Nav />
-            {tab === 'farm' ? <FarmPanel snapshot={snapshot} /> : <ComingSoon tab={tab} />}
+            {tab === 'farm' ? (
+              <FarmPanel snapshot={snapshot} />
+            ) : (
+              <TabPanel tab={tab} snapshot={snapshot} />
+            )}
           </aside>
         )}
         <main id="main" className={styles.stage} tabIndex={-1}>
@@ -125,17 +181,18 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             view={snapshot.view}
             theme={theme}
             minutes={minutes}
-            selected={paddockId}
+            selected={move ? move.target : paddockId}
+            pickable={pickables}
             reduceMotion={reduceMotion}
-            onTapPaddock={openPaddock}
+            onTapPaddock={
+              picking ? (id) => void moveTargetPicked(id) : move ? () => {} : openPaddock
+            }
           />
           <NoticeBar />
           <GameOver />
-          {!pc && tab === 'farm' && !showPaddockSheet && <TodoBanner snapshot={snapshot} />}
-          {showPaddockSheet && (
-            <PaddockSheet snapshot={snapshot} paddockId={paddockId} onClose={closePaddock} />
-          )}
-          {!pc && tab !== 'farm' && <ComingSoon tab={tab} />}
+          {!pc && tab === 'farm' && !sheetOpen && <TodoBanner snapshot={snapshot} />}
+          {sheetOpen && <Opened snapshot={snapshot} />}
+          {!pc && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
         </main>
         {!pc && <Nav />}
       </div>

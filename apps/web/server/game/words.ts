@@ -11,6 +11,8 @@ import type { TodoWire } from '../../lib/game/types';
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 const money = (n: number): string => `$${Math.round(Math.abs(n)).toLocaleString('en-AU')}`;
 
+const SUPP_WORD = { none: 'no supplement', lick: 'lick', hay: 'hay', pellet: 'pellets' } as const;
+
 const FENCE_WORD = { electric: 'electric', tape: 'tape' } as const;
 
 /** A stable key for a thing to do, so the browser can name it and the server can find it again. */
@@ -34,11 +36,13 @@ export function todoKey(t: ThingToDo): string {
 export function todoWire(t: ThingToDo): TodoWire {
   const key = todoKey(t);
   const button = (label: string): string | null => (t.action ? label : null);
+  const base = { key, mob: null, opens: null } as const;
   switch (t.type) {
     case 'calves-to-mark': {
       const bulls = t.youngBulls > 0 ? ` and ${plural(t.youngBulls, 'young bull')}` : '';
       return {
-        key,
+        ...base,
+        mob: t.mob,
         text: `${t.mobName} has ${plural(t.count, 'calf', 'calves')} old enough to mark${bulls}.`,
         button: button('Mark calves'),
         urgent: false,
@@ -46,49 +50,54 @@ export function todoWire(t: ThingToDo): TodoWire {
     }
     case 'no-water':
       return {
-        key,
+        ...base,
+        mob: t.mob,
         text: `${t.mobName} has no water${t.area ? ` in ${t.area}` : ''}. ${plural(t.dryDays, 'day')} without so far. Cattle die on the fourth day without water.`,
         button: null,
         urgent: true,
       };
     case 'plan-waiting':
       return {
-        key,
+        ...base,
+        mob: t.mob,
         text: `${t.mobName}'s grazing plan can not move it into ${t.area}, because that area has no water. The plan tries again each day.`,
         button: button('Pause plan'),
         urgent: false,
       };
     case 'crop-ready':
       return {
-        key,
+        ...base,
         text: `A crop of ${SPECIES[t.sp].short} is ready to harvest, ${Math.round(t.count * 10) / 10} ha.`,
         button: button('Harvest'),
         urgent: false,
       };
     case 'in-yards':
       return {
-        key,
+        ...base,
+        mob: t.mob,
         text: `${t.mobName} (${plural(t.count, 'head', 'head')}) is in the stock yards, ${plural(t.days, 'day')} so far. The yards have water and almost no feed.`,
-        button: null,
+        // The button opens the move flow: pick the paddock, done.
+        button: 'Move out',
+        opens: 'move',
         urgent: false,
       };
     case 'fence-down':
       return {
-        key,
+        ...base,
         text: `A ${FENCE_WORD[t.fence]} fence is down.`,
         button: button('Put it back up'),
         urgent: false,
       };
     case 'trough-empty':
       return {
-        key,
+        ...base,
         text: 'A portable trough is empty.',
         button: button('Refill it'),
         urgent: true,
       };
     case 'trough-low':
       return {
-        key,
+        ...base,
         text: `A portable trough has ${Math.round(t.count).toLocaleString('en-AU')} litres left.`,
         button: button('Refill it'),
         urgent: false,
@@ -166,6 +175,9 @@ export function inboxWord(e: FarmEvent): string | null {
 /** What a done action did, in a sentence, from the events it made. */
 export function doneWord(events: readonly FarmEvent[]): string {
   const parts: string[] = [];
+  // A move into a paddock that holds a mob is one sentence: it moved and joined.
+  const joined = events.find((e) => e.type === 'mobs-joined');
+  const moved = events.some((e) => e.type === 'mob-moved');
   for (const e of events) {
     switch (e.type) {
       case 'calves-marked':
@@ -177,7 +189,37 @@ export function doneWord(events: readonly FarmEvent[]): string {
         );
         break;
       case 'mob-moved':
-        parts.push(`${e.mobName} moved.`);
+        parts.push(
+          joined?.type === 'mobs-joined'
+            ? `${joined.fromName} moved (${plural(e.head, 'head', 'head')}) and joined ${joined.intoName}.`
+            : `${e.mobName} moved (${plural(e.head, 'head', 'head')}).`,
+        );
+        break;
+      case 'mobs-joined':
+        if (!moved) parts.push(`${e.fromName} joined ${e.intoName}.`);
+        break;
+      case 'no-water':
+        parts.push(`${e.mobName} has no water in ${e.area}.`);
+        break;
+      case 'supplement-set':
+        parts.push(
+          e.supp === 'none'
+            ? `${e.mobName} is off supplements.`
+            : `${e.mobName} is on ${SUPP_WORD[e.supp]}.`,
+        );
+        break;
+      case 'sale-booked':
+        parts.push(
+          `${plural(e.head, 'head', 'head')} booked onto the sale on ${dateText(e.saleDate)}. Nothing is paid today.`,
+        );
+        break;
+      case 'sale-cancelled':
+        parts.push(
+          `${plural(e.head, 'head', 'head')} taken off the sale on ${dateText(e.saleDate)}.`,
+        );
+        break;
+      case 'cattle-sold':
+        parts.push(`${plural(e.head, 'head', 'head')} sold. ${money(e.net)} paid into the bank.`);
         break;
       case 'weaned':
         parts.push(`${plural(e.count, 'calf', 'calves')} weaned from ${e.mobName}.`);

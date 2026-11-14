@@ -70,6 +70,39 @@ export interface TodoWire {
   button: string | null;
   /** True for things that can hurt stock soon, such as no water. Styled firmer, worded the same way: facts. */
   urgent: boolean;
+  /** The mob this is about, so the banner can open its card. Null when it is about something else. */
+  mob: number | null;
+  /** 'move' when the button opens the move flow instead of doing a job at once (cattle in the yards). */
+  opens: 'move' | null;
+}
+
+export type SuppId = 'none' | 'lick' | 'hay' | 'pellet';
+export type SellGroupId = 'steer' | 'heifer' | 'heiferP' | 'cowP' | 'cowE' | 'bull';
+
+/** One class of cattle in a mob: head, average weight and CS. */
+export interface MobClassWire {
+  /** The class id, which the move picker sends back. */
+  id: string;
+  label: string;
+  head: number;
+  weightKg: number;
+  cs: number;
+  /** Calves go with their mothers, so they are not picked on their own. */
+  calf: boolean;
+}
+
+/** A supplement a mob can be on, with what it costs a day for this mob. Dollars, whole. */
+export interface SuppOptionWire {
+  id: SuppId;
+  label: string;
+  perDay: number;
+}
+
+/** A group in the mob that can be sold, and how many head are free to sell. */
+export interface SellGroupWire {
+  id: SellGroupId;
+  name: string;
+  head: number;
 }
 
 export interface MobWire {
@@ -88,6 +121,32 @@ export interface MobWire {
   adgKg: number | null;
   me: number | null;
   cp: number | null;
+  /** Intake in kg DM a head a day, and as % of live weight. Null before the mob's first day. */
+  intakeKg: number | null;
+  intakePct: number | null;
+  classes: MobClassWire[];
+  /** Plain sentences on why the mob is losing weight or short of feed or water. Empty when there is nothing to say. */
+  why: string[];
+  /** Females in calf (PTIC). */
+  ptic: number;
+  /** A fact about the joining under way, or null. */
+  joining: string | null;
+  supp: SuppId;
+  /** The supplements to pick from. Empty when the mob is not on pasture. */
+  suppOptions: SuppOptionWire[];
+  /** Why the supplement switch is off, or null. */
+  suppReason: string | null;
+  /** Head booked onto the next sale, and the sale's date. */
+  booked: number;
+  bookedDate: DateParts | null;
+  /** Bull calves and young bulls that marking would cover. */
+  markCount: number;
+  markReason: string | null;
+  /** Calves old enough to wean. */
+  weanCount: number;
+  weanReason: string | null;
+  sellGroups: SellGroupWire[];
+  sellReason: string | null;
 }
 
 export interface PaddockWire {
@@ -108,9 +167,17 @@ export interface PaddockWire {
   cp: number;
   head: number;
   ae: number;
+  dse: number;
+  aePerHa: number;
   dsePerHa: number;
   /** Days of feed with stock on it, or null with no stock. */
   feedDays: number | null;
+  /** Feed grown on the last day, kg DM/ha. */
+  growKgHaDay: number;
+  /** What the soil carries over the long term, DSE/ha. */
+  carryingDsePerHa: number;
+  /** A square in the paddock, which the move action names. */
+  cell: number;
 }
 
 export interface SaleDayWire {
@@ -166,6 +233,8 @@ export interface JobCardWire {
   fitsToday: boolean;
   cost: number;
   costToday: number;
+  /** For a supplement: what it costs a day for the mob while it is on, dollars. Null for any other job. */
+  perDay: number | null;
   /** Plain sentences about this job, for example that stock are booked onto a sale. */
   notes: string[];
 }
@@ -257,6 +326,10 @@ export type ActionRequest = { todo: string } | { action: SimpleAction };
 
 export type SimpleAction =
   | { type: 'markCalves'; mob: number }
+  | { type: 'sellGroup'; mob: number; group: SellGroupId; qty: number }
+  | { type: 'cancelSale'; mob: number }
+  | { type: 'setSupplement'; mob: number; supp: SuppId }
+  | { type: 'moveCattle'; picks: { mob: number; cls: string; qty: number }[]; cell: number }
   | { type: 'moveMob'; mob: number; cell: number }
   | { type: 'wean'; mob: number }
   | { type: 'harvest'; field: number }

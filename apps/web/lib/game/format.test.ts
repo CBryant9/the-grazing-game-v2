@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { cardLines, clockText, dateText, delta, durationText, lightNote, money } from './format';
+import {
+  aboutTime,
+  cardLines,
+  clockText,
+  dateText,
+  delta,
+  durationText,
+  lightNote,
+  money,
+} from './format';
 import type { JobCardWire } from './types';
 
 describe('format', () => {
@@ -39,6 +48,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   fitsToday: true,
   cost: 72,
   costToday: 72,
+  perDay: null,
   notes: [],
   ...over,
 });
@@ -46,10 +56,22 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
 describe('cardLines', () => {
   it('states time, cost and light left', () => {
     expect(cardLines(card())).toEqual([
-      'Takes 30 min.',
+      'Takes about 30 min.',
       'Costs $72.',
       'About 4 h 10 min of light left after.',
     ]);
+  });
+  it('gives the time lightly, to the nearest five minutes', () => {
+    expect(aboutTime(41)).toBe('about 40 min');
+    expect(aboutTime(2)).toBe('about 5 min');
+    expect(aboutTime(80)).toBe('about 1 h 20 min');
+  });
+  it('shows a supplement as a daily price, not a job cost', () => {
+    const lines = cardLines(card({ outcome: 'free', cost: 0, workMin: 0, perDay: 84 }));
+    expect(lines).toEqual(['Takes none of the day.', 'Costs about $84 a day while it is on.']);
+    expect(cardLines(card({ outcome: 'free', perDay: 4.5 }))[1]).toBe(
+      'Costs about $4.50 a day while it is on.',
+    );
   });
   it('says so when a job uses the full day, is free, or only part fits', () => {
     expect(cardLines(card({ usesRestOfDay: true }))).toContain('This would use up your full day.');

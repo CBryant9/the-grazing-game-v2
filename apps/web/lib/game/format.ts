@@ -65,13 +65,28 @@ export function plural(n: number, one: string, many = `${one}s`): string {
   return `${num(n)} ${n === 1 ? one : many}`;
 }
 
+/** A daily price: whole dollars from $10, cents below. */
+export function priceText(n: number): string {
+  return n >= 10 ? money(n) : `$${n.toFixed(2)}`;
+}
+
+/** Time, lightly: "about 40 min", "about 1 h 20 min". Never to the second. */
+export function aboutTime(minutes: number): string {
+  const m = Math.max(5, Math.round(minutes / 5) * 5);
+  return `about ${durationText(m)}`;
+}
+
 /** What a job card says, as short facts: time, cost, and the light left after it. */
 export function cardLines(card: JobCardWire): string[] {
   const lines: string[] = [];
   lines.push(
-    card.outcome === 'free' ? 'Takes none of the day.' : `Takes ${durationText(card.workMin)}.`,
+    card.outcome === 'free' ? 'Takes none of the day.' : `Takes ${aboutTime(card.workMin)}.`,
   );
-  if (card.cost < 0) lines.push(`Pays ${money(-card.cost)}.`);
+  if (card.perDay !== null && card.perDay !== undefined) {
+    lines.push(
+      card.perDay > 0 ? `Costs about ${priceText(card.perDay)} a day while it is on.` : 'No cost.',
+    );
+  } else if (card.cost < 0) lines.push(`Pays ${money(-card.cost)}.`);
   else if (card.cost === 0) lines.push('No cost.');
   else lines.push(`Costs ${money(card.cost)}.`);
   if (card.outcome !== 'free') {

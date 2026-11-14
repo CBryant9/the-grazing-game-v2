@@ -735,3 +735,457 @@
   gap: 12px;
   justify-items: start;
 }
+
+/* ---- The paddock sheet, the mob card and moving cattle -------------------- */
+
+.padfeed {
+  margin-left: auto;
+  font-weight: 700;
+}
+.waterline {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.nowater {
+  color: var(--bad);
+}
+.mobbtn {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tap);
+  align-items: center;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.mobs li:has(.mobbtn) {
+  padding: 0;
+}
+.mobbtn {
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel2);
+}
+.details {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+}
+.details > summary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+}
+.details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.details > :last-child {
+  margin-bottom: 10px;
+}
+.actions {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  font-size: 0.75rem;
+}
+
+/* The side-view picture */
+.swardwrap {
+  min-width: 0;
+}
+.swardrow {
+  display: flex;
+  gap: 8px;
+}
+.sward {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+.sward figcaption {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.swardcanvas {
+  display: block;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  max-width: 100%;
+}
+
+/* The mob card */
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.warntag,
+.holdtag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.warntag {
+  color: var(--bad);
+}
+.holdtag {
+  color: var(--muted);
+}
+.why {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--coral);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.hlist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.hrow {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.hbtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hhint,
+.hreason {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.hhint {
+  color: var(--muted);
+}
+.hreason {
+  color: var(--text);
+}
+.picker {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.field {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--ghost);
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+}
+.supp {
+  display: grid;
+  gap: 8px;
+}
+.supptitle {
+  font-size: 0.8125rem;
+}
+.suppopts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.suppbtn {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: var(--tap);
+  padding: 6px 10px;
+  border: 1px solid var(--ghost);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.suppbtn small {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.suppbtn[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+}
+.suppon span::after {
+  content: ' (on)';
+  font-weight: 400;
+}
+.booked {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+.classtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  margin-bottom: 10px;
+}
+.classtable th,
+.classtable td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.classtable th:first-child {
+  text-align: left;
+  font-weight: 400;
+}
+.classtable thead th {
+  color: var(--muted);
+  font-weight: 400;
+}
+.joinline {
+  margin-top: 10px;
+  font-size: 0.8125rem;
+}
+
+/* Moving cattle */
+.moveflow {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+  padding: 10px 14px 14px;
+  font-size: 0.8125rem;
+}
+.moveflow:focus {
+  outline: none;
+}
+.screen[data-layout='phone'] .moveflow {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 52%;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.screen[data-layout='landscape'] .moveflow {
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(46%, 380px);
+  border-left: 1px solid var(--line);
+  box-shadow: -10px 0 30px var(--shadow);
+}
+.screen[data-layout='pc'] .moveflow {
+  flex: 1;
+}
+.movebody {
+  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.pickrows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.pickrow {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pickname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pickfacts {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.keylight,
+.keydry {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid var(--text);
+  border-radius: 2px;
+}
+.keydry {
+  border-top-color: var(--bad);
+  margin-left: 6px;
+}
+.partset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--ghost);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.seg button {
+  min-height: var(--tap);
+  padding: 4px 8px;
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--sel);
+  font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.partrows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.partrows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 8px;
+}
+.partrows li:last-child {
+  grid-template-columns: 1fr;
+}
+
+/* The Herd and Paddocks lists */
+.listpanel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  background: var(--frame);
+  overflow-y: auto;
+  min-height: 0;
+}
+.screen[data-layout='phone'] .stage > .listpanel,
+.screen[data-layout='landscape'] .stage > .listpanel {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+}
+.screen[data-layout='pc'] .side > .listpanel {
+  flex: 1;
+}
+.sortbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sortlabel {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.sortbtn {
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--ghost);
+  border-radius: 999px;
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+.sortbtn[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+  font-weight: 700;
+}
+.rows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rowtop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.rowsub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moveflow,
+  .sheet {
+    transition: none;
+    animation: none;
+  }
+}

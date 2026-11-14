@@ -87,6 +87,7 @@ Drawing aids:
 - Fence drag preview: a dashed line with the length and cost. For tape, white = off your roll and red = new tape you'll buy.
 - Snap dots: green = joins an existing fence, white ring = open ground.
 - A hovered fence segment is highlighted white when it can be clicked.
+- While a tool asks for a paddock (moving a mob), every paddock that can be picked has a light tint and outline, and a paddock with no water is tinted and outlined red. The paddock sheet lists the same paddocks, with "No water" in words, so colour is never the only signal.
 
 ## Cattle sprites
 

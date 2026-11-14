@@ -11,21 +11,47 @@ function Row({
   item,
   job,
 }: {
-  item: { key: string; text: string; button: string | null; urgent: boolean };
+  item: {
+    key: string;
+    text: string;
+    button: string | null;
+    urgent: boolean;
+    mob?: number | null;
+    opens?: 'move' | null;
+  };
   job?: JobState;
 }) {
   const startJob = useGame((s) => s.startJob);
   const confirmJob = useGame((s) => s.confirmJob);
   const dismissJob = useGame((s) => s.dismissJob);
+  const openMob = useGame((s) => s.openMob);
+  const startMove = useGame((s) => s.startMove);
   const busy = useGame((s) => s.busy > 0);
   const phase = job?.phase;
   return (
     <li className={`${styles.todo} ${item.urgent ? styles.todourgent : ''}`}>
       <p className={styles.todotext}>{item.text}</p>
-      {!phase && item.button && (
-        <button type="button" className="btn sm" onClick={() => void startJob(item.key)}>
-          {item.button}
-        </button>
+      {!phase && (item.button || item.mob != null) && (
+        <div className={styles.jobbtns}>
+          {item.button && (
+            <button
+              type="button"
+              className="btn sm"
+              onClick={() =>
+                item.opens === 'move' && item.mob != null
+                  ? void startMove({ mobId: item.mob })
+                  : void startJob(item.key)
+              }
+            >
+              {item.button}
+            </button>
+          )}
+          {item.mob != null && (
+            <button type="button" className="btn sm ghost" onClick={() => openMob(item.mob!)}>
+              Open mob
+            </button>
+          )}
+        </div>
       )}
       {phase === 'previewing' && (
         <p className={styles.todostatus} role="status">
@@ -91,7 +117,7 @@ export function TodoList({ snapshot }: { snapshot: Snapshot }) {
   const live = new Set(snapshot.todo.map((t) => t.key));
   const ghosts = Object.values(jobs)
     .filter((j) => !live.has(j.key))
-    .map((j) => ({ key: j.key, text: j.text, button: j.button, urgent: false }));
+    .map((j) => ({ key: j.key, text: j.text, button: j.button, urgent: false, mob: null }));
   const items = [...snapshot.todo, ...ghosts];
   if (!items.length) return <p className="muted">Nothing needs doing right now.</p>;
   return (

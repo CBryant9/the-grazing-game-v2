@@ -3,9 +3,9 @@ import {
   CLASS_LABELS,
   clockView,
   farmTotals,
+  DSE_PER_AE,
   farmView,
   marketView,
-  mobSummaries,
   paddockSummaries,
   plansView,
   thingsToDo,
@@ -27,6 +27,7 @@ import {
   type Snapshot,
   type SummaryWire,
 } from '../../lib/game/types';
+import { buildMobs } from './mobs';
 import { causeWord, gameOverWord, inboxWord, stopWord, todoWire } from './words';
 
 /** Messages the snapshot carries. The browser shows a few; older ones stay on the server. */
@@ -78,6 +79,7 @@ export function buildSnapshot(
   const market = marketView(farm, env);
 
   const haOf = new Map(view.paddocks.map((p) => [p.id, p.ha]));
+  const cellOf = new Map(view.paddocks.map((p) => [p.id, p.labelCell]));
   const paddocks: PaddockWire[] = paddockSummaries(farm, env).map((p) => ({
     id: p.id,
     name: p.name,
@@ -96,27 +98,16 @@ export function buildSnapshot(
     cp: round(p.cp, 1),
     head: p.head,
     ae: round(p.ae, 1),
+    dse: round(p.ae * DSE_PER_AE),
+    aePerHa: round(p.rate, 2),
     dsePerHa: round(p.dsePerHa, 1),
     feedDays: Number.isFinite(p.feedDays) ? round(p.feedDays) : null,
+    growKgHaDay: round(p.ha > 0 ? p.grow / p.ha : 0),
+    carryingDsePerHa: round(p.cc * DSE_PER_AE, 1),
+    cell: cellOf.get(p.id) ?? 0,
   }));
 
-  const mobs: MobWire[] = mobSummaries(farm).map((m) => ({
-    id: m.id,
-    name: m.name,
-    where: m.where.kind,
-    area: m.area,
-    hasWater: m.hasWater,
-    head: m.head,
-    calves: m.calves,
-    ae: round(m.ae, 1),
-    dse: round(m.dse),
-    dryDays: m.dryDays,
-    weightKg: m.day ? round(m.day.wt) : null,
-    cs: m.day ? round(m.day.cs, 1) : null,
-    adgKg: m.day ? round(m.day.adg, 2) : null,
-    me: m.day ? round(m.day.me, 1) : null,
-    cp: m.day ? round(m.day.cp, 1) : null,
-  }));
+  const mobs: MobWire[] = buildMobs(farm, env, market);
 
   const inbox = [...farm.inbox]
     .reverse()

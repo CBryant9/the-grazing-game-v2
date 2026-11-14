@@ -56,8 +56,11 @@ beforeEach(() => {
     notice: null,
     tab: 'farm',
     paddockId: null,
+    mobId: null,
     summary: null,
     jobs: {},
+    acts: {},
+    move: null,
   });
 });
 
@@ -193,5 +196,162 @@ describe('the game store', () => {
     });
     await useGame.getState().nextDay();
     expect(useGame.getState().paddockId).toBeNull();
+  });
+
+  describe('the mob card and moving cattle', () => {
+    const farm = (over: Partial<Snapshot> = {}): Snapshot =>
+      snap({
+        paddocks: [
+          { id: 0, name: 'Paddock 1', cell: 10, mobs: [1] },
+          { id: 1, name: 'Paddock 2', cell: 20, mobs: [] },
+        ] as never,
+        mobs: [
+          {
+            id: 1,
+            name: 'Steers A',
+            head: 10,
+            calves: 0,
+            classes: [
+              {
+                id: 'weanerSteer',
+                label: 'Weaner steer',
+                head: 10,
+                weightKg: 250,
+                cs: 3,
+                calf: false,
+              },
+            ],
+          },
+        ] as never,
+        ...over,
+      });
+    const card = { action: 'moveMob', workMin: 30, cost: 0, notes: [] } as never;
+
+    it('opens a mob card, and closes one that has left the farm', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      useGame.getState().openMob(1);
+      expect(useGame.getState().mobId).toBe(1);
+      api.day.mockResolvedValueOnce({ snapshot: farm({ mobs: [] }), summary });
+      await useGame.getState().nextDay();
+      expect(useGame.getState().mobId).toBeNull();
+    });
+
+    it('runs a husbandry job on the card: job card, then confirm, then the result there', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      const action = { type: 'markCalves', mob: 1 } as const;
+      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      await useGame.getState().startAct('1:mark', 'Mark calves', action);
+      expect(api.preview).toHaveBeenCalledWith({ action });
+      expect(useGame.getState().acts['1:mark']).toMatchObject({ phase: 'confirm', card });
+      expect(api.act).not.toHaveBeenCalled();
+      api.act.mockResolvedValueOnce({
+        ok: true,
+        message: '4 calves marked in Steers A.',
+        card,
+        snapshot: farm(),
+      } satisfies ActResponse);
+      await useGame.getState().confirmAct('1:mark', action);
+      expect(useGame.getState().acts['1:mark']).toMatchObject({
+        phase: 'done',
+        message: '4 calves marked in Steers A.',
+      });
+      useGame.getState().dismissAct('1:mark');
+      expect(useGame.getState().acts).toEqual({});
+    });
+
+    it('shows a refusal right there, with its reason', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      api.preview.mockResolvedValueOnce({
+        ok: false,
+        reason: 'nothing-to-mark',
+        message: 'There are no calves to mark in this mob.',
+      });
+      await useGame.getState().startAct('1:mark', 'Mark calves', { type: 'markCalves', mob: 1 });
+      expect(useGame.getState().acts['1:mark']).toMatchObject({
+        phase: 'refused',
+        message: 'There are no calves to mark in this mob.',
+      });
+    });
+
+    it('moves a mob: pick the mob, pick the paddock, the card, confirm, and the tool ends', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      await useGame.getState().startMove({ mobId: 1 });
+      expect(useGame.getState().move).toMatchObject({ mobId: 1, target: null, phase: 'pick' });
+      expect(api.preview).not.toHaveBeenCalled();
+
+      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      await useGame.getState().moveTargetPicked(1);
+      expect(api.preview).toHaveBeenCalledWith({
+        action: { type: 'moveMob', mob: 1, cell: 20 },
+      });
+      expect(useGame.getState().move).toMatchObject({ phase: 'confirm', target: 1, card });
+
+      api.act.mockResolvedValueOnce({
+        ok: true,
+        message: 'Steers A moved (10 head).',
+        card,
+        snapshot: farm(),
+      } satisfies ActResponse);
+      await useGame.getState().moveConfirm();
+      expect(useGame.getState().move).toMatchObject({
+        phase: 'done',
+        message: 'Steers A moved (10 head).',
+      });
+      useGame.getState().moveEnd();
+      expect(useGame.getState().move).toBeNull();
+    });
+
+    it('starts from a paddock: pick the mob, and the card follows', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      await useGame.getState().startMove({ paddockId: 1 });
+      expect(useGame.getState().move).toMatchObject({ mobId: null, target: 1 });
+      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      await useGame.getState().moveMobPicked(1);
+      expect(useGame.getState().move).toMatchObject({ mobId: 1, target: 1, phase: 'confirm' });
+    });
+
+    it('moves part of a mob by class and number, and asks for a number first', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      await useGame.getState().startMove({ mobId: 1 });
+      useGame.getState().movePart(true);
+      await useGame.getState().moveTargetPicked(1);
+      expect(api.preview).not.toHaveBeenCalled();
+      expect(useGame.getState().move?.message).toBe('Pick how many head to move first.');
+      useGame.getState().moveQty('weanerSteer', 4);
+      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      await useGame.getState().moveTargetPicked(1);
+      expect(api.preview).toHaveBeenCalledWith({
+        action: {
+          type: 'moveCattle',
+          picks: [{ mob: 1, cls: 'weanerSteer', qty: 4 }],
+          cell: 20,
+        },
+      });
+    });
+
+    it('shows a refused move with its reason, and lets the player pick another paddock', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      await useGame.getState().startMove({ mobId: 1 });
+      api.preview.mockResolvedValueOnce({
+        ok: false,
+        reason: 'no-daylight',
+        message: 'Today is done.',
+      });
+      await useGame.getState().moveTargetPicked(1);
+      expect(useGame.getState().move).toMatchObject({
+        phase: 'refused',
+        message: 'Today is done.',
+      });
+      useGame.getState().moveBack();
+      expect(useGame.getState().move).toMatchObject({ phase: 'pick', target: null, mobId: 1 });
+    });
+
+    it('ends the move tool when the day moves on', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farm() });
+      await useGame.getState().startMove({ mobId: 1 });
+      api.day.mockResolvedValueOnce({ snapshot: farm(), summary });
+      await useGame.getState().nextDay();
+      expect(useGame.getState().move).toBeNull();
+    });
   });
 });

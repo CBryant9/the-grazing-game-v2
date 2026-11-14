@@ -80,6 +80,7 @@ import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
 import { easeFade, fadeStep, lodMode, type LodMode } from './lod';
 import { paintWash, type WashLayer } from './overlays';
+import { pickableDraws, type PickablePaddock } from './pickable';
 import { NATURAL, breedFor, paletteFor, type MapPalette, type MapTheme } from './palette';
 import { scatter } from './random';
 import { cattleSprite, defaultSprites } from './sprites/painters';
@@ -171,6 +172,8 @@ export interface FarmMap {
   setWeather(weather: MapWeather): void;
   /** Outline a paddock, or null to clear it. */
   setHighlight(paddock: number | null): void;
+  /** Outline the paddocks a tool can pick (light), and mark those with no water (red). Null clears it. */
+  setPickable(paddocks: readonly PickablePaddock[] | null): void;
   setAmbient(on: boolean): void;
   setReduceMotion(on: boolean): void;
   /** Draw every beast, or go back to sampling big mobs. For the speed test. */
@@ -349,6 +352,7 @@ class PixiFarmMap implements FarmMap {
   private minutes: number | null = null;
   private weather: MapWeather = { kind: 'clear' };
   private highlight: number | null = null;
+  private pickable: readonly PickablePaddock[] | null = null;
   private hoverPaddock: number | null = null;
   private hoverSquare = -1;
   private ambient: boolean;
@@ -1231,6 +1235,23 @@ class PixiFarmMap implements FarmMap {
       }
       g.stroke({ color: colour, width: width * px, alpha, cap: 'round' });
     };
+    // Paddocks a tool can pick: a light tint and outline, and red where stock would have no water.
+    const tint = (paddock: number, colour: number, alpha: number): void => {
+      const own = view.squares.paddock;
+      for (let i = 0; i < own.length; i++) {
+        if (own[i] === paddock) g.rect(i % GRID_W, Math.floor(i / GRID_W) * K, 1, K);
+      }
+      g.fill({ color: colour, alpha });
+    };
+    for (const d of pickableDraws(this.pickable, this.highlight)) {
+      if (d.kind === 'dry') {
+        tint(d.paddock, NATURAL.layerWaterNone, 0.18);
+        draw(d.paddock, NATURAL.layerWaterNone, PX.highlight + 1, 0.95);
+      } else {
+        tint(d.paddock, this.palette.ui.hover, 0.12);
+        draw(d.paddock, this.palette.ui.hover, PX.outline + 2, 0.9);
+      }
+    }
     if (this.hoverPaddock !== null && this.hoverPaddock !== this.highlight) {
       draw(this.hoverPaddock, this.palette.ui.hover, PX.outline, 0.7);
     }
@@ -1565,6 +1586,11 @@ class PixiFarmMap implements FarmMap {
 
   setHighlight(paddock: number | null): void {
     this.highlight = paddock;
+    this.drawOutlines();
+  }
+
+  setPickable(paddocks: readonly PickablePaddock[] | null): void {
+    this.pickable = paddocks;
     this.drawOutlines();
   }
 

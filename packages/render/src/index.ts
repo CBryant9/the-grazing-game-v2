@@ -10,6 +10,7 @@
  */
 
 export { createFarmMap } from './map';
+export type { PickablePaddock } from './pickable';
 export type {
   BenchOptions,
   FarmMap,

@@ -70,6 +70,19 @@ const DENY = [
   'formula',
   'G',
   'D',
+  // Added with the paddock sheet and the mob card: nothing that reveals a rule.
+  'threshold',
+  'thresholds',
+  'weights',
+  'dmd',
+  'dist',
+  'rule',
+  'rules',
+  'forecast',
+  'forecasts',
+  'predict',
+  'future',
+  'nextDay',
 ];
 /**
  * The map's mob list carries a number the map uses to stand each beast in
