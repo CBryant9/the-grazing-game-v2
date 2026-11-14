@@ -8,15 +8,19 @@
  * those reports said and nothing the engine knows besides (docs/LESSONS.md:
  * a read for the player holds only what the player has been told).
  *
- * Everything kept here is display state. No formula, price or chance reads
- * it, so no calibration or comparison figure can move because of it.
+ * What is kept here is what the player knows. No formula, price or chance
+ * reads it, so no calibration or comparison figure can move because of it.
+ * It does decide which animals a player's own pick by class or sale group
+ * takes (`knownClassOf`, `knownGroupOf`): the player picks from what they
+ * know, so "cows not in calf" can take a cow that is in calf and was never
+ * tested (milestone 1.7f, after the screens review).
  */
 
-import { classOf } from '../cattle/animal';
+import { classOf, groupKey } from '../cattle/animal';
 import { joiningFemales } from '../cattle/breeding';
 import type { CattleNote } from '../cattle/notes';
 import type { Animal } from '../cattle/types';
-import type { CattleClassId } from '../data/cattle';
+import type { CattleClassId, GroupId } from '../data/cattle';
 import type { FarmMob, FarmState, JoiningReport, MobReports, PregTestReport } from './state';
 
 /** True for a female in calf. */
@@ -122,6 +126,18 @@ export const knownInCalfSet = (farm: Pick<FarmState, 'knownInCalf'>): Set<number
 export function knownClassOf(a: Animal, known: ReadonlySet<number>): CattleClassId {
   if (a.preg >= 0 && !known.has(a.id)) return classOf({ ...a, preg: -1 });
   return classOf(a);
+}
+
+/**
+ * An animal's sale group as the player knows it: a female in calf is in the
+ * PTIC group only when the player knows she is. Every other cow or heifer is
+ * in the group that is not known in calf, whether or not she really is. The
+ * mob card counts by this, and `sellGroup` picks by it, so the two always
+ * agree and a sale never tells the player which cows are really empty.
+ */
+export function knownGroupOf(a: Animal, known: ReadonlySet<number>): GroupId {
+  if (a.preg >= 0 && !known.has(a.id)) return groupKey({ ...a, preg: -1 });
+  return groupKey(a);
 }
 
 /**

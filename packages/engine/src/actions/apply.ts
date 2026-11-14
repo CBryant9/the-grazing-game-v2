@@ -32,7 +32,7 @@
  *     not by where cattle were drawn.
  */
 
-import { classOf, groupKey, makeSaleBatch, marketClass } from '../cattle/animal';
+import { makeSaleBatch, marketClass } from '../cattle/animal';
 import { markCalves, weanMob, WEAN_MIN_AGE } from '../cattle/breeding';
 import { animalLookup, type Animal } from '../cattle/types';
 import { cropRisks, fieldById, harvestField, sow } from '../crops/fields';
@@ -113,7 +113,7 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
-import { toldBought } from '../sim/told';
+import { knownClassOf, knownGroupOf, knownInCalfSet, toldBought } from '../sim/told';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
@@ -577,8 +577,10 @@ function sellGroup(j: Job, a: Extract<Action, { type: 'sellGroup' }>): Out {
   const plan = salePlan(j);
   if ('ok' in plan) return plan;
   const taken = plan.kind === 'book' ? bookedIds(j.farm) : new Set<number>();
+  // The group as the player knows it: PTIC only when known in calf (sim/told.ts).
+  const known = knownInCalfSet(j.farm);
   const pool = m.animals.filter(
-    (x) => x.kind !== 'calf' && groupKey(x) === a.group && !taken.has(x.id),
+    (x) => x.kind !== 'calf' && knownGroupOf(x, known) === a.group && !taken.has(x.id),
   );
   if (a.group === 'steer' || a.group === 'heifer' || a.group === 'heiferP') pool.sort(byWeight);
   else pool.sort(byCondThenAge);
@@ -657,6 +659,8 @@ function moveCattle(j: Job, a: Extract<Action, { type: 'moveCattle' }>): Out {
   if ('ok' in where) return where;
   const s = j.survey;
   const picked: Animal[] = [];
+  // Classes as the player knows them, the rows the player picked from (sim/told.ts).
+  const known = knownInCalfSet(farm);
   for (const p of a.picks) {
     if (!p || typeof p !== 'object') {
       return refuse('bad-request', 'Pick a class and how many to move.');
@@ -667,7 +671,7 @@ function moveCattle(j: Job, a: Extract<Action, { type: 'moveCattle' }>): Out {
       return refuse('bad-request', 'Pick a class and how many to move.');
     }
     if (alreadyAt(s, m, where)) return refuse('already-there', `${m.name} is already there.`);
-    const g = m.animals.filter((x) => x.kind !== 'calf' && classOf(x) === p.cls);
+    const g = m.animals.filter((x) => x.kind !== 'calf' && knownClassOf(x, known) === p.cls);
     if (!g.length) continue;
     if (g[0]!.kind === 'cow' || g[0]!.kind === 'bull') g.sort((x, y) => x.cond - y.cond);
     else g.sort(byWeight);

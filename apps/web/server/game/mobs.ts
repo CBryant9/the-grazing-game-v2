@@ -10,9 +10,9 @@ import {
   areaWatered,
   breedingReports,
   dateOn,
-  groupKey,
   husbandryNow,
   knownClassOf,
+  knownGroupOf,
   mobSummaries,
   plantingsNow,
   predictGains,
@@ -97,10 +97,6 @@ function classRows(animals: readonly Animal[], known: ReadonlySet<number>): MobC
     calf: CALF_CLASSES.has(id),
   }));
 }
-
-/** The sale group a beast is in, as the player knows it: PTIC only when known. */
-const knownGroup = (a: Animal, known: ReadonlySet<number>): string =>
-  a.preg >= 0 && !known.has(a.id) ? groupKey({ ...a, preg: -1 }) : groupKey(a);
 
 const dateParts = (d: { year: number; month: number; date: number }): DateParts => ({
   year: d.year,
@@ -194,7 +190,7 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
     id,
     name: GROUPS[id].name,
     head: m.animals.filter(
-      (a) => a.kind !== 'calf' && knownGroup(a, r.known) === id && !bookedIds.has(a.id),
+      (a) => a.kind !== 'calf' && knownGroupOf(a, r.known) === id && !bookedIds.has(a.id),
     ).length,
   })).filter((g) => g.head > 0);
 

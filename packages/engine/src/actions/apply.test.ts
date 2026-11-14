@@ -576,6 +576,8 @@ describe('who goes first when a group is sold', () => {
     // Five of the lighter ones in calf: they are their own group, heaviest first again.
     const inCalf = heifers.slice(6, 11);
     for (const h of inCalf) h.preg = 60;
+    // The PTIC group is the heifers the player knows are in calf (a preg test said so).
+    farm.knownInCalf = Int32Array.from(inCalf.map((h) => h.id).sort((x, y) => x - y));
     const ptic = act(farm, { type: 'sellGroup', mob: m, group: 'heiferP', qty: 2 });
     const now = new Set(everyone(ptic).map((a) => a.id));
     expect(now.has(inCalf[0]!.id) || now.has(inCalf[1]!.id)).toBe(false);

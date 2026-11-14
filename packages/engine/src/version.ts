@@ -32,8 +32,14 @@
  * web server needs. No grass, cattle, crop, season or price formula
  * changed. A farm that never takes a fence down and builds again runs
  * exactly as it did on 0.9.0.
+ *
+ * 0.11.0 (milestone 1.7f, 14 Nov 2026): selling by sale group and moving
+ * part of a mob by class pick by what the player knows (`knownGroupOf`,
+ * `knownClassOf`), not by live pregnancy. No formula or price changed; a
+ * farm that never sells by a breeding group or moves cows by class runs
+ * exactly as it did on 0.10.0.
  */
-export const ENGINE_VERSION = '0.10.0';
+export const ENGINE_VERSION = '0.11.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.

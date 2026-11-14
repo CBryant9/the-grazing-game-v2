@@ -553,7 +553,7 @@ export {
 export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
 // What the player has been told about breeding (14 Nov 2026). Display state only.
-export { knownClassOf } from './sim/told';
+export { knownClassOf, knownGroupOf } from './sim/told';
 // Reads the web server needs, so it never copies a rule (14 Nov 2026).
 export { portableRefund, supplementCosts } from './sim/reads';
 export type { SupplementCost } from './sim/reads';
