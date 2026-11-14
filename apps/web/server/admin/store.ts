@@ -408,7 +408,10 @@ export async function userAction(
           throw new AdminError(409, 'That account is banned already. Lift the ban first.');
         }
         const until = new Date(Date.now() + act.days * 86_400_000).toISOString();
-        await tx.query('update public.account_status set suspended_until = $2::timestamptz where user_id = $1', [userId, until]);
+        await tx.query(
+          'update public.account_status set suspended_until = $2::timestamptz where user_id = $1',
+          [userId, until],
+        );
         await tx.query(
           `insert into public.moderation_actions (user_id, moderator_id, action, until) values ($1, $2, 'suspended', $3::timestamptz)`,
           [userId, adminId, until],
@@ -426,7 +429,10 @@ export async function userAction(
             'delete from public.ban_records where email_hash = $1 and banned_until is null',
             [hash],
           );
-          await tx.query('insert into public.ban_records (email_hash, banned_until) values ($1, null)', [hash]);
+          await tx.query(
+            'insert into public.ban_records (email_hash, banned_until) values ($1, null)',
+            [hash],
+          );
         }
         await tx.query(
           `insert into public.moderation_actions (user_id, moderator_id, action) values ($1, $2, 'banned')`,
@@ -558,7 +564,9 @@ export async function auditActions(sql: SqlClient): Promise<string[]> {
 }
 
 /** The fixed-shape details of a row, in plain words. */
-export function describeAudit(row: Pick<AuditRow, 'action' | 'targetType' | 'targetId' | 'details'>): string {
+export function describeAudit(
+  row: Pick<AuditRow, 'action' | 'targetType' | 'targetId' | 'details'>,
+): string {
   const d = row.details;
   const parts: string[] = [];
   if (typeof d.switch_key === 'string') parts.push(`switch ${d.switch_key}`);
@@ -567,7 +575,8 @@ export function describeAudit(row: Pick<AuditRow, 'action' | 'targetType' | 'tar
   if (typeof d.role === 'string') parts.push(`role ${d.role}`);
   if (typeof d.until === 'string') parts.push(`until ${d.until}`);
   if (typeof d.count === 'number') parts.push(`count ${d.count}`);
-  if (typeof d.value === 'number' || typeof d.value === 'boolean') parts.push(`value ${String(d.value)}`);
+  if (typeof d.value === 'number' || typeof d.value === 'boolean')
+    parts.push(`value ${String(d.value)}`);
   if (Array.isArray(d.ids)) parts.push(`${d.ids.length} account${d.ids.length === 1 ? '' : 's'}`);
   const what = row.targetType
     ? `${row.targetType.replace(/_/g, ' ')} ${row.targetId ?? ''}`.trim()
@@ -623,7 +632,10 @@ export async function dashboard(sql: SqlClient): Promise<Dashboard> {
     fast: { active: 0, ended: 0 },
   };
   for (const x of byMode.rows) {
-    if ((x.mode === 'daily' || x.mode === 'fast') && (x.status === 'active' || x.status === 'ended')) {
+    if (
+      (x.mode === 'daily' || x.mode === 'fast') &&
+      (x.status === 'active' || x.status === 'ended')
+    ) {
       farms[x.mode][x.status] = x.n;
     }
   }

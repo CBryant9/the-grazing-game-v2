@@ -67,13 +67,22 @@ let people: Record<string, Person>;
 
 async function person(
   key: string,
-  opts: { role?: string; ageYears?: number; suspended?: boolean; banned?: boolean; profile?: boolean } = {},
+  opts: {
+    role?: string;
+    ageYears?: number;
+    suspended?: boolean;
+    banned?: boolean;
+    profile?: boolean;
+  } = {},
 ): Promise<Person> {
   const email = `${key}@example.test`;
   const { user, cookie } = await auth.signInAs(email);
   const username = `u_${key}`.slice(0, 20);
   if (opts.profile !== false) {
-    await db.query('insert into public.profiles (user_id, username) values ($1, $2)', [user.id, username]);
+    await db.query('insert into public.profiles (user_id, username) values ($1, $2)', [
+      user.id,
+      username,
+    ]);
     await db.query(
       `insert into public.account_private (user_id, date_of_birth, terms_accepted_at)
        values ($1, ((now() at time zone 'Australia/Sydney')::date - ($2 || ' years')::interval)::date, now())`,
@@ -140,7 +149,13 @@ async function post(
 
 const auditRows = async () =>
   (
-    await db.query<{ action: string; admin_id: string; target_type: string; target_id: string; details: Record<string, unknown> }>(
+    await db.query<{
+      action: string;
+      admin_id: string;
+      target_type: string;
+      target_id: string;
+      details: Record<string, unknown>;
+    }>(
       'select action, admin_id, target_type, target_id, details from public.admin_audit_log order by id',
     )
   ).rows;
@@ -155,7 +170,10 @@ function failingAudit(sql: SqlClient): SqlClient {
       return tx.query(text, params);
     },
   });
-  return { query: (t, p) => wrap(sql).query(t, p), transaction: (fn) => sql.transaction((tx) => fn(wrap(tx))) };
+  return {
+    query: (t, p) => wrap(sql).query(t, p),
+    transaction: (fn) => sql.transaction((tx) => fn(wrap(tx))),
+  };
 }
 
 // ------------------------------------------------------------------ the role gate
@@ -178,7 +196,13 @@ describe('the role gate on every admin route', () => {
     const answers = new Set<string>();
     for (const route of Object.keys(BODIES)) {
       for (const who of [null, player, kid, susp, banned, noprofile, mod]) {
-        const res = await post(route, BODIES[route], who, {}, `10.2.${ip}.${Math.floor(Math.random() * 250)}`);
+        const res = await post(
+          route,
+          BODIES[route],
+          who,
+          {},
+          `10.2.${ip}.${Math.floor(Math.random() * 250)}`,
+        );
         expect(res.status, `${route} as ${who?.username ?? 'nobody'}`).toBe(404);
         expect(res.headers.get('x-robots-tag')).toContain('noindex');
         expect(res.headers.get('cache-control')).toBe('no-store');
@@ -201,12 +225,10 @@ describe('the role gate on every admin route', () => {
     expect(res.status).toBe(200);
     // Nothing the browser sends can make an admin: a role in the body or a header is ignored.
     const player = await person('player');
-    const forged = await post(
-      'switches',
-      { key: 'ads', enabled: true, role: 'admin' },
-      player,
-      { 'x-role': 'admin', 'x-admin': '1' },
-    );
+    const forged = await post('switches', { key: 'ads', enabled: true, role: 'admin' }, player, {
+      'x-role': 'admin',
+      'x-admin': '1',
+    });
     expect(forged.status).toBe(404);
   });
 
@@ -214,7 +236,9 @@ describe('the role gate on every admin route', () => {
     const admin = await person('admin', { role: 'admin' });
     await person('second', { role: 'admin' });
     expect((await post('switches', BODIES.switches, admin)).status).toBe(200);
-    await db.query("update public.account_status set role = 'player' where user_id = $1", [admin.id]);
+    await db.query("update public.account_status set role = 'player' where user_id = $1", [
+      admin.id,
+    ]);
     expect((await post('switches', BODIES.switches, admin)).status).toBe(404);
   });
 
@@ -257,12 +281,26 @@ describe('CSRF and rate limits on admin writes', () => {
   it('applies the shared CSRF rule', async () => {
     const admin = await person('admin', { role: 'admin' });
     const body = { key: 'community', enabled: true };
-    expect((await post('switches', body, admin, { origin: 'https://evil.example' })).status).toBe(403);
-    expect((await post('switches', body, admin, { 'sec-fetch-site': 'same-site' })).status).toBe(403);
-    expect((await post('switches', body, admin, { 'sec-fetch-site': 'cross-site' })).status).toBe(403);
-    expect((await post('switches', body, admin, { 'content-type': 'text/plain' })).status).toBe(403);
-    expect((await post('switches', body, admin, { 'content-type': 'application/x-www-form-urlencoded' })).status).toBe(403);
-    expect((await post('switches', body, admin, { origin: HOST, 'sec-fetch-site': 'same-origin' })).status).toBe(200);
+    expect((await post('switches', body, admin, { origin: 'https://evil.example' })).status).toBe(
+      403,
+    );
+    expect((await post('switches', body, admin, { 'sec-fetch-site': 'same-site' })).status).toBe(
+      403,
+    );
+    expect((await post('switches', body, admin, { 'sec-fetch-site': 'cross-site' })).status).toBe(
+      403,
+    );
+    expect((await post('switches', body, admin, { 'content-type': 'text/plain' })).status).toBe(
+      403,
+    );
+    expect(
+      (await post('switches', body, admin, { 'content-type': 'application/x-www-form-urlencoded' }))
+        .status,
+    ).toBe(403);
+    expect(
+      (await post('switches', body, admin, { origin: HOST, 'sec-fetch-site': 'same-origin' }))
+        .status,
+    ).toBe(200);
     expect(await auditRows()).toHaveLength(1);
   });
 
@@ -279,7 +317,8 @@ describe('CSRF and rate limits on admin writes', () => {
 
   it('limits visitors by address before the gate is asked', async () => {
     let last = 0;
-    for (let i = 0; i < 121; i++) last = (await post('switches', BODIES.switches, null, {}, '10.9.9.9')).status;
+    for (let i = 0; i < 121; i++)
+      last = (await post('switches', BODIES.switches, null, {}, '10.9.9.9')).status;
     expect(last).toBe(429);
   });
 
@@ -289,7 +328,12 @@ describe('CSRF and rate limits on admin writes', () => {
       routes.switches!.POST!(
         new Request(`${HOST}/api/admin/switches`, {
           method: 'POST',
-          headers: { host: 'localhost:3000', 'content-type': 'application/json', cookie: admin.cookie, 'x-real-ip': '10.3.3.3' },
+          headers: {
+            host: 'localhost:3000',
+            'content-type': 'application/json',
+            cookie: admin.cookie,
+            'x-real-ip': '10.3.3.3',
+          },
           body,
         }),
       );
@@ -313,7 +357,9 @@ describe('feature switches', () => {
       expect(JSON.stringify(i)).not.toMatch(/—/);
     }
     // The database has a row for each shared key and no other (a test in packages/db keeps them equal).
-    const dbKeys = (await db.query<{ key: string }>('select key from public.feature_switches order by key')).rows.map((r) => r.key);
+    const dbKeys = (
+      await db.query<{ key: string }>('select key from public.feature_switches order by key')
+    ).rows.map((r) => r.key);
     expect(dbKeys).toEqual(Object.keys(FEATURE_SWITCHES).sort());
   });
 
@@ -357,13 +403,17 @@ describe('feature switches', () => {
     const admin = await person('admin', { role: 'admin' });
     expect((await post('switches', { key: 'nope', enabled: true }, admin)).status).toBe(400);
     expect((await post('switches', { key: 'community', enabled: 'yes' }, admin)).status).toBe(400);
-    expect((await post('switches', { key: 'community; drop table x', enabled: true }, admin)).status).toBe(400);
+    expect(
+      (await post('switches', { key: 'community; drop table x', enabled: true }, admin)).status,
+    ).toBe(400);
     expect(await auditRows()).toEqual([]);
   });
 
   it('a failed audit write rolls the change back', async () => {
     const admin = await person('admin', { role: 'admin' });
-    await expect(setSwitch(failingAudit(deps.sql), admin.id, 'community', true)).rejects.toThrow('audit write failed');
+    await expect(setSwitch(failingAudit(deps.sql), admin.id, 'community', true)).rejects.toThrow(
+      'audit write failed',
+    );
     const row = (await listSwitches(deps.sql)).find((r) => r.key === 'community')!;
     expect(row.enabled).toBe(false);
     expect(row.changedBy).toBeNull();
@@ -385,17 +435,29 @@ describe('feature switches', () => {
 describe('site settings', () => {
   it('saves a valid announcement, shows it, and audits only its length', async () => {
     const admin = await person('admin', { role: 'admin' });
-    const res = await post('settings', { key: 'announcement', value: { text: 'Rain on the way', link: '/play' } }, admin);
+    const res = await post(
+      'settings',
+      { key: 'announcement', value: { text: 'Rain on the way', link: '/play' } },
+      admin,
+    );
     expect(res.status).toBe(200);
     const s = (await listSettings(deps.sql)).find((x) => x.key === 'announcement')!;
     expect(s.value).toEqual({ text: 'Rain on the way', link: '/play' });
     expect(s.changedBy).toBe(admin.username);
     const rows = await auditRows();
     expect(rows).toEqual([
-      { action: 'setting_set', admin_id: admin.id, target_type: 'site_setting', target_id: 'announcement', details: { count: 15 } },
+      {
+        action: 'setting_set',
+        admin_id: admin.id,
+        target_type: 'site_setting',
+        target_id: 'announcement',
+        details: { count: 15 },
+      },
     ]);
     expect(JSON.stringify(rows)).not.toMatch(/Rain/);
-    const pub = await db.query<{ is_public: boolean }>("select is_public from public.site_settings where key = 'announcement'");
+    const pub = await db.query<{ is_public: boolean }>(
+      "select is_public from public.site_settings where key = 'announcement'",
+    );
     expect(pub.rows[0]!.is_public).toBe(true);
   });
 
@@ -434,13 +496,20 @@ describe('site settings', () => {
     expect(all.find((x) => x.key === 'districts_available')!.value).toEqual(['cq', 'wv']);
     expect(all.find((x) => x.key === 'maintenance_wording')!.value).toEqual({ id: 'longer' });
     expect((await auditRows()).map((r) => r.details)).toEqual([{ count: 2 }, { value: 3 }]);
-    const pub = await db.query<{ is_public: boolean }>("select is_public from public.site_settings where key = 'maintenance_wording'");
+    const pub = await db.query<{ is_public: boolean }>(
+      "select is_public from public.site_settings where key = 'maintenance_wording'",
+    );
     expect(pub.rows[0]!.is_public).toBe(false);
   });
 
   it('lists every setting, with its default when none is stored', async () => {
     const all = await listSettings(deps.sql);
-    expect(all.map((x) => x.key)).toEqual(['announcement', 'districts_available', 'community_rules', 'maintenance_wording']);
+    expect(all.map((x) => x.key)).toEqual([
+      'announcement',
+      'districts_available',
+      'community_rules',
+      'maintenance_wording',
+    ]);
     expect(all.every((x) => x.changedBy === null)).toBe(true);
   });
 
@@ -461,7 +530,10 @@ describe('finding users', () => {
     const ava = await person('ava_grazier');
     await person('ava_two');
     await person('ben');
-    expect((await searchUsers(deps.sql, 'U_AVA_')).map((u) => u.username).sort()).toEqual(['u_ava_grazier', 'u_ava_two']);
+    expect((await searchUsers(deps.sql, 'U_AVA_')).map((u) => u.username).sort()).toEqual([
+      'u_ava_grazier',
+      'u_ava_two',
+    ]);
     expect((await searchUsers(deps.sql, 'u_ava_grazier')).map((u) => u.id)).toEqual([ava.id]);
     expect((await searchUsers(deps.sql, ava.id)).map((u) => u.id)).toEqual([ava.id]);
     expect((await searchUsers(deps.sql, ava.id.toUpperCase())).map((u) => u.id)).toEqual([ava.id]);
@@ -488,7 +560,13 @@ describe('finding users', () => {
     );
     const a = (await userDetail(deps.sql, adult.id))!;
     const k = (await userDetail(deps.sql, kid.id))!;
-    expect(a).toMatchObject({ username: adult.username, role: 'player', state: 'active', underSixteen: false, farms: { daily: 1, fast: 2 } });
+    expect(a).toMatchObject({
+      username: adult.username,
+      role: 'player',
+      state: 'active',
+      underSixteen: false,
+      farms: { daily: 1, fast: 2 },
+    });
     expect(a.lastSeen).toMatch(/^\d{4}/);
     expect(k.underSixteen).toBe(true);
     expect(k.lastSeen).toBeNull();
@@ -515,7 +593,12 @@ describe('user actions', () => {
     expect(d.history).toMatchObject([{ action: 'suspended', by: admin.username }]);
     const rows = await auditRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ action: 'user_suspend', admin_id: admin.id, target_type: 'account', target_id: p.id });
+    expect(rows[0]).toMatchObject({
+      action: 'user_suspend',
+      admin_id: admin.id,
+      target_type: 'account',
+      target_id: p.id,
+    });
     expect(Object.keys(rows[0]!.details)).toEqual(['until']);
     const days = (new Date(d.suspendedUntil!).getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(6.9);
@@ -530,7 +613,9 @@ describe('user actions', () => {
     expect((await act(admin, p.id, { action: 'ban' })).status).toBe(200);
     const hash = banHash(p.email, PEPPER)!;
     expect((await userDetail(deps.sql, p.id))!.state).toBe('banned');
-    const rec = await db.query<{ email_hash: string; banned_until: string | null }>('select email_hash, banned_until from public.ban_records');
+    const rec = await db.query<{ email_hash: string; banned_until: string | null }>(
+      'select email_hash, banned_until from public.ban_records',
+    );
     expect(rec.rows).toEqual([{ email_hash: hash, banned_until: null }]);
     expect(JSON.stringify(rec.rows)).not.toContain(p.email);
     // A second ban does not make a second record.
@@ -540,7 +625,11 @@ describe('user actions', () => {
     expect((await act(admin, p.id, { action: 'lift' })).status).toBe(200);
     expect((await userDetail(deps.sql, p.id))!.state).toBe('active');
     expect((await db.query('select 1 from public.ban_records')).rowCount).toBe(0);
-    expect((await userDetail(deps.sql, p.id))!.history.map((h) => h.action)).toEqual(['unbanned', 'banned', 'banned']);
+    expect((await userDetail(deps.sql, p.id))!.history.map((h) => h.action)).toEqual([
+      'unbanned',
+      'banned',
+      'banned',
+    ]);
     expect((await auditRows()).map((r) => r.action)).toEqual(['user_ban', 'user_ban', 'user_lift']);
   });
 
@@ -558,7 +647,10 @@ describe('user actions', () => {
     const p = await person('pat');
     expect((await act(admin, p.id, { action: 'set_role', role: 'moderator' })).status).toBe(200);
     expect((await userDetail(deps.sql, p.id))!.role).toBe('moderator');
-    expect((await auditRows())[0]).toMatchObject({ action: 'user_set_role', details: { role: 'moderator' } });
+    expect((await auditRows())[0]).toMatchObject({
+      action: 'user_set_role',
+      details: { role: 'moderator' },
+    });
     expect((await act(admin, p.id, { action: 'set_role', role: 'owner' })).status).toBe(400);
     // The new admin passes the gate at once.
     await act(admin, p.id, { action: 'set_role', role: 'admin' });
@@ -570,10 +662,20 @@ describe('user actions', () => {
     const p = await person('pat');
     await db.query('insert into auth.sessions (user_id) values ($1), ($1), ($2)', [p.id, admin.id]);
     expect((await act(admin, p.id, { action: 'sign_out_all' })).status).toBe(200);
-    expect((await db.query('select 1 from auth.sessions where user_id = $1', [p.id])).rowCount).toBe(0);
-    expect((await db.query('select 1 from auth.sessions where user_id = $1', [admin.id])).rowCount).toBe(1);
+    expect(
+      (await db.query('select 1 from auth.sessions where user_id = $1', [p.id])).rowCount,
+    ).toBe(0);
+    expect(
+      (await db.query('select 1 from auth.sessions where user_id = $1', [admin.id])).rowCount,
+    ).toBe(1);
     expect(await auditRows()).toEqual([
-      { action: 'user_sign_out_all', admin_id: admin.id, target_type: 'account', target_id: p.id, details: {} },
+      {
+        action: 'user_sign_out_all',
+        admin_id: admin.id,
+        target_type: 'account',
+        target_id: p.id,
+        details: {},
+      },
     ]);
   });
 
@@ -581,20 +683,34 @@ describe('user actions', () => {
     const admin = await person('admin', { role: 'admin' });
     const lost = await person('lost', { profile: false });
     expect((await act(admin, lost.id, { action: 'clear_refusal' })).status).toBe(404);
-    await db.query("insert into public.signup_refusals (user_id, reason) values ($1, 'too_young')", [lost.id]);
+    await db.query(
+      "insert into public.signup_refusals (user_id, reason) values ($1, 'too_young')",
+      [lost.id],
+    );
     const d = (await userDetail(deps.sql, lost.id))!;
     expect(d).toMatchObject({ username: null, refusedUnder14: true });
     expect((await act(admin, lost.id, { action: 'clear_refusal' })).status).toBe(200);
     expect((await db.query('select 1 from public.signup_refusals')).rowCount).toBe(0);
     expect(await auditRows()).toEqual([
-      { action: 'clear_signup_refusal', admin_id: admin.id, target_type: 'account', target_id: lost.id, details: {} },
+      {
+        action: 'clear_signup_refusal',
+        admin_id: admin.id,
+        target_type: 'account',
+        target_id: lost.id,
+        details: {},
+      },
     ]);
   });
 
   it('an admin can not suspend, ban or change the role of their own account', async () => {
     const admin = await person('admin', { role: 'admin' });
     await person('second', { role: 'admin' });
-    for (const body of [{ action: 'suspend', days: 1 }, { action: 'ban' }, { action: 'set_role', role: 'player' }, { action: 'set_role', role: 'admin' }]) {
+    for (const body of [
+      { action: 'suspend', days: 1 },
+      { action: 'ban' },
+      { action: 'set_role', role: 'player' },
+      { action: 'set_role', role: 'admin' },
+    ]) {
       const res = await act(admin, admin.id, body);
       expect(res.status).toBe(409);
       expect(await res.text()).toMatch(/your own account/);
@@ -624,17 +740,25 @@ describe('user actions', () => {
       transaction: (fn) =>
         deps.sql.transaction((tx) =>
           fn({
-            async query(text, params) {
-              const out = await tx.query(text, params);
-              if (/s\.role = 'admin'\s+and s\.banned_at is null/.test(text) && params?.[0] === one.id) {
-                await tx.query("update public.account_status set role = 'player' where user_id = $1", [one.id]);
+            async query<T>(text: string, params?: unknown[]) {
+              const out = await tx.query<T>(text, params);
+              if (
+                /s\.role = 'admin'\s+and s\.banned_at is null/.test(text) &&
+                params?.[0] === one.id
+              ) {
+                await tx.query(
+                  "update public.account_status set role = 'player' where user_id = $1",
+                  [one.id],
+                );
               }
               return out;
             },
           }),
         ),
     };
-    await expect(userAction(racing, one.id, two.id, { action: 'set_role', role: 'player' })).rejects.toMatchObject({
+    await expect(
+      userAction(racing, one.id, two.id, { action: 'set_role', role: 'player' }),
+    ).rejects.toMatchObject({
       status: 409,
       message: expect.stringMatching(/always be one admin/),
     });
@@ -644,7 +768,9 @@ describe('user actions', () => {
 
   it('the database refuses to leave no admin, whoever writes', async () => {
     const one = await person('one', { role: 'admin' });
-    await expect(db.query("update public.account_status set role = 'player' where user_id = $1", [one.id])).rejects.toMatchObject({ hint: 'last_admin' });
+    await expect(
+      db.query("update public.account_status set role = 'player' where user_id = $1", [one.id]),
+    ).rejects.toMatchObject({ hint: 'last_admin' });
     await person('two', { role: 'admin' });
     await db.query("update public.account_status set role = 'player' where user_id = $1", [one.id]);
     // Making an admin is never refused.
@@ -654,7 +780,9 @@ describe('user actions', () => {
   it('refuses a bad id, an unknown account and an unknown action', async () => {
     const admin = await person('admin', { role: 'admin' });
     expect((await act(admin, 'nope', { action: 'ban' })).status).toBe(400);
-    expect((await act(admin, '00000000-0000-4000-8000-0000000000ff', { action: 'ban' })).status).toBe(404);
+    expect(
+      (await act(admin, '00000000-0000-4000-8000-0000000000ff', { action: 'ban' })).status,
+    ).toBe(404);
     expect((await act(admin, admin.id, { action: 'delete' })).status).toBe(400);
     expect(() => parseUserAction({ action: 'drop' })).toThrow(AdminError);
   });
@@ -663,9 +791,21 @@ describe('user actions', () => {
     const admin = await person('admin', { role: 'admin' });
     const p = await person('pat');
     const bad = failingAudit(deps.sql);
-    await expect(userAction(bad, admin.id, p.id, { action: 'suspend', days: 3 })).rejects.toThrow('audit write failed');
-    await expect(userAction(bad, admin.id, p.id, { action: 'ban' }, { emailOf: (id) => auth.emailOf(id), pepper: PEPPER })).rejects.toThrow('audit write failed');
-    await expect(userAction(bad, admin.id, p.id, { action: 'set_role', role: 'moderator' })).rejects.toThrow('audit write failed');
+    await expect(userAction(bad, admin.id, p.id, { action: 'suspend', days: 3 })).rejects.toThrow(
+      'audit write failed',
+    );
+    await expect(
+      userAction(
+        bad,
+        admin.id,
+        p.id,
+        { action: 'ban' },
+        { emailOf: (id) => auth.emailOf(id), pepper: PEPPER },
+      ),
+    ).rejects.toThrow('audit write failed');
+    await expect(
+      userAction(bad, admin.id, p.id, { action: 'set_role', role: 'moderator' }),
+    ).rejects.toThrow('audit write failed');
     const d = (await userDetail(deps.sql, p.id))!;
     expect(d).toMatchObject({ state: 'active', role: 'player', history: [] });
     expect((await db.query('select 1 from public.ban_records')).rowCount).toBe(0);
@@ -676,10 +816,16 @@ describe('user actions', () => {
     const p = await person('pat');
     await db.query('insert into auth.sessions (user_id) values ($1)', [p.id]);
     // Not an admin any more by the time the function runs: it refuses, nothing changes.
-    await expect(userAction(deps.sql, p.id, p.id, { action: 'sign_out_all' })).rejects.toBeInstanceOf(AdminError);
-    expect((await db.query('select 1 from auth.sessions where user_id = $1', [p.id])).rowCount).toBe(1);
+    await expect(
+      userAction(deps.sql, p.id, p.id, { action: 'sign_out_all' }),
+    ).rejects.toBeInstanceOf(AdminError);
+    expect(
+      (await db.query('select 1 from auth.sessions where user_id = $1', [p.id])).rowCount,
+    ).toBe(1);
     // The functions also refuse a caller who is not an admin when called directly.
-    await expect(db.query('select public.admin_sign_out_everywhere($1, $2)', [p.id, admin.id])).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      db.query('select public.admin_sign_out_everywhere($1, $2)', [p.id, admin.id]),
+    ).rejects.toMatchObject({ code: '42501' });
     expect(await auditRows()).toEqual([]);
   });
 
@@ -722,22 +868,35 @@ describe('the audit log screen data', () => {
     expect((await listAudit(deps.sql, { admin: 'nobody_here' })).rows).toEqual([]);
     expect(await auditActions(deps.sql)).toEqual(['setting_set', 'switch_set']);
     expect(describeAudit(first.rows[0]!)).toBe('site setting maintenance_wording: value 2');
-    expect(describeAudit({ action: 'switch_set', targetType: 'feature_switch', targetId: 'groups', details: { switch_key: 'groups', enabled: true } })).toBe(
-      'feature switch groups: switch groups, turned on',
-    );
+    expect(
+      describeAudit({
+        action: 'switch_set',
+        targetType: 'feature_switch',
+        targetId: 'groups',
+        details: { switch_key: 'groups', enabled: true },
+      }),
+    ).toBe('feature switch groups: switch groups, turned on');
   });
 
   it('can not be changed or removed, by the server either', async () => {
     const admin = await person('admin', { role: 'admin' });
     await setSwitch(deps.sql, admin.id, 'community', true);
-    await expect(deps.sql.query("update public.admin_audit_log set action = 'x'")).rejects.toBeTruthy();
+    await expect(
+      deps.sql.query("update public.admin_audit_log set action = 'x'"),
+    ).rejects.toBeTruthy();
     await expect(deps.sql.query('delete from public.admin_audit_log')).rejects.toBeTruthy();
   });
 
   it('has nothing in a row that could hold a name or an email', async () => {
     const admin = await person('admin', { role: 'admin' });
     const p = await person('pat');
-    await userAction(deps.sql, admin.id, p.id, { action: 'ban' }, { emailOf: (id) => auth.emailOf(id), pepper: PEPPER });
+    await userAction(
+      deps.sql,
+      admin.id,
+      p.id,
+      { action: 'ban' },
+      { emailOf: (id) => auth.emailOf(id), pepper: PEPPER },
+    );
     await setSetting(deps.sql, admin.id, 'announcement', { text: 'Secret words here', link: null });
     const text = JSON.stringify(await auditRows());
     expect(text).not.toContain('@');
@@ -753,10 +912,27 @@ describe('the dashboard counts', () => {
     const a = await person('ava');
     await person('ben');
     await person('admin', { role: 'admin' });
-    const g1 = (await db.query<{ id: string }>(`insert into public.guest_sessions (token_hash) values (repeat('a', 64)) returning id`)).rows[0]!.id;
-    const g2 = (await db.query<{ id: string }>(`insert into public.guest_sessions (token_hash) values (repeat('b', 64)) returning id`)).rows[0]!.id;
-    await db.query(`insert into public.guest_sessions (token_hash, converted_at, converted_to) values (repeat('c', 64), now(), $1)`, [a.id]);
-    const farm = async (owner: string | null, guest: string | null, mode: string, status: string, savedDaysAgo: number | null) => {
+    const g1 = (
+      await db.query<{ id: string }>(
+        `insert into public.guest_sessions (token_hash) values (repeat('a', 64)) returning id`,
+      )
+    ).rows[0]!.id;
+    const g2 = (
+      await db.query<{ id: string }>(
+        `insert into public.guest_sessions (token_hash) values (repeat('b', 64)) returning id`,
+      )
+    ).rows[0]!.id;
+    await db.query(
+      `insert into public.guest_sessions (token_hash, converted_at, converted_to) values (repeat('c', 64), now(), $1)`,
+      [a.id],
+    );
+    const farm = async (
+      owner: string | null,
+      guest: string | null,
+      mode: string,
+      status: string,
+      savedDaysAgo: number | null,
+    ) => {
       const id = (
         await db.query<{ id: string }>(
           `insert into public.farms (owner_id, guest_session_id, mode, name, district, size, size_ha, enterprise, start_type, difficulty, engine_version, status, ended_at, timezone, sim_through)
@@ -787,7 +963,10 @@ describe('the dashboard counts', () => {
     await farm(a.id, null, 'fast', 'ended', 6);
     await farm(null, g1, 'fast', 'active', 7);
     await farm(null, g2, 'fast', 'active', 0);
-    await db.query(`insert into public.farm_saves_aside (farm_id, owner_id, reason) values (gen_random_uuid(), $1, 'x'), (gen_random_uuid(), $1, 'y')`, [a.id]);
+    await db.query(
+      `insert into public.farm_saves_aside (farm_id, owner_id, reason) values (gen_random_uuid(), $1, 'x'), (gen_random_uuid(), $1, 'y')`,
+      [a.id],
+    );
     const d = await dashboard(deps.sql);
     expect(d.accounts).toBe(3);
     expect(d.guests).toBe(2);
@@ -798,12 +977,20 @@ describe('the dashboard counts', () => {
     expect(d.brokenSaves).toBe(2);
     expect(Math.abs(new Date(d.asAt).getTime() - Date.now())).toBeLessThan(5000);
     const direct = await db.query<{ n: number }>('select count(*)::int as n from public.farms');
-    expect(d.farms.daily.active + d.farms.daily.ended + d.farms.fast.active + d.farms.fast.ended).toBe(direct.rows[0]!.n);
+    expect(
+      d.farms.daily.active + d.farms.daily.ended + d.farms.fast.active + d.farms.fast.ended,
+    ).toBe(direct.rows[0]!.n);
   });
 
   it('is all zeros on an empty database', async () => {
     const d = await dashboard(deps.sql);
-    expect(d).toMatchObject({ accounts: 0, guests: 0, playedToday: 0, playedWeek: 0, brokenSaves: 0 });
+    expect(d).toMatchObject({
+      accounts: 0,
+      guests: 0,
+      playedToday: 0,
+      playedWeek: 0,
+      brokenSaves: 0,
+    });
     expect(d.farms).toEqual({ daily: { active: 0, ended: 0 }, fast: { active: 0, ended: 0 } });
   });
 });
@@ -814,7 +1001,11 @@ describe('maintenance mode', () => {
   const farmGet = async (who: Person | null, address = `10.5.0.${ip}`) =>
     routes.farm!.GET!(
       new Request(`${HOST}/api/game/farm`, {
-        headers: { host: 'localhost:3000', 'x-real-ip': address, ...(who ? { cookie: who.cookie } : {}) },
+        headers: {
+          host: 'localhost:3000',
+          'x-real-ip': address,
+          ...(who ? { cookie: who.cookie } : {}),
+        },
       }),
     );
 
@@ -826,9 +1017,14 @@ describe('maintenance mode', () => {
     for (const who of [null, player]) {
       const res = await farmGet(who);
       expect(res.status).toBe(503);
-      expect(await res.json()).toEqual({ error: MAINTENANCE_WORDINGS[0].text, code: 'maintenance' });
+      expect(await res.json()).toEqual({
+        error: MAINTENANCE_WORDINGS[0].text,
+        code: 'maintenance',
+      });
     }
-    expect(MAINTENANCE_WORDINGS[0].text).toBe('The game is down for maintenance. Your farm is safe.');
+    expect(MAINTENANCE_WORDINGS[0].text).toBe(
+      'The game is down for maintenance. Your farm is safe.',
+    );
     expect((await farmGet(admin)).status).toBe(200);
     await post('switches', { key: 'maintenance_mode', enabled: false }, admin);
     expect((await farmGet(player)).status).toBe(200);
@@ -838,10 +1034,16 @@ describe('maintenance mode', () => {
     const admin = await person('admin', { role: 'admin' });
     await post('switches', { key: 'maintenance_mode', enabled: true }, admin);
     await post('settings', { key: 'maintenance_wording', value: { id: 'longer' } }, admin);
-    expect(((await (await farmGet(null)).json()) as { error: string }).error).toBe(MAINTENANCE_WORDINGS[2].text);
+    expect(((await (await farmGet(null)).json()) as { error: string }).error).toBe(
+      MAINTENANCE_WORDINGS[2].text,
+    );
     // Even a row written by hand with free text can not reach a player.
-    await db.query(`update public.site_settings set value = '{"id": "<b>Buy now</b>"}' where key = 'maintenance_wording'`);
-    expect(((await (await farmGet(null)).json()) as { error: string }).error).toBe(MAINTENANCE_WORDINGS[0].text);
+    await db.query(
+      `update public.site_settings set value = '{"id": "<b>Buy now</b>"}' where key = 'maintenance_wording'`,
+    );
+    expect(((await (await farmGet(null)).json()) as { error: string }).error).toBe(
+      MAINTENANCE_WORDINGS[0].text,
+    );
   });
 
   it('a suspended admin is a player: the game is down for them', async () => {
@@ -858,27 +1060,63 @@ describe('maintenance mode', () => {
     const create = await routes.farm!.POST!(
       new Request(`${HOST}/api/game/farm`, {
         method: 'POST',
-        headers: { host: 'localhost:3000', 'x-real-ip': '10.6.0.1', 'content-type': 'application/json', cookie: pat.cookie },
-        body: JSON.stringify({ district: 'wv', size: 'small', enterprise: 'grazing', years: 'random', startType: 'scratch', difficulty: 'medium', name: 'Kept Farm' }),
+        headers: {
+          host: 'localhost:3000',
+          'x-real-ip': '10.6.0.1',
+          'content-type': 'application/json',
+          cookie: pat.cookie,
+        },
+        body: JSON.stringify({
+          district: 'wv',
+          size: 'small',
+          enterprise: 'grazing',
+          years: 'random',
+          startType: 'scratch',
+          difficulty: 'medium',
+          name: 'Kept Farm',
+        }),
       }),
     );
     expect(create.status).toBe(200);
-    const before = (await db.query<{ farm_version: string }>('select farm_version from public.farm_saves')).rows;
+    const before = (
+      await db.query<{ farm_version: string }>('select farm_version from public.farm_saves')
+    ).rows;
     await post('switches', { key: 'maintenance_mode', enabled: true }, admin);
     const refused = await routes.farm!.POST!(
       new Request(`${HOST}/api/game/farm`, {
         method: 'POST',
-        headers: { host: 'localhost:3000', 'x-real-ip': '10.6.0.2', 'content-type': 'application/json', cookie: pat.cookie },
-        body: JSON.stringify({ district: 'cq', size: 'small', enterprise: 'grazing', years: 'random', startType: 'scratch', difficulty: 'medium', name: 'Second' }),
+        headers: {
+          host: 'localhost:3000',
+          'x-real-ip': '10.6.0.2',
+          'content-type': 'application/json',
+          cookie: pat.cookie,
+        },
+        body: JSON.stringify({
+          district: 'cq',
+          size: 'small',
+          enterprise: 'grazing',
+          years: 'random',
+          startType: 'scratch',
+          difficulty: 'medium',
+          name: 'Second',
+        }),
       }),
     );
     expect(refused.status).toBe(503);
     expect((await db.query('select 1 from public.farms')).rowCount).toBe(1);
-    expect((await db.query<{ farm_version: string }>('select farm_version from public.farm_saves')).rows).toEqual(before);
+    expect(
+      (await db.query<{ farm_version: string }>('select farm_version from public.farm_saves')).rows,
+    ).toEqual(before);
   });
 
   it('a database that can not be read leaves the game open', async () => {
-    setAuthDeps({ ...deps, sql: { query: () => Promise.reject(new Error('down')), transaction: () => Promise.reject(new Error('down')) } });
+    setAuthDeps({
+      ...deps,
+      sql: {
+        query: () => Promise.reject(new Error('down')),
+        transaction: () => Promise.reject(new Error('down')),
+      },
+    });
     resetSwitchCache();
     const { maintenanceNotice } = await import('./maintenance');
     expect(await maintenanceNotice(null)).toBeNull();

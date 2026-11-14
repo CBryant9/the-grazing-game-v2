@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 /** A pretend build. `homeKb` and `playKb` are the KB of script each page asks for. */
-function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20) {
+function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20, adminKb = 20) {
   const root = mkdtempSync(join(tmpdir(), 'gg-budget-'));
   dirs.push(root);
   const chunks = join(root, 'static', 'chunks');
@@ -48,6 +48,25 @@ function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20
     'account.html',
   ]) {
     writeFileSync(join(app, file), page('account'));
+  }
+  // The admin pages are rendered on demand: their scripts are named in two manifests, not in HTML.
+  writeFileSync(join(chunks, 'admin.js'), randomBytes(adminKb * 1024));
+  for (const rel of [
+    'admin/switches',
+    'admin/settings',
+    'admin/users/[id]',
+    'admin/users',
+    'admin',
+  ]) {
+    mkdirSync(join(app, rel, 'page'), { recursive: true });
+    writeFileSync(
+      join(app, rel, 'page', 'build-manifest.json'),
+      JSON.stringify({ rootMainFiles: ['static/chunks/admin.js'] }),
+    );
+    writeFileSync(
+      join(app, rel, 'page_client-reference-manifest.js'),
+      'globalThis.__RSC_MANIFEST = {"chunks":["/_next/static/chunks/admin.js"]};',
+    );
   }
   return { stat: join(root, 'static'), app, pages };
 }
@@ -85,6 +104,15 @@ describe('the JavaScript budget check', () => {
     const over = run(pretend(0, 100, false, 200));
     expect(over.status).toBe(1);
     expect(over.stdout).toMatch(/OVER\s+\/sign-in\s/);
+  });
+
+  it('gives /admin its own line, measured from its manifests, and fails it when it grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20, 20));
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/ok\s+\/admin\s/);
+    const over = run(pretend(0, 100, false, 20, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/admin\s/);
   });
 
   it('does not count the polyfills for old browsers (nomodule)', () => {

@@ -21,10 +21,7 @@ export interface AdminSession {
   username: string;
 }
 
-export type GateResult =
-  | { kind: 'off' }
-  | { kind: 'denied' }
-  | { kind: 'ok'; admin: AdminSession };
+export type GateResult = { kind: 'off' } | { kind: 'denied' } | { kind: 'ok'; admin: AdminSession };
 
 /** Is this account an admin in good standing right now? The username when it is, else null. */
 export async function activeAdmin(sql: SqlRunner, userId: string): Promise<string | null> {

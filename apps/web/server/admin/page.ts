@@ -33,6 +33,7 @@ export async function requireAdmin(): Promise<AdminPage | null> {
   const g = await gate();
   if (g.kind === 'off') return null;
   const deps = authDeps();
-  if (g.kind !== 'ok' || !deps) notFound();
+  if (g.kind !== 'ok') notFound();
+  if (!deps) notFound();
   return { admin: g.admin, deps };
 }

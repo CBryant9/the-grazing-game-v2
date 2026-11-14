@@ -4,11 +4,7 @@ import { authDeps } from '../auth/deps';
 import { sqlFromEnv, type SqlClient } from '../db/sql';
 import { logFailure } from '../logging';
 import { activeAdmin } from './gate';
-import {
-  DEFAULT_MAINTENANCE_WORDING,
-  MAINTENANCE_SETTING,
-  MAINTENANCE_WORDINGS,
-} from './info';
+import { DEFAULT_MAINTENANCE_WORDING, MAINTENANCE_SETTING, MAINTENANCE_WORDINGS } from './info';
 
 /**
  * Maintenance mode for the game routes. While the `maintenance_mode` switch is on, every game

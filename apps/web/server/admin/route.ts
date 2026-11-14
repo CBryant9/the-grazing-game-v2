@@ -78,7 +78,12 @@ export function adminRoute(
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
         throw new AdminError(400, 'That request was not sent properly.');
       }
-      const out = await handler({ req, admin: gate.admin, deps, body: raw as Record<string, unknown> });
+      const out = await handler({
+        req,
+        admin: gate.admin,
+        deps,
+        body: raw as Record<string, unknown>,
+      });
       const res = json(out ?? { ok: true }, 200);
       for (const [k, v] of Object.entries(HEADERS)) res.headers.set(k, v);
       return res;

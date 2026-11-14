@@ -11,10 +11,7 @@ import { MAINTENANCE_SETTING, MAINTENANCE_WORDINGS } from './info';
  * carries a number, the length of the text, how many districts, or the wording's place in the list.
  */
 export type SettingKey =
-  | 'announcement'
-  | 'districts_available'
-  | 'community_rules'
-  | typeof MAINTENANCE_SETTING;
+  'announcement' | 'districts_available' | 'community_rules' | typeof MAINTENANCE_SETTING;
 
 export interface SettingDef {
   key: SettingKey;
@@ -123,10 +120,10 @@ function parseDistricts(input: unknown): Parsed {
 function parseRules(input: unknown): Parsed {
   if (typeof input !== 'object' || input === null) return bad('Send the text.');
   const raw = (input as { text?: unknown }).text;
-  if (raw !== null && raw !== undefined && typeof raw !== 'string') return bad('The text must be words.');
+  if (raw !== null && raw !== undefined && typeof raw !== 'string')
+    return bad('The text must be words.');
   const text = (typeof raw === 'string' ? raw : '').replace(/\r\n?/g, '\n').trim();
   if (text.length > RULES_MAX) return bad(`Keep the rules to ${RULES_MAX} characters or fewer.`);
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) {
     return bad('The text has a character that can not be saved.');
   }
