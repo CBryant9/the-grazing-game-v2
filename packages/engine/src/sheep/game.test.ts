@@ -15,6 +15,8 @@ import { dateAt } from '../calendar';
 import { surveyOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
+import { farmView } from '../sim/view';
+import { VIEW_FENCE } from '@gg/shared';
 import { addSheepMob, occupiedAreas, sheepJobDates, sheepMobsOf } from './farm';
 import { heldDiet } from './graze';
 import { sellClip, sheepBuyPrice, sheepWorth, woolValue } from './market';
@@ -293,6 +295,14 @@ describe('netting fence', () => {
         6,
       );
       expect(nettingEdges(done.farm).length).toBe(10);
+      // The map tells netting from a cattle fence: the view draws the line as permanent fence
+      // (shared has no netting code yet) and `nettingEdges` names the same lines as netting.
+      const v = farmView(done.farm);
+      for (const e of nettingEdges(done.farm)) {
+        expect(v.fences[e.line][e.index]).toBe(VIEW_FENCE.permanent);
+      }
+      const plain = farmView(farm);
+      expect(nettingEdges(done.farm).every((e) => plain.fences[e.line][e.index] !== VIEW_FENCE.permanent)).toBe(true);
     }
     expect(NETTING_PER_M).toBeGreaterThan(COST_PER_M.permanent);
     const kinds = fenceKindsRead();

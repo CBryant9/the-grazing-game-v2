@@ -9,6 +9,7 @@ import { DRESSING, SRW, type SheepBreed } from '../data/sheep';
 import {
   SHEEP_HEAD_PRICES,
   SHEEP_INDICATORS_C_KG,
+  SHEARING_RATE,
   SHEEP_TRADE,
   WOOL_HARVEST,
   lambIndicator,
@@ -146,11 +147,26 @@ export function sheepBuyPrice(id: SheepBuyClassId): number {
   }
 }
 
-/** What the sheep on a farm would put in the bank if sold today, dollars (net worth). */
+/**
+ * What the wool on a sheep's back is worth today, dollars: the fleece at the
+ * wool price less the levy and its share of shearing (third pass). Net worth
+ * counts it, so a year's profit counts the wool grown in that year, not
+ * wool grown before the farm was bought or before a shearing.
+ */
+export function woolOnBack(s: Pick<Sheep, 'fleece' | 'micronKg' | 'sex'>): number {
+  if (s.fleece <= 0) return 0;
+  const gross = woolValue(s.fleece, s.micronKg / s.fleece) * (1 - WOOL_HARVEST.levyShare);
+  const shear = (s.sex === 'M' ? SHEARING_RATE.ram : SHEARING_RATE.sheep) + WOOL_HARVEST.shedStaffPerHead;
+  return Math.max(0, gross - shear);
+}
+
+/** What the sheep on a farm would put in the bank if sold today, with the wool on their backs, dollars (net worth). */
 export function sheepWorth(mobs: readonly { sheep: readonly Sheep[] }[]): number {
   let v = 0;
   for (const m of mobs) {
-    for (const s of m.sheep) if (!s.dead && s.n > 0) v += Math.max(0, sheepNetSaleValue(s)) * s.n;
+    for (const s of m.sheep) {
+      if (!s.dead && s.n > 0) v += (Math.max(0, sheepNetSaleValue(s)) + woolOnBack(s)) * s.n;
+    }
   }
   return v;
 }

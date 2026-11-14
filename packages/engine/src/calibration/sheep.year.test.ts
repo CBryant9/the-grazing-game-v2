@@ -83,10 +83,15 @@ const marked = (rs: SheepYearRun[]): number =>
  * is an expected failure, so it fails the run if it starts to pass.
  */
 const GAPS: Record<string, string> = {
-  'SB-43 xb nsw': 'first-cross ewes 4.2% a year (S67 puts their lambing deaths alone at 3.25%)',
-  'SB-43 xb cw': 'first-cross ewes 4.7% a year (S67 puts their lambing deaths alone at 3.25%)',
-  'SB-43 xb wv': 'first-cross ewes 4.6% a year (S67 puts their lambing deaths alone at 3.25%)',
-  'SB-47 wv': 'weaners lose 1.6% (the band is the national average, which takes in worms: C22)',
+  'SB-43 merino nsw':
+    'Merino ewes, mean 3.10% a year but one block of eight over 4.5% (4.67): ewe deaths outside lambing are 0.8%, derived from the document',
+  'SB-43 merino cw':
+    'Merino ewes, mean 3.98% a year, three blocks of eight over 4.5% (5.26, 5.00, 5.53): adult deaths 0.8%, derived from the document',
+  'SB-43 merino wv': 'Merino ewes 4.63% a year: adult deaths 0.8%, derived from the document',
+  'SB-43 xb nsw': 'first-cross ewes 4.50% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb cw': 'first-cross ewes 5.76% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb wv': 'first-cross ewes 5.13% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-47 wv': 'weaners lose 1.66% (the band is the national average, which takes in worms: C22)',
 };
 
 /** A test per district: an expected failure where the row has a known open gap. */
@@ -137,6 +142,8 @@ describe('sheep benchmarks: year', () => {
         const rs = ewes(d, breed);
         within(mean(rs.map((r) => r.csAtLambing!)), 2.5, 3.3);
         within(mean(rs.map((r) => r.deathsPct)), 2, 4);
+        // "Never over 4.5% in an average year": every block, as the document words it.
+        for (const r of rs) expect(r.deathsPct).toBeLessThanOrEqual(4.5);
       },
     );
   }

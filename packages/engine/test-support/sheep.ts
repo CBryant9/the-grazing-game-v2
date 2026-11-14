@@ -6,7 +6,8 @@
 
 import type { DistrictId } from '@gg/shared';
 import { dateAt, type FarmStart } from '../src/calendar';
-import { DSE_PER_AE, SRW, START_FLOCK, type SheepBreed } from '../src/data/sheep';
+import { DSE_PER_AE, SRW, START_FLOCK, type SheepBreed, type SheepFeed } from '../src/data/sheep';
+import { applyInstantly } from './instant';
 import { carryingCapacityAE } from '../src/money/costs';
 import { rngStream } from '../src/rng';
 import type { GrowthFactorSource } from '../src/season/factors';
@@ -68,7 +69,8 @@ export interface SheepYearCase {
   shear?: number[];
   crutch?: number[];
   /**
-   * Winter feeding (milestone 2.4): grain fed to fill the energy gap
+   * Winter feeding (milestone 2.4), set through the player's `setSheepFeed`
+   * action: grain fed to fill the energy gap
    * (`SHEEP_RATION`) whenever a mob's average CS falls under 2.7, until it is
    * back to 2.9. CS 2.7 and over from joining to lambing is Lifetime Wool's
    * target (S18; Agriculture Victoria S7).
@@ -105,7 +107,7 @@ export function sheepYearRun(
   seasons?: GrowthFactorSource,
 ): SheepYearRun {
   const env = seasons ? { seasons } : {};
-  const farm = createFarm(
+  let farm = createFarm(
     {
       seed,
       district: c.district,
@@ -183,6 +185,7 @@ export function sheepYearRun(
         csAtLambing = ewes.reduce((t, s) => t + s.cond * s.n, 0) / headOf(ewes);
       }
     }
+    const feedChanges: { mob: number; feed: SheepFeed }[] = [];
     if (c.winterFeed) {
       for (const sm of sheepMobsOf(farm)) {
         const w = sm.sheep.filter((x) => x.weaned);
@@ -191,10 +194,17 @@ export function sheepYearRun(
         // Weaners are fed to keep growing 50 g a day (S17); the rest to hold CS 2.7.
         const young = h > 0 && w.every((x) => x.age < 365);
         const adg = h ? w.reduce((t, x) => t + x.adg * x.n, 0) / h : 0;
-        if (young)
-          sm.feed = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
-        else if (cs < FEED_FROM_CS) sm.feed = 'grain';
-        else if (cs >= FEED_TO_CS) sm.feed = 'none';
+        let want = sm.feed;
+        if (young) want = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
+        else if (cs < FEED_FROM_CS) want = 'grain';
+        else if (cs >= FEED_TO_CS) want = 'none';
+        if (want !== sm.feed) feedChanges.push({ mob: sm.id, feed: want });
+      }
+      // Fed through the player's own action, as a player would set it.
+      for (const ch of feedChanges.splice(0)) {
+        const done = applyInstantly(farm, { type: 'setSheepFeed', mob: ch.mob, feed: ch.feed }, env);
+        if (!done.ok) throw new Error('setSheepFeed was refused: ' + done.message);
+        farm = done.farm;
       }
     }
     const res = stepDay(farm, env);
