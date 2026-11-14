@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { NEXT_ALLOWED, NEXT_DEFAULT, clearCookieText, cookieText, csrfRefusal, safeNext, siteOrigin } from './security';
+import {
+  NEXT_ALLOWED,
+  NEXT_DEFAULT,
+  clearCookieText,
+  cookieText,
+  csrfRefusal,
+  safeNext,
+  siteOrigin,
+} from './security';
 
 const HOST = 'localhost:3000';
 const post = (headers: Record<string, string>, body: string | null = '{"a":1}') =>
@@ -11,27 +19,43 @@ const post = (headers: Record<string, string>, body: string | null = '{"a":1}') 
 
 describe('the one CSRF rule for every state-changing route', () => {
   it('lets the site itself through, with an Origin or without', () => {
-    expect(csrfRefusal(post({ origin: `http://${HOST}`, 'content-type': 'application/json' }))).toBeNull();
+    expect(
+      csrfRefusal(post({ origin: `http://${HOST}`, 'content-type': 'application/json' })),
+    ).toBeNull();
     expect(csrfRefusal(post({ 'content-type': 'application/json' }))).toBeNull();
-    expect(csrfRefusal(post({ 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' }))).toBeNull();
-    expect(csrfRefusal(post({ 'sec-fetch-site': 'none', 'content-type': 'application/json' }))).toBeNull();
+    expect(
+      csrfRefusal(post({ 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' })),
+    ).toBeNull();
+    expect(
+      csrfRefusal(post({ 'sec-fetch-site': 'none', 'content-type': 'application/json' })),
+    ).toBeNull();
   });
 
   it('refuses another site by Origin, even a sibling on the same host name with a different port', () => {
-    expect(csrfRefusal(post({ origin: 'https://evil.example', 'content-type': 'application/json' }))).toMatch(/another site/);
-    expect(csrfRefusal(post({ origin: 'http://localhost:4000', 'content-type': 'application/json' }))).toMatch(/another site/);
-    expect(csrfRefusal(post({ origin: 'null', 'content-type': 'application/json' }))).toMatch(/another site/);
+    expect(
+      csrfRefusal(post({ origin: 'https://evil.example', 'content-type': 'application/json' })),
+    ).toMatch(/another site/);
+    expect(
+      csrfRefusal(post({ origin: 'http://localhost:4000', 'content-type': 'application/json' })),
+    ).toMatch(/another site/);
+    expect(csrfRefusal(post({ origin: 'null', 'content-type': 'application/json' }))).toMatch(
+      /another site/,
+    );
   });
 
   it('refuses cross-site and same-site (not same-origin) fetches', () => {
     for (const site of ['cross-site', 'same-site']) {
-      expect(csrfRefusal(post({ 'sec-fetch-site': site, 'content-type': 'application/json' }))).toMatch(/another site/);
+      expect(
+        csrfRefusal(post({ 'sec-fetch-site': site, 'content-type': 'application/json' })),
+      ).toMatch(/another site/);
     }
   });
 
   it('refuses a body that is not JSON, so a form or a plain-text post can not get through with no Origin', () => {
     expect(csrfRefusal(post({ 'content-type': 'text/plain' }))).toMatch(/not sent properly/);
-    expect(csrfRefusal(post({ 'content-type': 'application/x-www-form-urlencoded' }, 'a=1'))).toMatch(/not sent properly/);
+    expect(
+      csrfRefusal(post({ 'content-type': 'application/x-www-form-urlencoded' }, 'a=1')),
+    ).toMatch(/not sent properly/);
     expect(csrfRefusal(post({}))).toMatch(/not sent properly/);
     expect(csrfRefusal(post({ 'content-type': 'application/json; charset=utf-8' }))).toBeNull();
   });
@@ -82,7 +106,9 @@ describe('cookies', () => {
   });
 
   it('are Secure behind a proxy that says https, and not on plain http localhost in a check build', () => {
-    expect(cookieText(req('http://game.example/x', { 'x-forwarded-proto': 'https' }), 'a', 'b', 1)).toMatch(/Secure/);
+    expect(
+      cookieText(req('http://game.example/x', { 'x-forwarded-proto': 'https' }), 'a', 'b', 1),
+    ).toMatch(/Secure/);
     expect(cookieText(req('http://localhost:3291/x'), 'a', 'b', 1)).not.toMatch(/Secure/);
   });
 
@@ -94,7 +120,11 @@ describe('cookies', () => {
 
   it('the site address comes from the request host, not from a header a caller could set', () => {
     const r = new Request('http://localhost:3000/x', {
-      headers: { host: 'localhost:3000', 'x-forwarded-host': 'evil.example', origin: 'https://evil.example' },
+      headers: {
+        host: 'localhost:3000',
+        'x-forwarded-host': 'evil.example',
+        origin: 'https://evil.example',
+      },
     });
     expect(siteOrigin(r)).toBe('http://localhost:3000');
   });

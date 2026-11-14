@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { authApi } from '@/lib/auth/api';
+import { goTo } from '@/lib/auth/nav';
 import { useMe } from '@/lib/auth/store';
 import { clearAllLastFarms } from '@/lib/game/offline';
 import { useGame } from '@/lib/game/store';
@@ -26,7 +27,7 @@ export function AccountSection() {
       await authApi.signOut(false);
       // This browser forgets the farm it kept for this player.
       clearAllLastFarms();
-      window.location.assign('/');
+      goTo('/');
     } catch {
       setOut('failed');
     }

@@ -37,11 +37,15 @@ create table public.farm_saves_aside (
   setup jsonb,
   reason text check (char_length(reason) <= 200),
   aside_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   constraint farm_saves_aside_one_owner check ((owner_id is null) <> (guest_session_id is null))
 );
 alter table public.farm_saves_aside enable row level security;
 create index farm_saves_aside_owner on public.farm_saves_aside (owner_id);
 create index farm_saves_aside_guest on public.farm_saves_aside (guest_session_id);
+create trigger farm_saves_aside_touch before update on public.farm_saves_aside
+  for each row execute function app.touch_updated_at();
 
 -- Browser roles get nothing on either new table (Supabase's default grants are
 -- taken away, as the earlier migrations do).

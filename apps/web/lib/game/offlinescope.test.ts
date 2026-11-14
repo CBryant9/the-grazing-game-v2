@@ -52,7 +52,7 @@ describe('the offline copy is kept for one player', () => {
     expect(keyFor(A)).toBe(`${OFFLINE_KEY}:${A}`);
   });
 
-  it('one player never sees another player\'s farm on a shared device', () => {
+  it("one player never sees another player's farm on a shared device", () => {
     const s = storage();
     saveLastFarm(snap('Annie Farm'), s, A);
     saveLastFarm(snap('Guest Farm'), s, GUEST);

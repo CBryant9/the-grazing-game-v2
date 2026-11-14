@@ -47,9 +47,11 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | Table | Holds | Player | Admin |
 |---|---|---|---|
 | `farms` | Each farm: mode, setup summary, status, day, engine version, the Daily Farm clock | S own | S |
-| `farm_saves` | The engine's save, the setup, the stored format, save format, engine and data versions, the farm version, recent act requests, inbox read mark | **Server only** | Server only |
+| `farm_saves` | The engine's save, the setup, the stored format, save format, engine and data versions, the farm version, recent act requests, inbox read mark, the pay days missed (`missed_wages`, m3.2) | **Server only** | Server only |
 | `farm_days` | One row per day: the diary lines, daylight, time used, rain, a summary | S own | |
-| `farm_snapshots` | Where the map of a past day is kept in Storage | S own | |
+| `farm_snapshots` | The index of the days that have a picture kept (day, date). The picture is in `farm_snapshot_views` | S own |
+| `farm_snapshot_views` (m3.2) | The map and paddock figures of each past day, as the server built them. **Server only**, because it is game data the browser must only get through the server | Server only |
+| `farm_saves_aside` (m3.2) | A save that could not be opened, kept when "Start a new farm" removes the farm. Goes with its owner, and after 30 days. **Server only** | Server only | |
 | `farm_actions` | Every job and skip, in order (PRD 14.5) | **Server only** | Server only |
 | `farm_scores` | A farm's scores | S own | S |
 | `challenges` | Fast Farm challenges and Daily leagues | S public ones (visitors too) and your groups' ones, never the seed | S |
@@ -152,7 +154,7 @@ A guest plays one Fast Farm through a session the server makes (PRD 8.1, 5.16):
 A ban or suspension still running when an account is deleted leaves a row in `ban_records`: an email hash and an end date, nothing else. Sign-up checks it.
 
 - **The hash is made on the server, never in the database.** It is HMAC-SHA-256 of the normalised sign-in email, keyed with `BAN_HASH_PEPPER`, a secret kept only in the server's environment (never in the database, a backup or the repo). The database stores and compares the finished hash only. Without the pepper the list can't be tested against known emails, so a copy of the database or a backup gives nothing away.
-- **Normalising** before hashing (the server's job, milestone 3.2): lower case and trim every address. For `gmail.com` and `googlemail.com`, treat the two domains as one and take the dots out of the name: Google's own help says both hold for personal Gmail (support.google.com/mail/answer/7436150 for dots, which does not apply to Google Workspace addresses; answer/10313 for googlemail.com). For Fastmail, drop a `+tag` from the name: Fastmail's help says mail to `alias+anything` reaches the same account (fastmail.help/hc/en-us/articles/360060591053). No other provider rule is applied yet. Google's page on plus addresses, and Microsoft's, Apple's and Yahoo's consumer pages, could not be found stating their rules, so a Gmail `+tag` or an Outlook alias still gets past the list until a provider page is found and the rule added.
+- **Normalising** before hashing (the server's job, built in milestone 3.2 as `apps/web/server/auth/email.ts`, with tests): lower case and trim every address. For `gmail.com` and `googlemail.com`, treat the two domains as one and take the dots out of the name: Google's own help says both hold for personal Gmail (support.google.com/mail/answer/7436150 for dots, which does not apply to Google Workspace addresses; answer/10313 for googlemail.com). For Fastmail, drop a `+tag` from the name: Fastmail's help says mail to `alias+anything` reaches the same account (fastmail.help/hc/en-us/articles/360060591053). No other provider rule is applied yet. Google's page on plus addresses, and Microsoft's, Apple's and Yahoo's consumer pages, could not be found stating their rules, so a Gmail `+tag` or an Outlook alias still gets past the list until a provider page is found and the rule added.
 - **Rotating the pepper** makes every existing ban record stop matching (the old hashes can't be recomputed without the emails). Rotate only if the pepper leaks, and accept that running bans on deleted accounts are lost; bans on accounts that still exist are unaffected.
 - A different email address is a different sign-in and is not caught. The same holds for the under-14 refusal (`signup_refusals`, against the sign-in only); an admin can clear a refusal for an adult who mistyped (`clear_signup_refusal`).
 
@@ -206,10 +208,29 @@ Claudia makes the project (BUILD_PLAN section 8). Then, from a machine with the 
 4. In the dashboard: Data API exposes `public` only (the exposed schemas setting must never include `app`); **anonymous sign-ins must stay off** (Authentication, Sign In / Providers); turn on email link and Google sign-in.
 5. Turn on the switches in admin (or `update public.feature_switches set enabled = true where key = '...'`) when each part is ready.
 
+## What the server does itself (milestone 3.2)
+
+Everything above that said "the server" is built in `apps/web/server`. The database store is `server/db/dbstore.ts`, written against a small SQL interface (`server/db/sql.ts`). The site runs it on a `pg` connection pool opened from `SUPABASE_DB_POOLER_URL`; the tests run the same store on PGlite with every statement as `service_role`. The Supabase JS client can not run SQL (it speaks to the Data API), so the server's own connection is how it reads and writes saves. The secret key is used only for Auth's admin calls (deleting a user) and Storage (removing files).
+
+| Step | Where |
+|---|---|
+| Ban hash and email normalising | `server/auth/email.ts`: lower case and trim; gmail.com and googlemail.com one domain, dots dropped; `+tag` dropped at fastmail.com only. Sources as in "The ban list" |
+| Sign-up | `server/auth/accounts.ts` `finishSignUp`: checks `signup_refusals` and `ban_records` first, then `record_signup_email(user, hash)`, then `complete_sign_up(username, date_of_birth, display_name)` as the player (`set local role authenticated` and the token's claims in one transaction). `too_young` is final for that sign-in |
+| A guest's farm moves in | `convertGuest` calls `convert_guest(session, user)` with the guest session's id found by the cookie's SHA-256. With no room the farm limit guard refuses and nothing moves |
+| Download my data | `myData` calls `export_my_data()` as the player |
+| Delete my account | `deleteAccount`: `prepare_account_deletion(user, hash)` (always, the hash only matters for a running ban), `account_storage_paths(user)`, remove those files from Storage, then `auth.admin.deleteUser`. A failed step stops the rest, and the account is still there |
+| Feature switches | `featureSwitches` reads `feature_switches` (cached 30 seconds) and falls back to the shared defaults if the database can not be read |
+| Farm saves | `DbFarmStore`: a save is written in one transaction with the diary days it changed, the action log row and the picture of the new day. The write names the version it expects (`where farm_version = $expected`), so a second tab or server that loaded the same version changes nothing and is told the farm changed |
+| Guests | A guest cookie lasts 30 days with the database (90 with files), renewed each time the farm is played, because `prune_housekeeping` removes a guest not seen for 30 days. Playing marks the session seen |
+| Daily history | Every day for the last 90 days, then one a week back to 400 days (`pastKept`), written with the save. The file store keeps the last 14 days |
+
+Daily Farm slots exist in the tables and the limits. No Daily Farm can be started from the game in this milestone: the setup flow makes Fast Farms only, whatever the switch says. It comes with the rollover (3.3).
+
 ## Still owed against a real Supabase project
 
 1. Apply the migrations to a preview project and confirm each one runs: the `storage.buckets` insert, the policies on `storage.objects`, and `create extension pg_cron`.
 2. Run the database linter (Advisors). Expected: lint 0010 on the three views and nothing else.
+0. (m3.2) The server's own work, proven so far only against PGlite and a fake sign-in provider (`server/test-support/fakeAuth.ts`): the `pg` pooler connection and its `set local role` calls on Supabase's pooler (transaction mode allows `set local` inside a transaction), `@supabase/ssr` cookies (names, chunking, refresh), `getClaims()` on a real token, the emailed link (PKCE: it works only in the browser that asked), the Google round trip, `signOut` scopes, `auth.admin.deleteUser` with the trigger on `auth.users`, Storage removal, and two real connections racing on one save (PGlite has one connection, so the version check is proven but not parallel commits).
 3. Repeat the access matrix through the real Data API with real tokens for test users (a small script in 3.2), including column grants (`select=*` fails on a table with column grants; the app must name its columns).
 4. Confirm sign-in by emailed link and Google, the publishable and secret keys, and that anonymous sign-ins are off.
 5. Confirm Storage enforces the bucket sizes and file types, and serve post photos and avatars through signed links.

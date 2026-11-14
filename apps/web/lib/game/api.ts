@@ -93,7 +93,9 @@ async function once<T>(path: string, method: string, body?: unknown): Promise<T>
         ? (data as { error: string }).error
         : GENERIC;
     const code =
-      typeof data === 'object' && data !== null && typeof (data as { code?: unknown }).code === 'string'
+      typeof data === 'object' &&
+      data !== null &&
+      typeof (data as { code?: unknown }).code === 'string'
         ? (data as { code: string }).code
         : undefined;
     throw new ApiError(message, res.status, code);

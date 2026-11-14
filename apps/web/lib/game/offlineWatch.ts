@@ -133,7 +133,8 @@ export function startOfflineWatch(): () => void {
     }
     if ((s.phase === 'setup' || s.phase === 'broken') && prev.phase !== s.phase) {
       // No farm to keep: it was thrown away, or never started.
-      if (!useOffline.getState().offline) clearLastFarm(undefined, useMe.getState().me?.scope ?? GUEST);
+      if (!useOffline.getState().offline)
+        clearLastFarm(undefined, useMe.getState().me?.scope ?? GUEST);
       return;
     }
     if (s.snapshot && s.snapshot !== prev.snapshot && !useOffline.getState().offline) {

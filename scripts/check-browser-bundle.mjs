@@ -122,7 +122,9 @@ for (const f of files(SERVER_SRC)) {
 }
 const staleServer = SERVER_ONLY.filter((t) => !serverText.includes(t));
 if (staleServer.length) {
-  console.error(`These search terms are not in apps/web/server any more: ${staleServer.join(', ')}.`);
+  console.error(
+    `These search terms are not in apps/web/server any more: ${staleServer.join(', ')}.`,
+  );
   process.exit(1);
 }
 

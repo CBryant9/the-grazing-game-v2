@@ -49,7 +49,9 @@ describe('the ban hash', () => {
   });
 
   it('depends on the pepper: another pepper gives another hash', () => {
-    expect(banHash('alex@example.com', PEPPER)).not.toBe(banHash('alex@example.com', 'q'.repeat(40)));
+    expect(banHash('alex@example.com', PEPPER)).not.toBe(
+      banHash('alex@example.com', 'q'.repeat(40)),
+    );
   });
 
   it('refuses a missing or short pepper, and gives null for a non-address', () => {

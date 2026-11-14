@@ -59,7 +59,11 @@ describe('saving through the file store path', () => {
     const made = await game.create(A, choices);
     store.failPuts = { times: 99, error: new Error('no space') };
     await expect(
-      game.act(A, { action: { type: 'markCalves', mob: 9999 } }, { version: made.farmVersion, requestId: 'req-nosave-01' }),
+      game.act(
+        A,
+        { action: { type: 'markCalves', mob: 9999 } },
+        { version: made.farmVersion, requestId: 'req-nosave-01' },
+      ),
     ).rejects.toMatchObject({ code: 'save_failed' });
     store.failPuts = null;
     const again = await game.act(
@@ -123,7 +127,9 @@ describe('the file store keeps a smaller history', () => {
       await expect(game.pastDay(A, 1)).rejects.toMatchObject({ status: 404 });
       expect(readdirSync(dir).some((f) => f.endsWith('.past'))).toBe(true);
       await game.remove(A);
-      expect(readdirSync(dir).filter((f) => f.endsWith('.past') || f.endsWith('.json'))).toEqual([]);
+      expect(readdirSync(dir).filter((f) => f.endsWith('.past') || f.endsWith('.json'))).toEqual(
+        [],
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

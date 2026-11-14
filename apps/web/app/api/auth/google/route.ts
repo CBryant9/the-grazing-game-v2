@@ -18,6 +18,9 @@ export const POST = authRoute({ name: 'google', max: 10, write: true }, async (c
     return { url: await ctx.deps.provider.googleUrl(ctx.jar, redirectTo) };
   } catch (e) {
     console.error('Starting Google sign-in failed:', e instanceof Error ? e.message : e);
-    throw new GameError(503, 'Google sign-in is not working right now. Try the emailed link instead.');
+    throw new GameError(
+      503,
+      'Google sign-in is not working right now. Try the emailed link instead.',
+    );
   }
 });

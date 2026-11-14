@@ -53,11 +53,25 @@ export async function identify(
   const chosen = jar.getAll().find((c) => c.name === FARM_COOKIE)?.value;
   const mine = chosen && FARM_ID.test(chosen) ? farms.find((f) => f.id === chosen) : undefined;
   if (mine) {
-    return { user, key: farmKey(mine.id), farmId: mine.id, mustPick: false, farmCount: farms.length, guestSession };
+    return {
+      user,
+      key: farmKey(mine.id),
+      farmId: mine.id,
+      mustPick: false,
+      farmCount: farms.length,
+      guestSession,
+    };
   }
   if (farms.length === 1) {
     const only = farms[0]!;
-    return { user, key: farmKey(only.id), farmId: only.id, mustPick: false, farmCount: 1, guestSession };
+    return {
+      user,
+      key: farmKey(only.id),
+      farmId: only.id,
+      mustPick: false,
+      farmCount: 1,
+      guestSession,
+    };
   }
   if (farms.length > 1) {
     return { user, key: null, farmId: null, mustPick: true, farmCount: farms.length, guestSession };

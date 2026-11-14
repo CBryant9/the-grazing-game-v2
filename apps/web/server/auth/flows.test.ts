@@ -108,7 +108,8 @@ class Browser {
   async json<T = Record<string, unknown>>(res: Response): Promise<T> {
     return (await res.json()) as T;
   }
-  me = async (): Promise<MeResponse> => this.json<MeResponse>(await this.call('me', 'GET', '/api/auth/me'));
+  me = async (): Promise<MeResponse> =>
+    this.json<MeResponse>(await this.call('me', 'GET', '/api/auth/me'));
 }
 
 const adultDob = '1985-06-15';
@@ -142,7 +143,17 @@ async function signIn(email: string, b = new Browser()): Promise<{ b: Browser; r
 async function signUp(email: string, username: string, dob = adultDob, b = new Browser()) {
   await signIn(email, b);
   const res = await b.call('finish', 'POST', '/api/auth/finish', { username, dob });
-  return { b, res, out: await b.json<{ ok: boolean; reason?: string; moved?: number; noRoom?: boolean; final?: boolean }>(res) };
+  return {
+    b,
+    res,
+    out: await b.json<{
+      ok: boolean;
+      reason?: string;
+      moved?: number;
+      noRoom?: boolean;
+      final?: boolean;
+    }>(res),
+  };
 }
 
 // ---- the emailed link
@@ -150,39 +161,57 @@ async function signUp(email: string, username: string, dob = adultDob, b = new B
 describe('the emailed link', () => {
   it('sends a link and answers the same words for every address, so it never says who has an account', async () => {
     const b = new Browser();
-    const first = await b.call('email', 'POST', '/api/auth/email', { email: 'new.person@example.com' });
+    const first = await b.call('email', 'POST', '/api/auth/email', {
+      email: 'new.person@example.com',
+    });
     await signUp('known@example.com', 'known_user');
-    const known = await new Browser().call('email', 'POST', '/api/auth/email', { email: 'known@example.com' });
+    const known = await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'known@example.com',
+    });
     expect(first.status).toBe(known.status);
     expect(await first.json()).toEqual(await known.json());
   });
 
   it('answers the same even when the mail provider fails, and keeps the reason in the log only', async () => {
     auth.fail.sendLink = true;
-    const ok = await new Browser().call('email', 'POST', '/api/auth/email', { email: 'x@example.com' });
+    const ok = await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'x@example.com',
+    });
     auth.fail.sendLink = false;
-    const fine = await new Browser().call('email', 'POST', '/api/auth/email', { email: 'y@example.com' });
+    const fine = await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'y@example.com',
+    });
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual(await fine.json());
   });
 
   it('refuses text that is not an address with a plain line', async () => {
-    const res = await new Browser().call('email', 'POST', '/api/auth/email', { email: 'not an email' });
+    const res = await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'not an email',
+    });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/does not look like an email/);
   });
 
-  it('sends the link back to this site\'s own callback with a page from the allow-list', async () => {
-    await new Browser().call('email', 'POST', '/api/auth/email', { email: 'a@example.com', next: 'https://evil.example/' });
+  it("sends the link back to this site's own callback with a page from the allow-list", async () => {
+    await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'a@example.com',
+      next: 'https://evil.example/',
+    });
     const link = auth.sent[0]!;
     expect(link.redirectTo).toBe(`${HOST}/auth/callback?next=${encodeURIComponent('/play')}`);
-    await new Browser().call('email', 'POST', '/api/auth/email', { email: 'b@example.com', next: '/account' });
+    await new Browser().call('email', 'POST', '/api/auth/email', {
+      email: 'b@example.com',
+      next: '/account',
+    });
     expect(auth.sent[1]!.redirectTo).toBe(`${HOST}/auth/callback?next=%2Faccount`);
   });
 
   it('only a few links an hour go to one address, with the same answer', async () => {
     for (let i = 0; i < 5; i++) {
-      const res = await new Browser(`10.9.0.${i}`).call('email', 'POST', '/api/auth/email', { email: 'busy@example.com' });
+      const res = await new Browser(`10.9.0.${i}`).call('email', 'POST', '/api/auth/email', {
+        email: 'busy@example.com',
+      });
       expect(res.status).toBe(200);
     }
     expect(auth.sent.filter((s) => s.email === 'busy@example.com')).toHaveLength(3);
@@ -192,7 +221,8 @@ describe('the emailed link', () => {
     const b = new Browser('10.8.8.8');
     let last = 200;
     for (let i = 0; i < 12; i++) {
-      last = (await b.call('email', 'POST', '/api/auth/email', { email: `u${i}@example.com` })).status;
+      last = (await b.call('email', 'POST', '/api/auth/email', { email: `u${i}@example.com` }))
+        .status;
     }
     expect(last).toBe(429);
   });
@@ -223,7 +253,9 @@ describe('the callback', () => {
     await b.call('email', 'POST', '/api/auth/email', { email: 'replay@example.com' });
     const link = auth.sent[0]!;
     const path = `/auth/callback?next=%2Fplay&code=${link.code}`;
-    expect((await b.call('callback', 'GET', path)).headers.get('location')).toMatch(/sign-up\/finish/);
+    expect((await b.call('callback', 'GET', path)).headers.get('location')).toMatch(
+      /sign-up\/finish/,
+    );
     const other = new Browser();
     other.cookies = new Map(b.cookies);
     other.cookies.delete('fake_session');
@@ -244,10 +276,18 @@ describe('the callback', () => {
     await c.call('email', 'POST', '/api/auth/email', { email: 'diff@example.com' });
     const second = auth.sent[1]!;
     // Opened on a different phone or computer: the verifier cookie is not there.
-    const elsewhere = await new Browser().call('callback', 'GET', `/auth/callback?code=${second.code}`);
+    const elsewhere = await new Browser().call(
+      'callback',
+      'GET',
+      `/auth/callback?code=${second.code}`,
+    );
     expect(elsewhere.headers.get('location')).toBe(`${HOST}/sign-in?problem=link`);
 
-    for (const q of ['', '?error=access_denied&error_description=nope', '?code=' + 'x'.repeat(600)]) {
+    for (const q of [
+      '',
+      '?error=access_denied&error_description=nope',
+      '?code=' + 'x'.repeat(600),
+    ]) {
       const r = await new Browser().call('callback', 'GET', `/auth/callback${q}`);
       expect(r.headers.get('location')).toBe(`${HOST}/sign-in?problem=link`);
     }
@@ -262,7 +302,13 @@ describe('the callback', () => {
   });
 
   it('never redirects anywhere but a listed page on this site', async () => {
-    for (const next of ['https://evil.example', '//evil.example', '/\\evil.example', '/admin', '/account?x=1']) {
+    for (const next of [
+      'https://evil.example',
+      '//evil.example',
+      '/\\evil.example',
+      '/admin',
+      '/account?x=1',
+    ]) {
       const b = new Browser();
       await b.call('email', 'POST', '/api/auth/email', { email: `r${Math.random()}@example.com` });
       const link = auth.sent[auth.sent.length - 1]!;
@@ -281,7 +327,10 @@ describe('the callback', () => {
     const b = new Browser();
     const start = await b.call('google', 'POST', '/api/auth/google', { next: '/play' });
     expect((await start.json()).url).toMatch(/^https:\/\/accounts\.example\/google\?to=/);
-    const jar = { getAll: () => [...b.cookies].map(([name, value]) => ({ name, value })), setAll() {} };
+    const jar = {
+      getAll: () => [...b.cookies].map(([name, value]) => ({ name, value })),
+      setAll() {},
+    };
     const code = auth.googleReturn(jar, 'g.user@example.com');
     const r = await b.call('callback', 'GET', `/auth/callback?next=%2Fplay&code=${code}`);
     expect(r.headers.get('location')).toMatch(/sign-up\/finish/);
@@ -297,13 +346,27 @@ describe('finish sign-up', () => {
     const { b, out } = await signUp('adult@example.com', 'Farmer_Joe');
     expect(out).toMatchObject({ ok: true, moved: 0, noRoom: false });
     const me = await b.me();
-    expect(me).toMatchObject({ signedIn: true, needsSignUp: false, username: 'Farmer_Joe', accounts: true });
-    const row = await db.query<{ date_of_birth: string }>('select date_of_birth::text from public.account_private');
+    expect(me).toMatchObject({
+      signedIn: true,
+      needsSignUp: false,
+      username: 'Farmer_Joe',
+      accounts: true,
+    });
+    const row = await db.query<{ date_of_birth: string }>(
+      'select date_of_birth::text from public.account_private',
+    );
     expect(row.rows[0]!.date_of_birth).toBe(adultDob);
   });
 
   it('needs a signed-in player, and checks the username and the date', async () => {
-    expect((await new Browser().call('finish', 'POST', '/api/auth/finish', { username: 'abc', dob: adultDob })).status).toBe(401);
+    expect(
+      (
+        await new Browser().call('finish', 'POST', '/api/auth/finish', {
+          username: 'abc',
+          dob: adultDob,
+        })
+      ).status,
+    ).toBe(401);
     const b = new Browser();
     await signIn('check@example.com', b);
     for (const body of [
@@ -314,7 +377,9 @@ describe('finish sign-up', () => {
       { username: 'good_name', dob: 'yesterday' },
       { username: 'good_name' },
     ]) {
-      const out = await b.json<{ ok: boolean; reason: string }>(await b.call('finish', 'POST', '/api/auth/finish', body));
+      const out = await b.json<{ ok: boolean; reason: string }>(
+        await b.call('finish', 'POST', '/api/auth/finish', body),
+      );
       expect(out.ok).toBe(false);
       expect(['bad_username', 'bad_date_of_birth']).toContain(out.reason);
     }
@@ -327,7 +392,9 @@ describe('finish sign-up', () => {
     expect((out as unknown as { message: string }).message).toBe(
       'You need to be 14 or older to make an account. You can still play The Grazing Game as a guest.',
     );
-    expect((out as unknown as { message: string }).message).not.toMatch(/date|birth|try again|older date|another/i);
+    expect((out as unknown as { message: string }).message).not.toMatch(
+      /date|birth|try again|older date|another/i,
+    );
     // The same sign-in again, now with an adult date: the same answer.
     const retry = await b.json<{ ok: boolean; reason: string }>(
       await b.call('finish', 'POST', '/api/auth/finish', { username: 'young_one', dob: adultDob }),
@@ -342,12 +409,18 @@ describe('finish sign-up', () => {
     await db.exec(`update public.feature_switches set enabled = true where key = 'community'`);
     const kid = await signUp('teen@example.com', 'teen_one', dobYearsAgo(15, 3));
     expect(kid.out.ok).toBe(true);
-    expect(await kid.b.me()).toMatchObject({ community: false, interestAds: false, signedIn: true });
+    expect(await kid.b.me()).toMatchObject({
+      community: false,
+      interestAds: false,
+      signedIn: true,
+    });
     resetSwitchCache();
     const adult = await signUp('grownup@example.com', 'grown_one');
     expect(await adult.b.me()).toMatchObject({ community: true, interestAds: true });
     // The flag is never taken from the browser: asking with a claim of being older changes nothing.
-    const sneaky = await kid.b.call('me', 'GET', '/api/auth/me?under16=false', undefined, { 'x-under-16': 'false' });
+    const sneaky = await kid.b.call('me', 'GET', '/api/auth/me?under16=false', undefined, {
+      'x-under-16': 'false',
+    });
     expect(await sneaky.json()).toMatchObject({ community: false, interestAds: false });
   });
 
@@ -367,7 +440,11 @@ describe('finish sign-up', () => {
     await db.exec(`update public.feature_switches set enabled = false where key = 'signups_open'`);
     resetSwitchCache();
     const { out, b } = await signUp('late@example.com', 'late_user');
-    expect(out).toMatchObject({ ok: false, reason: 'signups_closed', message: 'Sign-ups are not open yet.' });
+    expect(out).toMatchObject({
+      ok: false,
+      reason: 'signups_closed',
+      message: 'Sign-ups are not open yet.',
+    });
     expect((await b.me()).signupsOpen).toBe(false);
   });
 
@@ -393,7 +470,9 @@ describe('the username check', () => {
   });
 
   it('is for signed-in players only, and rate limited', async () => {
-    expect((await new Browser().call('username', 'POST', '/api/auth/username', { name: 'abc' })).status).toBe(401);
+    expect(
+      (await new Browser().call('username', 'POST', '/api/auth/username', { name: 'abc' })).status,
+    ).toBe(401);
     const b = new Browser();
     await signIn('limit@example.com', b);
     let last = 200;
@@ -411,7 +490,9 @@ describe('a guest becomes an account', () => {
     const guest = new Browser();
     const made = await guest.call('farm', 'POST', '/api/game/farm', choices);
     expect(made.status).toBe(200);
-    await guest.call('day', 'POST', '/api/game/day', { version: (await guest.json<{ snapshot: { farmVersion: string } }>(made)).snapshot.farmVersion });
+    await guest.call('day', 'POST', '/api/game/day', {
+      version: (await guest.json<{ snapshot: { farmVersion: string } }>(made)).snapshot.farmVersion,
+    });
     expect(guest.cookies.has('gg_session')).toBe(true);
     const { out } = await signUp('convert@example.com', 'convert_me', adultDob, guest);
     expect(out).toMatchObject({ ok: true, moved: 1, noRoom: false });
@@ -432,7 +513,9 @@ describe('a guest becomes an account', () => {
     const acct = await signUp('full@example.com', 'full_house');
     const me = await acct.b.me();
     for (const name of ['One', 'Two']) {
-      expect((await acct.b.call('farm', 'POST', '/api/game/farm', { ...choices, name })).status).toBe(200);
+      expect(
+        (await acct.b.call('farm', 'POST', '/api/game/farm', { ...choices, name })).status,
+      ).toBe(200);
     }
     // A guest farm on another browser, then the account asks to take it in.
     const guest = new Browser();
@@ -440,16 +523,21 @@ describe('a guest becomes an account', () => {
     const sessionCookie = guest.cookies.get('gg_session')!;
     const result = await convertGuest(deps, sessionCookie, me.scope!);
     expect(result).toEqual({ moved: 0, noRoom: true });
-    const g = await db.query<{ owner_id: string | null }>(`select owner_id from public.farms where name = 'Guest Farm'`);
+    const g = await db.query<{ owner_id: string | null }>(
+      `select owner_id from public.farms where name = 'Guest Farm'`,
+    );
     expect(g.rows[0]!.owner_id).toBeNull();
     // And the guest can still play it.
-    const farm = await guest.json<{ snapshot: { farm: { name: string } } }>(await guest.call('farm', 'GET', '/api/game/farm'));
+    const farm = await guest.json<{ snapshot: { farm: { name: string } } }>(
+      await guest.call('farm', 'GET', '/api/game/farm'),
+    );
     expect(farm.snapshot.farm.name).toBe('Guest Farm');
   });
 
   it('a third farm on a full account is refused with a plain message', async () => {
     const acct = await signUp('three@example.com', 'three_farms');
-    for (const name of ['A', 'B']) await acct.b.call('farm', 'POST', '/api/game/farm', { ...choices, name });
+    for (const name of ['A', 'B'])
+      await acct.b.call('farm', 'POST', '/api/game/farm', { ...choices, name });
     const third = await acct.b.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'C' });
     expect(third.status).toBe(409);
     expect((await third.json()).error).toMatch(/most farms/);
@@ -472,15 +560,18 @@ describe('an account with farms', () => {
   it('opens its only farm straight away, and shows the picker when there is more than one', async () => {
     const { b } = await signUp('picker@example.com', 'picker_user');
     await b.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'First' });
-    const one = await b.json<{ snapshot: { farm: { name: string } } | null; pick?: unknown }>(await b.call('farm', 'GET', '/api/game/farm'));
+    const one = await b.json<{ snapshot: { farm: { name: string } } | null; pick?: unknown }>(
+      await b.call('farm', 'GET', '/api/game/farm'),
+    );
     expect(one.snapshot?.farm.name).toBe('First');
     await b.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'Second' });
     // A new browser session for the same account: no farm chosen, so the picker.
     const again = new Browser();
     again.cookies.set('fake_session', b.cookies.get('fake_session')!);
-    const pick = await again.json<{ snapshot: unknown; pick: { id: string; name: string; districtName: string; day: number }[] }>(
-      await again.call('farm', 'GET', '/api/game/farm'),
-    );
+    const pick = await again.json<{
+      snapshot: unknown;
+      pick: { id: string; name: string; districtName: string; day: number }[];
+    }>(await again.call('farm', 'GET', '/api/game/farm'));
     expect(pick.snapshot).toBeNull();
     expect(pick.pick.map((f) => f.name).sort()).toEqual(['First', 'Second']);
     expect(pick.pick[0]!.districtName).toMatch(/\w/);
@@ -488,54 +579,98 @@ describe('an account with farms', () => {
     const first = pick.pick.find((f) => f.name === 'First')!;
     const opened = await again.call('farms', 'POST', '/api/game/farms', { id: first.id });
     expect((await opened.json()).snapshot.farm.name).toBe('First');
-    expect(opened.headers.getSetCookie().find((c) => c.startsWith('gg_farm='))).not.toMatch(/Max-Age/);
-    const now = await again.json<{ snapshot: { farm: { name: string } } }>(await again.call('farm', 'GET', '/api/game/farm'));
+    expect(opened.headers.getSetCookie().find((c) => c.startsWith('gg_farm='))).not.toMatch(
+      /Max-Age/,
+    );
+    const now = await again.json<{ snapshot: { farm: { name: string } } }>(
+      await again.call('farm', 'GET', '/api/game/farm'),
+    );
     expect(now.snapshot.farm.name).toBe('First');
     // Back to the picker.
     await again.call('farms', 'POST', '/api/game/farms', { id: null });
-    const back = await again.json<{ pick?: unknown[] }>(await again.call('farm', 'GET', '/api/game/farm'));
+    const back = await again.json<{ pick?: unknown[] }>(
+      await again.call('farm', 'GET', '/api/game/farm'),
+    );
     expect(back.pick).toHaveLength(2);
-    const list = await again.json<{ farms: unknown[]; limit: number; going: number; signedIn: boolean }>(await again.call('farms', 'GET', '/api/game/farms'));
+    const list = await again.json<{
+      farms: unknown[];
+      limit: number;
+      going: number;
+      signedIn: boolean;
+    }>(await again.call('farms', 'GET', '/api/game/farms'));
     expect(list).toMatchObject({ limit: 2, going: 2, signedIn: true });
   });
 
-  it('never opens or deletes another account\'s farm, even with its id', async () => {
+  it("never opens or deletes another account's farm, even with its id", async () => {
     const a = await signUp('owner1@example.com', 'owner_one');
     await a.b.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'Mine' });
-    const mine = (await a.b.json<{ farms: { id: string }[] }>(await a.b.call('farms', 'GET', '/api/game/farms'))).farms[0]!.id;
+    const mine = (
+      await a.b.json<{ farms: { id: string }[] }>(await a.b.call('farms', 'GET', '/api/game/farms'))
+    ).farms[0]!.id;
     const other = await signUp('owner2@example.com', 'owner_two');
     expect((await other.b.call('farms', 'POST', '/api/game/farms', { id: mine })).status).toBe(404);
-    expect((await other.b.call('farms', 'DELETE', '/api/game/farms', { id: mine })).status).toBe(404);
+    expect((await other.b.call('farms', 'DELETE', '/api/game/farms', { id: mine })).status).toBe(
+      404,
+    );
     // A cookie naming it does not help either: the other account has no farm and sees none.
     other.b.cookies.set('gg_farm', mine);
-    expect((await other.b.json<{ snapshot: unknown }>(await other.b.call('farm', 'GET', '/api/game/farm'))).snapshot).toBeNull();
-    expect(await db.query(`select 1 from public.farms where name = 'Mine'`)).toMatchObject({ rowCount: 1 });
+    expect(
+      (
+        await other.b.json<{ snapshot: unknown }>(
+          await other.b.call('farm', 'GET', '/api/game/farm'),
+        )
+      ).snapshot,
+    ).toBeNull();
+    expect(await db.query(`select 1 from public.farms where name = 'Mine'`)).toMatchObject({
+      rowCount: 1,
+    });
     // And a guest can not use the picker.
-    expect((await new Browser().call('farms', 'POST', '/api/game/farms', { id: mine })).status).toBe(401);
-    expect(await (await new Browser().call('farms', 'GET', '/api/game/farms')).json()).toMatchObject({ signedIn: false, farms: [] });
+    expect(
+      (await new Browser().call('farms', 'POST', '/api/game/farms', { id: mine })).status,
+    ).toBe(401);
+    expect(
+      await (await new Browser().call('farms', 'GET', '/api/game/farms')).json(),
+    ).toMatchObject({ signedIn: false, farms: [] });
   });
 
   it('deletes one farm, which can not be undone, and leaves the other', async () => {
     const { b } = await signUp('del@example.com', 'del_user');
-    for (const name of ['Keep', 'Lose']) await b.call('farm', 'POST', '/api/game/farm', { ...choices, name });
-    const farms = (await b.json<{ farms: { id: string; name: string }[] }>(await b.call('farms', 'GET', '/api/game/farms'))).farms;
+    for (const name of ['Keep', 'Lose'])
+      await b.call('farm', 'POST', '/api/game/farm', { ...choices, name });
+    const farms = (
+      await b.json<{ farms: { id: string; name: string }[] }>(
+        await b.call('farms', 'GET', '/api/game/farms'),
+      )
+    ).farms;
     const lose = farms.find((f) => f.name === 'Lose')!;
-    const res = await b.json<{ farms: { name: string }[]; going: number }>(await b.call('farms', 'DELETE', '/api/game/farms', { id: lose.id }));
+    const res = await b.json<{ farms: { name: string }[]; going: number }>(
+      await b.call('farms', 'DELETE', '/api/game/farms', { id: lose.id }),
+    );
     expect(res.farms.map((f) => f.name)).toEqual(['Keep']);
     expect(res.going).toBe(1);
-    expect(await db.query(`select 1 from public.farms where name = 'Lose'`)).toMatchObject({ rowCount: 0 });
+    expect(await db.query(`select 1 from public.farms where name = 'Lose'`)).toMatchObject({
+      rowCount: 0,
+    });
   });
 
   it('the diary can show a past day, read only', async () => {
     const { b } = await signUp('past@example.com', 'past_user');
-    let version = (await b.json<{ snapshot: { farmVersion: string } }>(await b.call('farm', 'POST', '/api/game/farm', choices))).snapshot.farmVersion;
+    let version = (
+      await b.json<{ snapshot: { farmVersion: string } }>(
+        await b.call('farm', 'POST', '/api/game/farm', choices),
+      )
+    ).snapshot.farmVersion;
     for (let i = 0; i < 2; i++) {
-      const day = await b.json<{ snapshot: { farmVersion: string } }>(await b.call('day', 'POST', '/api/game/day', { version }));
+      const day = await b.json<{ snapshot: { farmVersion: string } }>(
+        await b.call('day', 'POST', '/api/game/day', { version }),
+      );
       version = day.snapshot.farmVersion;
     }
     const days = await b.json<{ days: number[] }>(await b.call('past', 'GET', '/api/game/past'));
     expect(days.days).toEqual([2, 1]);
-    const one = await b.json<{ day: number; view: { paddocks: unknown[] }; paddocks: unknown[] }>(await b.call('past', 'GET', '/api/game/past?day=1'));
+    const one = await b.json<{ day: number; view: { paddocks: unknown[] }; paddocks: unknown[] }>(
+      await b.call('past', 'GET', '/api/game/past?day=1'),
+    );
     expect(one.day).toBe(1);
     expect(one.paddocks.length).toBeGreaterThan(0);
     expect((await b.call('past', 'GET', '/api/game/past?day=77')).status).toBe(404);
@@ -553,7 +688,10 @@ describe('sign out', () => {
   it('ends this device only, or every device, and clears the cookies', async () => {
     const { b } = await signUp('out@example.com', 'out_user');
     const phone = new Browser();
-    phone.cookies.set('fake_session', (await auth.signInAs('out@example.com')).cookie.split('=')[1]!);
+    phone.cookies.set(
+      'fake_session',
+      (await auth.signInAs('out@example.com')).cookie.split('=')[1]!,
+    );
     expect((await phone.me()).signedIn).toBe(true);
     await b.call('signout', 'POST', '/api/auth/signout', {});
     expect(b.cookies.has('fake_session')).toBe(false);
@@ -573,14 +711,20 @@ describe('sign out', () => {
 
   it('is a state change: another site can not do it', async () => {
     const { b } = await signUp('out3@example.com', 'out_three');
-    const res = await b.call('signout', 'POST', '/api/auth/signout', {}, { origin: 'https://evil.example' });
+    const res = await b.call(
+      'signout',
+      'POST',
+      '/api/auth/signout',
+      {},
+      { origin: 'https://evil.example' },
+    );
     expect(res.status).toBe(403);
     expect((await b.me()).signedIn).toBe(true);
   });
 });
 
 describe('download my data', () => {
-  it('is a JSON file of the player\'s own data and never holds the engine save', async () => {
+  it("is a JSON file of the player's own data and never holds the engine save", async () => {
     const { b } = await signUp('data@example.com', 'data_user');
     await b.call('farm', 'POST', '/api/game/farm', choices);
     const res = await b.call('data', 'GET', '/api/account/data');
@@ -613,10 +757,14 @@ describe('delete my account', () => {
     const wrong = await b.call('delete', 'POST', '/api/account/delete', { confirm: 'gone' });
     expect(wrong.status).toBe(400);
     expect((await b.call('delete', 'POST', '/api/account/delete', {})).status).toBe(400);
-    expect(await db.query(`select 1 from auth.users where email = 'gone@example.com'`)).toMatchObject({ rowCount: 1 });
+    expect(
+      await db.query(`select 1 from auth.users where email = 'gone@example.com'`),
+    ).toMatchObject({ rowCount: 1 });
     const ok = await b.call('delete', 'POST', '/api/account/delete', { confirm: 'gone_user' });
     expect(ok.status).toBe(200);
-    expect(await db.query(`select 1 from auth.users where email = 'gone@example.com'`)).toMatchObject({ rowCount: 0 });
+    expect(
+      await db.query(`select 1 from auth.users where email = 'gone@example.com'`),
+    ).toMatchObject({ rowCount: 0 });
     expect(await db.query('select 1 from public.profiles')).toMatchObject({ rowCount: 0 });
     expect(await db.query('select 1 from public.farms')).toMatchObject({ rowCount: 0 });
     expect(await db.query('select 1 from public.farm_saves')).toMatchObject({ rowCount: 0 });
@@ -629,25 +777,45 @@ describe('delete my account', () => {
     const res = await b.call('delete', 'POST', '/api/account/delete', { confirm: 'stay_user' });
     expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/nothing was deleted/);
-    expect(await db.query(`select 1 from auth.users where email = 'stay@example.com'`)).toMatchObject({ rowCount: 1 });
+    expect(
+      await db.query(`select 1 from auth.users where email = 'stay@example.com'`),
+    ).toMatchObject({ rowCount: 1 });
     auth.fail.deleteUser = false;
-    expect((await b.call('delete', 'POST', '/api/account/delete', { confirm: 'stay_user' })).status).toBe(200);
+    expect(
+      (await b.call('delete', 'POST', '/api/account/delete', { confirm: 'stay_user' })).status,
+    ).toBe(200);
   });
 
-  it('keeps a running ban\'s peppered hash, and nothing else, when a banned account is deleted', async () => {
+  it("keeps a running ban's peppered hash, and nothing else, when a banned account is deleted", async () => {
     const { b } = await signUp('banme@example.com', 'ban_me');
     await db.exec(`update public.account_status set banned_at = now()`);
-    expect((await b.call('delete', 'POST', '/api/account/delete', { confirm: 'ban_me' })).status).toBe(200);
+    expect(
+      (await b.call('delete', 'POST', '/api/account/delete', { confirm: 'ban_me' })).status,
+    ).toBe(200);
     const rec = await db.query<{ email_hash: string }>('select email_hash from public.ban_records');
     expect(rec.rows).toHaveLength(1);
     expect(rec.rows[0]!.email_hash).toBe(banHash('banme@example.com', PEPPER));
   });
 
   it('is for the signed-in player and passes the CSRF rule', async () => {
-    expect((await new Browser().call('delete', 'POST', '/api/account/delete', { confirm: 'x' })).status).toBe(401);
+    expect(
+      (await new Browser().call('delete', 'POST', '/api/account/delete', { confirm: 'x' })).status,
+    ).toBe(401);
     const { b } = await signUp('csrf@example.com', 'csrf_user');
-    expect((await b.call('delete', 'POST', '/api/account/delete', { confirm: 'csrf_user' }, { 'sec-fetch-site': 'cross-site' })).status).toBe(403);
-    expect(await db.query(`select 1 from auth.users where email = 'csrf@example.com'`)).toMatchObject({ rowCount: 1 });
+    expect(
+      (
+        await b.call(
+          'delete',
+          'POST',
+          '/api/account/delete',
+          { confirm: 'csrf_user' },
+          { 'sec-fetch-site': 'cross-site' },
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      await db.query(`select 1 from auth.users where email = 'csrf@example.com'`),
+    ).toMatchObject({ rowCount: 1 });
   });
 });
 
@@ -659,20 +827,33 @@ describe('CSRF on every state-changing route', () => {
     const evil = { origin: 'https://evil.example' };
     expect((await b.call('farm', 'POST', '/api/game/farm', choices, evil)).status).toBe(403);
     expect((await b.call('farm', 'DELETE', '/api/game/farm', undefined, evil)).status).toBe(403);
-    expect((await b.call('day', 'POST', '/api/game/day', { version: 'abc' }, evil)).status).toBe(403);
+    expect((await b.call('day', 'POST', '/api/game/day', { version: 'abc' }, evil)).status).toBe(
+      403,
+    );
     expect((await b.call('farms', 'POST', '/api/game/farms', { id: null }, evil)).status).toBe(403);
-    expect((await b.call('farms', 'DELETE', '/api/game/farms', { id: 'a'.repeat(32) }, evil)).status).toBe(403);
-    expect((await b.call('email', 'POST', '/api/auth/email', { email: 'a@example.com' }, evil)).status).toBe(403);
+    expect(
+      (await b.call('farms', 'DELETE', '/api/game/farms', { id: 'a'.repeat(32) }, evil)).status,
+    ).toBe(403);
+    expect(
+      (await b.call('email', 'POST', '/api/auth/email', { email: 'a@example.com' }, evil)).status,
+    ).toBe(403);
     expect((await b.call('google', 'POST', '/api/auth/google', {}, evil)).status).toBe(403);
     expect((await b.call('finish', 'POST', '/api/auth/finish', {}, evil)).status).toBe(403);
-    expect((await b.call('username', 'POST', '/api/auth/username', { name: 'abc' }, evil)).status).toBe(403);
+    expect(
+      (await b.call('username', 'POST', '/api/auth/username', { name: 'abc' }, evil)).status,
+    ).toBe(403);
     expect((await b.call('delete', 'POST', '/api/account/delete', {}, evil)).status).toBe(403);
     const cross = { 'sec-fetch-site': 'cross-site' };
     expect((await b.call('farm', 'POST', '/api/game/farm', choices, cross)).status).toBe(403);
     // A form post that names no origin still fails: it is not JSON.
     const form = new Request(`${HOST}/api/game/farm`, {
       method: 'POST',
-      headers: { host: 'localhost:3000', 'content-type': 'text/plain', 'x-real-ip': '10.1.1.1', cookie: b.header() },
+      headers: {
+        host: 'localhost:3000',
+        'content-type': 'text/plain',
+        'x-real-ip': '10.1.1.1',
+        cookie: b.header(),
+      },
       body: JSON.stringify(choices),
     });
     expect((await routes.farm!.POST!(form)).status).toBe(403);
@@ -696,7 +877,9 @@ describe('with no sign-in keys', () => {
     const made = await b.call('farm', 'POST', '/api/game/farm', choices);
     expect(made.status).toBe(200);
     expect(b.cookies.get('gg_session')).toMatch(/^[0-9a-f]{32}$/);
-    expect((await (await b.call('farms', 'GET', '/api/game/farms')).json())).toMatchObject({ signedIn: false });
+    expect(await (await b.call('farms', 'GET', '/api/game/farms')).json()).toMatchObject({
+      signedIn: false,
+    });
   });
 });
 
@@ -719,28 +902,47 @@ function keyPaths(value: unknown): Set<string> {
   return out;
 }
 
-const NEVER = /"seed"|"saved"|saveFormat|engineVersion|formula|dmdMax|frostSen|token|secret|password|email_hash|pepper/i;
+const NEVER =
+  /"seed"|"saved"|saveFormat|engineVersion|formula|dmdMax|frostSen|token|secret|password|email_hash|pepper/i;
 
 describe('what the new replies send the browser', () => {
-  it('holds only the keys listed, with nothing from the engine save or the accounts\' secrets', async () => {
+  it("holds only the keys listed, with nothing from the engine save or the accounts' secrets", async () => {
     const { b } = await signUp('keys@example.com', 'keys_user');
     await b.call('farm', 'POST', '/api/game/farm', choices);
     await b.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'Two' });
     const farms = await b.json(await b.call('farms', 'GET', '/api/game/farms'));
     const me = await b.json(await b.call('me', 'GET', '/api/auth/me'));
     const bad = await b.json(await b.call('farms', 'POST', '/api/game/farms', { id: 'x' }));
-    const notAllowed = await b.json(await new Browser().call('finish', 'POST', '/api/auth/finish', {}));
+    const notAllowed = await b.json(
+      await new Browser().call('finish', 'POST', '/api/auth/finish', {}),
+    );
 
     const expectKeys = (reply: unknown, allowed: string[]): void => {
       expect([...keyPaths(reply)].sort()).toEqual([...allowed].sort());
     };
     expectKeys(me, [
-      'accounts', 'community', 'interestAds', 'method', 'needsSignUp', 'refused', 'scope',
-      'signedIn', 'signupsOpen', 'username',
+      'accounts',
+      'community',
+      'interestAds',
+      'method',
+      'needsSignUp',
+      'refused',
+      'scope',
+      'signedIn',
+      'signupsOpen',
+      'username',
     ]);
     expectKeys(farms, [
-      'farms', 'farms[].current', 'farms[].day', 'farms[].districtName', 'farms[].id',
-      'farms[].lastPlayed', 'farms[].name', 'going', 'limit', 'signedIn',
+      'farms',
+      'farms[].current',
+      'farms[].day',
+      'farms[].districtName',
+      'farms[].id',
+      'farms[].lastPlayed',
+      'farms[].name',
+      'going',
+      'limit',
+      'signedIn',
     ]);
     expectKeys(bad, ['error']);
     expectKeys(notAllowed, ['error']);
@@ -749,22 +951,42 @@ describe('what the new replies send the browser', () => {
     again.cookies.set('fake_session', b.cookies.get('fake_session')!);
     const pick = await again.json(await again.call('farm', 'GET', '/api/game/farm'));
     expectKeys(pick, [
-      'pick', 'pick[].current', 'pick[].day', 'pick[].districtName', 'pick[].id',
-      'pick[].lastPlayed', 'pick[].name', 'snapshot',
+      'pick',
+      'pick[].current',
+      'pick[].day',
+      'pick[].districtName',
+      'pick[].id',
+      'pick[].lastPlayed',
+      'pick[].name',
+      'snapshot',
     ]);
     for (const reply of [farms, me, pick]) expect(JSON.stringify(reply)).not.toMatch(NEVER);
   });
 
   it('the picture of a past day holds the same keys as the live map and paddock figures, and no more', async () => {
     const { b } = await signUp('pk@example.com', 'pk_user');
-    const made = await b.json<{ snapshot: { farmVersion: string } }>(await b.call('farm', 'POST', '/api/game/farm', choices));
+    const made = await b.json<{ snapshot: { farmVersion: string } }>(
+      await b.call('farm', 'POST', '/api/game/farm', choices),
+    );
     await b.call('day', 'POST', '/api/game/day', { version: made.snapshot.farmVersion });
     const past = await b.json(await b.call('past', 'GET', '/api/game/past?day=1'));
     const own = [...keyPaths(past)].filter((k) => !/^(view|paddocks)/.test(k)).sort();
-    expect(own).toEqual(['date', 'date.date', 'date.month', 'date.year', 'day', 'season', 'version']);
-    const live = (await b.json<{ snapshot: unknown }>(await b.call('farm', 'GET', '/api/game/farm'))).snapshot;
+    expect(own).toEqual([
+      'date',
+      'date.date',
+      'date.month',
+      'date.year',
+      'day',
+      'season',
+      'version',
+    ]);
+    const live = (
+      await b.json<{ snapshot: unknown }>(await b.call('farm', 'GET', '/api/game/farm'))
+    ).snapshot;
     const under = (set: Set<string>, root: string): string[] =>
-      [...set].filter((k) => k === root || k.startsWith(`${root}.`) || k.startsWith(`${root}[`)).sort();
+      [...set]
+        .filter((k) => k === root || k.startsWith(`${root}.`) || k.startsWith(`${root}[`))
+        .sort();
     expect(under(keyPaths(past), 'view')).toEqual(under(keyPaths(live), 'view'));
     expect(under(keyPaths(past), 'paddocks')).toEqual(under(keyPaths(live), 'paddocks'));
     expect(JSON.stringify(past)).not.toMatch(NEVER);

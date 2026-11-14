@@ -105,10 +105,7 @@ export function loadLastFarm(
 }
 
 /** Forget the kept farm: the farm was thrown away, or there is none. */
-export function clearLastFarm(
-  store: Store | null = defaultStore(),
-  scope: string = GUEST,
-): void {
+export function clearLastFarm(store: Store | null = defaultStore(), scope: string = GUEST): void {
   if (!store) return;
   try {
     store.removeItem(keyFor(scope));
@@ -120,7 +117,9 @@ export function clearLastFarm(
 type FullStore = Store & Pick<Storage, 'length' | 'key'>;
 
 /** Forget every kept farm, guest's and accounts', and who was last seen. For signing out and deleting an account. */
-export function clearAllLastFarms(store: FullStore | null = defaultStore() as FullStore | null): void {
+export function clearAllLastFarms(
+  store: FullStore | null = defaultStore() as FullStore | null,
+): void {
   if (!store) return;
   try {
     const names: string[] = [];

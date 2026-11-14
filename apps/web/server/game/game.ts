@@ -1045,119 +1045,129 @@ export class GameServer {
    */
   async act(sessionId: string, req: ActionRequest, meta: ActMeta = {}): Promise<ActResponse> {
     const id = farmIdFor(sessionId);
-    return this.locked(id, async () => {
-      const held = await this.need(id);
-      const seen = meta.requestId
-        ? held.stored.done.find((d) => d.id === meta.requestId)
-        : undefined;
-      if (seen) {
-        const snapshot = this.snapshotOf(held);
-        return seen.ok
-          ? { ok: true, message: seen.message, card: seen.card, snapshot, repeat: true }
-          : {
-              ok: false,
-              reason: seen.reason ?? 'refused',
-              message: seen.message,
-              snapshot,
-              repeat: true,
-            };
-      }
-      if (meta.version !== undefined && meta.version !== held.stored.version) {
-        return this.stale(held);
-      }
-      const action = this.resolve(held.farm, req);
-      const x = this.extras(held.farm, held.stored, action);
-      const result = applyAction(held.farm, action, envFor(held.stored.setup));
-      if (!result.ok) {
-        let shown = held;
-        if (meta.requestId) {
-          shown = await this.note(
-            id,
-            held,
-            {
-              id: meta.requestId,
-              ok: false,
-              reason: result.reason,
-              message: result.message,
-              card: null,
-            },
-            {
-              day: held.farm.day,
-              requestId: meta.requestId,
-              action: req,
-              ok: false,
-              reason: result.reason,
-            },
-          );
+    return this.locked(
+      id,
+      async () => {
+        const held = await this.need(id);
+        const seen = meta.requestId
+          ? held.stored.done.find((d) => d.id === meta.requestId)
+          : undefined;
+        if (seen) {
+          const snapshot = this.snapshotOf(held);
+          return seen.ok
+            ? { ok: true, message: seen.message, card: seen.card, snapshot, repeat: true }
+            : {
+                ok: false,
+                reason: seen.reason ?? 'refused',
+                message: seen.message,
+                snapshot,
+                repeat: true,
+              };
         }
-        return {
-          ok: false,
-          reason: result.reason,
-          message: result.message,
-          snapshot: this.snapshotOf(shown),
-        };
-      }
-      if (result.job) {
-        x.summary = this.summary(held.farm, held.stored, action, result.job, result.events);
-        x.notes.push(...handsNotes(held.farm, result.job));
-      }
-      const dateOf: DateOf = (day) => dateParts(dateOn(result.farm, day));
-      const message = doneWord(result.events, dateOf);
-      const card = result.job ? cardWire(result.job, x) : null;
-      const next = await this.save(
-        id,
-        held,
-        result.farm,
-        meta.requestId ? { id: meta.requestId, ok: true, message, card } : undefined,
-        message
-          ? [
+        if (meta.version !== undefined && meta.version !== held.stored.version) {
+          return this.stale(held);
+        }
+        const action = this.resolve(held.farm, req);
+        const x = this.extras(held.farm, held.stored, action);
+        const result = applyAction(held.farm, action, envFor(held.stored.setup));
+        if (!result.ok) {
+          let shown = held;
+          if (meta.requestId) {
+            shown = await this.note(
+              id,
+              held,
               {
-                day: result.farm.day,
-                date: dateParts(dateOn(result.farm, result.farm.day)),
-                lines: [message],
+                id: meta.requestId,
+                ok: false,
+                reason: result.reason,
+                message: result.message,
+                card: null,
               },
-            ]
-          : [],
-        [],
-        { action: { day: held.farm.day, requestId: meta.requestId, action: req, ok: true } },
-      );
-      return { ok: true, message, card, snapshot: this.snapshotOf(next) };
-    }, async () => {
-      // Another tab saved first. If it was this very request (a retry after a lost
-      // reply), give the answer it got. Otherwise the farm has changed: say so.
-      const held = await this.reload(id);
-      const seen = meta.requestId ? held.stored.done.find((d) => d.id === meta.requestId) : undefined;
-      if (seen) {
-        const snapshot = this.snapshotOf(held);
-        return seen.ok
-          ? { ok: true as const, message: seen.message, card: seen.card, snapshot, repeat: true }
-          : {
-              ok: false as const,
-              reason: seen.reason ?? 'refused',
-              message: seen.message,
-              snapshot,
-              repeat: true,
-            };
-      }
-      return this.stale(held);
-    });
+              {
+                day: held.farm.day,
+                requestId: meta.requestId,
+                action: req,
+                ok: false,
+                reason: result.reason,
+              },
+            );
+          }
+          return {
+            ok: false,
+            reason: result.reason,
+            message: result.message,
+            snapshot: this.snapshotOf(shown),
+          };
+        }
+        if (result.job) {
+          x.summary = this.summary(held.farm, held.stored, action, result.job, result.events);
+          x.notes.push(...handsNotes(held.farm, result.job));
+        }
+        const dateOf: DateOf = (day) => dateParts(dateOn(result.farm, day));
+        const message = doneWord(result.events, dateOf);
+        const card = result.job ? cardWire(result.job, x) : null;
+        const next = await this.save(
+          id,
+          held,
+          result.farm,
+          meta.requestId ? { id: meta.requestId, ok: true, message, card } : undefined,
+          message
+            ? [
+                {
+                  day: result.farm.day,
+                  date: dateParts(dateOn(result.farm, result.farm.day)),
+                  lines: [message],
+                },
+              ]
+            : [],
+          [],
+          { action: { day: held.farm.day, requestId: meta.requestId, action: req, ok: true } },
+        );
+        return { ok: true, message, card, snapshot: this.snapshotOf(next) };
+      },
+      async () => {
+        // Another tab saved first. If it was this very request (a retry after a lost
+        // reply), give the answer it got. Otherwise the farm has changed: say so.
+        const held = await this.reload(id);
+        const seen = meta.requestId
+          ? held.stored.done.find((d) => d.id === meta.requestId)
+          : undefined;
+        if (seen) {
+          const snapshot = this.snapshotOf(held);
+          return seen.ok
+            ? { ok: true as const, message: seen.message, card: seen.card, snapshot, repeat: true }
+            : {
+                ok: false as const,
+                reason: seen.reason ?? 'refused',
+                message: seen.message,
+                snapshot,
+                repeat: true,
+              };
+        }
+        return this.stale(held);
+      },
+    );
   }
 
   /** The player has opened the inbox: every message up to this number is read. */
   async markRead(sessionId: string, upTo: number): Promise<Snapshot> {
     const id = farmIdFor(sessionId);
-    return this.locked(id, async () => {
-      const held = await this.need(id);
-      const newest = held.farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0);
-      // Never past the newest message there is, and never backwards.
-      const to = Math.max(held.stored.inboxRead ?? 0, Math.min(upTo, newest));
-      if (to === (held.stored.inboxRead ?? 0)) return this.snapshotOf(held);
-      const stored: StoredFarm = { ...held.stored, inboxRead: to };
-      await this.persist(id, () => this.store.put(id, stored, { expect: held.stored.version }));
-      const next = { stored, farm: held.farm };
-      this.remember(id, next);
-      return this.snapshotOf(next);
-    }, async () => this.snapshotOf(await this.reload(id)));
+    return this.locked(
+      id,
+      async () => {
+        const held = await this.need(id);
+        const newest = held.farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0);
+        // Never past the newest message there is, and never backwards.
+        const to = Math.max(held.stored.inboxRead ?? 0, Math.min(upTo, newest));
+        if (to === (held.stored.inboxRead ?? 0)) return this.snapshotOf(held);
+        const stored: StoredFarm = { ...held.stored, inboxRead: to };
+        await this.persist(id, () => this.store.put(id, stored, { expect: held.stored.version }));
+        const next = { stored, farm: held.farm };
+        this.remember(id, next);
+        return this.snapshotOf(next);
+      },
+      async () => this.snapshotOf(await this.reload(id)),
+    );
   }
 
   /** The last year that closed among these events, and how many closed. */
@@ -1230,35 +1240,39 @@ export class GameServer {
   async endDay(sessionId: string, version: string): Promise<DayResponse | StaleResponse>;
   async endDay(sessionId: string, version?: string): Promise<DayResponse | StaleResponse> {
     const id = farmIdFor(sessionId);
-    return this.locked(id, async () => {
-      const held = await this.need(id);
-      if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
-      if (version !== undefined && version !== held.stored.version) return this.stale(held);
-      const seq0 = held.farm.inboxSeq;
-      const end = endDay(held.farm, envFor(held.stored.setup));
-      const report = reportWire(end.farm, seq0 - 1, (d) => dateParts(dateOn(end.farm, d)));
-      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, {
-        ...report,
-        pay: payFrom(end.dawn),
-        // One day: the bubbles sit in the summary, unless something needs the player's eye.
-        stepThrough: report.attention,
-      });
-      const next = await this.save(
-        id,
-        held,
-        end.farm,
-        undefined,
-        periodFilings(end.farm, seq0, summary, [end.day]),
-        missedDays(end.farm, held.farm.labour?.nextPayDay ?? null, end.dawn),
-        { past: true, action: { day: held.farm.day, action: { type: 'day' }, ok: true } },
-      );
-      return {
-        ok: true,
-        snapshot: this.snapshotOf(next),
-        summary,
-        ...this.yearsClosed(next, end.day.events),
-      };
-    }, async () => this.stale(await this.reload(id)));
+    return this.locked(
+      id,
+      async () => {
+        const held = await this.need(id);
+        if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
+        if (version !== undefined && version !== held.stored.version) return this.stale(held);
+        const seq0 = held.farm.inboxSeq;
+        const end = endDay(held.farm, envFor(held.stored.setup));
+        const report = reportWire(end.farm, seq0 - 1, (d) => dateParts(dateOn(end.farm, d)));
+        const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, {
+          ...report,
+          pay: payFrom(end.dawn),
+          // One day: the bubbles sit in the summary, unless something needs the player's eye.
+          stepThrough: report.attention,
+        });
+        const next = await this.save(
+          id,
+          held,
+          end.farm,
+          undefined,
+          periodFilings(end.farm, seq0, summary, [end.day]),
+          missedDays(end.farm, held.farm.labour?.nextPayDay ?? null, end.dawn),
+          { past: true, action: { day: held.farm.day, action: { type: 'day' }, ok: true } },
+        );
+        return {
+          ok: true,
+          snapshot: this.snapshotOf(next),
+          summary,
+          ...this.yearsClosed(next, end.day.events),
+        };
+      },
+      async () => this.stale(await this.reload(id)),
+    );
   }
 
   /** Skip a week, a month or a year. It stops early for the reasons the engine gives. */
@@ -1276,42 +1290,50 @@ export class GameServer {
     version?: string,
   ): Promise<DayResponse | StaleResponse> {
     const id = farmIdFor(sessionId);
-    return this.locked(id, async () => {
-      const held = await this.need(id);
-      if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
-      if (version !== undefined && version !== held.stored.version) return this.stale(held);
-      const seq0 = held.farm.inboxSeq;
-      const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
-      const ticks = result.days.flatMap((d) => d.events);
-      const report = reportWire(result.farm, seq0 - 1, (d) => dateParts(dateOn(result.farm, d)));
-      const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks, {
-        ...report,
-        pay: payFrom(result.dawn),
-        // After more than a day the bubbles are stepped through; after one day only if something needs the eye.
-        stepThrough: result.daysRun > 1 || report.attention,
-      });
-      const next =
-        result.daysRun > 0
-          ? await this.save(
-              id,
-              held,
-              result.farm,
-              undefined,
-              periodFilings(result.farm, seq0, summary, result.days),
-              missedDays(result.farm, held.farm.labour?.nextPayDay ?? null, result.dawn),
-              {
-                past: true,
-                action: { day: held.farm.day, action: { type: 'skip', length, anyway }, ok: true },
-              },
-            )
-          : held;
-      return {
-        ok: true,
-        snapshot: this.snapshotOf(next),
-        summary,
-        ...this.yearsClosed(next, ticks),
-      };
-    }, async () => this.stale(await this.reload(id)));
+    return this.locked(
+      id,
+      async () => {
+        const held = await this.need(id);
+        if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
+        if (version !== undefined && version !== held.stored.version) return this.stale(held);
+        const seq0 = held.farm.inboxSeq;
+        const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
+        const ticks = result.days.flatMap((d) => d.events);
+        const report = reportWire(result.farm, seq0 - 1, (d) => dateParts(dateOn(result.farm, d)));
+        const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks, {
+          ...report,
+          pay: payFrom(result.dawn),
+          // After more than a day the bubbles are stepped through; after one day only if something needs the eye.
+          stepThrough: result.daysRun > 1 || report.attention,
+        });
+        const next =
+          result.daysRun > 0
+            ? await this.save(
+                id,
+                held,
+                result.farm,
+                undefined,
+                periodFilings(result.farm, seq0, summary, result.days),
+                missedDays(result.farm, held.farm.labour?.nextPayDay ?? null, result.dawn),
+                {
+                  past: true,
+                  action: {
+                    day: held.farm.day,
+                    action: { type: 'skip', length, anyway },
+                    ok: true,
+                  },
+                },
+              )
+            : held;
+        return {
+          ok: true,
+          snapshot: this.snapshotOf(next),
+          summary,
+          ...this.yearsClosed(next, ticks),
+        };
+      },
+      async () => this.stale(await this.reload(id)),
+    );
   }
 }
 

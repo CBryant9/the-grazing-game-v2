@@ -17,7 +17,10 @@ import {
 const reply = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const saveFailed = (): Response =>
-  reply(503, { error: 'That was not saved, so nothing on your farm has changed.', code: SAVE_FAILED });
+  reply(503, {
+    error: 'That was not saved, so nothing on your farm has changed.',
+    code: SAVE_FAILED,
+  });
 
 let calls: { url: string; body: unknown }[];
 let script: (() => Response | Promise<Response>)[];
@@ -39,7 +42,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const ACT = { action: { type: 'markCalves', mob: 1 }, version: 'abc', requestId: 'req-12345678' } as never;
+const ACT = {
+  action: { type: 'markCalves', mob: 1 },
+  version: 'abc',
+  requestId: 'req-12345678',
+} as never;
 
 describe('saving again', () => {
   it('asks again with the very same one-use id, says "Saving again" meanwhile, and then shows the result', async () => {
@@ -56,7 +63,10 @@ describe('saving again', () => {
 
   it('never reports done before the server says stored: while it fails there is no result', async () => {
     let settled = false;
-    script = [saveFailed, () => new Promise((res) => setTimeout(() => res(reply(200, { ok: true })), 20))];
+    script = [
+      saveFailed,
+      () => new Promise((res) => setTimeout(() => res(reply(200, { ok: true })), 20)),
+    ];
     const p = api.act(ACT).then((v) => {
       settled = true;
       return v;

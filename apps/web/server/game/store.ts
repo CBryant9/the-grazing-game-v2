@@ -498,7 +498,9 @@ export class MemoryFarmStore implements FarmStore {
     const same = (o: Owner | null): boolean =>
       o !== null &&
       o.kind === owner.kind &&
-      (o.kind === 'guest' ? o.session === (owner as { session: string }).session : o.id === (owner as { id: string }).id);
+      (o.kind === 'guest'
+        ? o.session === (owner as { session: string }).session
+        : o.id === (owner as { id: string }).id);
     return [...this.farms.entries()]
       .filter(([, f]) => same(f.owner))
       .map(([id, f]) => ({

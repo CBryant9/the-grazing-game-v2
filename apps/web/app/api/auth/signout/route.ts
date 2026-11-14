@@ -20,7 +20,10 @@ export const POST = authRoute({ name: 'signout', max: 20, write: true }, async (
     // Signing out of this device must always work, even if the auth server can not be reached.
     console.error('Signing out failed at the provider:', e instanceof Error ? e.message : e);
     if (body?.everywhere === true) {
-      throw new GameError(503, 'Could not sign you out everywhere just now. Try again in a moment.');
+      throw new GameError(
+        503,
+        'Could not sign you out everywhere just now. Try again in a moment.',
+      );
     }
     await ctx.deps.provider.signOut(ctx.jar, 'local').catch(() => undefined);
   }

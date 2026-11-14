@@ -73,7 +73,7 @@ export function safeNext(value: unknown): string {
  * origin the request names, or the public URL set in the environment.
  */
 export function siteOrigin(req: Request): string {
-  const fixed = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '');
+  const fixed = process.env.GG_SITE_URL?.trim().replace(/\/+$/, '');
   if (fixed && /^https?:\/\/[^/\s]+$/.test(fixed)) return fixed;
   const url = new URL(req.url);
   const proto = req.headers.get('x-forwarded-proto') === 'https' ? 'https:' : url.protocol;
@@ -105,5 +105,8 @@ export function cookieText(
 
 /** The text of a cookie that removes another. */
 export function clearCookieText(req: Request, name: string): string {
-  return cookieText(req, name, '', 0).replace('Max-Age=0', 'Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  return cookieText(req, name, '', 0).replace(
+    'Max-Age=0',
+    'Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+  );
 }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { authApi } from '@/lib/auth/api';
 import { useMe } from '@/lib/auth/store';
+import { goTo } from '@/lib/auth/nav';
 import { clearAllLastFarms } from '@/lib/game/offline';
 import styles from './account.module.css';
 
@@ -75,7 +76,7 @@ export function Account() {
       await authApi.signOut(everywhere);
       // This browser forgets every farm it kept, so nobody else on this device sees it.
       clearAllLastFarms();
-      window.location.assign('/');
+      goTo('/');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Try again in a moment.');
       setWorking(null);
@@ -123,14 +124,26 @@ export function Account() {
       <div className={styles.card}>
         <h2 className={`px ${styles.label}`}>Sign out</h2>
         <div className={styles.actions}>
-          <button type="button" className="btn" disabled={working !== null} onClick={() => void signOut(false)}>
+          <button
+            type="button"
+            className="btn"
+            disabled={working !== null}
+            onClick={() => void signOut(false)}
+          >
             Sign out
           </button>
-          <button type="button" className="btn ghost" disabled={working !== null} onClick={() => void signOut(true)}>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={working !== null}
+            onClick={() => void signOut(true)}
+          >
             Sign out everywhere
           </button>
         </div>
-        <p className={styles.small}>Everywhere signs you out on every phone and computer you used.</p>
+        <p className={styles.small}>
+          Everywhere signs you out on every phone and computer you used.
+        </p>
       </div>
 
       <div className={`${styles.card} ${styles.danger}`}>
@@ -143,15 +156,15 @@ export function Account() {
           <>
             <p>
               <b>This can not be undone.</b> It deletes your account, your profile, your farms with
-              their saves and history, your posts, comments, likes and follows, your notifications and
-              your moderation history.
+              their saves and history, your posts, comments, likes and follows, your notifications
+              and your moderation history.
             </p>
             <p className={styles.small}>
-              What stays: your scores on the leaderboards stay, with no name or farm, as &quot;Former
-              player&quot;. Records of purchases stay, with nothing linking them to you. A group you
-              own passes to its longest-standing member, or is deleted if no one else is in it. If a
-              ban or suspension is still running, we keep a scrambled code made from your email
-              address (never the address itself) until it ends.
+              What stays: your scores on the leaderboards stay, with no name or farm, as
+              &quot;Former player&quot;. Records of purchases stay, with nothing linking them to
+              you. A group you own passes to its longest-standing member, or is deleted if no one
+              else is in it. If a ban or suspension is still running, we keep a scrambled code made
+              from your email address (never the address itself) until it ends.
             </p>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="confirm">
@@ -176,7 +189,14 @@ export function Account() {
               >
                 {working === 'delete' ? 'Deleting' : 'Delete my account for good'}
               </button>
-              <button type="button" className="btn ghost" onClick={() => { setDeleting(false); setTyped(''); }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setDeleting(false);
+                  setTyped('');
+                }}
+              >
                 Keep my account
               </button>
             </div>

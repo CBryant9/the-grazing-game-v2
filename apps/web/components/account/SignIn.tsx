@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { authApi } from '@/lib/auth/api';
 import { useMe } from '@/lib/auth/store';
 import styles from './account.module.css';
@@ -32,13 +32,17 @@ export function SignIn() {
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'google'>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [problem, setProblem] = useState(false);
-  const [next, setNext] = useState('/play');
+  // Read from the address when this runs in the browser. Nothing here is drawn until the server
+  // has said who the player is, so the first paint matches the server's.
+  const [problem] = useState(() =>
+    typeof window === 'undefined'
+      ? false
+      : new URLSearchParams(window.location.search).get('problem') === 'link',
+  );
+  const [next] = useState(() => (typeof window === 'undefined' ? '/play' : nextFromUrl()));
 
   useEffect(() => {
     void load();
-    setNext(nextFromUrl());
-    setProblem(new URLSearchParams(window.location.search).get('problem') === 'link');
   }, [load]);
 
   if (!settled) {
@@ -52,7 +56,9 @@ export function SignIn() {
     return (
       <div className={styles.card}>
         <p>Sign-in is not set up on this copy of the game yet.</p>
-        <p className={styles.small}>You can still play as a guest. Your farm is kept on this device.</p>
+        <p className={styles.small}>
+          You can still play as a guest. Your farm is kept on this device.
+        </p>
         <Link href="/play" className={`btn coral ${styles.linkbtn}`}>
           Play as a guest
         </Link>
@@ -62,7 +68,11 @@ export function SignIn() {
   if (me.signedIn) {
     return (
       <div className={styles.card}>
-        <p>{me.needsSignUp ? 'You are signed in. One more step to finish.' : `You are signed in as ${me.username}.`}</p>
+        <p>
+          {me.needsSignUp
+            ? 'You are signed in. One more step to finish.'
+            : `You are signed in as ${me.username}.`}
+        </p>
         <div className={styles.actions}>
           {me.needsSignUp ? (
             <Link href="/sign-up/finish" className={`btn coral ${styles.linkbtn}`}>
@@ -154,12 +164,21 @@ export function SignIn() {
             {error}
           </p>
         )}
-        <button type="submit" className="btn coral" disabled={state !== 'idle' || email.trim() === ''}>
+        <button
+          type="submit"
+          className="btn coral"
+          disabled={state !== 'idle' || email.trim() === ''}
+        >
           {state === 'sending' ? 'Sending' : 'Email me a link'}
         </button>
       </form>
       <div className={styles.card}>
-        <button type="button" className="btn" disabled={state !== 'idle'} onClick={() => void google()}>
+        <button
+          type="button"
+          className="btn"
+          disabled={state !== 'idle'}
+          onClick={() => void google()}
+        >
           {state === 'google' ? 'Opening Google' : 'Continue with Google'}
         </button>
       </div>
@@ -173,14 +192,17 @@ export function SignIn() {
 
 /** "Check your email": shown after the link is sent. It never says whether the address has an account. */
 export function CheckEmail() {
-  const [email, setEmail] = useState<string | null>(null);
-  useEffect(() => {
-    try {
-      setEmail(sessionStorage.getItem(EMAIL_KEY));
-    } catch {
-      setEmail(null);
-    }
-  }, []);
+  const email = useSyncExternalStore(
+    () => () => undefined,
+    () => {
+      try {
+        return sessionStorage.getItem(EMAIL_KEY);
+      } catch {
+        return null;
+      }
+    },
+    () => null,
+  );
   return (
     <>
       <div className={styles.card} role="status">

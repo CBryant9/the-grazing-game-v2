@@ -10,7 +10,10 @@ import type { SqlClient, SqlRunner } from '../db/sql';
  */
 export function pgliteSql(db: PGlite, role: string | null = 'service_role'): SqlClient {
   const runner = (exec: {
-    query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; affectedRows?: number }>;
+    query: (
+      text: string,
+      params?: unknown[],
+    ) => Promise<{ rows: unknown[]; affectedRows?: number }>;
   }): SqlRunner => ({
     async query<T>(text: string, params?: unknown[]) {
       const r = await exec.query(text, params);

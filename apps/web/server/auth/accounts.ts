@@ -220,7 +220,10 @@ export async function deleteAccount(deps: AuthDeps, user: AuthUser): Promise<voi
 }
 
 /** Fast Farms the account may have, and how many are going. */
-export async function fastLimits(deps: AuthDeps, userId: string): Promise<{ limit: number; going: number }> {
+export async function fastLimits(
+  deps: AuthDeps,
+  userId: string,
+): Promise<{ limit: number; going: number }> {
   const r = await deps.sql.query<{ lim: number; going: number }>(
     `select public.farm_limit($1, null, 'fast') as lim,
             (select count(*)::int from public.farms f

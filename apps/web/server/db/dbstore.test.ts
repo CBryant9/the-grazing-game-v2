@@ -86,11 +86,13 @@ describe('the database store: a guest farm', () => {
     expect(farms.rows[0]).toMatchObject({ owner_id: null, mode: 'fast', district: 'wv' });
     expect(farms.rows[0]!.guest_session_id).not.toBeNull();
     // Only the hash of the secret is kept, never the secret.
-    const g = await db.query<{ token_hash: string }>('select token_hash from public.guest_sessions');
-    expect(g.rows[0]!.token_hash).toBe(sessionHash(session(1)));
-    expect(JSON.stringify((await db.query('select * from public.guest_sessions')).rows)).not.toContain(
-      session(1),
+    const g = await db.query<{ token_hash: string }>(
+      'select token_hash from public.guest_sessions',
     );
+    expect(g.rows[0]!.token_hash).toBe(sessionHash(session(1)));
+    expect(
+      JSON.stringify((await db.query('select * from public.guest_sessions')).rows),
+    ).not.toContain(session(1));
     // A fresh server (no cache) reads the same farm from the database.
     const again = new GameServer({ store, saveRetryMs: [0, 0] });
     const snap = await again.snapshot(session(1));
@@ -169,7 +171,9 @@ describe('the database store: old and broken saves', () => {
     expect((await fresh.snapshot(session(4)))?.farm.name).toBe('Db Test');
     // Saved again, it is written in the current format.
     await fresh.endDay(session(4));
-    const f = await db.query<{ stored_format: number }>('select stored_format from public.farm_saves');
+    const f = await db.query<{ stored_format: number }>(
+      'select stored_format from public.farm_saves',
+    );
     expect(f.rows[0]!.stored_format).toBe(3);
   });
 
@@ -255,7 +259,19 @@ describe('the database store: accounts, limits and slots', () => {
     expect(await game.ownerOf(hex(9))).toEqual({ kind: 'user', id: USER });
     expect(await game.ownerOf(hex(10))).toBeNull();
     await game.create(session(8), choices);
-    expect((await game.ownerOf(fromUuid((await db.query<{ id: string }>(`select id from public.farms where guest_session_id is not null`)).rows[0]!.id)))?.kind).toBe('guest');
+    expect(
+      (
+        await game.ownerOf(
+          fromUuid(
+            (
+              await db.query<{ id: string }>(
+                `select id from public.farms where guest_session_id is not null`,
+              )
+            ).rows[0]!.id,
+          ),
+        )
+      )?.kind,
+    ).toBe('guest');
   });
 });
 
@@ -286,9 +302,7 @@ describe('the database store: clean-ups', () => {
 
   it('playing keeps a guest from being removed: the session is seen again', async () => {
     await game.create(session(13), choices);
-    await db.query(
-      `update public.guest_sessions set last_seen_at = now() - interval '29 days'`,
-    );
+    await db.query(`update public.guest_sessions set last_seen_at = now() - interval '29 days'`);
     await game.endDay(session(13));
     const r = await db.query<{ fresh: boolean }>(
       `select last_seen_at > now() - interval '1 day' as fresh from public.guest_sessions`,
@@ -327,16 +341,18 @@ describe('stale versions, one-use request ids and two tabs', () => {
 
   it('a save made on a version that is no longer the farm is refused by the database write', async () => {
     await game.create(session(22), choices);
-    const id = fromUuid((await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id);
-    const farm = (await store.get(id)) as StoredFarm;
-    await expect(store.put(id, { ...farm, version: 'new1' }, { expect: 'not-the-version' })).rejects.toBeInstanceOf(
-      SaveConflictError,
+    const id = fromUuid(
+      (await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id,
     );
+    const farm = (await store.get(id)) as StoredFarm;
+    await expect(
+      store.put(id, { ...farm, version: 'new1' }, { expect: 'not-the-version' }),
+    ).rejects.toBeInstanceOf(SaveConflictError);
     await store.put(id, { ...farm, version: 'new2' }, { expect: farm.version });
     // A second write on the same old version loses.
-    await expect(store.put(id, { ...farm, version: 'new3' }, { expect: farm.version })).rejects.toBeInstanceOf(
-      SaveConflictError,
-    );
+    await expect(
+      store.put(id, { ...farm, version: 'new3' }, { expect: farm.version }),
+    ).rejects.toBeInstanceOf(SaveConflictError);
     expect(await store.version(id)).toBe('new2');
   });
 
@@ -389,7 +405,10 @@ describe('saving that never loses a job silently', () => {
     state.fail = 2; // two lost connections, then it works
     const day = await g.endDay(session(30));
     expect(day.ok).toBe(true);
-    expect((await db.query<{ current_day: number }>('select current_day from public.farms')).rows[0]!.current_day).toBe(1);
+    expect(
+      (await db.query<{ current_day: number }>('select current_day from public.farms')).rows[0]!
+        .current_day,
+    ).toBe(1);
   });
 
   it('a save that keeps failing says plainly it was not saved, and nothing was changed', async () => {
@@ -407,10 +426,15 @@ describe('saving that never loses a job silently', () => {
       message: SAVE_FAILED_MESSAGE,
     });
     // Nothing pretends: the stored farm is still day 0 at the same version.
-    expect((await db.query<{ current_day: number }>('select current_day from public.farms')).rows[0]!.current_day).toBe(0);
-    expect(await store.version(fromUuid((await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id))).toBe(
-      made.farmVersion,
-    );
+    expect(
+      (await db.query<{ current_day: number }>('select current_day from public.farms')).rows[0]!
+        .current_day,
+    ).toBe(0);
+    expect(
+      await store.version(
+        fromUuid((await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id),
+      ),
+    ).toBe(made.farmVersion);
     // The database comes back: the same request works, from the farm as it really is.
     state.fail = 0;
     const day = await g.endDay(session(31), made.farmVersion);
@@ -436,7 +460,12 @@ describe('what the browser roles can read', () => {
     await game.create(farmKey(hex(40)), choices, user(USER));
     await game.endDay(farmKey(hex(40)));
     for (const role of ['anon', 'authenticated'] as const) {
-      for (const table of ['farm_saves', 'farm_actions', 'farm_snapshot_views', 'farm_saves_aside']) {
+      for (const table of [
+        'farm_saves',
+        'farm_actions',
+        'farm_snapshot_views',
+        'farm_saves_aside',
+      ]) {
         expect(await asRole(role, `select * from public.${table}`)).toMatch(/permission denied/);
       }
     }
@@ -446,16 +475,24 @@ describe('what the browser roles can read', () => {
     await db.query(`select set_config('request.jwt.claims', $1, true)`, [
       JSON.stringify({ sub: USER, role: 'authenticated' }),
     ]);
-    await expect(db.query('select save from public.farm_saves')).rejects.toThrow(/permission denied/);
+    await expect(db.query('select save from public.farm_saves')).rejects.toThrow(
+      /permission denied/,
+    );
     await db.exec('rollback');
   });
 });
 
 describe('errors from the driver', () => {
   it('turns the farm limit into a plain refusal, a refusal by a rule into itself, and anything else into "try again"', () => {
-    expect(mapDbError({ code: 'P0001', hint: 'farm_limit' }).constructor.name).toBe('FarmLimitError');
+    expect(mapDbError({ code: 'P0001', hint: 'farm_limit' }).constructor.name).toBe(
+      'FarmLimitError',
+    );
     expect(mapDbError({ code: '23505', message: 'dup' }).message).toBe('dup');
-    expect(mapDbError({ message: 'socket hang up' }).constructor.name).toBe('StoreUnavailableError');
-    expect(mapDbError({ code: '57P01', message: 'terminating' }).constructor.name).toBe('StoreUnavailableError');
+    expect(mapDbError({ message: 'socket hang up' }).constructor.name).toBe(
+      'StoreUnavailableError',
+    );
+    expect(mapDbError({ code: '57P01', message: 'terminating' }).constructor.name).toBe(
+      'StoreUnavailableError',
+    );
   });
 });

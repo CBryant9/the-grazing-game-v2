@@ -102,7 +102,9 @@ export function supabaseProvider(
       for (const f of files) byBucket.set(f.bucket, [...(byBucket.get(f.bucket) ?? []), f.path]);
       for (const [bucket, paths] of byBucket) {
         for (let i = 0; i < paths.length; i += 100) {
-          const { error } = await admin().storage.from(bucket).remove(paths.slice(i, i + 100));
+          const { error } = await admin()
+            .storage.from(bucket)
+            .remove(paths.slice(i, i + 100));
           if (error) throw error;
         }
       }

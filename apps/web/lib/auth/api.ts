@@ -50,8 +50,7 @@ export const authApi = {
   username: (name: string) => call<{ free: boolean }>('/api/auth/username', 'POST', { name }),
   finish: (input: { username: string; displayName?: string; dob: string }) =>
     call<FinishResult>('/api/auth/finish', 'POST', input),
-  signOut: (everywhere: boolean) =>
-    call<{ ok: true }>('/api/auth/signout', 'POST', { everywhere }),
+  signOut: (everywhere: boolean) => call<{ ok: true }>('/api/auth/signout', 'POST', { everywhere }),
   deleteAccount: (confirm: string) =>
     call<{ ok: true }>('/api/account/delete', 'POST', { confirm }),
 };

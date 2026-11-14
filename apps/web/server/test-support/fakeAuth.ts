@@ -22,7 +22,12 @@ export class FakeAuth implements AuthProvider {
   readonly deleted: string[] = [];
   readonly users = new Map<string, AuthUser>();
   /** For tests: make the next provider call of this kind throw. */
-  fail: Partial<Record<'sendLink' | 'googleUrl' | 'exchange' | 'deleteUser' | 'signOut' | 'removeFiles', boolean>> = {};
+  fail: Partial<
+    Record<
+      'sendLink' | 'googleUrl' | 'exchange' | 'deleteUser' | 'signOut' | 'removeFiles',
+      boolean
+    >
+  > = {};
   private readonly links = new Map<
     string,
     { email: string; verifier: string; used: boolean; expired: boolean; method: string }
@@ -49,7 +54,13 @@ export class FakeAuth implements AuthProvider {
     if (this.fail.sendLink) throw new Error('mail is down');
     const code = `link-${++this.n}`;
     const verifier = randomBytes(8).toString('hex');
-    this.links.set(code, { email: email.toLowerCase(), verifier, used: false, expired: false, method: 'email' });
+    this.links.set(code, {
+      email: email.toLowerCase(),
+      verifier,
+      used: false,
+      expired: false,
+      method: 'email',
+    });
     this.sent.push({ email, redirectTo, code });
     jar.setAll([{ name: 'fake_verifier', value: `${code}:${verifier}` }]);
   }
@@ -65,7 +76,13 @@ export class FakeAuth implements AuthProvider {
   googleReturn(jar: CookieJar, email: string): string {
     const code = `g-${++this.n}`;
     const verifier = (this.cookie(jar, 'fake_verifier') ?? '').split(':')[1] ?? '';
-    this.links.set(code, { email: email.toLowerCase(), verifier, used: false, expired: false, method: 'google' });
+    this.links.set(code, {
+      email: email.toLowerCase(),
+      verifier,
+      used: false,
+      expired: false,
+      method: 'google',
+    });
     return code;
   }
 
@@ -84,7 +101,10 @@ export class FakeAuth implements AuthProvider {
     const user = await this.upsert(l.email, l.method);
     const token = randomBytes(12).toString('hex');
     this.sessions.set(token, user.id);
-    jar.setAll([{ name: 'fake_session', value: token }, { name: 'fake_verifier', value: '', maxAge: 0 }]);
+    jar.setAll([
+      { name: 'fake_session', value: token },
+      { name: 'fake_verifier', value: '', maxAge: 0 },
+    ]);
     return user;
   }
 
@@ -99,10 +119,12 @@ export class FakeAuth implements AuthProvider {
   private async upsert(email: string, method: string): Promise<AuthUser> {
     for (const u of this.users.values()) if (u.email === email) return u;
     const user: AuthUser = { id: randomUUID(), email, method, anonymous: false };
-    await this.db.query(
-      'insert into auth.users (id, email, aud, role) values ($1, $2, $3, $4)',
-      [user.id, email, 'authenticated', 'authenticated'],
-    );
+    await this.db.query('insert into auth.users (id, email, aud, role) values ($1, $2, $3, $4)', [
+      user.id,
+      email,
+      'authenticated',
+      'authenticated',
+    ]);
     this.users.set(user.id, user);
     return user;
   }

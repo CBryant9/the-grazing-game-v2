@@ -145,7 +145,7 @@ These came from planning the phone and PC rebuild. Full detail and open question
 - [ ] Game over means starting again.
 - [ ] Visuals more polished: "that retro feel but not be so pixelly", like the Ship or Die art in docs/reference/.
 - [ ] Grass, saleyard, messages and paddock views must work well on every screen size.
-- [ ] Anyone can join; date of birth at sign-up; the social side is hidden for under 16s.
+- [x] Anyone can join; date of birth at sign-up; the social side is hidden for under 16s. *(Built in 3.2: emailed link and Google, a finish page for username and date of birth, and the flags (`community`, `interestAds`) come from the server. Proven against a fake sign-in provider; a real project is still owed.)*
 - [ ] Ad slots (banners, videos between days and years, sponsor cards) are built in-house so Claudia can run her own business's ads or sell them. No Google game video ads for now.
 - [ ] Build everything now (ads, Stripe, subscriptions, community) and turn each on from an admin back end when ready. The admin shows analytics, connects Stripe, sets subscriptions and manages ads.
 - [ ] Community: overall leaderboard, groups to compete with friends, profiles (photo, where from, years farming, education, what and how much they farm, real farm, links to socials and website), posts with photos, comments and likes, a feed of friends and others, friends' daily activity (daily mode only), a view of anyone's farm as it is now, and a live activity ticker like Ship or Die ("Tom1998 moved 4000 head into a 4ha paddock").
@@ -224,7 +224,7 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 
 ### Farms, payments and game over
 
-- [ ] Free accounts get 2 Daily Farms and 2 Fast Farms ("one where they start from 0 and one where they start with a lot"). *(Changed: the PRD had 1 Daily and 3 Fast.)*
+- [ ] Free accounts get 2 Daily Farms and 2 Fast Farms *(3.2: the two Fast Farm slots and the farm picker are built and enforced by the database. Daily Farm slots exist in the data and stay behind the switch, off, until the rollover (3.3).)* ("one where they start from 0 and one where they start with a lot"). *(Changed: the PRD had 1 Daily and 3 Fast.)*
 - [ ] One-off payments, not a subscription: about $30 for 5 of each farm plus perks; about $50 for 5 of each farm, no ads and more perks. *(Changed: the PRD had a monthly or yearly subscription.)*
 - [ ] Nothing in the game can be bought for an advantage: "they can't pay for perks in the game".
 - [ ] On game over, a player can pay to keep going. It clears the debt and puts the farm back to "small modest funds", with a penalty that fits their situation (for example they may have had to sell all their stock). The offer shows exactly what they get for the money.
@@ -254,7 +254,7 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 - [ ] Workers helping on a fence the farmer draws: the first part of the line is the workers' share and uses none of the farmer's daylight (about 500 m for a worker, more or less by their skills). Then the line continues and uses the farmer's daylight. *(Built in the engine, milestone 2.1, at about 300 m for an average hand, not 500 m. This conflicts with the 500 m here: the "about 800 m a day instead of 500 m" line above gives 300 m, and 500 m would make 1,000 m a day. See DEVELOPMENT_LOG, m2.1, Calls, item 1. One constant.)* *(On screen, milestone 2.2: the job card says "[name]: the first 139 m is the hand's share, done from their own day. It uses none of your light."; the part that does not fit today is still red, for the player's own share only.)* *(Built as a call, awaiting Claudia: 300 m for an average hand against the 500 m she said.)*
 - [ ] The line stops drawing when the day is used up, with a warning that this is the full day, and that to move cows as well they need to do less fence. *(Kept, and made firmer on 14 Nov 2026: the part that fits is built, the rest shows red and is drawn again another day.)*
 - [ ] Driving on the farm is faster than 25 km/h in real life, but 25 works for the game's scale. *(Reversed 14 Nov 2026: no driving.)*
-- [ ] Nobody under 14 can make an account. No community under 16. *(Changed: PRD v1.0 had 13.)*
+- [x] Nobody under 14 can make an account. No community under 16. *(Changed: PRD v1.0 had 13.)* *(Built in 3.2: the refusal is final for that sign-in, with no form and no hint. An account under 16 is told no community and no interest ads by the server.)*
 - [ ] For everything else on the list, Claudia accepted the suggested defaults "for now": "better to get this in and then scale and adapt as we go". They are listed in PRD section 21.
 
 ### Security
@@ -327,3 +327,11 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [ ] Onboarding and a tour show how things work, with help available at any time. *(Built in 1.7e: the guided first day, with Skip this step, Skip the tour and Show the tour again, and the Help button always in the top bar. Tour progress is kept in the browser, not yet per player.)*
 - [ ] A short guided first day: open a paddock, move cattle, build a short fence and watch the daylight bar, open the market, end the day. It can be skipped and replayed from More. *(Built in 1.7e.)*
 - [ ] Empty states with one clear next step. *(Built in 1.7e for Herd, Plans, Paddocks, the inbox and Sell. The no farms, no posts and no followers states come with accounts and the community.)*
+
+### Accounts and saves (milestone 3.2)
+
+- [x] A failed save retries, the player sees "Saving again", a job is never shown as done before it is stored, and if saving finally fails the player is told what was not saved. *(BUILD_PLAN 3.2, built and tested with injected failures and races.)*
+- [x] A guest plays one farm kept on this device; making an account moves the farm in, or says plainly there is no room. *(PRD 8.1.)*
+- [x] See the farm on a past day, read only, from the Diary, with "You are looking at Day N" and a way back. *(Closes the call deferred in 1.7g. The picture is kept for every day for 90 days, then weekly to 400 days; the file store keeps the last 14.)*
+- [x] Download my data and delete my account, with a typed confirm that says what goes and what stays. *(PRD 21a "Your data".)*
+- [x] One player never sees another's farm on a shared device: the offline copy is kept per player and cleared on sign out. *(PRD 21a.)*

@@ -37,7 +37,8 @@ export function Finish() {
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
-  const [check, setCheck] = useState<Check>('idle');
+  // The server's last answer, for the name it was asked about. Null means it could not say.
+  const [answer, setAnswer] = useState<{ name: string; free: boolean | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Extract<FinishResult, { ok: true }> | null>(null);
@@ -50,28 +51,33 @@ export function Finish() {
 
   // The live check: a short wait after typing, and only the newest answer is used.
   useEffect(() => {
-    if (username === '') {
-      setCheck('idle');
-      return;
-    }
-    if (!USERNAME.test(username)) {
-      setCheck('bad');
-      return;
-    }
-    setCheck('checking');
+    if (!USERNAME.test(username)) return;
     const mine = ++ticket.current;
     const timer = setTimeout(() => {
       authApi
         .username(username)
         .then((r) => {
-          if (mine === ticket.current) setCheck(r.free ? 'free' : 'taken');
+          if (mine === ticket.current) setAnswer({ name: username, free: r.free });
         })
         .catch(() => {
-          if (mine === ticket.current) setCheck('idle');
+          if (mine === ticket.current) setAnswer({ name: username, free: null });
         });
     }, 400);
     return () => clearTimeout(timer);
   }, [username]);
+
+  const check: Check =
+    username === ''
+      ? 'idle'
+      : !USERNAME.test(username)
+        ? 'bad'
+        : answer?.name !== username
+          ? 'checking'
+          : answer.free === null
+            ? 'idle'
+            : answer.free
+              ? 'free'
+              : 'taken';
 
   if (!settled) {
     return (
@@ -109,8 +115,8 @@ export function Finish() {
         </p>
         {done?.noRoom && (
           <p className={`${styles.notice} ${styles.alert}`}>
-            The farm you were playing as a guest could not move in, because this account already
-            has the most farms it can have. It is still on this device.
+            The farm you were playing as a guest could not move in, because this account already has
+            the most farms it can have. It is still on this device.
           </p>
         )}
         <Link href="/play" className={`btn coral ${styles.linkbtn}`}>
@@ -277,7 +283,8 @@ export function Finish() {
         </div>
         <p id="dob-hint" className={styles.hint}>
           We ask once, and no one else sees it. You need to be 14 or older to make an account. If
-          you are 14 or 15, you can play everything, but the community stays hidden until you turn 16.
+          you are 14 or 15, you can play everything, but the community stays hidden until you turn
+          16.
         </p>
       </fieldset>
       {error && (
