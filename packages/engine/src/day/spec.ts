@@ -15,7 +15,7 @@
  *
  *   - `line`: fence, tape or pipe, built piece by piece in the order it
  *     was drawn. Each piece is one segment of fence or one square of pipe.
- *   - `whole`: a job done in one go (a gate, a trough, a move, a muster).
+ *   - `whole`: a job done in one go (a gate, a trough, a move, marking).
  *   - `free`: it takes none of the day (sowing and harvest, which cost
  *     money and happen at once; buying; taking a mob off a supplement).
  *
@@ -24,8 +24,8 @@
  */
 
 import type { Action, ActionDone, JobPiece, JobWorkPart } from '../actions/types';
-import { JOB_TIMES, metresPerMinute, musterMinutes, type Pace } from '../data/jobTimes';
-import { tapeRun, type Survey } from '../farm/layout';
+import { JOB_TIMES, metresPerMinute, type Pace } from '../data/jobTimes';
+import { tapeRun } from '../farm/layout';
 import { EDGE, getEdge, type EdgeRef } from '../farm/topology';
 import { areaIdOf, surveyOf } from '../sim/derived';
 import type { FarmMob, FarmState } from '../sim/state';
@@ -150,16 +150,6 @@ const LINE_WHAT: Partial<Record<Action['type'], JobWorkPart['what']>> = {
 // Jobs done in one go
 // ---------------------------------------------------------------------------
 
-/**
- * Minutes to muster a mob off the ground it runs on. Stock work is done
- * where the mob is: nothing is walked to the yards. A mob in the yards or
- * the feedlot is already in hand.
- */
-function musterOf(survey: Survey, m: FarmMob): number {
-  if (m.where.kind !== 'paddock') return 0;
-  return musterMinutes(survey.topology.areas[areaIdOf(survey, m)]!.ha);
-}
-
 const part = (what: JobWorkPart['what'], minutes: number): JobWorkPart => ({ what, minutes });
 
 const whole = (parts: JobWorkPart[]): JobSpec => ({ kind: 'whole', parts });
@@ -192,7 +182,6 @@ function mobsThatLost(before: FarmState, after: FarmState): { mob: FarmMob; head
  */
 export function specFor(before: FarmState, action: Action, trial: ActionDone): JobSpec {
   const T = JOB_TIMES;
-  const survey = surveyOf(before);
   const sideM = before.layout.scale.sideM;
   const mobById = (id: number): FarmMob => before.mobs.find((m) => m.id === id)!;
 
@@ -221,21 +210,10 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'sellAnimals':
     case 'sellGroup':
     case 'sellClass': {
-      // Muster each mob that has cattle going, then draft and load.
+      // Done where the mob is, with no muster: draft and load.
       const lost = mobsThatLost(before, trial.farm);
-      const areas = new Set<number>();
-      let muster = 0;
-      let head = 0;
-      for (const { mob, head: n } of lost) {
-        head += n;
-        if (mob.where.kind !== 'paddock') continue;
-        const id = areaIdOf(survey, mob);
-        if (areas.has(id)) continue;
-        areas.add(id);
-        muster += musterOf(survey, mob);
-      }
+      const head = lost.reduce((n, l) => n + l.head, 0);
       return whole([
-        part('muster', muster),
         part('draft-and-load', T.sellBaseMin.value),
         part('head', (head / 10) * T.sellMinPer10Head.value),
       ]);
@@ -252,14 +230,13 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
       ]);
     }
     case 'setSupplement':
-      // Taking a mob off its supplement is a decision, not a job. Builder's rule.
-      if (action.supp === 'none') return { kind: 'free' };
-      return whole([part('feed-out', T.feedOutMin.value)]);
+      // Switching a supplement on or off is a decision at a daily price. It takes none of the
+      // daylight (Claudia, 14 Nov 2026).
+      return { kind: 'free' };
     case 'wean': {
       // "0.5 min per head": every head in the mob goes through the draft, calves included.
       const m = mobById(action.mob);
       return whole([
-        part('muster', musterOf(survey, m)),
         part('draft-and-load', T.weanBaseMin.value),
         part('head', m.animals.length * T.weanMinPerHead.value),
       ]);
@@ -268,10 +245,7 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
       // "2 min per calf": every calf at foot is handled, bull calf or heifer.
       const m = mobById(action.mob);
       const calves = m.animals.filter((a) => a.kind === 'calf').length;
-      return whole([
-        part('muster', musterOf(survey, m)),
-        part('head', calves * T.markMinPerCalf.value),
-      ]);
+      return whole([part('head', calves * T.markMinPerCalf.value)]);
     }
 
     // ---- Gates and repairs

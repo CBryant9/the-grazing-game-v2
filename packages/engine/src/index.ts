@@ -552,9 +552,9 @@ export type { SavedFarm } from './save/save';
 
 // Milestone 1.5a: the working day (the farm clock, job times, Next day and
 // skips, what needs doing).
-export { JOB_TIMES, SKIP_DAYS, metresPerMinute, musterMinutes } from './data/jobTimes';
+export { JOB_TIMES, SKIP_DAYS, metresPerMinute } from './data/jobTimes';
 export type { FigureStatus, JobFigure, Pace, SkipLength } from './data/jobTimes';
-export { dayMinutes, lightLeft, lightOn, startDay, timeNow } from './sim/clock';
+export { dayMinutes, lightLeft, lightOn, timeNow } from './sim/clock';
 export type { ClockSpan, FarmClock } from './sim/state';
 export type { WorkEvent } from './sim/events';
 export type { JobCard, JobPiece, JobPreview, JobWorkPart } from './actions/types';

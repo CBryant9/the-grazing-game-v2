@@ -1,13 +1,13 @@
 /**
  * The farm at the start: soil, the bore, fences, gates, water, arable land,
- * the starting rotation, the homestead and yards, and the pasture as the
+ * the starting rotation, the stock yards, and the pasture as the
  * last owner left it.
  *
  * Each piece draws from its own named random stream, so a change to one
  * never shifts another (BUILD_PLAN 2.3). The pieces follow the MVP's newGame,
  * startScratch and startLayout, drawing their random numbers in the same
  * order, so each can be checked against the MVP given the same numbers.
- * The homestead and yards are new in the rebuild (PRD 5.13).
+ * The yards are new in the rebuild (PRD 5.13). There is no homestead.
  */
 
 import type { DistrictId } from '@gg/shared';

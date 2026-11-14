@@ -142,9 +142,18 @@ describe('nothing a player can reach uses it', () => {
     ]);
   });
 
-  it('lint forbids engine and server code from importing it', () => {
+  it('lint forbids engine and server code from importing it, and the unclocked pieces', () => {
     const config = readFileSync(join(REPO, 'eslint.config.mjs'), 'utf8');
-    expect(config.match(/importNames: \['applyInstant'\]/g)!.length).toBe(2);
+    expect(
+      config.match(/importNames: \['applyInstant', 'tryAction', 'recordAction'\]/g)!.length,
+    ).toBe(2);
+  });
+
+  it('the engine index does not export the functions that reset or skip the farm clock', () => {
+    const names = Object.keys(engine);
+    for (const name of ['startDay', 'applyInstant', 'tryAction', 'recordAction']) {
+      expect(names, name).not.toContain(name);
+    }
   });
 
   it('nothing outside the engine names the instant path at all', () => {

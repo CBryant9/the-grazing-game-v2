@@ -327,13 +327,13 @@ describe('stock work, done where the mob is', () => {
     expect(some.workMin).toBeCloseTo(15.2, 9);
   });
 
-  it('a muster is 30 minutes and an hour for each 200 ha', () => {
+  it('husbandry has no muster: the size of the paddock does not change the time', () => {
     const b = busyFarm();
     // The cows' paddock is 6 squares by 6: 36 squares of a quarter hectare, 9 ha.
     const mark = card(b.farm, { type: 'markCalves', mob: b.cows });
-    expect(mark.parts[0]!.what).toBe('muster');
-    expect(mark.parts[0]!.minutes).toBeCloseTo(30 + (60 * 9) / 200, 9);
-    // A mob on 2,080 ha takes 30 minutes and 10 hours 24 minutes.
+    expect(mark.parts.some((p) => (p.what as string) === 'muster')).toBe(false);
+    expect(mark.workMin).toBeCloseTo(2 * 12, 9);
+    // The same mob on 2,080 ha takes the same: 30 minutes and half a minute a head.
     const wide = openFarm('nsw', { size: 2080 });
     const stocked = setUp(wide, {
       type: 'buyCattle',
@@ -342,87 +342,89 @@ describe('stock work, done where the mob is', () => {
       to: { cell: wide.layout.water.bore },
     });
     for (const a of stocked.mobs[0]!.animals) if (a.kind === 'calf') a.age = 120;
-    const muster = previewAction(stocked, { type: 'wean', mob: stocked.mobs[0]!.id, to: 'lot' });
-    if (!muster.ok) throw new Error(muster.message);
-    expect(muster.card.parts[0]!.minutes).toBeCloseTo(30 + (60 * 2080) / 200, 6);
+    const wean = previewAction(stocked, { type: 'wean', mob: stocked.mobs[0]!.id, to: 'lot' });
+    if (!wean.ok) throw new Error(wean.message);
+    const head = stocked.mobs[0]!.animals.length;
+    expect(wean.card.workMin).toBeCloseTo(30 + 0.5 * head, 6);
   });
 
-  it('weaning: the muster, 30 minutes, and half a minute a head', () => {
+  it('weaning: 30 minutes, and half a minute a head', () => {
     const b = busyFarm();
     // 12 cows and 12 calves.
     const wean = card(b.farm, { type: 'wean', mob: b.cows });
     expect(wean.parts).toEqual([
-      { what: 'muster', minutes: 30 + (60 * 9) / 200 },
       { what: 'draft-and-load', minutes: 30 },
       { what: 'head', minutes: 12 },
     ]);
-    expect(wean.workMin).toBeCloseTo(32.7 + 30 + 12, 9);
+    // 30 + 0.5 x 24 head = 42 minutes. 12 cows and 12 calves are 24 head.
+    expect(wean.workMin).toBeCloseTo(30 + 0.5 * 24, 9);
   });
 
-  it('marking: the muster and 2 minutes for every calf at foot', () => {
+  it('marking: 2 minutes for every calf at foot', () => {
     const b = busyFarm();
     // 12 calves are handled. 6 are bull calves and get marked.
     const done = work(b.farm, { type: 'markCalves', mob: b.cows });
     expect(done.events.find((e) => e.type === 'calves-marked')).toMatchObject({ count: 6 });
-    expect(done.job.parts).toEqual([
-      { what: 'muster', minutes: 30 + (60 * 9) / 200 },
-      { what: 'head', minutes: 24 },
-    ]);
-    expect(done.job.workMin).toBeCloseTo(32.7 + 24, 9);
+    expect(done.job.parts).toEqual([{ what: 'head', minutes: 24 }]);
+    // 2 min x 12 calves = 24 minutes.
+    expect(done.job.workMin).toBeCloseTo(2 * 12, 9);
     // With the heifer calves gone from the mob, only the bull calves are left to count.
     const m = b.farm.mobs.find((x) => x.id === b.cows)!;
     m.animals = m.animals.filter((a) => a.kind !== 'calf' || a.sex === 'M');
-    expect(work(b.farm, { type: 'markCalves', mob: b.cows }).job.parts[1]).toEqual({
+    expect(work(b.farm, { type: 'markCalves', mob: b.cows }).job.parts[0]).toEqual({
       what: 'head',
       minutes: 12,
     });
   });
 
-  it('selling: the muster, an hour, and a minute for each 10 head', () => {
+  it('selling: an hour, and a minute for each 10 head', () => {
     const b = busyFarm();
     // The steers run on two paddocks joined by a fence that is down: 72 squares, 18 ha.
     const sale = card(b.farm, { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 });
     expect(sale.parts).toEqual([
-      { what: 'muster', minutes: 30 + (60 * 18) / 200 },
       { what: 'draft-and-load', minutes: 60 },
       { what: 'head', minutes: 1 },
     ]);
     // Calves at foot are loaded too: 3 cows and 3 calves is 6 head.
     const cows = card(b.farm, { type: 'sellClass', cls: 'cow', qty: 3 });
-    expect(cows.parts[2]).toEqual({ what: 'head', minutes: 0.6 });
-    // A class sold out of two mobs musters both.
+    expect(cows.parts[1]).toEqual({ what: 'head', minutes: 0.6 });
+    // A class sold out of two mobs has no muster for either: 60 + 1 x (head / 10).
     const ids = b.farm.mobs
       .flatMap((m) => m.animals.filter((a) => a.kind !== 'calf'))
       .map((a) => a.id);
     const all = card(b.farm, { type: 'sellAnimals', ids });
-    expect(all.parts[0]!.minutes).toBeCloseTo(30 + (60 * 9) / 200 + 30 + (60 * 18) / 200, 9);
-    // Stock in the feedlot are in hand: no muster.
+    expect(all.parts[0]!.minutes).toBe(60);
+    // Calves at foot go with their dams, so every head on the farm is loaded.
+    const head = b.farm.mobs.reduce((n, m) => n + m.animals.length, 0);
+    expect(all.workMin).toBeCloseTo(60 + head / 10, 9);
+    // Stock in the feedlot take the same.
     const lot = setUp(b.farm, { type: 'moveMob', mob: b.steers, to: 'lot' });
     const fromLot = card(lot, { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 });
-    expect(fromLot.parts[0]).toEqual({ what: 'muster', minutes: 0 });
+    expect(fromLot.parts[0]).toEqual({ what: 'draft-and-load', minutes: 60 });
     expect(fromLot.workMin).toBeCloseTo(61, 9);
   });
 
-  it('stock in the yards are in hand too: no muster, and nothing is walked there', () => {
+  it('stock in the yards take the same, and nothing is walked there', () => {
     const b = busyFarm();
     const m = b.farm.mobs.find((x) => x.id === b.steers)!;
     m.where = { kind: 'yards' };
     const sale = card(b.farm, { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 });
-    expect(sale.parts[0]).toEqual({ what: 'muster', minutes: 0 });
-    // Marking the cows in their paddock takes the muster of that paddock, not a trip to the yards.
+    expect(sale.parts[0]).toEqual({ what: 'draft-and-load', minutes: 60 });
+    // Marking the cows in their paddock is done there, not by a trip to the yards.
     const mark = card(b.farm, { type: 'markCalves', mob: b.cows });
-    expect(mark.workMin).toBeCloseTo(32.7 + 24, 9);
+    expect(mark.workMin).toBeCloseTo(2 * 12, 9);
     const cows = b.farm.mobs.find((x) => x.id === b.cows)!;
     expect(work(b.farm, { type: 'markCalves', mob: b.cows }).farm.mobs[0]!.where).toEqual(
       cows.where,
     );
   });
 
-  it('feeding lick or hay to a mob takes 30 minutes, and taking them off it takes none', () => {
+  it('switching a supplement on or off takes none of the daylight', () => {
     const b = busyFarm();
     const fed = work(b.farm, { type: 'setSupplement', mob: b.steers, supp: 'hay' });
-    expect(fed.job.workMin).toBe(30);
-    expect(fed.job.parts).toEqual([{ what: 'feed-out', minutes: 30 }]);
+    expect(fed.job.outcome).toBe('free');
+    expect(fed.job.workMin).toBe(0);
+    expect(fed.farm.clock.used).toBe(b.farm.clock.used);
     const off = work(fed.farm, { type: 'setSupplement', mob: b.steers, supp: 'none' });
     expect(off.job.outcome).toBe('free');
     expect(off.farm.clock.used).toBe(fed.farm.clock.used);

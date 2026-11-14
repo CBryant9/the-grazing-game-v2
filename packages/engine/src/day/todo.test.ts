@@ -36,7 +36,7 @@ describe('things to do', () => {
     expect(thingsToDo(openFarm('nsw'))).toEqual([]);
   });
 
-  it('calves to mark and calves to wean, with the mob, the count and the action', () => {
+  it('calves to mark, with the mob, the count and the action', () => {
     const b = busyFarm();
     const list = thingsToDo(b.farm);
     const area = surveyOf(b.farm).topology.areas.find((a) =>
@@ -55,22 +55,13 @@ describe('things to do', () => {
         action: { type: 'markCalves', mob: b.cows },
       },
     ]);
-    expect(ofType(list, 'calves-to-wean')).toEqual([
-      {
-        type: 'calves-to-wean',
-        mob: b.cows,
-        mobName: 'Mob 1',
-        area,
-        count: 12,
-        does: 'wean',
-        action: { type: 'wean', mob: b.cows },
-      },
-    ]);
-    // The steers have nothing to mark or wean.
+    // Weaning is not listed: the model weans a drop by itself when it is due.
+    expect(list.some((x) => (x.type as string) === 'calves-to-wean')).toBe(false);
+    // The steers have nothing to mark.
     expect(list.some((x) => 'mob' in x && x.mob === b.steers)).toBe(false);
   });
 
-  it("the ages are the model's own: 60 days for the marking note, 90 days to wean", () => {
+  it("the age is the model's own: 60 days for the marking note", () => {
     const b = busyFarm();
     const withAge = (age: number): ThingToDo[] => {
       const f = cloneFarm(b.farm);
@@ -79,8 +70,6 @@ describe('things to do', () => {
     };
     expect(ofType(withAge(59), 'calves-to-mark')).toEqual([]);
     expect(ofType(withAge(60), 'calves-to-mark')[0]!.count).toBe(6);
-    expect(ofType(withAge(89), 'calves-to-wean')).toEqual([]);
-    expect(ofType(withAge(90), 'calves-to-wean')[0]!.count).toBe(12);
     // The model's own note for marking goes out at the same age.
     const f = cloneFarm(b.farm);
     for (const a of f.mobs[0]!.animals) if (a.kind === 'calf') a.age = 58;
@@ -96,20 +85,16 @@ describe('things to do', () => {
     const b = busyFarm();
     const marked = work(b.farm, { type: 'markCalves', mob: b.cows }).farm;
     expect(ofType(thingsToDo(marked), 'calves-to-mark')).toEqual([]);
-    expect(ofType(thingsToDo(marked), 'calves-to-wean').length).toBe(1);
-    const weaned = work(marked, { type: 'wean', mob: b.cows }).farm;
-    expect(ofType(thingsToDo(weaned), 'calves-to-wean')).toEqual([]);
   });
 
-  it('unmarked young bulls are counted beside the calves', () => {
+  it('a mob with only an unmarked young bull and no bull calves old enough gives no item', () => {
     const b = busyFarm();
     const f = cloneFarm(b.farm);
     const steer = f.mobs.find((m) => m.id === b.steers)!.animals[0]!;
     steer.kind = 'bull';
     steer.sex = 'M';
     steer.young = true;
-    const item = ofType(thingsToDo(f), 'calves-to-mark').find((x) => x.mob === b.steers)!;
-    expect(item).toMatchObject({ count: 0, youngBulls: 1, does: 'markCalves' });
+    expect(ofType(thingsToDo(f), 'calves-to-mark').find((x) => x.mob === b.steers)).toBeUndefined();
   });
 
   it('a mob with no water: the fact, the days so far, and that it needs a move', () => {
@@ -237,12 +222,7 @@ describe('things to do', () => {
     const f = cloneFarm(b.farm);
     f.layout.water.ports[0]!.level = 100;
     const list = thingsToDo(f);
-    expect(list.map((x) => x.type)).toEqual([
-      'trough-low',
-      'calves-to-mark',
-      'calves-to-wean',
-      'fence-down',
-    ]);
+    expect(list.map((x) => x.type)).toEqual(['trough-low', 'calves-to-mark', 'fence-down']);
     for (const item of list) {
       expect(item.does).toBe(item.action!.type);
       expect(previewAction(f, item.action!).ok, item.type).toBe(true);

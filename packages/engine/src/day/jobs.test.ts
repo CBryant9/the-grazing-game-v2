@@ -337,7 +337,6 @@ describe('a job done in one go fits today or it is refused', () => {
       { type: 'movePortable', port: b.port, cell: b.openCell },
       { type: 'placeGate', edge: b.tape },
       { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 10 },
-      { type: 'setSupplement', mob: b.steers, supp: 'hay' },
     ];
     let done = 0;
     let refused = 0;
@@ -364,13 +363,14 @@ describe('a job done in one go fits today or it is refused', () => {
 });
 
 describe("builder's rule: a job longer than a day's light", () => {
-  // One paddock of 4,160 ha: a muster is 30 minutes and 20 h 48 m, more than any day's light.
+  // A mob of 1,000 cows with 1,000 calves: weaning is 30 minutes and half a minute a head,
+  // 30 + 0.5 x 2,000 = 1,030 minutes (17 h 10 m), more than any day's light.
   function bigPaddock(): { farm: FarmState; mob: number } {
     const farm = openFarm('nsw', { size: 4160 });
     const stocked = setUp(farm, {
       type: 'buyCattle',
       cls: 'cowCalf',
-      qty: 6,
+      qty: 1000,
       to: { cell: farm.layout.water.bore },
     });
     let k = 0;
@@ -384,29 +384,29 @@ describe("builder's rule: a job longer than a day's light", () => {
 
   it('can be done at first light, and takes the whole day', () => {
     const { farm, mob } = bigPaddock();
-    const done = work(farm, { type: 'markCalves', mob });
+    const done = work(farm, { type: 'wean', mob });
     const c = done.job;
     expect(c.outcome).toBe('done');
-    // The muster alone is 21 h 18 m. The day is about 12 h 17 m.
-    expect(c.totalWorkMin).toBeCloseTo(30 + (60 * 4160) / 200 + 12, 6);
+    // The job is 17 h 10 m. The day is about 12 h 17 m.
+    expect(c.totalWorkMin).toBeCloseTo(30 + 0.5 * 2000, 6);
     expect(c.totalWorkMin).toBeGreaterThan(c.dayMin);
     expect(c.workMin).toBe(c.dayMin);
     expect(c.leftAfterMin).toBe(0);
     expect(c.usesRestOfDay).toBe(true);
-    expect(done.events.some((e) => e.type === 'calves-marked')).toBe(true);
+    expect(done.events.some((e) => e.type === 'weaned')).toBe(true);
     expect(turnedDown(done.farm, { type: 'placePortable', cell: 5 }).reason).toBe('no-daylight');
   });
 
   it('once anything else has been done that day it is refused, and the reason says to do it at first light', () => {
     const { farm, mob } = bigPaddock();
     const after = work(farm, { type: 'placePortable', cell: 5 }).farm;
-    const no = turnedDown(after, { type: 'markCalves', mob });
+    const no = turnedDown(after, { type: 'wean', mob });
     expect(no.reason).toBe('not-enough-daylight');
     expect(no.message).toBe(
-      `${NOT_TODAY} It takes 21 h 30 m, which is more than a day's light. It can be done at first light, before anything else that day, and it takes the whole day.`,
+      `${NOT_TODAY} It takes 17 h 10 m, which is more than a day's light. It can be done at first light, before anything else that day, and it takes the whole day.`,
     );
     // The next morning it can be done.
-    expect(work(endDay(after).farm, { type: 'markCalves', mob }).job.outcome).toBe('done');
+    expect(work(endDay(after).farm, { type: 'wean', mob }).job.outcome).toBe('done');
   });
 });
 

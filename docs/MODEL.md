@@ -714,12 +714,12 @@ electric fence    metres ÷ 1,000 m an hour
 tape              metres ÷ 3,000 m an hour, out or rolled up
 pipe              metres ÷ 400 m an hour
 gate 60 min       trough or hub 180 min       portable trough 30 min
-muster            30 min + 60 min × hectares ÷ 200, of the ground the mob runs on
 move a mob        15 min for each mob cattle come from + head ÷ 100
-wean              muster + 30 min + 0.5 min × head in the mob
-mark              muster + 2 min × calves at foot in the mob
-sell              muster of each mob + 60 min + head loaded ÷ 10
-feed out          30 min
+wean              30 min + 0.5 min × head in the mob
+mark              2 min × calves at foot in the mob
+sell              60 min + head loaded ÷ 10
+supplement        none of the day (switched on or off at a daily price)
+muster            none: husbandry is done where the mob is
 taking out        as long as putting in
 buy, sow, harvest none of the day
 ```
@@ -787,14 +787,15 @@ The two checks before the first day can be passed with `anyway: true`, as the MV
 |---|---|---|---|
 | `no-water` | A mob on ground with no water, its head and its days dry so far | The mob's grazing area has no water point | `moveMob` (the player picks the paddock) |
 | `trough-low`, `trough-empty` | A portable trough under a quarter full, or empty, and the litres left | The trough's own low-water mark (1,500 L) | `refillPortable` |
-| `calves-to-mark` | Unmarked bull calves of 60 days or more, and unmarked young bulls | The age at which the model notes calves for marking | `markCalves` |
-| `calves-to-wean` | Calves of 90 days or more | The age from which the model weans a calf | `wean` |
+| `calves-to-mark` | Unmarked bull calves of 60 days or more (young bulls are counted on the item for information, but do not make it show) | The age at which the model notes calves for marking | `markCalves` |
 | `crop-ready` | A grain crop that has reached maturity, and its hectares | The crop's days to maturity | `harvest` |
 | `fence-down` | A segment of electric fence or tape that is knocked down | The fence code | `fixFence` |
 
+Weaning is not listed, because the model weans a drop by itself when it is due. Weaning earlier is the player's choice, offered on the mob card.
+
 Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, stock, crops, fences. It holds no words, so it can't nag or judge.
 
-**Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then no more jobs fit today, so a screen can dim the farm and light up Next day. The farm can still be looked at after dark.
+**Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then only jobs shorter than that still fit (a few segments of tape, for example), so a screen can dim the farm and light up Next day. `canStartJobs` is false only when no light is left. The farm can still be looked at after dark.
 
 ### The time of day on what happens
 

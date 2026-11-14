@@ -71,16 +71,39 @@ export const JOB_TIMES = {
   // ---- Stock work, done where the mob is
   moveMobSettleMin: fig(15, 'min', 'proposed', 'PRD 5.4: move a mob'),
   moveMobMinPer100Head: fig(1, 'min per 100 head', 'proposed', 'PRD 5.4: move a mob'),
-  musterBaseMin: fig(30, 'min', 'proposed', 'PRD 5.4: muster a whole paddock'),
-  musterMinPer200Ha: fig(60, 'min per 200 ha', 'proposed', 'PRD 5.4: muster a whole paddock'),
-  feedOutMin: fig(30, 'min', 'proposed', 'PRD 5.4: feed lick or hay to a mob'),
+  musterBaseMin: fig(
+    30,
+    'min',
+    'proposed',
+    'PRD 5.4: muster a whole paddock. Taken out 14 Nov 2026: husbandry is done where the mob is, with no muster. For Claudia to confirm.',
+    false,
+  ),
+  musterMinPer200Ha: fig(
+    60,
+    'min per 200 ha',
+    'proposed',
+    'PRD 5.4: muster a whole paddock. Taken out 14 Nov 2026: husbandry is done where the mob is, with no muster. For Claudia to confirm.',
+    false,
+  ),
+  feedOutMin: fig(
+    30,
+    'min',
+    'proposed',
+    'PRD 5.4: feed lick or hay to a mob. Kept for Daily Farm feeders, a later part.',
+    false,
+  ),
   /** A lick run or feed run: this for each mob. For feed on hand, in Daily Farm. */
   feedRunMinPerMob: fig(5, 'min per mob', 'proposed', 'PRD 5.4: lick run or feed run', false),
   weanBaseMin: fig(30, 'min', 'proposed', 'PRD 5.4: wean'),
   weanMinPerHead: fig(0.5, 'min per head', 'proposed', 'PRD 5.4: wean'),
   markMinPerCalf: fig(2, 'min per calf', 'proposed', 'PRD 5.4: mark calves'),
   pregTestMinPerCow: fig(1, 'min per cow', 'proposed', 'PRD 5.4: preg test (vet)', false),
-  sellBaseMin: fig(60, 'min', 'proposed', 'PRD 5.4: sell (muster, draft, load)'),
+  sellBaseMin: fig(
+    60,
+    'min',
+    'proposed',
+    'PRD 5.4: sell (muster, draft, load). Muster taken out 14 Nov 2026',
+  ),
   sellMinPer10Head: fig(1, 'min per 10 head', 'proposed', 'PRD 5.4: sell (muster, draft, load)'),
   buyOnlineMin: fig(30, 'min', 'proposed', 'PRD 5.4: buy online', false),
 } as const;
@@ -109,10 +132,6 @@ export function metresPerMinute(pace: Pace, dayMin: number): number {
       return JOB_TIMES.pipeMPerHour.value / 60;
   }
 }
-
-/** Minutes to muster a mob off an area of the given size. */
-export const musterMinutes = (areaHa: number): number =>
-  JOB_TIMES.musterBaseMin.value + (JOB_TIMES.musterMinPer200Ha.value * areaHa) / 200;
 
 /** How many days each skip runs (PRD 5.3). The MVP's month was 30 days. */
 export const SKIP_DAYS = { week: 7, month: 30, year: 365 } as const;

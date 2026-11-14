@@ -408,7 +408,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     }
   }
   toInbox(farm, day, events);
-  // The new day starts at first light, with the player at the homestead.
+  // The new day starts at first light, with all of the day's light left.
   startDay(farm);
   return result;
 }

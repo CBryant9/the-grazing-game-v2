@@ -5,7 +5,6 @@ import {
   atLastLight,
   busyFarm,
   cell,
-  setUp,
   turnedDown,
   withLightLeft,
   work,
@@ -235,7 +234,6 @@ describe('looking is free', () => {
       'newMob',
       'spend',
       'splitMobs',
-      'startDay',
       'startHerd',
       'stepDay',
     ];
@@ -389,7 +387,6 @@ describe('when the light is used up', () => {
       { type: 'setGate', edge: b.gate, open: true },
       { type: 'refillPortable', port: b.port },
       { type: 'markCalves', mob: b.cows },
-      { type: 'setSupplement', mob: b.steers, supp: 'hay' },
     ];
     for (const job of jobs) {
       const no = turnedDown(farm, job);
@@ -413,8 +410,11 @@ describe('when the light is used up', () => {
     const farm = atLastLight(b.farm);
     expect(mobSummaries(farm).length).toBe(2);
     expect(engine.thingsToDo(farm).length).toBeGreaterThan(0);
-    // Taking a mob off its supplement, and buying, are decisions, not jobs.
-    const fed = setUp(farm, { type: 'setSupplement', mob: b.steers, supp: 'hay' });
+    // Switching a supplement on or off, and buying, are decisions, not jobs.
+    const on = work(farm, { type: 'setSupplement', mob: b.steers, supp: 'hay' });
+    expect(on.job.outcome).toBe('free');
+    expect(on.job.workMin).toBe(0);
+    const fed = on.farm;
     const off = work(fed, { type: 'setSupplement', mob: b.steers, supp: 'none' });
     expect(off.job.outcome).toBe('free');
     expect(off.job.workMin).toBe(0);

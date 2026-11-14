@@ -82,7 +82,7 @@ export default tseslint.config(
             {
               // The instant path is for calibration and tests only.
               group: ['**/actions/apply', './apply'],
-              importNames: ['applyInstant'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
               message:
                 'Engine code must not use the instant path. Jobs go through applyAction in day/act.ts, on the farm clock.',
             },
@@ -106,7 +106,7 @@ export default tseslint.config(
             },
             {
               group: ['**/actions/apply'],
-              importNames: ['applyInstant'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
               message:
                 'Server code must not use the instant path. Jobs go through applyAction, on the farm clock.',
             },

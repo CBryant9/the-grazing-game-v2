@@ -543,15 +543,15 @@ How long each job takes, for one person with normal gear. The table is `packages
 | Move or refill a portable trough | 30 min | Proposed | `portableTroughMin` | yes |
 | Move a mob: settling | 15 min | Proposed | `moveMobSettleMin` | yes |
 | Move a mob: for each 100 head | 1 min | Proposed | `moveMobMinPer100Head` | yes |
-| Muster a whole paddock: to start | 30 min | Proposed | `musterBaseMin` | yes |
-| Muster a whole paddock: for each 200 ha | 60 min | Proposed | `musterMinPer200Ha` | yes |
-| Feed lick or hay to a mob | 30 min | Proposed | `feedOutMin` | yes |
+| Muster a whole paddock: to start | 30 min | Proposed | `musterBaseMin` | no (taken out 14 Nov 2026) |
+| Muster a whole paddock: for each 200 ha | 60 min | Proposed | `musterMinPer200Ha` | no (taken out 14 Nov 2026) |
+| Feed lick or hay to a mob | 30 min | Proposed | `feedOutMin` | no (kept for Daily Farm feeders, a later part) |
 | Lick run or feed run, each mob | 5 min | Proposed | `feedRunMinPerMob` | not yet (feed on hand, Daily Farm) |
-| Wean: after the muster | 30 min | Proposed | `weanBaseMin` | yes |
+| Wean: to start | 30 min | Proposed | `weanBaseMin` | yes |
 | Wean: for each head | 0.5 min | Proposed | `weanMinPerHead` | yes |
 | Mark calves: for each calf | 2 min | Proposed | `markMinPerCalf` | yes |
 | Preg test: for each cow | 1 min | Proposed | `pregTestMinPerCow` | not yet |
-| Sell (muster, draft, load): after the muster | 60 min | Proposed | `sellBaseMin` | yes |
+| Sell (draft and load): to start | 60 min | Proposed | `sellBaseMin` | yes |
 | Sell: for each 10 head | 1 min | Proposed | `sellMinPer10Head` | yes |
 | Buy online | 30 min | Proposed | `buyOnlineMin` | not yet |
 
@@ -563,6 +563,7 @@ How long each job takes, for one person with normal gear. The table is `packages
 | Go to the saleyard to buy | 6 h including travel | No trip. Buying takes none of the day. Bought cattle will arrive in the stock yards (next part) |
 | Sowing or harvest by contractor | "within a few days of booking" (the builder had taken 3 days) | They happen at once: "they can straight up just go and harvest" |
 | Walking a mob along its route | 1.5 km/h (Decided) | "Pick the paddock, done": no route through gates and no walking time |
+| Muster a whole paddock | 30 min and 60 min for each 200 ha (Proposed) | Husbandry is done where the mob is, with no muster, so marking, weaning and selling no longer include it. For Claudia to confirm |
 | Wire gate, tape gate handle, and 5 min each time stock go through a wire gate | 30 min, 5 min, 5 min | The three gate types are dropped for now. One gate: the proper swing gate |
 
 Not built yet: contractor fencing teams (500 m and 1,000 m a day, Decided, PRD 5.11) and a farm hand's share of a fence (about 500 m, Proposed).
@@ -574,17 +575,17 @@ The PRD gives the figures. Where it does not say how a figure is applied, the si
 1. **"500 m per working day".** A working day is that day's light, from first light to last light, whatever its length. So a whole day on the fence builds 500 m in June and in December, half a day builds 250 m, and time spent on other jobs comes off it in proportion. The other way to read it is a fixed pace by the hour (500 m over a 10 hour day would be 50 m an hour: about 535 m on a Western Victoria June day and 715 m on a Central Queensland December day). `metresPerMinute` in `jobTimes.ts`.
 2. **Whole segments only.** A line is built one map square's side at a time. A segment is built if all of it fits in the light left. On a big farm a segment is long (340 m on 12,000 ha), so a day of permanent fence there is one segment, not 500 m.
 3. **The bank must cover the whole line as drawn**, though only the part that fits is built and charged today.
-4. **A job that needs more than a whole day's light** can be done at first light, before anything else that day, and it uses the whole day. This is so no job is impossible: a muster of 4,000 ha is 20 h 30 m.
+4. **A job that needs more than a whole day's light** can be done at first light, before anything else that day, and it uses the whole day. This is so no job is impossible. With the muster gone it matters only for a very big mob: weaning 2,000 head is 17 h 10 m.
 5. **Taking things out takes as long as putting them in:** pulling down fence (at the pace of its kind), taking out a gate (60 min), a trough or a water hub (180 min). `removalWork` and the removal cases in `day/spec.ts`.
 6. **Moving a fixed trough** takes as long as fitting one (180 min).
 7. **Water hubs.** On a fence line or corner: a trough (180 min). On a square: a trough if the square has none (180 min) and a swing gate for each side that gets one (60 min each).
 8. **Putting a knocked-down segment back up:** its length at the pace of its kind (electric or tape).
-9. **A muster is of the mob's whole grazing area** (every paddock joined to it by open gates), where the mob is. A mob in the yards or the feedlot is in hand: no muster.
+9. **There is no muster.** Marking, weaning and selling are done where the mob is, and the size of the paddock does not change the time. (Taken out on 14 Nov 2026. For Claudia to confirm.)
 10. **Weaning's "0.5 min per head"** counts every head in the mob, calves included.
 11. **Marking's "2 min per calf"** counts every calf at foot in the mob, heifer calves too, though only bull calves are marked.
-12. **Selling's "1 min per 10 head"** counts every animal loaded, calves at foot included. Cattle sold out of several mobs: each mob's area is mustered.
+12. **Selling's "1 min per 10 head"** counts every animal loaded, calves at foot included. Cattle sold out of several mobs take the same single time.
 13. **Moving stock:** 15 min for each mob cattle are taken from, and 1 min per 100 head moved, calves included.
-14. **Putting a mob on a supplement** is "feed lick or hay to a mob" (30 min). Taking a mob off its supplement takes none of the day. (Claudia has since said that in Fast Farm a supplement is switched on at a daily price with no daylight cost. That is the next part: not built here.)
+14. **Switching a supplement on or off takes none of the day.** In Fast Farm it is switched on at a daily price that does not cut the daylight (Claudia, 14 Nov 2026). The 30 minute figure is kept for Daily Farm feeders, a later part.
 15. **Opening or shutting a gate** takes none of the day, but it is still a job: it can't be done after last light.
 16. **Buying, sowing and harvest take none of the day** and can be done after last light.
 17. **Skips:** a week is 7 days, a month 30 (the MVP's) and a year 365.

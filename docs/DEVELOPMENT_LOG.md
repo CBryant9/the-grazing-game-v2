@@ -581,7 +581,7 @@ Built, all in `packages/engine`:
 - **What fits today.** A job done in one go is done if it fits in the light left and refused if it does not, with how long it takes. A line of fence, tape or pipe is built as far as its whole pieces fit, in the order drawn, and charged for that much. The card gives the pieces that fit and the pieces that do not, the reason "You don't have enough time to do this today", and a flag when the job uses up the rest of the day. Nothing carries over.
 - **Buying, sowing and harvest** take none of the day and happen at once.
 - **Next day and skips** (`day/days.ts`): `endDay`, and `skipDays` for a week, a month, a year or a number of days. A skip stops for everything the MVP stopped its clock for. Both return a summary of facts.
-- **Things to do** (`day/look.ts`, `thingsToDo`): a read-only list for the banner and the mob card. A mob with no water, a portable trough low or empty, calves to mark, calves to wean, a crop ready, a fence down. Each is a fact with the mob or the place and a count, and names the action that deals with it.
+- **Things to do** (`day/look.ts`, `thingsToDo`): a read-only list for the banner and the mob card. A mob with no water, a portable trough low or empty, calves to mark, a crop ready, a fence down. Weaning is not listed: the model weans a drop by itself when it is due. Each is a fact with the mob or the place and a count, and names the action that deals with it.
 - **Evening** (`clockView`): says when the light is used up, and when less is left than the shortest job needs, so a screen can dim the farm and light up Next day.
 - **The time of day** is on every job in the action log, on a `job-worked` event, on a mob's arrival and on each inbox message from a job.
 - **The instant path** for the calibration suites and the MVP comparisons: `applyInstant`, not exported, reached only by test support.
@@ -598,6 +598,21 @@ After the review (14 Nov 2026):
 - Marking's time counts every calf at foot (it counted bull calves only).
 - "Looking is free" is tested against every function the index exports that takes a farm, not a list picked by hand.
 - A real-year farm saved in format 2 loads, gets its real date's light, and carries on.
+
+After the second review:
+
+1. `startDay` is no longer exported from the engine index. It resets the day's used light, so a caller could have switched the daylight limit off. A test checks the index leaves out `startDay`, `applyInstant`, `tryAction` and `recordAction`, and the lint guard now names all three of the last. `day/act.ts`, which puts them behind the clock, has the one exception.
+2. The `calves-to-wean` item is gone from things to do. It listed calves from 90 days, the youngest the model allows, so it showed for months. The model weans a drop by itself at about 280 days.
+3. `calves-to-mark` shows only when there are bull calves of 60 days or more. Young bulls stay on the item as a number for information and no longer make it show.
+4. Marking, weaning and selling have no muster. A 4,000 ha paddock made each of them take a whole day. Marking is 2 min per calf, weaning 30 min and 0.5 min a head, selling 60 min and 1 min per 10 head.
+5. Switching a supplement on takes none of the day. The 30 minute figure is kept for Daily Farm feeders.
+
+Questions for Claudia from the second review:
+
+- (a) Husbandry now has no mustering time: right?
+- (b) On a 12,000 ha farm one permanent fence segment is about 340 m and takes 68% of a day, so it is one a day, and none once a third of the day is used. On 6,000 ha a day builds 480 m and on 4,000 ha 392 m. Should permanent fence scale with the farm?
+- (c) Things to do does not list a crop to lock up or grain shedding, though the model raises both. Add them?
+- (d) Does a contractor's fence run carry on day after day (Stage 2)?
 
 How it was tested:
 
@@ -622,7 +637,6 @@ Not done, or not verified:
 - **The `realism-guardian` agent was not run** on this change, and there was no Lighthouse run (no page changed).
 - **A mob's grazing is not split at the time of a move.** The times are recorded.
 - **Buying is still straight into a paddock.** Sale days, and delivery into the yards for the player to move out, are the next part.
-- **Putting a mob on a supplement still takes 30 minutes.** Claudia has said that in Fast Farm it is switched on with no daylight cost. That was marked for the next part and is not built.
 - **Daily Farm:** nothing specific was built.
 - **Farm hands and contractor fencing** are Stage 2.
 - The VISUALS and mockups docs still show a homestead and a "job in progress". They were not touched.
@@ -633,7 +647,7 @@ Questions for Claudia:
 
 1. **"500 m a working day."** Built: a working day is that day's light, so a whole day on the fence is 500 m in June and in December, and other jobs come off it. Or is it a pace by the hour?
 2. **Whole segments only.** A line is built one map square's side at a time, so on a big farm a day of permanent fence can be one 340 m segment, with the rest of the day's light left for other jobs. Right, or should the last segment be built in part?
-3. **A job longer than a day's light.** At 30 min plus an hour per 200 ha, mustering 4,000 ha takes 20 h 30 m. Built: a job like that can be done at first light, before anything else that day, and takes the whole day. Right? Or is the muster figure too slow for big country?
+3. **A job longer than a day's light.** Built: a job longer than the day's light can be done at first light, before anything else that day, and takes the whole day. With the muster taken out this only affects a very big mob (weaning 2,000 head is 17 h 10 m). Right?
 4. **The bank** must cover the whole line as drawn, though only today's part is built and paid for. Right?
 5. **Electric fence pace.** PRD 5.4 has single-wire electric at about 1 km an hour (built). The mockup's job card shows 650 m in 4 h 20 m, which is 150 m an hour. Which?
 6. **Taking things out.** The PRD has no times. Built: as long as putting in (a gate 1 h, a trough or hub 3 h, fence at its building pace). Moving a fixed trough: 3 h.
@@ -645,7 +659,7 @@ Questions for Claudia:
 12. **"The line stops drawing when the day is used up" and "the part that fits is built, the rest shows red"** are built as one thing: the engine gives the split and a "uses the rest of the day" flag, and the screen draws the red and says the words. Is that how you meant them?
 13. **A year's skip started part-way through a year stops at the year's end** (the MVP stopped its clock there). A month is 30 days and a year 365. Right?
 14. **Evening** is called when less than 15 minutes of light is left (the shortest job, moving a mob). Right time to dim the farm?
-15. **Things to do** lists six kinds of fact. Should anything else be on the banner (no bull with the cows, a sowing window open, low condition)? They were left off because they are closer to advice than to a job.
+15. **Things to do** lists five kinds of fact. Should anything else be on the banner (no bull with the cows, a sowing window open, low condition)? They were left off because they are closer to advice than to a job.
 
 ## Ideas raised but not built yet
 

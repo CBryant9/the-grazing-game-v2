@@ -6,7 +6,7 @@
 
 import type { Action, ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
-import { MARK_NOTE_MIN_AGE, WEAN_MIN_AGE } from '../cattle/breeding';
+import { MARK_NOTE_MIN_AGE } from '../cattle/breeding';
 import { JOB_TIMES } from '../data/jobTimes';
 import { SPECIES, type SpeciesId } from '../data/species';
 import { EDGE, H_EDGES, V_EDGES, type EdgeRef } from '../farm/topology';
@@ -85,8 +85,6 @@ export type ThingToDo =
         /** Unmarked young bulls in the mob, which marking also deals with. */
         youngBulls: number;
       }
-    /** Calves old enough to be weaned (90 days or more). */
-    | { type: 'calves-to-wean'; mob: number; mobName: string; area: string | null; count: number }
     /** A mob on ground with no water. `count` is its head, calves included. Everything dies on day 4. */
     | {
         type: 'no-water';
@@ -110,10 +108,12 @@ export type ThingToDo =
 
 /**
  * What needs doing on the farm now, for the banner and the mob card. It
- * uses only what the model already knows: the ages at which the model
- * notes calves for marking and lets them be weaned, a mob's water, a
- * crop's maturity, fences that are down and the level in a portable
- * trough. In the order: water, stock, crops, fences.
+ * uses only what the model already knows: the age at which the model
+ * notes calves for marking, a mob's water, a crop's maturity, fences that
+ * are down and the level in a portable trough. Weaning is not listed,
+ * because the model weans a drop by itself when it is due. Weaning earlier
+ * is the player's choice, offered on the mob card. In the order: water,
+ * stock, crops, fences.
  */
 export function thingsToDo(farm: FarmState): ThingToDo[] {
   const out: ThingToDo[] = [];
@@ -155,14 +155,12 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
     const area = areaName(areaIdOf(survey, m));
     let toMark = 0;
     let youngBulls = 0;
-    let toWean = 0;
     for (const a of m.animals) {
       if (a.kind === 'calf') {
         if (a.sex === 'M' && a.age >= MARK_NOTE_MIN_AGE) toMark++;
-        if (a.age >= WEAN_MIN_AGE) toWean++;
       } else if (a.sex === 'M' && a.young) youngBulls++;
     }
-    if (toMark || youngBulls) {
+    if (toMark > 0) {
       out.push({
         type: 'calves-to-mark',
         mob: m.id,
@@ -172,17 +170,6 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
         youngBulls,
         does: 'markCalves',
         action: { type: 'markCalves', mob: m.id },
-      });
-    }
-    if (toWean) {
-      out.push({
-        type: 'calves-to-wean',
-        mob: m.id,
-        mobName: m.name,
-        area,
-        count: toWean,
-        does: 'wean',
-        action: { type: 'wean', mob: m.id },
       });
     }
   }

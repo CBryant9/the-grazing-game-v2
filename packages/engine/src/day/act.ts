@@ -26,6 +26,8 @@
  * progress.
  */
 
+// The one place that may use the unclocked pieces: it puts them behind the farm clock.
+// eslint-disable-next-line no-restricted-imports
 import { recordAction, refusedOutright, tryAction, type ActionEnv } from '../actions/apply';
 import type {
   Action,

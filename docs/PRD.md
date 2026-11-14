@@ -87,6 +87,8 @@ All **[Decided]** by Claudia on 13 Nov 2026 unless marked. **Where older wording
 | 5.13 Buildings the player can add | Sheds, silos, feed bins, extra yards, a feedlot | None for now |
 | 5.7 Things to check | A chip on the map | A banner and the mob card say what needs doing, as facts, each with its button |
 | 21, row 4 Travel time | Included, at 25 km/h, behind a setting | Taken out. There is no setting |
+| 5.3 Skips | Jobs in progress keep going during a skip | Reversed with jobs in progress: there are none, so nothing carries on through a skip |
+| 5.11 and 21, row 34 Contractor teams | Teams that "keep going day after day" | Stage 2, and **not decided by this change.** Question for Claudia: is a contractor's run the one kind of job that carries on from day to day? |
 | 21, rows 16, 17, 18, 20, 34 | Gate types, walking with dogs, yard work at the yards, building costs, fences longer than a day | Follow the rows above. Row 34 is now: the part of a line that fits is built and the rest is drawn again another day |
 
 For the game screens milestone: an information panel that explains how the day works, and onboarding and a tour, with help available at any time.
