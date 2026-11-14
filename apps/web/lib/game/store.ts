@@ -26,6 +26,7 @@ import type {
   ActResponse,
   DiaryDay,
   EdgeWire,
+  FarmListItem,
   FenceKindId,
   JobCardWire,
   PreviewResponse,
@@ -144,8 +145,14 @@ export interface Notice {
 }
 
 interface GameState {
-  /** 'broken': the farm is there and can't be opened. */
-  phase: 'loading' | 'setup' | 'ready' | 'failed' | 'broken';
+  /** 'broken': the farm is there and can't be opened. 'pick': a signed-in player with more than one farm chooses one. */
+  phase: 'loading' | 'setup' | 'ready' | 'failed' | 'broken' | 'pick';
+  /** The signed-in player's farms, while the picker is showing. */
+  farms: FarmListItem[];
+  /** The Fast Farms the account may have at once. */
+  farmLimit: number;
+  /** True while a save is being tried again: the screen says "Saving again". */
+  saving: boolean;
   snapshot: Snapshot | null;
   /** Requests under way. The map can always be looked at while this is above zero. */
   busy: number;
@@ -173,6 +180,14 @@ interface GameState {
   build: BuildState | null;
 
   load: () => Promise<void>;
+  /** Open one of the account's farms from the picker. */
+  openFarm: (id: string) => Promise<void>;
+  /** Delete one of the account's farms (the screen has confirmed). */
+  deleteFarm: (id: string) => Promise<void>;
+  /** Go back to the picker. */
+  showPicker: () => Promise<void>;
+  /** Start another farm from the picker. */
+  startAnother: () => void;
   created: (choices: SetupChoices) => Promise<void>;
   restart: () => Promise<void>;
   nextDay: () => Promise<void>;
@@ -295,6 +310,24 @@ export const useGame = create<GameState>()((set, get) => {
       mobId: mobId !== null && snapshot.mobs.some((m) => m.id === mobId) ? mobId : null,
     };
   };
+
+  /** What a different farm starts with: nothing open, no panels, no half-done jobs. */
+  const fresh = (): Partial<GameState> => ({
+    tab: 'farm',
+    jobs: {},
+    acts: {},
+    move: null,
+    plan: null,
+    sow: null,
+    build: null,
+    summary: null,
+    yearEnd: null,
+    overHidden: false,
+    morePage: 'menu',
+    record: null,
+    paddockId: null,
+    mobId: null,
+  });
 
   /** Fetch the farm again, quietly: after a failed or refused job, so the screen shows the farm as it is. */
   async function reload(): Promise<void> {
@@ -501,6 +534,9 @@ export const useGame = create<GameState>()((set, get) => {
 
   return {
     phase: 'loading',
+    farms: [],
+    farmLimit: 2,
+    saving: false,
     snapshot: null,
     busy: 0,
     notice: null,
@@ -522,12 +558,58 @@ export const useGame = create<GameState>()((set, get) => {
     async load() {
       set({ phase: 'loading', notice: null });
       try {
-        const { snapshot, broken } = await api.farm();
+        const { snapshot, broken, pick } = await api.farm();
         if (broken) set({ phase: 'broken', snapshot: null, notice: { message: broken } });
+        else if (pick) set({ phase: 'pick', snapshot: null, farms: pick });
         else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
       } catch (e) {
         set({ phase: 'failed', notice: { message: messageOf(e), retry: () => void get().load() } });
       }
+    },
+
+    async openFarm(id) {
+      await run(
+        () => void get().openFarm(id),
+        async () => {
+          const r = await api.openFarm(id);
+          if ('ok' in r) return;
+          if (r.broken) set({ phase: 'broken', snapshot: null, notice: { message: r.broken } });
+          else if (r.snapshot) {
+            lineChecker.cancel();
+            set({ ...adopt(r.snapshot), ...fresh() });
+          }
+        },
+      );
+    },
+
+    async deleteFarm(id) {
+      await run(
+        () => void get().deleteFarm(id),
+        async () => {
+          const r = await api.deleteFarm(id);
+          set({ farms: r.farms, farmLimit: r.limit });
+          if (get().phase === 'ready' && get().snapshot && !r.farms.some((f) => f.current)) {
+            // The farm that was open is gone: back to choosing.
+            await get().load();
+          }
+        },
+      );
+    },
+
+    async showPicker() {
+      await run(
+        () => void get().showPicker(),
+        async () => {
+          await api.openFarm(null);
+          lineChecker.cancel();
+          set({ ...fresh() });
+          await get().load();
+        },
+      );
+    },
+
+    startAnother() {
+      set({ phase: 'setup', snapshot: null, notice: null });
     },
 
     async created(choices) {

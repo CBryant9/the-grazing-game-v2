@@ -10,10 +10,12 @@
 //   /        website page    PRD target 100 KB. The public pages are built with the pages
 //                            router and send no script file at all (limit 1 KB)
 //   /play    game page       under 250 KB before the art and map load
+//   /sign-in, /sign-in/check-email, /sign-up/finish, /account
+//                            sign-in and account pages (milestone 3.2), each its own line
 //
 // gzip is a little larger than the brotli that Vercel serves, so a pass here
 // is a pass there. For its own test the folders and limits can be given:
-//   --static <dir> --app <dir> --pages <dir> --limit-home <KB> --limit-play <KB>
+//   --static <dir> --app <dir> --pages <dir> --limit-home <KB> --limit-play <KB> --limit-account <KB>
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -53,6 +55,22 @@ const PAGES = [
     limitKb: Number(arg('--limit-play', '250')),
     mayHaveNoScripts: false,
   },
+  // The sign-in and account pages (milestone 3.2) are app-router pages and send the page shell
+  // and a small form. Each has its own line, so a page that grows is seen on its own. The limit is
+  // the measured size with room to spare, never raised to make a change pass.
+  ...[
+    ['/sign-in', 'sign-in.html'],
+    ['/sign-in/check-email', 'sign-in/check-email.html'],
+    ['/sign-up/finish', 'sign-up/finish.html'],
+    ['/account', 'account.html'],
+  ].map(([path, file]) => ({
+    path,
+    dir: APP,
+    file,
+    targetKb: 100,
+    limitKb: Number(arg('--limit-account', '150')),
+    mayHaveNoScripts: false,
+  })),
 ];
 
 /** The script files a page's HTML names, once each. */
@@ -77,7 +95,7 @@ for (const page of PAGES) {
   const srcs = scriptsOf(html);
   if (srcs.length === 0 && page.mayHaveNoScripts && /<main[\s>]/.test(html)) {
     console.log(
-      `ok   ${page.path.padEnd(6)} 0.0 KB compressed in 0 scripts (limit ${page.limitKb} KB)`,
+      `ok   ${page.path.padEnd(20)} 0.0 KB compressed in 0 scripts (limit ${page.limitKb} KB)`,
     );
     continue;
   }
@@ -100,7 +118,7 @@ for (const page of PAGES) {
   const kb = bytes / 1024;
   const ok = kb < page.limitKb;
   console.log(
-    `${ok ? 'ok  ' : 'OVER'} ${page.path.padEnd(6)} ${kb.toFixed(1)} KB compressed in ${srcs.length} scripts (limit ${page.limitKb} KB)`,
+    `${ok ? 'ok  ' : 'OVER'} ${page.path.padEnd(20)} ${kb.toFixed(1)} KB compressed in ${srcs.length} scripts (limit ${page.limitKb} KB)`,
   );
   if (ok && kb >= page.targetKb) {
     console.log(`     note: above the PRD 14.10 target of ${page.targetKb} KB, held at the limit.`);

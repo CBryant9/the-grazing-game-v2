@@ -8,6 +8,7 @@ import { num, plural, shortDate } from '@/lib/game/format';
 import { kindName, setupFacts, unreadSeqs, unreadWord } from '@/lib/game/more';
 import { useGame } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
+import { AccountSection } from './AccountSection';
 import { DiaryPanel } from './DiaryPanel';
 import { EmptyState } from './EmptyState';
 import { HelpSection } from './HelpPanel';
@@ -198,6 +199,7 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
       <Inbox snapshot={snapshot} />
       <HelpSection />
       <Farm snapshot={snapshot} />
+      <AccountSection />
       <section aria-labelledby="look-title" className={styles.stack}>
         <h3 id="look-title" className={`px ${styles.minihead}`}>
           Look and links

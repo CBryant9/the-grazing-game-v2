@@ -1,0 +1,150 @@
+/* The farm picker, the past-day view and the saving strip (milestone 3.2). */
+
+.pick {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+.picktitle {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.farmlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.farmcard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+.farmname {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.farmsub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.row .btn {
+  min-height: var(--tap);
+}
+.confirm {
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+/* The saving strip: sits above the map, never covers a control. */
+.saving {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: calc(100% - 24px);
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* The farm on a past day: a screen over the farm, read only. */
+.past {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.paststrip {
+  background: var(--gamehdr);
+  border-bottom: 1px solid var(--gamehdr-line);
+  padding: 10px var(--gutter);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.paststrip p {
+  margin: 0;
+  flex: 1 1 200px;
+  font-size: 0.875rem;
+}
+.pastmap {
+  position: relative;
+  flex: 0 0 46%;
+  min-height: 200px;
+  background: var(--frame);
+}
+.pastlist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px var(--gutter) 24px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.pastpad {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  min-height: var(--tap);
+  width: 100%;
+}
+.pastpad[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+}
+.pastfacts {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.viewbtn {
+  margin-top: 6px;
+}
+@media (min-width: 900px) {
+  .past {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .paststrip {
+    flex: 1 0 100%;
+  }
+  .pastmap {
+    flex: 1 1 60%;
+  }
+  .pastlist {
+    flex: 0 0 360px;
+  }
+}

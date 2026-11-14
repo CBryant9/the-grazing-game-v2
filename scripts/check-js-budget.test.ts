@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 /** A pretend build. `homeKb` and `playKb` are the KB of script each page asks for. */
-function pretend(homeKb: number, playKb: number, missing = false) {
+function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20) {
   const root = mkdtempSync(join(tmpdir(), 'gg-budget-'));
   dirs.push(root);
   const chunks = join(root, 'static', 'chunks');
@@ -37,6 +37,18 @@ function pretend(homeKb: number, playKb: number, missing = false) {
     homeKb === 0 ? '<html><main>Home</main></html>' : page('home'),
   );
   writeFileSync(join(app, 'play.html'), missing ? page('gone') : page('play'));
+  // The sign-in and account pages each ask for a small script of their own.
+  writeFileSync(join(chunks, 'account.js'), randomBytes(accountKb * 1024));
+  mkdirSync(join(app, 'sign-in'), { recursive: true });
+  mkdirSync(join(app, 'sign-up'), { recursive: true });
+  for (const file of [
+    'sign-in.html',
+    'sign-in/check-email.html',
+    'sign-up/finish.html',
+    'account.html',
+  ]) {
+    writeFileSync(join(app, file), page('account'));
+  }
   return { stat: join(root, 'static'), app, pages };
 }
 
@@ -62,6 +74,17 @@ describe('the JavaScript budget check', () => {
     const r = run(pretend(50, 280));
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/OVER\s+\/play/);
+  });
+
+  it('gives each sign-in and account page its own line, and fails one that grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20));
+    expect(ok.status).toBe(0);
+    for (const path of ['/sign-in', '/sign-in/check-email', '/sign-up/finish', '/account']) {
+      expect(ok.stdout).toContain(path);
+    }
+    const over = run(pretend(0, 100, false, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/sign-in\s/);
   });
 
   it('does not count the polyfills for old browsers (nomodule)', () => {

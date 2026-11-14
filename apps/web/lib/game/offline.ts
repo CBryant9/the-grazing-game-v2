@@ -11,6 +11,17 @@ import { SNAPSHOT_VERSION, type Snapshot } from './types';
  */
 
 export const OFFLINE_KEY = 'gg-last-farm';
+/** Which player this browser last saw, so the offline view can find that player's copy without asking the server. */
+export const SCOPE_KEY = 'gg-last-scope';
+
+/**
+ * The copy is kept for one player. A guest's copy is under `gg-last-farm`; an account's is under
+ * `gg-last-farm:<account id>`. So on a phone or computer two people share, one never sees the
+ * other's farm, and signing out clears every copy (`clearAllLastFarms`).
+ */
+export const GUEST = 'guest';
+export const keyFor = (scope: string): string =>
+  scope === GUEST ? OFFLINE_KEY : `${OFFLINE_KEY}:${scope}`;
 
 /** The one line shown while the farm is the saved copy. */
 export const OFFLINE_LINE = 'You are offline. This is the farm as you last saw it.';
@@ -56,16 +67,20 @@ function defaultStore(): Store | null {
 }
 
 /** Keep the snapshot. A failure (no storage, no room) is ignored: the farm just can not be seen offline. */
-export function saveLastFarm(snapshot: Snapshot, store: Store | null = defaultStore()): void {
+export function saveLastFarm(
+  snapshot: Snapshot,
+  store: Store | null = defaultStore(),
+  scope: string = GUEST,
+): void {
   if (!store) return;
   try {
     const saved: Saved = { v: SNAPSHOT_VERSION, savedAt: Date.now(), snapshot };
-    store.setItem(OFFLINE_KEY, JSON.stringify(saved));
+    store.setItem(keyFor(scope), JSON.stringify(saved));
   } catch {
     // Too big for this browser's storage, or storage is off. Drop the old copy
     // so a stale farm is never shown as the last one seen.
     try {
-      store.removeItem(OFFLINE_KEY);
+      store.removeItem(keyFor(scope));
     } catch {
       // Nothing more to do.
     }
@@ -73,10 +88,13 @@ export function saveLastFarm(snapshot: Snapshot, store: Store | null = defaultSt
 }
 
 /** The kept snapshot, or null when there is none or it can not be trusted. */
-export function loadLastFarm(store: Store | null = defaultStore()): Snapshot | null {
+export function loadLastFarm(
+  store: Store | null = defaultStore(),
+  scope: string = GUEST,
+): Snapshot | null {
   if (!store) return null;
   try {
-    const raw = store.getItem(OFFLINE_KEY);
+    const raw = store.getItem(keyFor(scope));
     if (!raw) return null;
     const saved = JSON.parse(raw) as Partial<Saved> | null;
     if (!saved || saved.v !== SNAPSHOT_VERSION) return null;
@@ -87,11 +105,52 @@ export function loadLastFarm(store: Store | null = defaultStore()): Snapshot | n
 }
 
 /** Forget the kept farm: the farm was thrown away, or there is none. */
-export function clearLastFarm(store: Store | null = defaultStore()): void {
+export function clearLastFarm(
+  store: Store | null = defaultStore(),
+  scope: string = GUEST,
+): void {
   if (!store) return;
   try {
-    store.removeItem(OFFLINE_KEY);
+    store.removeItem(keyFor(scope));
   } catch {
     // Nothing to do.
+  }
+}
+
+type FullStore = Store & Pick<Storage, 'length' | 'key'>;
+
+/** Forget every kept farm, guest's and accounts', and who was last seen. For signing out and deleting an account. */
+export function clearAllLastFarms(store: FullStore | null = defaultStore() as FullStore | null): void {
+  if (!store) return;
+  try {
+    const names: string[] = [];
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (k && (k === OFFLINE_KEY || k.startsWith(`${OFFLINE_KEY}:`) || k === SCOPE_KEY)) {
+        names.push(k);
+      }
+    }
+    for (const k of names) store.removeItem(k);
+  } catch {
+    // Nothing to do.
+  }
+}
+
+/** Remember who this browser last saw. */
+export function rememberScope(scope: string, store: Store | null = defaultStore()): void {
+  try {
+    store?.setItem(SCOPE_KEY, scope);
+  } catch {
+    // Not kept: the offline view then looks for the guest's copy.
+  }
+}
+
+/** Who this browser last saw: an account id or `guest`. Used only when the server can not be asked. */
+export function lastScope(store: Store | null = defaultStore()): string {
+  try {
+    const v = store?.getItem(SCOPE_KEY);
+    return v && /^[0-9a-f-]{36}$/.test(v) ? v : GUEST;
+  } catch {
+    return GUEST;
   }
 }

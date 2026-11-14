@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
+import { useMe } from '@/lib/auth/store';
+import { onSavingAgain } from '@/lib/game/api';
 import { wireTour } from '@/lib/game/helpstore';
 import { useGame } from '@/lib/game/store';
+import { FarmPicker } from './FarmPicker';
+import { PastDay } from './PastDay';
 import { PlayScreen } from './PlayScreen';
 import { SetupFlow } from './SetupFlow';
 import styles from './play.module.css';
+import accounts from './accounts.module.css';
 
 /**
  * /play. A visitor with no farm sees the setup flow. A visitor with a farm
@@ -18,14 +23,33 @@ export function PlayApp() {
   const snapshot = useGame((s) => s.snapshot);
   const notice = useGame((s) => s.notice);
   const load = useGame((s) => s.load);
+  const saving = useGame((s) => s.saving);
+  const loadMe = useMe((s) => s.load);
 
   useEffect(() => {
     // Watch for a new farm, so the guided first day starts with it. Before load, so no change is missed.
     wireTour();
     void load();
-  }, [load]);
+    // Who is playing (a guest or an account): decides what More offers and whose offline copy is kept.
+    void loadMe();
+    // A save that is being tried again shows "Saving again".
+    onSavingAgain((again) => useGame.setState({ saving: again }));
+    return () => onSavingAgain(null);
+  }, [load, loadMe]);
 
-  if (phase === 'ready' && snapshot) return <PlayScreen snapshot={snapshot} />;
+  if (phase === 'ready' && snapshot) {
+    return (
+      <>
+        <PlayScreen snapshot={snapshot} />
+        <PastDay />
+        {saving && (
+          <p className={accounts.saving} role="status">
+            Saving again. Your last change shows as done once it is stored.
+          </p>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className={styles.plain}>
@@ -47,8 +71,24 @@ export function PlayApp() {
           </div>
         )}
         {phase === 'broken' && <BrokenFarm message={notice?.message} />}
+        {phase === 'pick' && <FarmPicker />}
         {phase === 'setup' && <SetupFlow />}
+        {phase === 'setup' && <BackToFarms />}
       </main>
+    </div>
+  );
+}
+
+/** On the setup screen, a signed-in player who already has farms can go back to them. */
+function BackToFarms() {
+  const farms = useGame((s) => s.farms);
+  const load = useGame((s) => s.load);
+  if (farms.length === 0) return null;
+  return (
+    <div className={accounts.pick}>
+      <button type="button" className="btn ghost" onClick={() => void load()}>
+        Back to your farms
+      </button>
     </div>
   );
 }

@@ -82,6 +82,15 @@ const ENGINE_ONLY = [
   'listedDays',
 ];
 
+/**
+ * Names of the server's secrets (milestone 3.2). They are environment variable names, which the
+ * server code reads and nothing sent to the browser may hold: a bundle that carries one has
+ * pulled server code in (the secret key, the database connection or the ban pepper with it).
+ * Each is also looked for in apps/web/server, so the list can not go stale.
+ */
+const SERVER_ONLY = ['SUPABASE_SECRET_KEY', 'SUPABASE_DB_POOLER_URL', 'BAN_HASH_PEPPER'];
+const SERVER_SRC = join(ROOT, 'apps/web/server');
+
 /** Text the browser code does hold. Seeing it proves the scan read the right files. */
 const BROWSER_HAS = 'Next day';
 
@@ -104,6 +113,16 @@ if (stale.length) {
   console.error(
     'Pick current names from packages/engine/src and update scripts/check-browser-bundle.mjs.',
   );
+  process.exit(1);
+}
+
+let serverText = '';
+for (const f of files(SERVER_SRC)) {
+  if (f.endsWith('.ts') && !f.endsWith('.test.ts')) serverText += readFileSync(f, 'utf8');
+}
+const staleServer = SERVER_ONLY.filter((t) => !serverText.includes(t));
+if (staleServer.length) {
+  console.error(`These search terms are not in apps/web/server any more: ${staleServer.join(', ')}.`);
   process.exit(1);
 }
 
@@ -179,7 +198,7 @@ let sawBrowserText = false;
 for (const f of new Set([...scripts, ...pages, ...swFiles])) {
   const text = readFileSync(f, 'utf8');
   if (scripts.includes(f) && text.includes(BROWSER_HAS)) sawBrowserText = true;
-  for (const term of ENGINE_ONLY) {
+  for (const term of [...ENGINE_ONLY, ...SERVER_ONLY]) {
     if (text.includes(term)) found.push(`${term}  in  ${relative(ROOT, f)}`);
   }
 }
@@ -192,10 +211,10 @@ if (!sawBrowserText) {
   process.exit(1);
 }
 if (found.length) {
-  console.error('What the browser is sent holds engine text. The rules are not hidden:');
+  console.error('What the browser is sent holds engine text or a server secret name:');
   for (const line of found) console.error(`  ${line}`);
   process.exit(1);
 }
 console.log(
-  `Browser bundle clean: ${scripts.length} script files, ${pages.length} /play page files and the service worker with ${swFiles.size - 1} files in its list searched for ${ENGINE_ONLY.length} engine-only terms, none found.`,
+  `Browser bundle clean: ${scripts.length} script files, ${pages.length} /play page files and the service worker with ${swFiles.size - 1} files in its list searched for ${ENGINE_ONLY.length} engine-only terms and ${SERVER_ONLY.length} server secret names, none found.`,
 );

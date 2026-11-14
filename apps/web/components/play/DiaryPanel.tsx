@@ -1,6 +1,8 @@
 'use client';
 
 import { dateText } from '@/lib/game/format';
+import { useEffect } from 'react';
+import { usePast } from '@/lib/game/pastStore';
 import { useGame } from '@/lib/game/store';
 import { RecordStatus } from './ScoresPanel';
 import styles from './play.module.css';
@@ -10,6 +12,14 @@ export function DiaryPanel() {
   const record = useGame((s) => s.record);
   const loadEarlier = useGame((s) => s.loadEarlier);
   const days = record?.data ? record.diary : null;
+  const pictures = usePast((s) => s.days);
+  const loadDays = usePast((s) => s.loadDays);
+  const view = usePast((s) => s.view);
+  const status = usePast((s) => s.status);
+  const message = usePast((s) => s.message);
+  useEffect(() => {
+    void loadDays();
+  }, [loadDays]);
   return (
     <div className={styles.stack}>
       <RecordStatus />
@@ -29,9 +39,24 @@ export function DiaryPanel() {
                       <li key={i}>{line}</li>
                     ))}
                   </ul>
+                  {pictures?.includes(d.day) && (
+                    <button
+                      type="button"
+                      className="btn sm ghost"
+                      disabled={status === 'loading'}
+                      onClick={() => void view(d.day)}
+                    >
+                      View the farm on this day
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
+            {status === 'failed' && message && (
+              <p className="muted" role="alert">
+                {message}
+              </p>
+            )}
             {record?.status === 'failed' && record.message && (
               <p className="muted" role="alert">
                 {record.message}

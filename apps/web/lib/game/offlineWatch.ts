@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { api, UNREACHABLE } from './api';
-import { clearLastFarm, loadLastFarm, saveLastFarm } from './offline';
+import { useMe } from '../auth/store';
+import {
+  GUEST,
+  clearLastFarm,
+  lastScope,
+  loadLastFarm,
+  rememberScope,
+  saveLastFarm,
+} from './offline';
 import { useGame } from './store';
 import type { Snapshot } from './types';
 
@@ -98,8 +106,12 @@ export function startOfflineWatch(): () => void {
   const flush = (): void => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
-    if (pending && !useOffline.getState().offline) saveLastFarm(pending);
-    pending = null;
+    // The copy is kept for one player. Until the server has said who that is, it waits.
+    const who = useMe.getState();
+    if (pending && !useOffline.getState().offline && who.settled && !who.unknown) {
+      saveLastFarm(pending, undefined, who.me?.scope ?? GUEST);
+      pending = null;
+    }
   };
 
   // The game could not be reached on opening, and a farm was kept: show it.
@@ -107,7 +119,8 @@ export function startOfflineWatch(): () => void {
     const s = useGame.getState();
     if (s.phase !== 'failed') return false;
     if (navigator.onLine !== false && s.notice?.message !== UNREACHABLE) return false;
-    const kept = loadLastFarm();
+    // The server can not be asked who this is, so the player this browser last saw.
+    const kept = loadLastFarm(undefined, lastScope());
     if (!kept) return false;
     showKept(kept);
     return true;
@@ -120,11 +133,21 @@ export function startOfflineWatch(): () => void {
     }
     if ((s.phase === 'setup' || s.phase === 'broken') && prev.phase !== s.phase) {
       // No farm to keep: it was thrown away, or never started.
-      if (!useOffline.getState().offline) clearLastFarm();
+      if (!useOffline.getState().offline) clearLastFarm(undefined, useMe.getState().me?.scope ?? GUEST);
       return;
     }
     if (s.snapshot && s.snapshot !== prev.snapshot && !useOffline.getState().offline) {
       pending = s.snapshot;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(flush, SAVE_AFTER_MS);
+    }
+  });
+
+  // When the server says who the player is, remember it, and keep the copy that was waiting.
+  const unwatchMe = useMe.subscribe((m, prev) => {
+    if (!m.settled || prev.settled || m.unknown) return;
+    if (m.me) rememberScope(m.me.scope ?? GUEST);
+    if (pending) {
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(flush, SAVE_AFTER_MS);
     }
@@ -148,6 +171,7 @@ export function startOfflineWatch(): () => void {
 
   return () => {
     unsubscribe();
+    unwatchMe();
     window.removeEventListener('offline', onOffline);
     window.removeEventListener('online', onOnline);
     window.removeEventListener('pagehide', flush);
