@@ -284,6 +284,26 @@ function packSheep(list: readonly Sheep[]): PackedSheep {
   };
 }
 
+/**
+ * A format 10 lamb's doom (the days it had left, or -1) as this engine's: it
+ * dies on day 1 or 2 of life (`doomed`, `doomed2`), or, if its day was later
+ * (the first pass let a doomed lamb live to day 3), on its next day, by a
+ * daily risk of 1 from day 3 (`lambRisk`). Before, a later day was dropped
+ * and the lamb lived.
+ */
+export function format10Doom(
+  age: number,
+  left: number,
+  lambRisk: number,
+): { doomed: number; doomed2: number; lambRisk: number } {
+  const dieAt = left >= 0 ? age + left + 1 : -1;
+  return {
+    doomed: dieAt === 1 ? 1 : 0,
+    doomed2: dieAt === 2 ? 1 : 0,
+    lambRisk: dieAt > 2 ? 1 : lambRisk,
+  };
+}
+
 function unpackSheep(p: PackedSheep, format: number): Sheep[] {
   const ints = new Int32Array(ownBuffer(fromBase64(p.ints)));
   const nums = new Float64Array(ownBuffer(fromBase64(p.nums)));
@@ -307,11 +327,8 @@ function unpackSheep(p: PackedSheep, format: number): Sheep[] {
     for (let k = 0; k < NN - 1; k++) s[SHEEP_NUMS[k]!] = nums[i * NN + k]!;
     if (old) {
       // A sheep each, and a doomed lamb's days left turned into the day of life it dies on.
-      const left = s.doomed as number;
-      const dieAt = left >= 0 ? (s.age as number) + left + 1 : -1;
       s.n = 1;
-      s.doomed = dieAt === 1 ? 1 : 0;
-      s.doomed2 = dieAt === 2 ? 1 : 0;
+      Object.assign(s, format10Doom(s.age as number, s.doomed as number, s.lambRisk as number));
     }
     out.push(s as unknown as Sheep);
   }
@@ -370,7 +387,7 @@ export function saveFarm(farm: FarmState): SavedFarm {
  * was added after the first saves were made, with the value it had before
  * it existed.
  */
-function upgrade(f: Record<string, unknown>): void {
+function upgrade(f: Record<string, unknown>, format: number): void {
   const farm = f as unknown as Partial<FarmState> & Record<string, unknown>;
   farm.inbox ??= [];
   farm.inboxSeq ??= farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0) + 1;
@@ -452,6 +469,9 @@ function upgrade(f: Record<string, unknown>): void {
       x.n ??= 1;
       x.doomed2 ??= 0;
     }
+    // Format 12: a joining's `lambingStart` is null before lambing, so a lambing that began
+    // before the farm's first day can be a negative day. Older saves stored -1 for "not yet".
+    if (format < 12 && m.join && m.join.lambingStart === -1) m.join.lambingStart = null;
   }
 }
 
@@ -466,7 +486,7 @@ export function loadFarm(saved: SavedFarm): FarmState {
     throw new Error('This farm was saved by a newer version of the game.');
   }
   const raw = unpack(saved, format) as Record<string, unknown>;
-  upgrade(raw);
+  upgrade(raw, format);
   const farm = raw as unknown as FarmState;
   farm.saveFormat = SAVE_FORMAT_VERSION;
   farm.engineVersion = ENGINE_VERSION;

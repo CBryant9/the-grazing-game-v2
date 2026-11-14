@@ -50,6 +50,7 @@ import {
   placeAnchor,
   pricesOf,
   realSourcesOf,
+  refreshSheepPrices,
   seasonsOf,
   stepMarket,
   surveyOf,
@@ -286,6 +287,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     births: [],
   };
   if (farm.over) return result;
+  // Real-year sheep prices for today (sheep may have come since the last day).
+  refreshSheepPrices(farm, env);
   result.ran = true;
 
   const stream = (name: PlayStream): Rng => env.rng?.[name] ?? rngFromState(farm.rng[name]);
@@ -522,6 +525,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     closed.realYear = real.plan.yearAt(real.plan.gameYearOn(day));
   }
   stepMarket(farm, env, farm.day, rng.market);
+  refreshSheepPrices(farm, env);
   farm.priceHistory.push({ day: farm.day, c: { ...pricesOf(farm).classes } });
   if (farm.priceHistory.length > PRICE_HISTORY_DAYS) farm.priceHistory.shift();
   // The new real year opens on its own first day's prices, so the step in

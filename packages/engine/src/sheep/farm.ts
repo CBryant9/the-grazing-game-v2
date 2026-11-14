@@ -32,7 +32,11 @@ import { rngFromState, rngStream } from '../rng';
 import { areaIdOf, areaNameOf, grazingArea, placeAnchor } from '../sim/derived';
 import type { TickEvent } from '../sim/events';
 import type { FarmState, MobWhere } from '../sim/state';
-import { SHEARING_RATE, SHEEP_HEALTH_PER_HEAD_YEAR, WOOL_HARVEST } from '../data/sheepMarket';
+import {
+  SHEEP_BUDGET_COSTS,
+  SHEEP_HEAD_PRICES,
+  SHEEP_HEALTH_PER_HEAD_YEAR,
+} from '../data/sheepMarket';
 import { isAdultRam, matureKg } from './energy';
 import { sellClip } from './market';
 import { crutchMob, shearMob } from './wool';
@@ -321,11 +325,9 @@ export function shearToday(farm: FarmState, m: SheepMob, events: TickEvent[]): v
   for (const x of m.sheep) if (x.weaned && isAdultRam(x)) rams += x.n;
   const r = shearMob(m, farm.day);
   if (!r.head) return;
-  // Shearers' piece rates and the shed staff; the clip sold less its selling costs.
+  // Shearing all in, a head (rams twice), the budget figure; the clip sold less its selling costs.
   const cost =
-    (r.head - rams) * SHEARING_RATE.sheep +
-    rams * SHEARING_RATE.ram +
-    r.head * WOOL_HARVEST.shedStaffPerHead;
+    (r.head - rams) * SHEEP_BUDGET_COSTS.shearPerHead + rams * 2 * SHEEP_BUDGET_COSTS.shearPerHead;
   const sale = sellClip(r.cleanKg, r.greasyKg, r.micron);
   const income = sale.net;
   farm.cash += income - cost;
@@ -349,7 +351,7 @@ export function shearToday(farm: FarmState, m: SheepMob, events: TickEvent[]): v
 export function crutchToday(farm: FarmState, m: SheepMob, events: TickEvent[]): void {
   const head = crutchMob(m, farm.day);
   if (!head) return;
-  const cost = head * SHEARING_RATE.crutch;
+  const cost = head * SHEEP_BUDGET_COSTS.crutchPerHead;
   farm.cash -= cost;
   farm.year.running += cost;
   events.push({ type: 'sheep-crutched', mob: m.id, mobName: m.name, head, cost });
@@ -452,11 +454,13 @@ export function sheepDay(
     if (m.crutchOn && date.month === m.crutchOn.month && date.date === m.crutchOn.date) {
       crutchToday(farm, m, events);
     }
-    // Animal health, a head a day.
+    // Animal health, a head a day; and the rams' replacement, a ram a day (SHEEP_BUDGET_COSTS).
     const health = (headOf(m.sheep.filter((x) => x.weaned)) * SHEEP_HEALTH_PER_HEAD_YEAR) / 365;
-    if (health > 0) {
-      farm.cash -= health;
-      farm.year.running += health;
+    const rams = headOf(m.sheep.filter((x) => isAdultRam(x)));
+    const ramCost = (rams * SHEEP_HEAD_PRICES.ramHead) / SHEEP_BUDGET_COSTS.ramYears / 365;
+    if (health + ramCost > 0) {
+      farm.cash -= health + ramCost;
+      farm.year.running += health + ramCost;
     }
     // Sheep in the stock yards graze the yards' square and have water, as cattle there do.
     const grazeArea =
@@ -493,6 +497,8 @@ export function sheepDay(
         born += s.n;
         out.births.push({ id: s.id, mob: m.id, count: s.n });
       }
+      // Lambs count in the year's births, as calves do.
+      farm.year.births += born;
       events.push({ type: 'lambs-born', mob: m.id, mobName: m.name, count: born });
     }
     if (res.deaths.length) {
@@ -514,7 +520,11 @@ export function sheepDay(
   // share of a beast).
   settleSheepDeaths(state.mobs, deaths, byId, farm.animalIds, rng.deaths);
   state.mobs = state.mobs.filter((m) => m.sheep.length);
+  // Keep the other sheep streams (the breakout stream): replacing the whole record started
+  // the breakout draws again from the seed every day, so a thirsty mob drew the same number
+  // each day and most never got out (review of the third pass).
   state.rng = {
+    ...state.rng,
     breeding: rng.breeding.state(),
     deaths: rng.deaths.state(),
     flies: rng.flies.state(),

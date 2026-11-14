@@ -4,7 +4,7 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 
 ## Benchmarks
 
-| What | Target | Why this figure | State (engine 0.16.0) |
+| What | Target | Why this figure | State (engine 0.17.0) |
 |---|---|---|---|
 | Steer gain, Central Qld, set-stocked, no lick | 20–60 kg/head/yr | Spear grass country without supplement: weight lost through the dry wipes out most of the wet-season gain | Pass |
 | Steer gain, Central Qld, with lick | 75–130 kg/head/yr | Urea/protein lick lifts dry-season intake (CP < 7%) | Pass, with a known gap held: the average year may run up to 2 kg over the top (`averageYearOver`) |
@@ -25,8 +25,9 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 | Home-bred calves, Central Qld (m2.5) | 0.6–0.95 kg/day birth to 200 days and from 100 to 200 days; 100–146 kg at 100 days; 140–225 kg at 200 days | Nearest source, not the district's own: Brahman-Shorthorn calves in north Queensland (Fordyce et al. 1993), about 0.77 kg/day; the floors are a quarter under it (stand-in, years 25% apart); 100 kg at 100 days is FutureBeef's usual lowest weaning weight | Weight at 100 and 200 days pass. Known open gaps (expected failures): 0.53 kg/day birth to 200 days, 0.33 from 100 to 200. Regression floors held |
 | Home-bred calves, Northern Tablelands, Central West, Western Victoria (m2.5) | 0.7–1.1 kg/day birth to 200 days and from 100 to 200 days; 101–146 kg at 100 days; 171–256 kg at 200 days | Nearest source, not the districts' own: MLA More Beef from Pastures tool 5.05 (British calves, Grafton) | Weight at 100 days passes. Known open gaps (expected failures): birth to 200 days 0.54 / 0.57 / 0.63 kg/day, 200 days 143 / 149 / 163 kg, 100 to 200 days 0.39 / 0.29 / 0.36 kg/day. Regression floors held |
 | Herd years 1 to 3, no player action (m2.5, `herdYears.test.ts`) | pinned to the m2.5 figures (5 calves per 100 females, 8 points of cows under CS 2.25) | A pin, not a benchmark: holds calving and cow condition in later years | Pass |
-| Sheep, SHEEP_BENCHMARKS.md rows (SB-01 to SB-65) | each row's band (see Sheep benchmarks below) | Sources S1 to S74 | 82 tests named by SB row: 70 pass; 7 known open gaps (expected failures, figures in their names): SB-43 Merino ewe deaths 3.10 (one block 4.67) / 3.98 (blocks 5.26, 5.00, 5.53) / 4.63%, SB-43 first-cross 4.50 / 5.76 / 5.13% (Tablelands / Central West / Western Victoria), SB-47 Western Victoria weaners 1.66%; 5 skipped: SB-59 to SB-62 (C18, carrying capacity) and SB-65 (C26, fence price) |
-| Start flock, first year with no hands (m2.3) | profit −$50 to $200 a DSE; within half to twice the DPIRD $50.46/DSE gross margin | DPIRD 2025 self-replacing 20-micron Merino gross margin | First band passes. Known open gaps (expected failures): $11.6 / $124.7 / $149.9 a DSE (Tablelands / Central West / Western Victoria) |
+| Sheep, SHEEP_BENCHMARKS.md rows (SB-01 to SB-65) | each row's band (see Sheep benchmarks below) | Sources S1 to S74 | Engine 0.17.0: 82 tests named by SB row: 71 pass; 7 known open gaps (expected failures, figures in their names), each with a regression limit beside it: SB-43 Merino ewe deaths 3.33 (blocks 4.67, 5.08) / 3.98 (blocks 5.26, 5.53) / 4.70%, SB-43 first-cross 4.95 / 5.36 / 5.35% (Tablelands / Central West / Western Victoria), SB-47 Western Victoria weaners 1.66%; 4 skipped: SB-59 to SB-62 (C18, carrying capacity). SB-65 is now tested (netting $10 a metre against permanent $7) |
+| Start flock, first year with no hands (m2.3) | within half to twice the DPIRD $50.46/DSE gross margin (unmanaged: no sales, no feeding) | DPIRD 2025 self-replacing 20-micron Merino gross margin | Central West passes ($44.28). Known open gaps (expected failures) with regression limits: Tablelands $5.37, Western Victoria $135.74 a DSE |
+| SB-GM: a managed self-replacing Merino flock, gross margin (m2.7 review) | $37.85 to $63.08 a budget DSE (±25% of DPIRD's $50.46; the budget rates 2.32 DSE a ewe joined) | NSW DPIRD 2025 self-replacing 20-micron Merino (Sheep Central, 5 Aug 2026) | Central West passes ($38.69). Known open gaps with regression limits: Tablelands $71.88, Western Victoria $90.33 (wool at 2026 prices) |
 | Speed | under ~5 ms per simulated day with 4,000+ head (cattle); the largest flock (sheep) | Fast-forward must stay smooth | Pass (`pnpm test:speed`) |
 
 Seasons are random. Judge a run against its season: a drought year below target is expected, but an average year outside target is a bug.
@@ -1453,6 +1454,56 @@ So the calf change moves no sheep figure, and the sheep work moves no cattle fig
 **A mixed farm, two years with no player action** (`sim/mixedFarm.test.ts`: Western Victoria, seed 11, medium, from 1 March, easy, cattle and sheep). 86 cattle and 659 sheep at the start. Over the two years: 89 calves born and 58 weaned, 1,185 lambs born and 725 weaned, three shearings, 4 cattle and 579 sheep (mostly lambs) dead; profit $192,435 then $25,757, wool $59,231 then $70,847. Held by the test: no day has cattle and sheep in one paddock; the year lines (sales, wool, sheep sales, grain and interest, less buys, sheep buys, feed, crops, infrastructure and running costs) add up to the change in cash over the two years; the farm eats exactly what the same farm eats with only its cattle plus what it eats with only its sheep, day by day until day 276, when the first lambs are weaned to Paddock 1 because Paddock 6 holds cattle (with no cattle they go to Paddock 6); both species breed and wean; the same seed gives the same farm (by its hash). It runs in about 10 seconds.
 
 **Speed** (each run alone, after the join): cattle 4.49 ms a day with 4,890 head and 407 calves (limit 5); the largest flock 1.99 ms a day with 6,975 sheep.
+
+### 15 Nov 2026, m2.7 review of the sheep third pass: engine 0.17.0, save format 12
+
+What changed in the model (sheep only; no cattle, grass or crop rule): a lambing that began before the farm's first day is a negative day, so start lambs are marked and weaned; no lamb stays at foot past 150 days; a sheep under half the weight it is measured against dies, starved (a lamb at foot against the normal weight for its age, a weaned sheep against the normal weight at weaning); adult and wether deaths 0.91% a year (the document's own arithmetic, was written "about 0.8%"); the start flock keeps one age class of ewe weaners, casts the oldest class at weaning, has its lambs at foot at the CS the model's flocks lamb at with the ewes that died lambing taken out, and mid-joining has the ewes whose heat came before the first day in lamb; lambs count in the year's births; the sheep breakout stream carries on from day to day (it restarted from the seed every day, so most thirsty mobs never got out); shearing $9.81 a head all in, crutching $1.92, ram replacement (NSW DPIRD budget, search summaries); real-year sheep prices. No band was changed.
+
+**Cattle: unchanged.** The 216 steer and herd runs (every field, calf weights included) are byte for byte the calf branch's, and the cattle calibration suites give the same results and the same figures in every name. The no-hands digests pass untouched.
+
+**Every sheep row that moved** (mean of eight seeds, average year, winter feeding; Tablelands / Central West / Western Victoria). Every other sheep row (units, paddock, mob, SB-47, SB-52, SB-52b, SB-52c, SB-53, SB-54) is unchanged.
+
+| Row | Band | Before (0.16.0) | After (0.17.0) |
+|---|---|---|---|
+| SB-40 Merino marking | 75–90% | 89.53 / 87.07 / 85.24 | 88.82 / 87.40 / 85.09 |
+| SB-41 first-cross marking | 100–120% | 115.22 / 111.05 / 115.94 | 114.59 / 111.45 / 115.50 |
+| SB-43 Merino ewe deaths (highest block) | 2–4%, no block over 4.5% | 3.10 (4.67) / 3.98 (5.53) / 4.63 (5.33) | 3.33 (5.08) / 3.98 (5.53) / 4.70 (6.07): all three open, as before |
+| SB-43 first-cross ewe deaths | 2–4% | 4.50 / 5.76 / 5.13 | 4.95 / 5.36 / 5.35: open, as before |
+| SB-52a ewe fleece, kg clean; micron | 3.3–4.7 | 4.42 / 4.13 / 4.27; 18.30 / 18.11 / 18.17 | 4.42 / 4.12 / 4.27; 18.29 / 18.10 / 18.17 |
+| SB-65 netting against cattle fence price | higher | skipped | passes ($10 a metre against $7) |
+
+The deaths rise is the adult rate (0.8 to 0.91%). Each open row now has a regression limit beside it (today's mean plus 0.3 of a point; SB-47's weaners no less than 1.36%).
+
+**Start flocks, the first year with no hands** (seed 7, medium, from 1 September, average year):
+
+| District | Head (at foot) | DSE | Lambs born | Weaned | Deaths | First shearing | Profit |
+|---|---|---|---|---|---|---|---|
+| Tablelands | 1,150 (0) | 1,712 | 1,217 | 791 | 885 | day 80: 3.70 kg, 17.75 µm | $9,191, $5.37/DSE (was $11.6) |
+| Central West | 3,072 (1,333) | 2,981 | 2,070 (was 628) | 1,333 (was 0) | 2,233 | day 353: 3.35 kg, 17.66 µm | $131,978, $44.28/DSE (was $124.7) |
+| Western Victoria | 947 (0) | 1,439 | 1,268 | 709 | 416 | day 74: 4.08 kg, 17.92 µm | $195,357, $135.74/DSE (was $149.9) |
+
+The Central West flock now weans its lambs at foot on day 6 at about 22 kg, joins dry on 5 January and lambs 2,070 (was 628); its start lambs are shorn with the flock. The deaths are the unfed winter (no one feeds in this test; C18). Western Victoria stays high: nothing is sold, so the lamb crop counts at 2026 prices.
+
+**SB-GM, a managed self-replacing Merino flock** (`calibration/sheep.margin.test.ts`; seeds 7 and 8, second year; surplus lambs and cast-for-age ewes sold, replacements kept, winter feeding). Dollars a budget DSE (a ewe joined ÷ 2.32, the budget's own rating):
+
+| District | Gross margin | Sales | Wool | Stock change | Shearing | Crutching | Health | Rams | Feed | Model DSE a ewe | Gross margin a model DSE |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Tablelands | **71.88** (open) | 51.03 | 59.38 | −16.36 | 6.46 | 1.28 | 2.39 | 1.95 | 10.09 | 1.86 | 89.65 |
+| Central West | **38.69** (passes) | 25.01 | 51.72 | −23.31 | 5.56 | 1.11 | 2.09 | 1.83 | 4.13 | 1.60 | 56.27 |
+| Western Victoria | **90.33** (open) | 54.18 | 64.71 | −16.11 | 6.76 | 1.31 | 2.48 | 1.90 | 0.00 | 1.98 | 105.56 |
+
+Band $37.85 to $63.08 (±25% of $50.46): the same DPIRD budget moved from $27.81 on October 2024 prices to $50.46 on 2025 prices, so a tighter band would test the price date. What still differs from the budget: **wool** $52 to $65 a budget DSE against the budget's about $20 (5.64 kg greasy at $8.10, October 2024), from the game's September 2026 wool prices (about $26 a kg clean at 18 µm, $21 at 20 µm) against the budget's $13.30 a kg clean for 20 µm, a heavier cut (4.1 to 4.4 kg clean against 3.67) and finer wool (18 µm against 20); **costs** not charged because no figure was read: marking, freight beyond the $3 head fee, pasture; animal health at the $3.57 stand-in. **The DSE**: the model's DSE from energy is 1.6 to 2.0 a ewe joined, against the budget's 2.32, so a margin "per DSE" on the model's own DSE reads 20 to 45% higher than on the budget's: that, with wool, is most of the "three times the margin" the review found. The stock change is negative because the flock is drawn down a little as it settles from the start flock's shape.
+
+**Cattle against sheep on the same farm, the same average year** (seed 11, medium, from 1 March, no player action: the mixed start farm run once with its cattle only and once with its sheep only, each carrying the whole farm's overheads; profit is the change in net worth):
+
+| District | Cattle, year 1; year 2 ($/DSE) | Sheep, year 1; year 2 ($/DSE) |
+|---|---|---|
+| Western Victoria | 20.14; −95.75 (971 DSE) | −67.92; 101.16 (901 DSE) |
+| Central West | −23.83; −96.51 (1,621 DSE) | −230.98; 58.59 (867 DSE) |
+
+Unmanaged figures swing on stock values and overheads year to year and are not margins; on Claudia's list.
+
+**Speed** (each alone): see the DEVELOPMENT_LOG entry.
 
 ### Earlier checks (build sessions, older model versions)
 

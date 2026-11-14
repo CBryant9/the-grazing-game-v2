@@ -155,6 +155,25 @@ describe('one mob to a paddock, across species', () => {
     void dryCell;
   });
 
+  it('the sheep breakout draws carry on from day to day, so a thirsty mob tries each day at the cattle odds', () => {
+    // The cattle odds for 200 head: 0.25 × 1.5 a day. Over 4 days about 85% of mobs get out.
+    let out = 0;
+    let late = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const { farm } = dryHalfSheep(seed);
+      for (let d = 0; d < 4; d++) {
+        const broke = stepDay(farm).events.some((e) => e.type === 'sheep-breakout');
+        if (broke) {
+          out++;
+          if (d > 0) late++;
+          break;
+        }
+      }
+    }
+    expect(out).toBeGreaterThanOrEqual(13);
+    expect(late).toBeGreaterThan(0);
+  });
+
   it('a netting fence holds sheep: thirsty sheep behind netting stay put', () => {
     const { farm } = dryHalfSheep(4);
     const done = applyInstantly(farm, {

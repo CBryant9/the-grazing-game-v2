@@ -95,8 +95,22 @@
  * the m2.7 entry). A farm with no sheep plays as the calf branch did (the
  * no-hands digests hold). No stored field changed, so the save format
  * stays 11.
+ *
+ * 0.17.0 (m2.7, review of the sheep third pass): sheep only. A lambing that
+ * began before the farm's first day is a negative day, so start lambs are
+ * marked and weaned (and no lamb stays at foot past 150 days); a sheep
+ * under half its normal weight for its age dies, starved; the start flock
+ * keeps only the replacements it needs, casts the oldest ewes at weaning,
+ * has the lambs and the ewes in lamb the model itself would; adult and
+ * wether deaths 0.91% a year (the document's arithmetic); lambs count in
+ * the year's births; sheep plans take a move's daylight, warn of dry stops
+ * and pause and resume; sheep on their way count in net worth; the sheep
+ * breakout stream carries on from day to day; real-year sheep prices; the
+ * budget's shearing, crutching and ram replacement costs; the weekly
+ * losing-weight and low-condition notes. No cattle, grass or crop rule
+ * changed. Logged in docs/CALIBRATION.md (the m2.7 review entry).
  */
-export const ENGINE_VERSION = '0.16.0';
+export const ENGINE_VERSION = '0.17.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -152,5 +166,12 @@ export const ENGINE_VERSION = '0.16.0';
  * `shearOn`, `crutchOn` and `lastBreak`; a year may have `wool` and
  * `sheepDeaths`. A format 10 save loads each sheep as a record of one, with
  * the district's shearing days and no feed. Older saves load with no sheep.
+ *
+ * 12: the sheep review (m2.7). A joining's `lambingStart` is null before
+ * lambing, not -1, so a lambing that began before the farm's first day can
+ * be a negative day; a format 11 or older save's -1 loads as null. On a
+ * real-year farm, `sheep.prices` keeps today's sheep indicators and their
+ * data version (left out with random seasons). A format 10 lamb doomed to
+ * die after day 2 now dies on its next day.
  */
-export const SAVE_FORMAT_VERSION = 11;
+export const SAVE_FORMAT_VERSION = 12;

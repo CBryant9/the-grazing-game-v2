@@ -14,7 +14,7 @@ import { netSaleValue, type Prices } from '../market/prices';
 import { coverPct } from '../pasture/summary';
 import { pricesOf } from '../sim/derived';
 import type { FarmState, InfraLedger, YearRecord, YearScore, YearTotals } from '../sim/state';
-import { sheepWorth } from '../sheep/market';
+import { sheepIndicatorsOf, sheepWorth } from '../sheep/market';
 import { INFRA_WORTH_SHARE, segmentCost } from './costs';
 
 const sum = (r: Record<string, number>): number => {
@@ -68,9 +68,13 @@ export function stockWorth(farm: Pick<FarmState, 'mobs'>, prices: Prices): numbe
  * What was paid for cattle bought and not yet in the yards. They are
  * counted at what was paid until they land, then at net sale value.
  */
-export function arrivalsWorth(farm: Pick<FarmState, 'arrivals'>): number {
+export function arrivalsWorth(
+  farm: Pick<FarmState, 'arrivals'> & Partial<Pick<FarmState, 'sheep'>>,
+): number {
   let v = 0;
   for (const a of farm.arrivals) v += a.cost;
+  // Sheep bought on the clock, on their way to the yards, likewise at what was paid.
+  for (const a of farm.sheep?.arrivals ?? []) v += a.total;
   return v;
 }
 
@@ -100,7 +104,7 @@ export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): numb
     farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm) - wagesOwedOf(farm);
   for (const m of farm.mobs) for (const a of m.animals) v += Math.max(0, netSaleValue(a, prices));
   // Sheep at what they would fetch today. A farm with no sheep adds nothing.
-  if (farm.sheep) v += sheepWorth(farm.sheep.mobs);
+  if (farm.sheep) v += sheepWorth(farm.sheep.mobs, sheepIndicatorsOf(farm));
   return v;
 }
 
@@ -120,7 +124,7 @@ export function netWorthParts(farm: FarmState): {
     stock:
       stockWorth(farm, prices) +
       arrivalsWorth(farm) +
-      (farm.sheep ? sheepWorth(farm.sheep.mobs) : 0),
+      (farm.sheep ? sheepWorth(farm.sheep.mobs, sheepIndicatorsOf(farm)) : 0),
     infrastructure: infraInPlace(farm) * INFRA_WORTH_SHARE,
     ...(owed > 0 ? { wagesOwed: owed } : {}),
     total: netWorth(farm, prices),

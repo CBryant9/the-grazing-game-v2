@@ -86,8 +86,6 @@ const net = (y: YearTotals): number =>
   y.infra -
   y.running;
 
-const eatenOver = (f: FarmState): number => f.years.reduce((t, y) => t + y.eaten, 0) + f.year.eaten;
-
 describe('a mixed farm left alone for two years (Western Victoria)', () => {
   const start = mixedFarm();
   const mixed = run(loadFarm(saveFarm(start)));
@@ -117,25 +115,53 @@ describe('a mixed farm left alone for two years (Western Victoria)', () => {
   });
 
   /*
-   * Day by day, the mixed farm eats what the same farm eats with only its
-   * cattle plus what it eats with only its sheep. This holds until a
-   * weaning sends weaners somewhere else: they go to an empty watered
-   * paddock, and which paddocks are empty depends on where the other
-   * species is (on this farm the first lambs, on day 276, go to Paddock 1
-   * with the cattle there and to Paddock 6 without them). From then the farms differ by where stock stand, not by
-   * anything eaten twice; the shared-paddock test above covers the rest.
+   * Nothing eaten twice, square by square. Each day the mixed farm's green
+   * and dead feed on every square equal the cattle-only farm's on the
+   * squares its cattle graze and the sheep-only farm's on the squares its
+   * sheep graze, and both on squares nobody grazes. This holds for as long
+   * as the three farms can be kept in step: until a weaning sends weaners
+   * somewhere else (weaners go to an empty watered paddock, and which are
+   * empty depends on where the other species is; on this farm the first
+   * lambs, on day 276, go to Paddock 1 with the cattle there and to
+   * Paddock 6 without them).
+   *
+   * And the intake really comes off the pasture, once: on a day of each
+   * season, the feed on the farm the same day with no stock on it, less the
+   * feed with the stock, summed square by square in kg DM, is what the stock
+   * ate that day (the year's eaten) plus what they trampled.
    */
-  it('eats what its cattle alone and its sheep alone eat: nothing twice', () => {
+  it('nothing is eaten twice: square by square, each species takes only its own paddock', () => {
     const m = loadFarm(saveFarm(start));
     const c = loadFarm(saveFarm(start));
     delete c.sheep;
     const s = loadFarm(saveFarm(start));
     s.mobs = [];
-    let days = 0;
     const intoOf = (events: TickEvent[], type: 'weaned' | 'sheep-weaned'): string =>
       JSON.stringify(events.flatMap((e) => (e.type === type ? [e.into?.area ?? null] : [])));
+    let days = 0;
+    let bad = 0;
+    let cattleSquares = 0;
+    let sheepSquares = 0;
     for (; days < DAYS; days++) {
+      // Who stands where this morning, on the mixed farm, and tonight (weaners are moved
+      // before the day's grazing): 1 cattle, 2 sheep.
+      const sv = surveyOf(m);
+      const own = new Int8Array(sv.topology.areas.length);
+      const mark = (): void => {
+        for (const x of m.mobs)
+          if (x.where.kind === 'paddock' && x.animals.length) {
+            const k = areaIdOf(sv, x);
+            own[k] = own[k]! | 1;
+          }
+        for (const x of sheepMobsOf(m))
+          if (x.where.kind === 'paddock' && x.sheep.length) {
+            const k = areaIdOf(sv, x);
+            own[k] = own[k]! | 2;
+          }
+      };
+      mark();
       const em = stepDay(m).events;
+      mark();
       const ec = stepDay(c).events;
       const es = stepDay(s).events;
       if (
@@ -143,11 +169,55 @@ describe('a mixed farm left alone for two years (Western Victoria)', () => {
         intoOf(em, 'sheep-weaned') !== intoOf(es, 'sheep-weaned')
       )
         break;
-      expect(eatenOver(m)).toBeCloseTo(eatenOver(c) + eatenOver(s), 6);
+      for (let i = 0; i < m.pasture.G.length; i++) {
+        const area = sv.topology.areaOf[i]!;
+        const who = area >= 0 ? own[area]! : 0;
+        const ref = who === 1 ? c : who === 2 ? s : null;
+        if (who === 1) cattleSquares++;
+        if (who === 2) sheepSquares++;
+        const same = (f: FarmState): boolean =>
+          m.pasture.G[i] === f.pasture.G[i] && m.pasture.D[i] === f.pasture.D[i];
+        const ok = who === 3 ? same(c) || same(s) : ref ? same(ref) : same(c) && same(s);
+        if (!ok) bad++;
+      }
     }
     expect(days).toBeGreaterThan(200);
-    expect(eatenOver(c)).toBeGreaterThan(0);
-    expect(eatenOver(s)).toBeGreaterThan(0);
+    expect(cattleSquares).toBeGreaterThan(0);
+    expect(sheepSquares).toBeGreaterThan(0);
+    expect(bad).toBe(0);
+  });
+
+  it('what the stock eat comes off the pasture, once', () => {
+    const f = loadFarm(saveFarm(start));
+    const checked: number[] = [];
+    for (let d = 0; d < DAYS && checked.length < 4; d++) {
+      if (d % 91 === 45) {
+        const bare = loadFarm(saveFarm(f));
+        bare.mobs = [];
+        delete bare.sheep;
+        const eaten0 = f.year.eaten;
+        const year0 = f.years.length;
+        stepDay(f);
+        stepDay(bare);
+        const eaten =
+          f.years.length > year0
+            ? f.years.at(-1)!.eaten - eaten0 + f.year.eaten
+            : f.year.eaten - eaten0;
+        const ha = f.layout.scale.haPerSquare;
+        let lost = 0;
+        for (let i = 0; i < f.pasture.G.length; i++) {
+          lost +=
+            (bare.pasture.G[i]! + bare.pasture.D[i]! - f.pasture.G[i]! - f.pasture.D[i]!) * ha;
+        }
+        expect(eaten).toBeGreaterThan(0);
+        // Trampling knocks down extra dead feed with what is eaten: 4 to 16% of it (MODEL,
+        // grazing). So the feed lost is what was eaten and up to 16% more: never less, never twice.
+        expect(lost / eaten).toBeGreaterThanOrEqual(1 - 1e-6);
+        expect(lost / eaten).toBeLessThanOrEqual(1.16 + 1e-6);
+        checked.push(d);
+      } else stepDay(f);
+    }
+    expect(checked.length).toBe(4);
   });
 
   it('plays the same twice on the same seed', () => {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { loadFarm, saveFarm, type SavedFarm } from '../save/save';
+import { format10Doom, loadFarm, saveFarm, type SavedFarm } from '../save/save';
 import { stepDay } from '../sim/tick';
 import { SAVE_FORMAT_VERSION } from '../version';
 import { sheepJobDates, sheepMobsOf } from './farm';
@@ -11,7 +11,10 @@ import { headOf } from './simFlock';
  * fixtures were made by the old code itself: `save-format-10.json` by the
  * first sheep pass (commit e35982a, engine 0.14.0), a running Western
  * Victoria farm with 120 ewes and 3 rams through lambing; `save-format-9.json`
- * by the hands branch (b4e8b75, engine 0.13.0), a running farm with no sheep.
+ * by the hands branch (b4e8b75, engine 0.13.0), a running farm with no sheep;
+ * `save-format-11.json` (a Northern Tablelands mixed farm mid-joining) and
+ * `save-format-11-lambs.json` (a Central West start flock with lambs at foot)
+ * by the engine join (44f0583, engine 0.16.0).
  */
 
 const fixture = (name: string): SavedFarm =>
@@ -40,6 +43,43 @@ describe('older saves', () => {
     expect(headOf(sheepMobsOf(farm)[0]!.sheep)).toBeGreaterThan(100);
     const again = loadFarm(JSON.parse(JSON.stringify(saveFarm(farm))) as SavedFarm);
     expect(headOf(sheepMobsOf(again)[0]!.sheep)).toBe(headOf(sheepMobsOf(farm)[0]!.sheep));
+  });
+
+  it('a format 11 save mid-joining loads with lambing not begun (-1 read as null) and lambs on time', () => {
+    const saved = fixture('save-format-11.json');
+    expect(saved.saveFormat).toBe(11);
+    const farm = loadFarm(saved);
+    expect(farm.saveFormat).toBe(SAVE_FORMAT_VERSION);
+    expect(farm.mobs.length).toBeGreaterThan(0);
+    const ewes = sheepMobsOf(farm).find((m) => m.join)!;
+    expect(ewes.join!.lambingStart).toBeNull();
+    let lambed = -1;
+    for (let d = 0; d < 200 && lambed < 0; d++) {
+      for (const e of stepDay(farm).events)
+        if (e.type === 'lambs-born' && lambed < 0) lambed = farm.day;
+    }
+    // Joined from 7 April and the farm started on 1 May: lambing comes about 147 − 24 days in,
+    // or a little later for the ewes still to conceive.
+    expect(lambed).toBeGreaterThan(110);
+    expect(lambed).toBeLessThan(160);
+    expect(sheepMobsOf(farm).find((m) => m.id === ewes.id)!.join!.lambingStart).toBe(lambed - 1);
+  });
+
+  it('a format 11 start flock with lambs at foot (lambing on day −92) weans them on day 6', () => {
+    const farm = loadFarm(fixture('save-format-11-lambs.json'));
+    expect(sheepMobsOf(farm)[0]!.join!.lambingStart).toBe(-92);
+    let weaned = -1;
+    for (let d = 0; d < 20 && weaned < 0; d++) {
+      for (const e of stepDay(farm).events) if (e.type === 'sheep-weaned') weaned = farm.day - 1;
+    }
+    expect(weaned).toBe(6);
+  });
+
+  it('a format 10 doomed lamb whose day was past day 2 still dies, on its next day', () => {
+    expect(format10Doom(0, 0, 0)).toEqual({ doomed: 1, doomed2: 0, lambRisk: 0 });
+    expect(format10Doom(0, 1, 0)).toEqual({ doomed: 0, doomed2: 1, lambRisk: 0 });
+    expect(format10Doom(1, 1, 0.01)).toEqual({ doomed: 0, doomed2: 0, lambRisk: 1 });
+    expect(format10Doom(5, -1, 0.01)).toEqual({ doomed: 0, doomed2: 0, lambRisk: 0.01 });
   });
 
   it('a format 9 save (no sheep) loads with no sheep and plays on', () => {

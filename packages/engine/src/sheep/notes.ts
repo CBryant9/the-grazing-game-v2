@@ -8,10 +8,11 @@ export type SheepNote =
   | { type: 'noWater'; days: number }
   /** The area supplied `f` of the pasture the mob wanted (at most once a fortnight). */
   | { type: 'shortOfFeed'; f: number }
-  /** Average CS is under 2 (at most once a month). */
+  /** Average CS is under 2 (at most once a week, `LOSS_NOTE_DAYS`). */
   | { type: 'lowCondition'; cs: number }
   /**
-   * The mob has lost weight for 10 days running, on feed of this energy and
+   * The mob has lost weight for 10 days running (then once a week while it
+   * carries on, `LOSS_NOTE_DAYS`), on feed of this energy and
    * protein, with the reasons that apply, in this order (the cattle
    * warnings' reasons): not enough feed where they graze, low energy (ME
    * under 8), protein under 7%, ewes milking, ewes in late pregnancy. An
@@ -40,10 +41,12 @@ export type SheepLossReason = 'lowFeed' | 'lowEnergy' | 'lowProtein' | 'milking'
 /**
  * Why a sheep died. `weaner` is a weaner in its first year after weaning
  * dying of being light or not growing (MMFS ch. 10.4, S17: deaths rise as
- * weaning weight and growth after weaning fall).
+ * weaning weight and growth after weaning fall). `starved` is a sheep under
+ * half its normal weight for its age (`STARVED`).
  */
 export type SheepDeathCause =
   | 'noWater'
+  | 'starved'
   | 'poorCondition'
   | 'lambing'
   | 'newborn'

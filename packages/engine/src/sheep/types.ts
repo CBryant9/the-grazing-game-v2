@@ -11,6 +11,7 @@
  * plays exactly as it did before sheep existed.
  */
 
+import type { SheepIndicators } from '../market/realSheepPrices';
 import type { SheepBreed, SheepFeed } from '../data/sheep';
 import type { Rng, RngState } from '../rng';
 import type { MobWhere, PlanRun } from '../sim/state';
@@ -144,8 +145,12 @@ export interface SheepJoining {
   foetuses: number;
   /** True once the scanning count has been taken (`LAMBING_TIMES.scanDays` after joining started). */
   scanned: boolean;
-  /** The farm day the first lamb was born, or -1. */
-  lambingStart: number;
+  /**
+   * The farm day the first lamb was born, or null before lambing. It can be
+   * before the farm's first day (a start flock with lambs at foot), so it is
+   * negative then (save format 12; older saves stored -1 for "not yet").
+   */
+  lambingStart: number | null;
   /** Lambs born, and the ewes that lambed. */
   born: number;
   ewesLambed: number;
@@ -210,6 +215,13 @@ export interface SheepState {
    * yards at first light on `arriveDay`, as cattle do. Left out when none.
    */
   arrivals?: { arriveDay: number; cls: string; total: number; sheep: Sheep[] }[];
+  /**
+   * On a real-year farm, today's sheep indicators (c/kg carcase weight, in
+   * the market's dollars) for the real date, and the sheep data version they
+   * came from (save format 12). Left out on a farm with random seasons: it
+   * sells at the dated stand-in.
+   */
+  prices?: { dataVersion: string; date: string; indicators: SheepIndicators };
 }
 
 /** The random streams the sheep step draws from. */

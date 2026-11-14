@@ -8,6 +8,7 @@ import { netSaleValue } from '../market/prices';
 import { RANDOM_SEASON_SALE_WEEKDAY, STAND_IN_BREAK } from '../market/saleCalendar';
 import { netWorth } from '../money/worth';
 import { farmHash, loadFarm, saveFarm } from '../save/save';
+import { SAVE_FORMAT_VERSION } from '../version';
 import { loadRealData } from '../server';
 import { createFarm } from '../sim/create';
 import { dateOn, nextSaleDay, pricesOf, saleDayOn } from '../sim/derived';
@@ -603,7 +604,7 @@ describe('saves and repeatability', () => {
     const booked = work(farm, { type: 'sellGroup', mob, group: 'steer', qty: 10 }).farm;
     const f = work(toSaleDay(farm), { type: 'buyCattle', cls: 'yearSteer', qty: 4 }).farm;
     const saved = saveFarm(f);
-    expect(saved.saveFormat).toBe(11);
+    expect(saved.saveFormat).toBe(SAVE_FORMAT_VERSION);
     expect(Array.isArray(saved.arrivals)).toBe(true);
     // The booking is a packed whole-number array, not a list of numbers in text.
     expect(JSON.stringify(saveFarm(booked).saleBookings)).toContain('"$":"i32"');

@@ -33,7 +33,14 @@ import { buildStartFlock } from '../sheep/start';
 import { dateAt } from '../calendar';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 import { startDay } from './clock';
-import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
+import {
+  placeAnchor,
+  pricesOf,
+  refreshSheepPrices,
+  seasonsOf,
+  surveyOf,
+  type SourceEnv,
+} from './derived';
 import type { FarmStarted, StartHerd } from './events';
 import { mergeShared, newMob } from './mobs';
 import {
@@ -192,7 +199,14 @@ export function startFlock(farm: FarmState, rng: Rng, scale: number): StartFlock
   });
   if (!r.ok) return null;
   // The flock as it stands on the start date: ages, pregnancy or lambs, replacements, wool.
-  buildStartFlock(r.mob, ewes, dateAt(farm.start, farm.day), farm.animalIds, rng);
+  buildStartFlock(
+    r.mob,
+    ewes,
+    dateAt(farm.start, farm.day),
+    farm.animalIds,
+    rng,
+    START_FLOCK.csAtLambing[farm.district],
+  );
   for (const s of r.mob.sheep) {
     s.paid = !s.weaned
       ? 0
@@ -356,6 +370,8 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     running && stock !== 'cattle'
       ? startFlock(farm, rngStream(o.seed, FLOCK_STREAM), stock === 'mix' ? 0.5 : 1)
       : null;
+  // A real-year farm with sheep sells and values them at the real date's indicators.
+  refreshSheepPrices(farm, env);
   farm.year = newYear(farm);
 
   const season = seasonsOf(farm, { data: env.data }).factorsOn(0);

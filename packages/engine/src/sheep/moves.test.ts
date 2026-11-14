@@ -181,3 +181,81 @@ describe('moving sheep', () => {
     expect(applyInstantly(t.farm, { type: 'clearSheepPlan', mob: t.mob }).ok).toBe(false);
   });
 });
+
+describe('sheep plans cost and warn as cattle plans do (review of the third pass, items 2 and 7)', () => {
+  function withPlan(t: Setup, stops: number[]): void {
+    t.farm.plans.push({
+      id: 60,
+      name: 'Two',
+      legs: [{ stops, rule: { mode: 'days', every: 3 }, rounds: 0 }],
+      after: 'repeat',
+    });
+  }
+
+  it('setting a plan whose first stop is another paddock is a move: the same daylight as moveSheep', () => {
+    const t = setup();
+    const to = t.emptyCells[0]!;
+    withPlan(t, [to, t.sheepCell]);
+    const move = previewAction(t.farm, { type: 'moveSheep', mob: t.mob, to: { cell: to } });
+    const plan = previewAction(t.farm, { type: 'setSheepPlan', mob: t.mob, template: 60 });
+    expect(move.ok && plan.ok).toBe(true);
+    if (move.ok && plan.ok) {
+      expect(move.card!.workMin).toBeGreaterThan(0);
+      expect(plan.card!.workMin).toBe(move.card!.workMin);
+    }
+    const done = applyInstantly(t.farm, { type: 'setSheepPlan', mob: t.mob, template: 60 });
+    expect(done.ok && done.events.some((e) => e.type === 'sheep-moved')).toBe(true);
+  });
+
+  it('setting a plan on the stop the mob is already on takes none of the day', () => {
+    const t = setup();
+    withPlan(t, [t.sheepCell, t.emptyCells[0]!]);
+    const plan = previewAction(t.farm, { type: 'setSheepPlan', mob: t.mob, template: 60 });
+    expect(plan.ok && plan.card!.workMin).toBe(0);
+  });
+
+  it('a plan with a dry stop names it, as the cattle plan does', () => {
+    const t = setup();
+    if (t.dryCell === null) return;
+    withPlan(t, [t.dryCell, t.emptyCells[0]!]);
+    const done = applyInstantly(t.farm, { type: 'setSheepPlan', mob: t.mob, template: 60 });
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    const set = done.events.find((e) => e.type === 'sheep-plan-set');
+    expect(set?.type === 'sheep-plan-set' && set.dryAreas.length).toBe(1);
+    // Put on a dry first stop, the mob is told it has no water, as a hand move is.
+    expect(done.events.some((e) => e.type === 'no-water')).toBe(true);
+  });
+
+  it('a hand move pauses the plan; resume puts the mob back on the plan at a step, at the move time', () => {
+    const t = setup();
+    withPlan(t, [t.sheepCell, t.emptyCells[0]!]);
+    const set = applyInstantly(t.farm, { type: 'setSheepPlan', mob: t.mob, template: 60 });
+    if (!set.ok) throw new Error(set.message);
+    const moved = applyInstantly(set.farm, {
+      type: 'moveSheep',
+      mob: t.mob,
+      to: { cell: t.emptyCells[0]! },
+    });
+    if (!moved.ok) throw new Error(moved.message);
+    expect(sheepMobsOf(moved.farm)[0]!.plan!.paused).toBe(true);
+    // Paused, the plan does not move the mob.
+    for (let d = 0; d < 5; d++) stepDay(moved.farm);
+    expect(mobArea(moved.farm)).toBe(areaOf(moved.farm, t.emptyCells[0]!));
+    const card = previewAction(moved.farm, { type: 'resumePlan', mob: t.mob, step: 0 });
+    expect(card.ok && card.card!.workMin).toBeGreaterThan(0);
+    const back = applyInstantly(moved.farm, { type: 'resumePlan', mob: t.mob, step: 0 });
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    expect(back.events.some((e) => e.type === 'sheep-plan-resumed')).toBe(true);
+    expect(sheepMobsOf(back.farm)[0]!.plan!.paused).toBe(false);
+    expect(mobArea(back.farm)).toBe(areaOf(back.farm, t.sheepCell));
+    // Pause by asking, then it waits; a second pause is refused.
+    const paused = applyInstantly(back.farm, { type: 'pausePlan', mob: t.mob });
+    expect(paused.ok && paused.events.some((e) => e.type === 'sheep-plan-paused')).toBe(true);
+    if (paused.ok) {
+      const again = applyInstantly(paused.farm, { type: 'pausePlan', mob: t.mob });
+      expect(again.ok ? 'ok' : again.reason).toBe('already-paused');
+    }
+  });
+});

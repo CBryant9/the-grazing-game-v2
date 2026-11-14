@@ -155,8 +155,11 @@ export type Action =
     }
   /** Buy sheep of a class into a paddock (not where cattle graze; never in Central Queensland). */
   | { type: 'buySheep'; cls: string; qty: number; to: { cell: number } }
-  /** Sell sheep of a class from a sheep mob. Ewes with lambs at foot go with their share of the lambs. */
-  | { type: 'sellSheep'; mob: number; cls: string; qty: number }
+  /**
+   * Sell sheep of a class (and, if given, of one sex: 'F' ewes, 'W' wethers, 'M' rams) from a
+   * sheep mob. Ewes with lambs at foot go with their share of the lambs.
+   */
+  | { type: 'sellSheep'; mob: number; cls: string; qty: number; sex?: 'F' | 'W' | 'M' }
   /** Move a whole sheep mob to a paddock (not where cattle graze). It pauses the mob's plan. */
   | { type: 'moveSheep'; mob: number; to: { cell: number } }
   /** Move part of a sheep mob, by class and head, to a paddock (ewes take their lambs at foot). */

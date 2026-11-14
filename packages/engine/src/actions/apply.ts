@@ -115,7 +115,14 @@ import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
 import { sheepAreas } from '../sheep/farm';
 import { buySheep, sellSheep, setSheepDates, setSheepFeed } from '../sheep/actions';
-import { clearSheepPlan, moveSheep, moveSheepPart, setSheepPlan } from '../sheep/moves';
+import {
+  clearSheepPlan,
+  moveSheep,
+  moveSheepPart,
+  pauseSheepPlan,
+  resumeSheepPlan,
+  setSheepPlan,
+} from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
@@ -955,6 +962,9 @@ function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
 
 function pausePlan(j: Job, a: Extract<Action, { type: 'pausePlan' }>): Out {
   const m = j.mob(a.mob);
+  // A sheep mob's plan pauses the same way (sheep/moves.ts).
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob))
+    return pauseSheepPlan(j.farm, j.events, a.mob);
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
@@ -974,6 +984,9 @@ function pausePlan(j: Job, a: Extract<Action, { type: 'pausePlan' }>): Out {
 
 function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
   const m = j.mob(a.mob);
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob)) {
+    return resumeSheepPlan(j.farm, j.events, a.mob, a.step);
+  }
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan to resume. Set one.`);

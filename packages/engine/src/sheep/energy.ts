@@ -6,7 +6,10 @@
 
 import {
   APPETITE,
+  BIRTH_KG,
   DSE_MJ,
+  LAMBING_TIMES,
+  START_FLOCK,
   DSE_PER_AE,
   GAIN_MJ,
   KG_PER_CS_SHARE,
@@ -40,6 +43,20 @@ export function sheepClassOf(s: Pick<Sheep, 'sex' | 'weaned' | 'age' | 'parity'>
  */
 export const matureKg = (s: Pick<Sheep, 'srw' | 'sex'>): number =>
   s.sex === 'M' ? s.srw * RAM.srwFactor : s.srw;
+
+/**
+ * A young sheep's normal weight at an age, kg: a single's birth weight, then
+ * the lamb growth figure to weaning, then the weaner growth figure
+ * (START_FLOCK), up to 95% of SRW. The start flock is built on it. The
+ * starved rule (`STARVED`) reads it from a triplet's birth weight, the
+ * lightest normal start.
+ */
+export function normalKg(srw: number, age: number, birthKg: number = BIRTH_KG.single): number {
+  const F = START_FLOCK;
+  const atWean = birthKg + F.lambGrowthKg * Math.min(age, LAMBING_TIMES.weanDays);
+  const after = Math.max(0, age - LAMBING_TIMES.weanDays) * F.weanerGrowthKg;
+  return Math.min(0.95 * srw, atWean + after);
+}
 
 /** Kilograms in one condition score: 0.19 × mature weight (S27, call C28). */
 export const kgPerCs = (s: Pick<Sheep, 'srw' | 'sex'>): number => KG_PER_CS_SHARE * matureKg(s);

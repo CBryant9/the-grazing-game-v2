@@ -319,6 +319,13 @@ export const LAMBING_TIMES = {
   weanDays: 98,
   /** The scanning count is taken this many days after joining started (S30: scan in May to June after a March join). */
   scanDays: 80,
+  /**
+   * No lamb stays at foot past this age, days: a mob is weaned when any lamb
+   * reaches it (lambs with no joining record, or born late). STAND-IN: the
+   * oldest lamb at the usual weaning is 98 days plus the 35 days of joining;
+   * 150 days (5 months) leaves room past that.
+   */
+  weanByAge: 150,
 } as const;
 
 /** An orphan lamb this old or more is weaned; younger ones die at the cattle orphan rate, 2% a day. */
@@ -348,22 +355,24 @@ export const JOIN_START: Partial<Record<DistrictId, { month: number; date: numbe
 // ---------------------------------------------------------------------------
 
 /**
- * Adult ewe and ram deaths outside lambing and flystrike, a day: 0.8% a
+ * Adult ewe and ram deaths outside lambing and flystrike, a day: 0.91% a
  * year, DERIVED from the document's own figures: Lifetime Wool's 3.2% a
  * year at the CS 3 baseline (S19) less 1.95% at lambing (AWI and MLA S67,
- * SB-43a) leaves 1.25% a year; less flystrike (17% struck × 2% dying = 0.34%,
- * S37; the review's probes measured 0.37 to 0.56%) leaves about 0.8%. (The
- * second pass set 0.4% to make SB-43 pass; put back, third pass.)
+ * SB-43a) leaves 1.25% a year; less flystrike, 17% of unmulesed Merino ewes
+ * struck a year (Horton and others 2018, S37; SB-53) × 2% of the struck
+ * dying (S37) = 0.34%, leaves 0.91%. (The third pass wrote "about 0.8%";
+ * the arithmetic gives 0.91%, used from the review of the third pass. The
+ * second pass's 0.4% was fitted to SB-43 and was undone.)
  */
-export const ADULT_DAILY = 0.008 / 365;
+export const ADULT_DAILY = (0.032 - 0.0195 - 0.17 * 0.02) / 365;
 
 /**
- * Wethers' deaths, a day: 0.8% a year, DERIVED as the ewes' deaths outside
+ * Wethers' deaths, a day: 0.91% a year, DERIVED as the ewes' deaths outside
  * lambing and flystrike (the working above), since wethers do not lamb and
  * the document found no wether figure of its own (C7: the NSW wether
  * budget's figure was seen only in a search summary).
  */
-export const WETHER_DAILY = 0.008 / 365;
+export const WETHER_DAILY = ADULT_DAILY;
 
 /**
  * A ewe's risk of dying at lambing, by litter: singles 1.35%, twins 3.05%,
@@ -400,6 +409,19 @@ export const WEANER_DEATHS = {
 
 /** Low condition: (1.4 − CS) × 1.5% a day under CS 1.4, the cattle rule (MODEL.md, section 3). */
 export const THIN_DEATHS = { below: 1.4, perCs: 0.015 } as const;
+
+/**
+ * Starved: a sheep whose live weight falls under this share of the weight
+ * it is measured against is dead, cause `starved` (`starvedRefKg`: a lamb at
+ * foot against the normal weight for its age from a triplet's birth weight;
+ * a weaned sheep against the normal weight at weaning, about 22 kg, so a
+ * slow weaner is stunted, not starved). STAND-IN, for Claudia: a sheep that has
+ * lost half its weight is long past CS 1, and no figure for the weight at
+ * which a sheep dies was read. Without it a lamb kept at foot on too little
+ * milk could live on at 3 kg (the third pass review found yearlings at 3.3
+ * to 3.5 kg).
+ */
+export const STARVED = { share: 0.5 } as const;
 
 /** No water: every sheep dies on day 4, the cattle rule (call C30), losing 4% of live weight a day. */
 export const NO_WATER = { dieOnDay: 4, lossShare: 0.04 } as const;
@@ -589,6 +611,16 @@ export const START_FLOCK = {
   eweYearDse: 1.5,
   /** CS at the start: AWI's target of CS 3 at joining, scanning, lambing (singles) and weaning (S22). */
   cs: 3,
+  /**
+   * The CS the start flock's lambs are taken to have been born at, by
+   * district, for their survival: DERIVED from the model's own Merino ewe
+   * year runs with the district's winter feeding (SB-43, CS at lambing,
+   * third pass: Tablelands 2.66, Central West 2.69, Western Victoria 2.92),
+   * so the lambs at foot are what the model's flocks mark (review of the
+   * third pass: at CS 3 the Central West start flock carried 101 lambs a
+   * 100 ewes against the model's own 87).
+   */
+  csAtLambing: { nsw: 2.66, cw: 2.69, wv: 2.92 } as Partial<Record<DistrictId, number>>,
   /** Maidens are joined at about 1.5 years (MMFS S25: maiden Merinos joined at 75 to 80% of SRW). */
   maidenYears: 1.5,
   /**
@@ -616,9 +648,10 @@ export const START_FLOCK = {
  * Which fences hold sheep (Tasmanian government guide, S48; SB-63, SB-64): a
  * plain-wire fence that suits cattle "will not be adequate for sheep"; it
  * needs hinge-joint or similar netting. The game's cattle fences
- * (permanent, electric, tape) do not hold sheep; a netting fence does. The
- * netting fence, its price (call C26) and sheep getting through cattle
- * fences come in milestone 2.4: until then sheep stay in their grazing area.
+ * (permanent, electric, tape, standing or knocked down) do not hold sheep;
+ * a netting fence, a gate and the boundary do. Hungry or thirsty sheep get
+ * through a cattle fence by the cattle breakout rule (`sheepBreakouts` in
+ * sim/tick.ts). The netting price is a stand-in (call C26).
  */
 export function fenceHoldsSheep(kind: 'permanent' | 'electric' | 'tape' | 'netting'): boolean {
   return kind === 'netting';

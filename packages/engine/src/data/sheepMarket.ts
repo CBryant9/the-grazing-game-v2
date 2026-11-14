@@ -87,6 +87,27 @@ export const WOOL_PRICE_C_KG: readonly (readonly [number, number])[] = [
 export const SHEARING_RATE = { sheep: 3.8158, ram: 7.6316, crutch: 1.1066 } as const;
 
 /**
+ * What the game charges for wool harvesting and rams (review of the third
+ * pass, item 14), from the NSW DPIRD Merino ewe gross margin budgets (Farm
+ * Enterprise Budget Series, October 2024, 20-micron ewes; the pages refuse
+ * automatic reading, so the figures were seen in search summaries only,
+ * docs/DATA.md "Sheep gross margin budget"):
+ * - shearing $9.81 a head shorn, all in (shearers, shed hands, classer and
+ *   presser; the award piece rate above is the shearer's alone), rams twice
+ *   that (the award's ram to sheep ratio);
+ * - crutching $1.92 a head;
+ * - rams at 2% of the ewes (the budget's ram percentage; the game joins at
+ *   1% + 1, call C13) are replaced over `ramYears` working years at the
+ *   ram price (SHEEP_HEAD_PRICES.ramHead): a running cost a ram a day.
+ *   `ramYears` 4 is a STAND-IN: no ram working life was read.
+ */
+export const SHEEP_BUDGET_COSTS = {
+  shearPerHead: 9.81,
+  crutchPerHead: 1.92,
+  ramYears: 4,
+} as const;
+
+/**
  * Animal health (drench, vaccine, lice), dollars a head a year. STAND-IN:
  * no sheep figure was read (the NSW DPIRD budgets refused automatic
  * reading); the cattle figure for the district ($30 a head, the MVP's) over

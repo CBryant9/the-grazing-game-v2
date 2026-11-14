@@ -152,8 +152,21 @@ export type TickEvent =
     }
   /** Sheep were moved by hand to an area: the mob they are in there, and the head moved. */
   | { type: 'sheep-moved'; mob: number; mobName: string; head: number; area: string }
-  /** A sheep mob was put on a plan, or taken off one, or finished one. */
-  | { type: 'sheep-plan-set'; mob: number; mobName: string; template: number }
+  /**
+   * A sheep mob was put on a plan (with the stops that have no water, as the
+   * cattle `plan-set` gives them), or taken off one, or finished one; or
+   * its plan was paused (by asking) or resumed at a step.
+   */
+  | { type: 'sheep-plan-set'; mob: number; mobName: string; template: number; dryAreas: string[] }
+  | { type: 'sheep-plan-paused'; mob: number; mobName: string; template: number; step: number }
+  | {
+      type: 'sheep-plan-resumed';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      area: string;
+    }
   | { type: 'sheep-plan-cleared'; mob: number; mobName: string }
   | { type: 'sheep-plan-finished'; mob: number; mobName: string }
   /** A sheep plan's next stop has no water, or cattle in it: the plan waits (told once a stop). */

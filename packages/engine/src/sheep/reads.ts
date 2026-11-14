@@ -5,15 +5,17 @@
  */
 
 import { aeOf } from '../cattle/animal';
+import { dateAt, type CalendarDate } from '../calendar';
+import { daysSince } from './start';
 import {
   DSE_PER_AE,
+  JOIN_DAYS,
   SHEEP_FEEDS,
   fenceHoldsSheep,
   sheepDistrict,
   type SheepFeed,
 } from '../data/sheep';
 import {
-  SHEEP_INDICATORS_C_KG,
   SHEEP_PRICE_DATE,
   SHEEP_TRADE,
   WOOL_PRICE_C_KG,
@@ -21,7 +23,12 @@ import {
 } from '../data/sheepMarket';
 import { EDGE, type EdgeRef } from '../farm/topology';
 import { COST_PER_M, NETTING_PER_M } from '../money/costs';
-import { SHEEP_BUY_CLASSES, sheepBuyPrice, type SheepBuyClassId } from './market';
+import {
+  SHEEP_BUY_CLASSES,
+  sheepBuyPrice,
+  sheepIndicatorsOf,
+  type SheepBuyClassId,
+} from './market';
 import {
   areaNameOf,
   dateOn,
@@ -259,15 +266,18 @@ export interface SheepMarketRead {
 }
 
 /** The sheep market as a screen may show it. Prices are figures to show, not formulas. */
-export function sheepMarketRead(farm: Pick<FarmState, 'district'>): SheepMarketRead {
+export function sheepMarketRead(
+  farm: Pick<FarmState, 'district'> & Partial<Pick<FarmState, 'sheep'>>,
+): SheepMarketRead {
+  const prices = sheepIndicatorsOf(farm);
   return {
     buy: (Object.keys(SHEEP_BUY_CLASSES) as SheepBuyClassId[]).map((cls) => ({
       cls,
       name: SHEEP_BUY_CLASSES[cls].name,
-      perHead: Math.round(sheepBuyPrice(cls) + SHEEP_TRADE.headFee),
+      perHead: Math.round(sheepBuyPrice(cls, prices) + SHEEP_TRADE.headFee),
     })),
-    indicators: { ...SHEEP_INDICATORS_C_KG },
-    date: SHEEP_PRICE_DATE,
+    indicators: { ...prices },
+    date: farm.sheep?.prices?.date ?? SHEEP_PRICE_DATE,
     wool: WOOL_PRICE_C_KG.map(([micron, cKg]) => ({ micron, cKg })),
     offered: sheepDistrict(farm.district),
   };
@@ -342,8 +352,19 @@ export interface SheepConditionFact {
   floor: number;
 }
 
-/** The stage most of a mob's weaned sheep are at, by head. */
-function stageOf(m: SheepMob): SheepStage {
+/**
+ * A dry ewe is at the joining stage from this many days before the mob's
+ * joining day to its end; out of season she is a dry sheep (floor 2).
+ * STAND-IN: Lifetime Wool's target is condition at joining; six weeks is
+ * about what it takes to put on half a score.
+ */
+export const JOINING_PREP_DAYS = 42;
+
+/** The stage most of a mob's weaned sheep are at, by head, on a date (farm day `day`). */
+function stageOf(m: SheepMob, date: CalendarDate, day: number): SheepStage {
+  const sinceJoin = m.join ? day - m.join.start : -1;
+  const toJoin = (365 - daysSince(date, m.joinOn)) % 365;
+  const inSeason = (sinceJoin >= 0 && sinceJoin < JOIN_DAYS) || toJoin <= JOINING_PREP_DAYS;
   const lambsOf = lambsByDam(m.sheep);
   const by: Record<SheepStage, number> = {
     joining: 0,
@@ -363,7 +384,9 @@ function stageOf(m: SheepMob): SheepStage {
             : 'pregnancy'
           : lambsPerEwe(s, lambsOf) > 0
             ? 'lactation'
-            : 'joining';
+            : inSeason
+              ? 'joining'
+              : 'other';
     by[st] += s.n;
   }
   return (Object.keys(by) as SheepStage[]).reduce((a, b) => (by[b] > by[a] ? b : a));
@@ -374,14 +397,17 @@ function stageOf(m: SheepMob): SheepStage {
  * (`CS_FLOOR`). Facts only: the screens word them, and what to do is the
  * player's.
  */
-export function sheepConditionFacts(farm: Pick<FarmState, 'sheep'>): SheepConditionFact[] {
+export function sheepConditionFacts(
+  farm: Pick<FarmState, 'sheep' | 'day' | 'start'>,
+): SheepConditionFact[] {
   const out: SheepConditionFact[] = [];
+  const date = dateAt(farm.start, farm.day);
   for (const m of sheepMobsOf(farm)) {
     const w = m.sheep.filter((s) => s.weaned && s.n > 0);
     const h = headOf(w);
     if (!h) continue;
     const cs = w.reduce((t, s) => t + s.cond * s.n, 0) / h;
-    const stage = stageOf(m);
+    const stage = stageOf(m, date, farm.day);
     const floor = CS_FLOOR[stage];
     if (cs < floor) out.push({ mob: m.id, mobName: m.name, stage, cs, floor });
   }

@@ -887,7 +887,7 @@ Every figure is a constant in `packages/engine/src/data/sheep.ts`, marked there 
 | Crossbred lambing risk | × 1.35 | Fitted | S67 (SB-43a) |
 | Thin ewes at lambing | × (1 + (2.5 − CS)) | Sourced | S18, S19: doubles at CS 1.5 (SB-44) |
 | Pregnancy toxaemia | + 3.8% a CS lost from scanning to lambing, × litter ÷ 3 | Sourced (triplets) | S35 (C23) |
-| Adult deaths outside lambing | 0.8% a year | Fitted | S19, S67 (SB-43; C7) |
+| Adult deaths outside lambing | 0.91% a year (see the third pass table and the review below) | Derived | S19, S67, S37 (SB-43; C7) |
 | Weaner deaths | by growth and weaning weight (MODEL section 12) | Fitted | S17 table 10.1 (SB-45, SB-46) |
 | Low condition, no water | the cattle rules | Model | MODEL section 3 (C30) |
 | Flystrike a day, unprotected | Merino 0.066%, crossbred 0.018% | Fitted | S37: 17% and 5% a year with one shearing and one crutch (SB-53, SB-54; C21) |
@@ -956,8 +956,8 @@ Constants in `packages/engine/src/data/sheep.ts`, `data/sheepMarket.ts`, `data/s
 | Animal health | $30 ÷ 8.4 = $3.57 a head a year | Stand-in | The cattle district figure scaled by one DSE's share; the NSW DPIRD sheep budgets refused automatic reading |
 | Netting fence | $10 a metre (cattle permanent $7) | Stand-in, Claudia's (C26) | S49, S69 give netting fence costs but not beside a cattle fence |
 | Start flock | 1.5 DSE a ewe for the year | Stand-in | The DSE tables (S5, S6) for a dry, pregnant and milking ewe |
-| Adult deaths outside lambing | 0.8% a year (the second pass's fitted 0.4% put back, third pass) | Derived | S19's 3.2% a year at CS 3, less 1.95% at lambing (S67) = 1.25%, less flystrike (17% struck × 2% die = 0.34%, S37) = about 0.8% |
-| Wether deaths | 0.8% a year | Derived | The ewes' working above (wethers do not lamb; no wether figure was read, C7) |
+| Adult deaths outside lambing | 0.91% a year (the review of the third pass; the third pass wrote about 0.8%) | Derived | S19's 3.2% a year at CS 3, less 1.95% at lambing (S67) = 1.25%, less flystrike: 17% of unmulesed Merino ewes struck a year (Horton and others 2018, S37) × 2% of the struck dying (S37) = 0.34%, leaves 0.91% |
+| Wether deaths | 0.91% a year | Derived | The ewes' working above (wethers do not lamb; no wether figure was read, C7) |
 | Young sheep put gain into frame | under 540 days (cattle 900) | Stand-in | S25 joins maidens young; no figure found |
 | Sheep bought when age and weight are not given | adults 3 years, hoggets 15 months, weaners 5 months; weaners 0.6 and hoggets 0.8 of mature weight; weaned 40 and 300 days ago; weaned at 45% of SRW | Stand-in; the last sourced | S17 for the weaning weight |
 | Sheep bought by class (age, weight share) | Merino ewes and wethers 3 years, 1.0; first-cross ewes 548 days, 0.95; rams 3 years, 1.0; store weaners and lambs 150 days, 0.55 | Stand-in | — |
@@ -968,7 +968,7 @@ Constants in `packages/engine/src/data/sheep.ts`, `data/sheepMarket.ts`, `data/s
 |---|---|---|---|
 | Wool price level | the micron guide (S53) scaled by 1,890 ÷ 1,722 | Sourced, dated (C20) | S53's sale commentary gives the Eastern Market Indicator as 1,890 c/kg clean for 1 to 2 September 2026; the micron guide on the same page sits under a ticker with no date and an EMI of 1,722. The guide gives the spread by micron, the dated EMI the level (`WOOL_EMI`) |
 | Merino ewe micron | 17.8 (wethers and rams 19.0) | Builder's call | S46 (males 1 to 3 µm coarser); the document's medium-wool districts (19 to 21 µm); the coarsest figure that keeps SB-51's 1-micron gap |
-| Shed staff (wool handlers, presser, classer) | $1.50 a head shorn | Stand-in | The Pastoral Award shed hand rates and NSW DPIRD budgets refused automatic reading |
+| Shed staff (wool handlers, presser, classer) | $1.50 a head shorn (not charged from engine 0.17.0: inside the budget's all-in shearing, below) | Stand-in | The Pastoral Award shed hand rates and NSW DPIRD budgets refused automatic reading |
 | Wool levy | 1.5% of the sale | Stand-in | WoolPoll figure seen only in a search summary |
 | Broker's selling, testing and warehousing | $40 a bale | Stand-in | AWI selling systems review refused automatic reading |
 | Cartage to store; wool pack | $16 and $14 a bale | Stand-in | — |
@@ -981,7 +981,37 @@ Constants in `packages/engine/src/data/sheep.ts`, `data/sheepMarket.ts`, `data/s
 | Merino gross margin, for comparison only | $50.46/DSE, self-replacing 20-micron Merino, 2025 | Comparison, not used by the model | NSW DPIRD release, 6 Aug 2026, as found by the research step; check the figure by hand before it is quoted outside the docs |
 | Flystrike season | the same in every district | Known simplification | No district fly season page was read |
 
-**MLA indicators the real-year sheep prices need** (pulled, not yet wired into the real-data bundle): National Light Lamb, Trade Lamb, Heavy Lamb, Merino Lamb, Restocker Lamb and Mutton (S52); and for store and breeding ewes by the head, Online Sheep and Online Lamb (AuctionsPlus), not pulled.
+**MLA indicators for the real-year sheep prices** (wired in engine 0.17.0, below): National Light Lamb, Trade Lamb, Heavy Lamb, Merino Lamb, Restocker Lamb and Mutton (S52). Store and breeding ewes by the head (Online Sheep and Online Lamb, AuctionsPlus) are not pulled: Merino breeding sheep stay at mutton value × 1.5 and first-cross ewes at the dated $556.
+
+### Review of the third pass (m2.7, 15 Nov 2026)
+
+**The sheep gross margin budget (item 13).** The source behind the $50.46/DSE is NSW DPIRD's 2025 sheep gross margin budgets. The DPIRD budget pages and PDFs (dpird.nsw.gov.au, dpi.nsw.gov.au and their mirror) all returned HTTP 403 to automatic reading on 15 Nov 2026, so the budget itself could not be read. What was read, and what was seen only in search summaries:
+
+| Figure | Value | How it was got | Source |
+|---|---|---|---|
+| Self-replacing 20-micron Merino gross margin, 2025 | $50.46 a DSE | Read | Sheep Central, "Lower costs and fertility underpin 2025 NSW sheep gross margins", 5 Aug 2026 (sheepcentral.com/?p=168454): April to September 2025 prices; 20-micron ewes to terminal rams $49.70; average sheep enterprise $43.73 (2024: $24.53); wool harvesting about 28% of total costs in Merino enterprises; Merino sheep sale income up 102% on 2024 |
+| 20-micron Merino ewe budget, October 2024 prices: flock and DSE | 1,000 ewes, 59 kg, 2.32 DSE a ewe | Search summary only | NSW DPIRD Farm Enterprise Budget Series, "Merino ewes 20 micron" (dpi.nsw.gov.au/__data/assets/pdf_file/0009/1596141) |
+| Same: wool | 5.64 kg greasy a head at $8.10/kg greasy (20 µm $13.30/kg clean at 65% yield) | Search summary only | Same |
+| Same: flock figures | marking 89%, weaning 86%, flock deaths 4%, rams 2% | Search summary only | Same |
+| Same: gross margin | $27.81 a DSE ($21.87 with fodder), $278.05 a ha | Search summary only | Same |
+| 25% terminal variant, October 2024: shearing; crutching | $9.81 a head; $1.92 a head (deaths 5%, 5-year productive life, 87% weaning) | Search summary only | NSW DPIRD, "Merino ewes 25 terminal" (dpird-web.matrix.squiz.cloud/__data/assets/pdf_file/0005/1596137) |
+| Marking, animal health, ram cost, freight and selling, supplementary feed, pasture costs | not found | — | The budget's cost lines were in no summary read |
+
+**Used in the engine (item 14).** `SHEEP_BUDGET_COSTS` in `data/sheepMarket.ts`: shearing $9.81 a head all in (rams twice), in place of the award piece rate plus $1.50 shed staff ($5.32); crutching $1.92 a head (was the award's $1.11); ram replacement, the rams at the ram price ($1,200, stand-in) over 4 working years (stand-in), a running cost a ram a day. Animal health stays the $3.57 stand-in: no budget figure was read. Marking, freight on stock sold beyond the $3 head fee, and pasture costs are not charged: no figure was found.
+
+**Micron and cut, not changed (item 14).** The review asked for ewes at 19 to 20 micron (C15's medium wool). Two sourced rows hold the ewe micron down: SB-52 holds wethers at 18 to 20 micron (S64's NSW bloodline average, 19.0) and SB-51 holds males 1 to 3 micron coarser than ewes on the same feed (S46). Ewes at 19 micron would need wethers at 20 or more, outside SB-52. So 17.8 (the coarsest that keeps both) stays, now with that reason; listed for Claudia. The cut is grown from feed (`WOOL.gPerKgDm`, fitted to S64's wethers): ewes cut 4.1 to 4.4 kg clean, inside SB-52a (3.3 to 4.7) and above the budget's 3.67 kg clean (5.64 greasy at 65%). Not changed: the biology figures are sourced.
+
+**Model figures added (all for Claudia).**
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Starved: dead under this share of normal weight for age | 0.5 (`STARVED`), normal weight from a triplet's birth weight on the start flock's growth path | Stand-in | No figure read for the weight at which a sheep dies |
+| No lamb at foot past | 150 days (`LAMBING_TIMES.weanByAge`) | Stand-in | The usual weaning (98 days from the first lamb) plus the 35 days of joining, with room |
+| Start flock lambs: CS at lambing | Tablelands 2.66, Central West 2.69, Western Victoria 2.92 | Derived (the model's own) | The Merino ewe year runs' CS at lambing (SB-43, third pass) |
+| Start flock replacements | one age class (ewes ÷ 5) of this year's ewe lambs; the oldest class cast at weaning | Model | START_FLOCK (cast at 6, stand-in) |
+| Joining stage for the CS floor | from 42 days before the joining day to its end (`JOINING_PREP_DAYS`) | Stand-in | S19's targets are at joining; six weeks is about half a CS gained |
+| Losing-weight and low-condition notes | from the 10th day of losses, then at most once a week (`LOSS_NOTE_DAYS`) | Model | — |
+| Real-year sheep prices | the six MLA national indicators on the real date, in today's dollars by the CPI; rows under 20 head passed over; the newest usable row stands 45 days | Sourced tables; the 45 days is the builder's | Only two breaks are longer than the cattle's 21 days: heavy lamb, 3 Dec 1996 to 9 Jan 1997 (37 days), and Merino lamb, 17 Dec 1996 to 9 Jan 1997 (23 days). Every other break from 1997 is 12 days or less. Wool has no MLA series and stays at the dated stand-in |
 
 ## Calf growth to weaning (m2.5, 15 Nov 2026)
 

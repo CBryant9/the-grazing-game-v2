@@ -20,9 +20,17 @@ import {
 } from '../data/sheep';
 import type { Rng } from '../rng';
 import type { CalendarDate } from '../calendar';
-import { litterMean, litterShares, lambSurvival, pregnantShare, ramsNeeded } from './breeding';
-import { multinomial } from './counts';
-import { matureKg } from './energy';
+import {
+  cycleConception,
+  litterMean,
+  litterShares,
+  lambSurvival,
+  lambingRisk,
+  pregnantShare,
+  ramsNeeded,
+} from './breeding';
+import { binomial, multinomial } from './counts';
+import { matureKg, normalKg } from './energy';
 import { makeSheep } from './farm';
 import { refFleeceKg } from './wool';
 import type { Sheep, SheepJoining, SheepMob } from './types';
@@ -47,6 +55,7 @@ export function buildStartFlock(
   date: CalendarDate,
   ids: { next: number },
   rng: Rng,
+  csAtLambing: number = START_FLOCK.cs,
 ): void {
   const F = START_FLOCK;
   const srw = 50;
@@ -93,7 +102,9 @@ export function buildStartFlock(
     pregnant: 0,
     foetuses: 0,
     scanned: d >= LAMBING_TIMES.scanDays,
-    lambingStart: d >= GESTATION_DAYS ? -(d - GESTATION_DAYS) : -1,
+    // The first lambs came a gestation after joining began: before the farm's first day when
+    // the season is past it, so the day is negative (marking and weaning count from it).
+    lambingStart: d >= GESTATION_DAYS ? GESTATION_DAYS - d : null,
     born: 0,
     ewesLambed: 0,
     marked: -1,
@@ -102,14 +113,31 @@ export function buildStartFlock(
   };
   let weanedLambs = 0;
   const out: Sheep[] = [];
+  const keptWeaners: Sheep[] = [];
   const share = litterShares(litterMean(cs, breed));
   if (d < JOIN_DAYS) {
     // Joining under way: each ewe on a day of her cycle, as the joining would have shared them.
+    // A ewe whose heat came before the first day had her chance then, at the model's own
+    // conception for her CS (the rams at 1% + 1 cover all): the ones that held are in lamb.
     for (const c of classes) {
       const byDay = multinomial(c.n, new Array<number>(CYCLE_DAYS).fill(1 / CYCLE_DAYS), rng);
       for (let k = 0; k < CYCLE_DAYS; k++) {
-        if (!byDay[k]) continue;
-        out.push({ ...c, id: ids.next++, n: byDay[k]!, oes: k });
+        let open = byDay[k]!;
+        if (!open) continue;
+        for (let h = k; h < d && h < JOIN_DAYS; h += CYCLE_DAYS) {
+          const got = binomial(open, cycleConception(cs, breed), rng);
+          if (!got) continue;
+          open -= got;
+          const byLitter = multinomial(got, [share[1], share[2], share[3]], rng);
+          for (let lit = 1; lit <= 3; lit++) {
+            const n = byLitter[lit - 1]!;
+            if (!n) continue;
+            join.pregnant += n;
+            join.foetuses += n * lit;
+            out.push({ ...c, id: ids.next++, n, oes: -1, preg: d - h, litter: lit, csJoin: cs });
+          }
+        }
+        if (open) out.push({ ...c, id: ids.next++, n: open, oes: k });
       }
     }
   } else {
@@ -134,10 +162,17 @@ export function buildStartFlock(
         }
         // Lambed: lambs at foot until weaning, then weaned (and the ewes dry).
         const lambAge = conceived - GESTATION_DAYS;
-        const lambs = Math.round(k * lit * lambSurvival(cs, lit, breed));
+        // Ewes that died lambing, with their lambs, at the model's lambing risk; and lamb
+        // survival, both at the CS the model's own flocks lamb at in the district (csAtLambing).
+        const died = Math.round(k * lambingRisk(csAtLambing, lit, breed, cs - csAtLambing));
+        const live = k - died;
+        const lambs = Math.round(live * lit * lambSurvival(csAtLambing, lit, breed));
         join.born += k * lit;
         join.ewesLambed += k;
+        join.eweDeathsLambing += died;
+        e.n = live;
         e.parity++;
+        if (live <= 0) continue;
         if (lambAge < LAMBING_TIMES.weanDays) {
           e.lact = lambAge;
           e.reared = lit;
@@ -169,7 +204,8 @@ export function buildStartFlock(
           }
         } else {
           out.push(e);
-          // This year's ewe weaners kept as replacements; the wether lambs were sold at weaning.
+          // This year's ewe weaners: as many kept as replace one age class (scaled below); the
+          // wether lambs and the surplus ewe lambs were sold at weaning.
           weanedLambs += lambs;
           const kept = Math.round(lambs / 2);
           if (kept > 0) {
@@ -188,17 +224,22 @@ export function buildStartFlock(
             w.reared = lit;
             fleeceOn(w, Math.min(lambAge, wool));
             out.push(w);
+            keptWeaners.push(w);
           }
         }
       }
     }
-    if (join.lambingStart >= 0 || d >= GESTATION_DAYS + LAMBING_TIMES.markDays) {
-      if (d - GESTATION_DAYS >= LAMBING_TIMES.markDays)
-        join.marked = out.filter((s) => !s.weaned).reduce((t, s) => t + s.n, 0);
-      if (d - GESTATION_DAYS >= LAMBING_TIMES.weanDays) {
-        join.weaned = weanedLambs;
-      }
+    // Keep only the replacements one age class needs (`each`): the rest were sold.
+    const kept = keptWeaners.reduce((t, w) => t + w.n, 0);
+    if (kept > each) for (const w of keptWeaners) w.n = Math.round((w.n * each) / kept);
+    // The oldest class is cast for age once its lambs are weaned (sold before the first day).
+    if (conceived - GESTATION_DAYS >= LAMBING_TIMES.weanDays) {
+      const cast = (s: Sheep): boolean => s.sex === 'F' && s.age >= F.castForAge * 365;
+      for (let i = out.length - 1; i >= 0; i--) if (cast(out[i]!)) out.splice(i, 1);
     }
+    if (d - GESTATION_DAYS >= LAMBING_TIMES.markDays)
+      join.marked = out.filter((s) => !s.weaned).reduce((t, s) => t + s.n, 0) + weanedLambs;
+    if (d - GESTATION_DAYS >= LAMBING_TIMES.weanDays) join.weaned = weanedLambs;
   }
   // Last year's ewe drop, kept as replacements: they join as maidens next season.
   const lastDrop = d - F.meanConceptionDay - GESTATION_DAYS + 365;
@@ -233,14 +274,5 @@ export function buildStartFlock(
   m.join = join;
 }
 
-/**
- * A young sheep's weight at an age, kg: birth weight, then the lamb growth
- * figure to weaning, then the weaner growth figure (START_FLOCK), up to 95%
- * of SRW.
- */
-export function youngKg(srw: number, age: number): number {
-  const F = START_FLOCK;
-  const atWean = BIRTH_KG.single + F.lambGrowthKg * Math.min(age, LAMBING_TIMES.weanDays);
-  const after = Math.max(0, age - LAMBING_TIMES.weanDays) * F.weanerGrowthKg;
-  return Math.min(0.95 * srw, atWean + after);
-}
+/** A young sheep's weight at an age, kg (`normalKg`). */
+export const youngKg = (srw: number, age: number): number => normalKg(srw, age);

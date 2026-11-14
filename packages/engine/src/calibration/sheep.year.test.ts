@@ -84,15 +84,45 @@ const marked = (rs: SheepYearRun[]): number =>
  */
 const GAPS: Record<string, string> = {
   'SB-43 merino nsw':
-    'Merino ewes, mean 3.10% a year but one block of eight over 4.5% (4.67): ewe deaths outside lambing are 0.8%, derived from the document',
+    'Merino ewes, mean 3.33% a year but two blocks of eight over 4.5% (4.67, 5.08): ewe deaths outside lambing are 0.91%, derived from the document',
   'SB-43 merino cw':
-    'Merino ewes, mean 3.98% a year, three blocks of eight over 4.5% (5.26, 5.00, 5.53): adult deaths 0.8%, derived from the document',
-  'SB-43 merino wv': 'Merino ewes 4.63% a year: adult deaths 0.8%, derived from the document',
-  'SB-43 xb nsw': 'first-cross ewes 4.50% a year (S67 puts their lambing deaths alone at 3.25%)',
-  'SB-43 xb cw': 'first-cross ewes 5.76% a year (S67 puts their lambing deaths alone at 3.25%)',
-  'SB-43 xb wv': 'first-cross ewes 5.13% a year (S67 puts their lambing deaths alone at 3.25%)',
+    'Merino ewes, mean 3.98% a year but two blocks of eight over 4.5% (5.26, 5.53): adult deaths 0.91%, derived from the document',
+  'SB-43 merino wv': 'Merino ewes 4.70% a year: adult deaths 0.91%, derived from the document',
+  'SB-43 xb nsw': 'first-cross ewes 4.95% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb cw': 'first-cross ewes 5.36% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb wv': 'first-cross ewes 5.35% a year (S67 puts their lambing deaths alone at 3.25%)',
   'SB-47 wv': 'weaners lose 1.66% (the band is the national average, which takes in worms: C22)',
 };
+
+/**
+ * REGRESSION LIMITS beside the open rows, not benchmarks: today's figure
+ * (review of the third pass, 15 Nov 2026) and a stated margin, on the side
+ * away from the band, so an open row cannot slide further unseen while it
+ * stays open. Ewe deaths a year, %: no more than today's mean plus 0.3 of
+ * a point (about half the block-to-block noise). Weaner deaths: no less
+ * than today's less 0.3.
+ */
+const LIMITS: Record<string, { today: number; worse: 'up' | 'down' }> = {
+  'SB-43 merino nsw': { today: 3.33, worse: 'up' },
+  'SB-43 merino cw': { today: 3.98, worse: 'up' },
+  'SB-43 merino wv': { today: 4.7, worse: 'up' },
+  'SB-43 xb nsw': { today: 4.95, worse: 'up' },
+  'SB-43 xb cw': { today: 5.36, worse: 'up' },
+  'SB-43 xb wv': { today: 5.35, worse: 'up' },
+  'SB-47 wv': { today: 1.66, worse: 'down' },
+};
+const LIMIT_MARGIN = 0.3;
+
+/** The regression limit for an open row: its figure must not pass today's by more than the margin. */
+function limitTest(key: string, name: string, figure: () => number): void {
+  const l = LIMITS[key]!;
+  const bound = l.worse === 'up' ? l.today + LIMIT_MARGIN : l.today - LIMIT_MARGIN;
+  const word = l.worse === 'up' ? 'no more than' : 'no less than';
+  it(`REGRESSION LIMIT ${name}: ${word} ${bound.toFixed(2)}%`, () => {
+    if (l.worse === 'up') expect(figure()).toBeLessThanOrEqual(bound);
+    else expect(figure()).toBeGreaterThanOrEqual(bound);
+  });
+}
 
 /** A test per district: an expected failure where the row has a known open gap. */
 function byDistrict(
@@ -126,11 +156,11 @@ describe('sheep benchmarks: year', () => {
   );
 
   /**
-   * SB-43: breeding ewes near CS 3, 2 to 4% a year. Held on the mean over the
-   * blocks, as every year band is (CALIBRATION, how a benchmark is judged):
-   * one block of a few hundred ewes differs from the next by about 0.7
-   * points in the same season. The "never over 4.5%" is the same mean, and
-   * the highest single block is logged in CALIBRATION.
+   * SB-43: breeding ewes near CS 3, 2 to 4% a year. The 2 to 4% is held on
+   * the mean over the blocks, as every year band is (CALIBRATION, how a
+   * benchmark is judged): one block of a few hundred ewes differs from the
+   * next by about 0.7 points in the same season. The "never over 4.5%" is
+   * held on every block, as the document words it.
    */
   for (const breed of ['merino', 'xb'] as const) {
     byDistrict(
@@ -146,6 +176,14 @@ describe('sheep benchmarks: year', () => {
         for (const r of rs) expect(r.deathsPct).toBeLessThanOrEqual(4.5);
       },
     );
+    for (const d of DISTRICTS) {
+      const key = `SB-43 ${breed} ${d}`;
+      if (LIMITS[key]) {
+        limitTest(key, `${key} ewe deaths a year`, () =>
+          mean(ewes(d, breed).map((r) => r.deathsPct)),
+        );
+      }
+    }
   }
 
   const weanerDeaths = (district: DistrictId): number =>
@@ -167,6 +205,7 @@ describe('sheep benchmarks: year', () => {
     (d) => `Merino weaners grown to target, ${NAME[d]}, average year: 2 to 6% die after weaning`,
     (d) => within(weanerDeaths(d), 2, 6),
   );
+  limitTest('SB-47 wv', 'SB-47 wv weaner deaths', () => weanerDeaths('wv'));
 
   it('SB-52 adult Merino wethers, Tablelands and Central West, average year, shorn once: 3.8 to 4.6 kg clean, 18 to 20 micron', () => {
     for (const district of ['nsw', 'cw'] as const) {

@@ -26,7 +26,13 @@ import type { DistrictId } from '@gg/shared';
 import { DISTRICTS } from '../data/districts';
 import { DISTRICT_YARDS, type YardId } from '../data/yards';
 import { parseCpiTable, type CpiTable } from '../market/cpi';
-import { parsePriceTable } from '../market/priceTable';
+import { parsePriceTable, type PriceTable } from '../market/priceTable';
+import {
+  SHEEP_INDICATOR_FILES,
+  buildSheepPrices,
+  type SheepRealPrices,
+} from '../market/realSheepPrices';
+import type { SheepIndicatorId } from '../data/sheepMarket';
 import {
   CATTLE_INDICATORS,
   buildDistrictPrices,
@@ -100,6 +106,23 @@ export interface DistrictRealData {
 export interface RealData {
   /** A district's data. Read and worked out the first time, then kept. */
   district(id: DistrictId): DistrictRealData;
+  /**
+   * The national sheep indicators (`market/realSheepPrices.ts`), with their own
+   * data version. Read and worked out the first time a sheep farm asks, then kept.
+   */
+  sheep(): SheepRealPrices;
+}
+
+/** Where a sheep indicator's table lives under `packages/engine/data/raw/`. */
+export const sheepTablePath = (id: SheepIndicatorId): string =>
+  `mla/national/${SHEEP_INDICATOR_FILES[id]}.csv`;
+
+/** The sheep price tables, in a fixed order, and the CPI table. */
+export function sheepTablePaths(): string[] {
+  return [
+    ...(Object.keys(SHEEP_INDICATOR_FILES) as SheepIndicatorId[]).map(sheepTablePath),
+    RAW_TABLE_PATHS.cpi,
+  ];
 }
 
 const hex = (n: number): string => n.toString(16).padStart(8, '0');
@@ -145,9 +168,21 @@ export function buildRealData(read: RawTableReader): RealData {
 
   let national: NationalPrices | undefined;
   let cpi: CpiTable | undefined;
+  let sheep: SheepRealPrices | undefined;
   const built = new Map<DistrictId, DistrictRealData>();
 
   return {
+    sheep() {
+      if (sheep) return sheep;
+      const version = tablesVersion(sheepTablePaths().map((path) => ({ path, text: text(path) })));
+      const tables = {} as Record<SheepIndicatorId, PriceTable>;
+      for (const id of Object.keys(SHEEP_INDICATOR_FILES) as SheepIndicatorId[]) {
+        tables[id] = parsePriceTable(text(sheepTablePath(id)));
+      }
+      cpi ??= parseCpiTable(text(RAW_TABLE_PATHS.cpi));
+      sheep = buildSheepPrices(tables, cpi, version);
+      return sheep;
+    },
     district(id) {
       let d = built.get(id);
       if (d) return d;

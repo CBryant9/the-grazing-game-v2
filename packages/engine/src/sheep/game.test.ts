@@ -4,7 +4,7 @@ import { heldRun, testMob, testSheep } from '../../test-support/sheep';
 import { across, toSaleDay, work } from '../../test-support/workingDay';
 import { endDay } from '../day/days';
 import { SHEEP_RATION } from '../data/sheep';
-import { SHEARING_RATE, WOOL_HARVEST, woolPriceCKg } from '../data/sheepMarket';
+import { SHEEP_BUDGET_COSTS, woolPriceCKg } from '../data/sheepMarket';
 import { DSE_PER_AE, MVP_DSE_PER_AE } from '../data/stocking';
 import { GRID_W } from '../grid';
 import { COST_PER_M, NETTING_PER_M, segmentCost } from '../money/costs';
@@ -94,6 +94,54 @@ describe('the facts a player gets to feed by', () => {
     for (const s of sheepMobsOf(farm)[0]!.sheep) s.cond = 3;
     expect(sheepConditionFacts(farm)).toEqual([]);
   });
+  it('a mob sliding on poor feed is told it is losing weight, with reasons, once a week, and low condition once a week', () => {
+    const m = testMob([testSheep({ id: 1, sex: 'F', n: 200, cond: 2.6 })]);
+    const losing: number[] = [];
+    const thin: number[] = [];
+    heldRun(m, 90, {
+      diet: heldDiet(700, 0.5),
+      f: 0.6,
+      each: (day, r) => {
+        for (const n of r.notes) {
+          if (n.type === 'losingWeight') {
+            losing.push(day);
+            expect(n.why.length).toBeGreaterThan(0);
+          }
+          if (n.type === 'lowCondition') thin.push(day);
+        }
+      },
+    });
+    // Losing from about day 1, told from day 10 and then each week it carries on.
+    expect(losing.length).toBeGreaterThanOrEqual(8);
+    for (let i = 1; i < losing.length; i++)
+      expect(losing[i]! - losing[i - 1]!).toBeGreaterThanOrEqual(7);
+    expect(thin.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < thin.length; i++) expect(thin[i]! - thin[i - 1]!).toBeGreaterThanOrEqual(7);
+  });
+  it('dry ewes are at the joining stage only in the six weeks before joining and through it', () => {
+    const ewesOn = (month: number): FarmState => {
+      const f = createFarm({
+        seed: 3,
+        district: 'wv',
+        size: 'small',
+        start: { year: 2021, month },
+        startType: 'scratch',
+        difficulty: 'easy',
+      });
+      const r = addSheepMob(f, surveyOf(f), {
+        cell: f.layout.water.bore,
+        breed: 'merino',
+        groups: [{ cls: 'ewe', head: 100 }],
+      });
+      if (!r.ok) throw new Error(r.reason);
+      for (const s of r.mob.sheep) s.cond = 2.4;
+      return f;
+    };
+    // Western Victoria joins on 1 April. In March (before it) a dry ewe at CS 2.4 is under the
+    // joining floor (2.6); in October she is a dry ewe out of season (floor 2): no fact.
+    expect(sheepConditionFacts(ewesOn(2)).map((x) => x.stage)).toEqual(['joining']);
+    expect(sheepConditionFacts(ewesOn(9))).toEqual([]);
+  });
   it('says what each feed would cost the mob today, and changes nothing', () => {
     const farm = farmWithSheep();
     const before = JSON.stringify(saveFarm(farm));
@@ -132,10 +180,7 @@ describe('contractors: shearing and crutching on their days', () => {
       for (const e of stepDay(farm).events) if (e.type === 'sheep-shorn') shorn = e;
     }
     expect(shorn).toBeDefined();
-    expect(shorn!.cost).toBeCloseTo(
-      shorn!.head * (SHEARING_RATE.sheep + WOOL_HARVEST.shedStaffPerHead),
-      6,
-    );
+    expect(shorn!.cost).toBeCloseTo(shorn!.head * SHEEP_BUDGET_COSTS.shearPerHead, 6);
     const sale = sellClip(shorn!.cleanKg, shorn!.greasyKg, shorn!.micron);
     expect(shorn!.woolIncome).toBeCloseTo(sale.net, 6);
     expect(sale.net).toBeLessThan((shorn!.cleanKg * woolPriceCKg(shorn!.micron)) / 100);
@@ -235,6 +280,16 @@ describe('the sheep market', () => {
     expect(yards).toBeDefined();
     expect(headOf(yards!.sheep)).toBe(40);
     expect(next.sheep!.arrivals).toBeUndefined();
+  });
+
+  it('sheep on their way to the yards count in net worth at what was paid, as cattle on the way do', () => {
+    const farm = toSaleDay(farmWithSheep());
+    const before = netWorth(farm);
+    const bought = work(farm, { type: 'buySheep', cls: 'merinoWethers', qty: 40, to: { cell: 0 } });
+    const paid = farm.cash - bought.farm.cash;
+    expect(paid).toBeGreaterThan(0);
+    // Paying moves cash into stock on the way: net worth does not fall by the price.
+    expect(netWorth(bought.farm)).toBeCloseTo(before, 0);
   });
 
   it('sells sheep at the mutton indicator less commission and the head fee, in the sheep sales line', () => {

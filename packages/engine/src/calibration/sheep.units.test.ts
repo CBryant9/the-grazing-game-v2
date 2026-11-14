@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { flock, heldRun, testMob, testSheep } from '../../test-support/sheep';
 import { CYCLE_DAYS, DSE_MJ, GESTATION_DAYS, REF_WALK, SRW, fenceHoldsSheep } from '../data/sheep';
+import { COST_PER_M, NETTING_PER_M, segmentCost } from '../money/costs';
 import { onHeat } from '../sheep/breeding';
 import { appetiteShare, dseOf, kgPerCs, maintMJ, needsMJ, qualityFactor } from '../sheep/energy';
 import { heldDiet, sheepAvail } from '../sheep/graze';
@@ -208,7 +209,13 @@ describe('sheep benchmarks: unit', () => {
     expect(fenceHoldsSheep('netting')).toBe(true);
   });
 
-  it.skip("SB-65 sheep-proof fence price above the cattle fence price: skipped, the amount is Claudia's call (C26) and the netting fence is milestone 2.4", () => {});
+  // Netting is built at the $10 a metre stand-in (call C26); only the amount waits on Claudia.
+  it('SB-65 sheep-proof fence price above the cattle fence price: netting $10 a metre (stand-in, C26) against permanent $7', () => {
+    expect(NETTING_PER_M).toBeGreaterThan(COST_PER_M.permanent);
+    for (const kind of ['permanent', 'electric', 'tape'] as const) {
+      expect(segmentCost('netting', 100)).toBeGreaterThan(segmentCost(kind, 100));
+    }
+  });
 
   it('the reference DSE is the 8.3 MJ of S4', () => {
     expect(maintMJ(wether(), REF_WALK)).toBeCloseTo(DSE_MJ, 6);

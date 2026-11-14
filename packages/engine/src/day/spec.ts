@@ -278,6 +278,14 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
       // not already there. Making the plan is a decision. The moves a plan makes by itself
       // take none of the day (as in the old game).
       const lost = mobsThatLost(before, trial.farm);
+      // A sheep mob's plan resumed on another stop moves the sheep: the sheep move's time.
+      const sheepMoved = trial.events.find((e) => e.type === 'sheep-moved');
+      if (!lost.length && sheepMoved?.type === 'sheep-moved') {
+        return whole([
+          part('settle', T.moveMobSettleMin.value),
+          part('head', (sheepMoved.head / 100) * T.moveMobMinPer100Head.value),
+        ]);
+      }
       if (!lost.length) return { kind: 'free' };
       const head = lost.reduce((n, l) => n + l.head, 0);
       return whole([

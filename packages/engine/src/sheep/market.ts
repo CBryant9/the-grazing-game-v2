@@ -9,12 +9,13 @@ import { DRESSING, SRW, type SheepBreed } from '../data/sheep';
 import {
   SHEEP_HEAD_PRICES,
   SHEEP_INDICATORS_C_KG,
-  SHEARING_RATE,
+  SHEEP_BUDGET_COSTS,
   SHEEP_TRADE,
   WOOL_HARVEST,
   lambIndicator,
   woolPriceCKg,
 } from '../data/sheepMarket';
+import type { SheepIndicators } from '../market/realSheepPrices';
 import { matureKg } from './energy';
 import type { Sheep, SheepSex } from './types';
 
@@ -37,16 +38,31 @@ export const carcaseKg = (s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'wt'
  * dollars: lambs and weaners by the lamb indicator for their carcase weight
  * and breed, adults by the mutton indicator.
  */
-export function sheepSaleValue(s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'wt'>): number {
+export function sheepSaleValue(
+  s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'wt'>,
+  prices: SheepIndicators = SHEEP_INDICATORS_C_KG,
+): number {
   const kg = carcaseKg(s);
   const ind = s.age < 365 ? lambIndicator(kg, s.breed) : 'mutton';
-  return (kg * SHEEP_INDICATORS_C_KG[ind]) / 100;
+  return (kg * prices[ind]) / 100;
+}
+
+/**
+ * The sheep indicators a farm sells and buys at today, c/kg carcase weight:
+ * the real-year figures on a real-year farm (`market/realSheepPrices.ts`, set
+ * each day by the tick), else the dated stand-in (`SHEEP_INDICATORS_C_KG`).
+ */
+export function sheepIndicatorsOf(farm: {
+  sheep?: { prices?: { indicators: SheepIndicators } };
+}): SheepIndicators {
+  return farm.sheep?.prices?.indicators ?? SHEEP_INDICATORS_C_KG;
 }
 
 /** What one sheep puts in the bank when sold: its value less commission and the head fee. */
 export const sheepNetSaleValue = (
   s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'wt'>,
-): number => sheepSaleValue(s) * (1 - SHEEP_TRADE.commission) - SHEEP_TRADE.headFee;
+  prices: SheepIndicators = SHEEP_INDICATORS_C_KG,
+): number => sheepSaleValue(s, prices) * (1 - SHEEP_TRADE.commission) - SHEEP_TRADE.headFee;
 
 /** The sheep sold to buy: what each is, and how it is priced. */
 export interface SheepBuyClass {
@@ -132,7 +148,10 @@ export function boughtKg(c: SheepBuyClass): number {
 }
 
 /** The price of one sheep of a class, before the head fee, dollars. */
-export function sheepBuyPrice(id: SheepBuyClassId): number {
+export function sheepBuyPrice(
+  id: SheepBuyClassId,
+  prices: SheepIndicators = SHEEP_INDICATORS_C_KG,
+): number {
   const c: SheepBuyClass = SHEEP_BUY_CLASSES[id];
   const s = { sex: c.sex, breed: c.breed, cond: 3, age: c.age, wt: boughtKg(c) };
   switch (c.price) {
@@ -141,9 +160,9 @@ export function sheepBuyPrice(id: SheepBuyClassId): number {
     case 'ram':
       return SHEEP_HEAD_PRICES.ramHead;
     case 'store':
-      return (carcaseKg(s) * SHEEP_INDICATORS_C_KG.restockerLamb) / 100;
+      return (carcaseKg(s) * prices.restockerLamb) / 100;
     case 'breeding':
-      return sheepSaleValue({ ...s, age: 1095 }) * SHEEP_HEAD_PRICES.breedingPremium;
+      return sheepSaleValue({ ...s, age: 1095 }, prices) * SHEEP_HEAD_PRICES.breedingPremium;
   }
 }
 
@@ -156,17 +175,20 @@ export function sheepBuyPrice(id: SheepBuyClassId): number {
 export function woolOnBack(s: Pick<Sheep, 'fleece' | 'micronKg' | 'sex'>): number {
   if (s.fleece <= 0) return 0;
   const gross = woolValue(s.fleece, s.micronKg / s.fleece) * (1 - WOOL_HARVEST.levyShare);
-  const shear =
-    (s.sex === 'M' ? SHEARING_RATE.ram : SHEARING_RATE.sheep) + WOOL_HARVEST.shedStaffPerHead;
+  const shear = SHEEP_BUDGET_COSTS.shearPerHead * (s.sex === 'M' ? 2 : 1);
   return Math.max(0, gross - shear);
 }
 
 /** What the sheep on a farm would put in the bank if sold today, with the wool on their backs, dollars (net worth). */
-export function sheepWorth(mobs: readonly { sheep: readonly Sheep[] }[]): number {
+export function sheepWorth(
+  mobs: readonly { sheep: readonly Sheep[] }[],
+  prices: SheepIndicators = SHEEP_INDICATORS_C_KG,
+): number {
   let v = 0;
   for (const m of mobs) {
     for (const s of m.sheep) {
-      if (!s.dead && s.n > 0) v += (Math.max(0, sheepNetSaleValue(s)) + woolOnBack(s)) * s.n;
+      if (!s.dead && s.n > 0)
+        v += (Math.max(0, sheepNetSaleValue(s, prices)) + woolOnBack(s)) * s.n;
     }
   }
   return v;

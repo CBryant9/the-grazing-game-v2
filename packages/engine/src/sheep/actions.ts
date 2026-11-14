@@ -28,6 +28,7 @@ import {
   SHEEP_BUY_CLASSES,
   boughtKg,
   sheepBuyPrice,
+  sheepIndicatorsOf,
   sheepNetSaleValue,
   type SheepBuyClass,
   type SheepBuyClassId,
@@ -130,7 +131,8 @@ export function buySheep(
   const no = notSaleDay(farm, env, clocked);
   if (no) return no;
   const c: SheepBuyClass = SHEEP_BUY_CLASSES[a.cls as SheepBuyClassId];
-  const each = sheepBuyPrice(a.cls as SheepBuyClassId) + SHEEP_TRADE.headFee;
+  const each =
+    sheepBuyPrice(a.cls as SheepBuyClassId, sheepIndicatorsOf(farm)) + SHEEP_TRADE.headFee;
   const total = each * a.qty;
   const cls =
     c.sex === 'M'
@@ -238,7 +240,14 @@ export function sellSheep(
   if (no) return no;
   const lambsOf = lambsByDam(m.sheep);
   const pool = m.sheep
-    .filter((s) => s.weaned && !s.dead && s.n > 0 && sheepClassOf(s) === (a.cls as SheepClass))
+    .filter(
+      (s) =>
+        s.weaned &&
+        !s.dead &&
+        s.n > 0 &&
+        sheepClassOf(s) === (a.cls as SheepClass) &&
+        (a.sex === undefined || s.sex === a.sex),
+    )
     .sort(sellOrder);
   if (!pool.length)
     return refuse('nothing-to-sell', 'There are no sheep of that class in the mob.');
@@ -253,7 +262,7 @@ export function sellSheep(
     const k = Math.min(left, s.n);
     left -= k;
     head += k;
-    net += sheepNetSaleValue(s) * k;
+    net += sheepNetSaleValue(s, sheepIndicatorsOf(farm)) * k;
     kg += s.wt * k;
     // The ewes' share of their lambs at foot goes with them.
     if (lambsOf.has(s.id)) {
@@ -261,7 +270,7 @@ export function sellSheep(
         if (l.weaned || l.dam !== s.id || l.n <= 0) continue;
         const c = k >= s.n ? l.n : Math.round((l.n * k) / s.n);
         if (c <= 0) continue;
-        net += sheepNetSaleValue(l) * c;
+        net += sheepNetSaleValue(l, sheepIndicatorsOf(farm)) * c;
         atFoot += c;
         l.n -= c;
       }

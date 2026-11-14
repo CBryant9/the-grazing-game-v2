@@ -18,6 +18,7 @@ import { createFarm } from '../sim/create';
 import { stepDay } from '../sim/tick';
 import { sheepMobsOf } from './farm';
 import { stockingRead } from './reads';
+import { START_FLOCK } from '../data/sheep';
 
 const DPIRD_GM_PER_DSE = 50.46;
 const env = { seasons: AVERAGE_YEAR };
@@ -77,6 +78,69 @@ function firstYear(district: 'nsw' | 'cw' | 'wv'): Year {
   return y;
 }
 
+/** A start flock on the 1st of a month, as the setup builds it. */
+function startFlock(district: 'nsw' | 'cw' | 'wv', month: number) {
+  const farm = createFarm(
+    {
+      seed: 7,
+      district,
+      size: 'medium',
+      start: { year: 2021, month },
+      startType: 'running',
+      difficulty: 'easy',
+      stock: 'sheep',
+    },
+    env,
+  );
+  return { farm, mob: sheepMobsOf(farm)[0]! };
+}
+
+describe('the start flock is the flock the model would have on that date (review, item 6)', () => {
+  it('keeps only the ewe weaners it needs as replacements (Western Victoria, 1 March)', () => {
+    const { mob } = startFlock('wv', 2);
+    const eweWeaners = mob.sheep
+      .filter((s) => s.sex === 'F' && s.weaned && s.age < 365)
+      .reduce((t, s) => t + s.n, 0);
+    // One age class: the hoggets (last year's drop, kept the same way) are one class.
+    const hoggets = mob.sheep
+      .filter((s) => s.sex === 'F' && s.age >= 365 && s.age < 730 && s.parity === 0 && s.preg < 0)
+      .reduce((t, s) => t + s.n, 0);
+    expect(eweWeaners).toBeGreaterThan(0);
+    expect(eweWeaners).toBeLessThanOrEqual(Math.ceil(hoggets * 1.05));
+  });
+
+  it('casts the oldest ewes for age once their lambs are weaned, whatever the start month', () => {
+    // Joined last at 5.5 years, cast at weaning: never older than 6.25 years on the farm, and
+    // none over the cast-for-age age once that season's lambs are weaned.
+    for (const district of ['nsw', 'cw', 'wv'] as const) {
+      for (const month of [0, 3, 6, 9, 11]) {
+        const { mob } = startFlock(district, month);
+        const oldest = Math.max(...mob.sheep.filter((s) => s.sex === 'F').map((s) => s.age));
+        expect(oldest / 365).toBeLessThanOrEqual(START_FLOCK.castForAge + 0.25);
+        if (mob.join!.weaned >= 0) expect(oldest / 365).toBeLessThan(START_FLOCK.castForAge);
+      }
+    }
+  });
+
+  it('carries about the lambs at foot the model marks per ewe joined (Central West, 1 September)', () => {
+    // The model's own Central West Merino flock marks 87.4 lambs a 100 ewes joined (8 seeds,
+    // review of the third pass); the start flock is built from the same rules at the CS the
+    // model lambs at, so it sits within 5 points of it (before: 101).
+    const { mob } = startFlock('cw', 8);
+    const lambs = mob.sheep.filter((s) => !s.weaned).reduce((t, s) => t + s.n, 0);
+    const joined = mob.join!.joined;
+    expect(Math.abs((lambs / joined) * 100 - 87.4)).toBeLessThanOrEqual(5);
+  });
+
+  it('mid-joining, the ewes that came on heat before the first day are already in lamb (Tablelands, 1 May)', () => {
+    const { mob } = startFlock('nsw', 4);
+    const ewes = mob.join!.joined;
+    const inLamb = mob.sheep.filter((s) => s.preg >= 0).reduce((t, s) => t + s.n, 0);
+    // 24 days into a 35-day joining: most ewes have had a heat (about 60 to 65% conceive on it).
+    expect(inLamb / ewes).toBeGreaterThan(0.5);
+  });
+});
+
 describe('start flock, first year with no hands', () => {
   for (const district of ['nsw', 'cw', 'wv'] as const) {
     it(`${district}: lambs in the first year`, { timeout: 120_000 }, () => {
@@ -93,32 +157,41 @@ describe('start flock, first year with no hands', () => {
       expect(y.micron).toBeGreaterThan(16.5);
       expect(y.micron).toBeLessThan(19.5);
     });
-    it(
-      `${district}: no windfall and no wipe-out (-$50 to $200 a DSE)`,
-      { timeout: 120_000 },
-      () => {
-        const y = firstYear(district);
-        expect(y.perDse).toBeGreaterThan(-50);
-        expect(y.perDse).toBeLessThan(200);
-      },
-    );
   }
-  // Known gap: an unmanaged year is not the DPIRD managed gross margin. Measured (seed 7):
-  // Northern Tablelands $11.6/DSE (897 deaths, nobody fed through winter); Central West
-  // $124.7/DSE and Western Victoria $149.9/DSE (no sales, so the whole lamb crop is valued
-  // at 2026 market prices, and running costs carry shearing, feed and health only).
-  for (const [district, got] of [
-    ['nsw', 11.6],
-    ['cw', 124.7],
-    ['wv', 149.9],
-  ] as const) {
+  // An unmanaged first year is not the DPIRD managed gross margin; the managed flock is
+  // benchmarked in calibration/sheep.margin.test.ts. Measured here (seed 7, review of the third
+  // pass): Northern Tablelands $5.37/DSE (885 deaths, nobody fed through winter); Central
+  // West $44.28/DSE (inside); Western Victoria $135.74/DSE (no sales, so the whole lamb crop is
+  // valued at 2026 market prices). Open rows are expected failures, each with a REGRESSION
+  // LIMIT beside it: today's figure and $10 a DSE on the side away from the band.
+  const GAP: Partial<Record<'nsw' | 'cw' | 'wv', { got: number; worse: 'up' | 'down' }>> = {
+    nsw: { got: 5.37, worse: 'down' },
+    wv: { got: 135.74, worse: 'up' },
+  };
+  for (const district of ['nsw', 'cw', 'wv'] as const) {
+    const gap = GAP[district];
+    const check = (): void => {
+      const y = firstYear(district);
+      expect(y.perDse).toBeGreaterThan(DPIRD_GM_PER_DSE / 2);
+      expect(y.perDse).toBeLessThan(DPIRD_GM_PER_DSE * 2);
+    };
+    if (!gap) {
+      it(`${district}: within half to twice the DPIRD gross margin`, { timeout: 120_000 }, check);
+      continue;
+    }
     it.fails(
-      `${district}: within half to twice the DPIRD gross margin (known gap: $${got}/DSE)`,
+      `${district}: within half to twice the DPIRD gross margin (known gap: $${gap.got}/DSE)`,
+      { timeout: 120_000 },
+      check,
+    );
+    const bound = gap.worse === 'up' ? gap.got + 10 : gap.got - 10;
+    it(
+      `${district}: REGRESSION LIMIT, ${gap.worse === 'up' ? 'no more' : 'no less'} than $${bound.toFixed(2)}/DSE`,
       { timeout: 120_000 },
       () => {
         const y = firstYear(district);
-        expect(y.perDse).toBeGreaterThan(DPIRD_GM_PER_DSE / 2);
-        expect(y.perDse).toBeLessThan(DPIRD_GM_PER_DSE * 2);
+        if (gap.worse === 'up') expect(y.perDse).toBeLessThanOrEqual(bound);
+        else expect(y.perDse).toBeGreaterThanOrEqual(bound);
       },
     );
   }

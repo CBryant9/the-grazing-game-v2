@@ -19,8 +19,8 @@ import type { GrazingLand } from '../cattle/types';
 import type { Survey } from '../farm/layout';
 import { areaIdOf, grazingArea, placeAnchor, surveyOf } from '../sim/derived';
 import type { FarmEvent, TickEvent } from '../sim/events';
-import { newRun, perDay, positionOf, templateOf } from '../sim/plans';
-import type { FarmState } from '../sim/state';
+import { newRun, perDay, positionOf, stepOf, templateOf } from '../sim/plans';
+import type { FarmState, PlanTemplate } from '../sim/state';
 import { sheepClassOf } from './energy';
 import { createSheepMob, mergeSheepShared, sheepMobsOf } from './farm';
 import { headOf, lambsByDam, splitOff } from './simFlock';
@@ -183,11 +183,107 @@ export function setSheepPlan(
   const to = sheepTarget(farm, s, cell);
   if (typeof to !== 'number') return to;
   m.plan = newRun(farm, tpl, pos.leg, pos.idx);
-  if (areaIdOf(s, m) !== to) {
-    m.where = { kind: 'paddock', anchor: placeAnchor(s, to) };
-    mergeSheepShared(farm, s, events as TickEvent[]);
+  putSheepOnStop(farm, s, m, to, events);
+  events.push({
+    type: 'sheep-plan-set',
+    mob: m.id,
+    mobName: m.name,
+    template: tpl.id,
+    dryAreas: dryStops(s, tpl),
+  });
+  return null;
+}
+
+/**
+ * Put a sheep mob on a plan's stop: a move (with its `sheep-moved` event, so
+ * it takes the move's daylight, and the no-water warning) when the mob is
+ * not already there; nothing when it is.
+ */
+function putSheepOnStop(
+  farm: FarmState,
+  s: Survey,
+  m: SheepMob,
+  to: number,
+  events: FarmEvent[],
+): void {
+  if (m.where.kind === 'paddock' && areaIdOf(s, m) === to) return;
+  m.where = { kind: 'paddock', anchor: placeAnchor(s, to) };
+  const head = headOf(m.sheep);
+  mergeSheepShared(farm, s, events as TickEvent[]);
+  const now = sheepMobsOf(farm).find((x) => x.sheep.some((y) => m.sheep.includes(y))) ?? m;
+  arrived(s, now, head, events);
+}
+
+/** The names of a plan's stops that have no water, each once (the cattle plan's `dryAreas`). */
+function dryStops(s: Survey, tpl: PlanTemplate): string[] {
+  const names = new Set<string>();
+  for (const l of tpl.legs) {
+    for (const c of l.stops) {
+      const id = s.topology.areaOf[c]!;
+      if (!s.points.areaTroughs[id]!.length) names.add(s.topology.areas[id]!.name);
+    }
   }
-  events.push({ type: 'sheep-plan-set', mob: m.id, mobName: m.name, template: tpl.id });
+  return [...names];
+}
+
+/** Pause a sheep mob's plan, as `pausePlan` does for cattle. */
+export function pauseSheepPlan(farm: FarmState, events: FarmEvent[], mob: number): Out {
+  const m = sheepMob(farm, mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
+  if (run.paused) return refuse('already-paused', `${m.name}'s plan is already paused.`);
+  run.paused = true;
+  run.waiting = null;
+  events.push({
+    type: 'sheep-plan-paused',
+    mob: m.id,
+    mobName: m.name,
+    template: run.template,
+    step: stepOf(templateOf(farm, run)!, run.leg, run.idx),
+  });
+  return null;
+}
+
+/**
+ * Resume a sheep mob's plan at a step (where it was if left out), as
+ * `resumePlan` does for cattle: the mob goes to that stop (a move) and the
+ * days on it start again.
+ */
+export function resumeSheepPlan(
+  farm: FarmState,
+  events: FarmEvent[],
+  mob: number,
+  step: number | undefined,
+): Out {
+  const m = sheepMob(farm, mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan to resume. Set one.`);
+  const tpl = templateOf(farm, run);
+  if (!tpl) return refuse('no-such-plan', 'There is no such plan.');
+  const at = step ?? stepOf(tpl, run.leg, run.idx);
+  const pos = positionOf(tpl, at);
+  if (!pos) return refuse('bad-request', 'That step is not in the plan.');
+  const s = surveyOf(farm);
+  const to = sheepTarget(farm, s, tpl.legs[pos.leg]!.stops[pos.idx]!);
+  if (typeof to !== 'number') return to;
+  run.leg = pos.leg;
+  run.idx = pos.idx;
+  run.round = 0;
+  run.moved = farm.day;
+  run.noted = 0;
+  run.waiting = null;
+  run.paused = false;
+  putSheepOnStop(farm, s, m, to, events);
+  events.push({
+    type: 'sheep-plan-resumed',
+    mob: m.id,
+    mobName: m.name,
+    template: tpl.id,
+    step: at,
+    area: s.topology.areas[to]!.name,
+  });
   return null;
 }
 

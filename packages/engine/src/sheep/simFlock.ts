@@ -16,6 +16,7 @@ import type { AnimalIds, GrazingArea, GrazingLand } from '../cattle/types';
 import type { CalendarDate } from '../calendar';
 import {
   ADULT_DAILY,
+  BIRTH_KG,
   CYCLE_DAYS,
   DSE_PER_AE,
   FLYSTRIKE,
@@ -32,6 +33,7 @@ import {
   NO_WATER,
   ORPHAN,
   SHEEP_RATION,
+  STARVED,
   THIN_DEATHS,
   WEANER_DEATHS,
   WETHER_DAILY,
@@ -66,6 +68,7 @@ import {
   maintMJ,
   milkPotentialMJ,
   milkSpendMJ,
+  normalKg,
   pregnancyMJ,
   qualityFactor,
   walkFactor,
@@ -125,6 +128,9 @@ export interface FlockDayResult {
 /** The flystrike note comes at most once in this many days a mob. */
 export const FLY_NOTE_DAYS = 7;
 
+/** The losing-weight and low-condition notes come at most once in this many days a mob. */
+export const LOSS_NOTE_DAYS = 7;
+
 /** Live lambs at foot, by the record of their dams. */
 export function lambsByDam(sheep: readonly Sheep[]): Map<number, number> {
   const out = new Map<number, number>();
@@ -142,6 +148,18 @@ export function lambsPerEwe(s: Sheep, lambsOf: ReadonlyMap<number, number>): num
 /** A weaner in its first year after weaning. */
 const inWeanerYear = (s: Sheep): boolean =>
   s.weaned && s.wage > 0 && s.age - s.wage < WEANER_DEATHS.days;
+
+/**
+ * The weight a sheep is measured against for `STARVED`, kg: a lamb at foot
+ * against the normal weight for its age (from a triplet's birth weight, the
+ * lightest normal start); a weaned sheep against the normal weight at
+ * weaning, so a weaner that grows slowly is stunted, not starved (SB-46's
+ * weaners losing 10 g a day live on at about 18 kg).
+ */
+export function starvedRefKg(s: Pick<Sheep, 'srw' | 'age' | 'weaned'>): number {
+  const age = s.weaned ? Math.min(s.age, LAMBING_TIMES.weanDays) : s.age;
+  return normalKg(s.srw, age, BIRTH_KG.triplet);
+}
 
 /** The daily death risk outside lambing, before no water and flystrike. */
 export function dailyDeathRisk(s: Sheep): number {
@@ -255,7 +273,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
   let rams = 0;
   if (joining) for (const s of order) if (isAdultRam(s) && !s.dead) rams += s.n;
   const cover = joining ? ramCover(rams, join.joined) : 0;
-  const lambing = join !== null && join.lambingStart >= 0 && join.marked < 0;
+  const lambing = join !== null && join.lambingStart !== null && join.marked < 0;
 
   const added: Sheep[] = [];
   let feedCost = 0;
@@ -347,7 +365,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
         if (s.preg >= GESTATION_DAYS) {
           const lit = s.litter;
           lambRecord(s, m, inp, added, births, deaths);
-          if (join && join.lambingStart < 0 && day >= join.start && lit > 0) {
+          if (join && join.lambingStart === null && day >= join.start && lit > 0) {
             join.lambingStart = day;
             notes.push({ type: 'lambingStarted' });
           }
@@ -416,6 +434,9 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     let pd = dailyDeathRisk(s);
     if (s.struck >= 0) pd += STRUCK_DAILY;
     if (m.dry >= NO_WATER.dieOnDay) pd = 1;
+    // A sheep under half its normal weight for its age is dead (STARVED).
+    const starved = s.wt < STARVED.share * starvedRefKg(s);
+    if (starved) pd = 1;
     const died = binomial(s.n, pd, rng.deaths);
     if (died > 0) {
       s.n -= died;
@@ -425,15 +446,17 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
         cause:
           m.dry > 2
             ? 'noWater'
-            : s.cond < 1.6
-              ? 'poorCondition'
-              : s.struck >= 0
-                ? 'flystrike'
-                : !s.weaned && s.age < MARK_DAYS
-                  ? 'newborn'
-                  : inWeanerYear(s)
-                    ? 'weaner'
-                    : 'natural',
+            : starved
+              ? 'starved'
+              : s.cond < 1.6
+                ? 'poorCondition'
+                : s.struck >= 0
+                  ? 'flystrike'
+                  : !s.weaned && s.age < MARK_DAYS
+                    ? 'newborn'
+                    : inWeanerYear(s)
+                      ? 'weaner'
+                      : 'natural',
       });
       if (s.n <= 0) {
         s.dead = true;
@@ -518,7 +541,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     }
     // The marking count: lambs alive, and ram lambs marked.
     if (
-      join.lambingStart >= 0 &&
+      join.lambingStart !== null &&
       join.marked < 0 &&
       day - join.lambingStart >= LAMBING_TIMES.markDays
     ) {
@@ -556,7 +579,9 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     notes.push({ type: 'shortOfFeed', f });
   }
   m.lossDays = n && st.adg < -0.02 ? m.lossDays + 1 : 0;
-  if (m.lossDays === 10) {
+  // Told on the 10th day of losses, then once a week while the slide carries on (review of the
+  // third pass: a mob could lose a third of its weight with one note).
+  if (m.lossDays >= 10 && (m.lossDays - 10) % LOSS_NOTE_DAYS === 0) {
     const why: SheepLossReason[] = [];
     if (f < 0.85 || diet.avail < 0.75) why.push('lowFeed');
     if (me < 8) why.push('lowEnergy');
@@ -565,7 +590,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     if (latePregnant > 0) why.push('latePregnancy');
     notes.push({ type: 'losingWeight', me, cp: diet.cp, why });
   }
-  if (n && st.cs < 2 && m.lastThin < day - 30) {
+  if (n && st.cs < 2 && m.lastThin <= day - LOSS_NOTE_DAYS) {
     m.lastThin = day;
     notes.push({ type: 'lowCondition', cs: st.cs });
   }
@@ -608,7 +633,7 @@ function startJoining(
     pregnant: 0,
     foetuses: 0,
     scanned: false,
-    lambingStart: -1,
+    lambingStart: null,
     born: 0,
     ewesLambed: 0,
     marked: -1,
@@ -709,15 +734,22 @@ export function weanSheep(s: Sheep): void {
   s.wage = s.age;
 }
 
-/** True when the mob's lambs are due to be weaned: 14 weeks from the start of lambing (S17). */
+/**
+ * True when the mob's lambs are due to be weaned: 14 weeks from the start of
+ * lambing (S17), or as soon as any lamb at foot reaches
+ * `LAMBING_TIMES.weanByAge` days old (lambs with no joining record, or born
+ * after the mob's weaning day).
+ */
 export function sheepWeaningDue(m: SheepMob, day: number): boolean {
   const j = m.join;
-  return (
+  if (
     j !== null &&
-    j.lambingStart >= 0 &&
+    j.lambingStart !== null &&
     j.weaned < 0 &&
     day - j.lambingStart >= LAMBING_TIMES.weanDays
-  );
+  )
+    return true;
+  return m.sheep.some((s) => !s.weaned && !s.dead && s.n > 0 && s.age >= LAMBING_TIMES.weanByAge);
 }
 
 /**

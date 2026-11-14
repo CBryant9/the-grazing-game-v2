@@ -180,7 +180,7 @@ export function sheepYearRun(
     if (mob) {
       if (shearDays.has(d)) shorn.push(shearMob(mob, d));
       if (crutchDays.has(d)) crutchMob(mob, d);
-      if (csAtLambing === null && mob.join && mob.join.lambingStart >= 0) {
+      if (csAtLambing === null && mob.join && mob.join.lambingStart !== null) {
         const ewes = mob.sheep.filter((s) => s.sex === 'F' && isStart(s, d));
         csAtLambing = ewes.reduce((t, s) => t + s.cond * s.n, 0) / headOf(ewes);
       }
@@ -281,7 +281,7 @@ export function pastJoining(joined: number, start = -150): SheepJoining {
     pregnant: joined,
     foetuses: 0,
     scanned: true,
-    lambingStart: -1,
+    lambingStart: null,
     born: 0,
     ewesLambed: 0,
     marked: -1,
