@@ -2,7 +2,13 @@ import 'server-only';
 import { mkdir, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SavedFarm } from '@gg/engine';
-import type { JobCardWire, SetupChoices } from '../../lib/game/types';
+import type {
+  DateParts,
+  FarmListItem,
+  JobCardWire,
+  PastDayWire,
+  SetupChoices,
+} from '../../lib/game/types';
 import { DIARY_DAYS, type StoredDiaryDay } from './diary';
 
 /**
@@ -53,6 +59,12 @@ export interface StoredFarm {
 
 /** A stored farm that could not be read: bad JSON, or not a farm at all. */
 export class BrokenFarmError extends Error {}
+/** Someone else's save got in first: the version this write expected is not the farm's now. */
+export class SaveConflictError extends Error {}
+/** The account has no room for another farm (the database's farm limit). */
+export class FarmLimitError extends Error {}
+/** The store could not do it right now (a lost connection, a timeout). Worth trying again. */
+export class StoreUnavailableError extends Error {}
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -89,14 +101,84 @@ export function upgradeStored(raw: unknown, version: () => string): StoredFarm {
   };
 }
 
+/** Who a farm belongs to: a guest's session (the browser's secret), or an account. */
+export type Owner = { kind: 'guest'; session: string } | { kind: 'user'; id: string };
+
+/** What the store needs to know about a farm beyond the save: the facts the lists and the database keep. */
+export interface FarmFacts {
+  name: string;
+  district: string;
+  districtName: string;
+  size: string;
+  sizeHa: number;
+  enterprise: string;
+  startType: string;
+  difficulty: string;
+  years: string;
+  engineVersion: string;
+  day: number;
+  date: DateParts;
+  /** Why the game ended, or null while it is going. */
+  over: string | null;
+}
+
+/** One job or skip, for the action log (PRD 14.5). The file store does not keep it. */
+export interface ActionLogEntry {
+  day: number;
+  requestId?: string;
+  action: unknown;
+  ok: boolean;
+  reason?: string;
+}
+
+export interface PutOptions {
+  /**
+   * The version the farm had when it was loaded. The write only goes ahead
+   * if that is still the farm's version, so two tabs can not both win.
+   * Left out, the write is not checked (a test, or the file store).
+   */
+  expect?: string;
+  facts?: FarmFacts;
+  /** The days whose diary lines changed, so a database writes only those. */
+  diaryDays?: number[];
+  action?: ActionLogEntry;
+  /** The farm on its new day, kept for "see the farm on a past day". */
+  past?: PastDayWire;
+}
+
 /**
- * Where farms are kept. Files for now; a database replaces this later by
- * implementing the same calls. The key is the farm's id, never a session id.
+ * Past days kept for each farm. The database keeps every day for the last
+ * 90, then one a week back to 400 days (BUILD_PLAN 5.2). The file store
+ * keeps the last 14 days only: it is for one machine. The cap is there
+ * because each picture is the whole map (tens of KB), so a farm kept for
+ * years would otherwise grow without end.
+ */
+export const PAST_FILE_DAYS = 14;
+export const PAST_DAILY_DAYS = 90;
+export const PAST_MAX_DAYS = 400;
+
+/** Is the picture of `day` kept, when `newest` is the farm's latest day? */
+export function pastKept(day: number, newest: number, mode: 'file' | 'db' = 'db'): boolean {
+  const age = newest - day;
+  if (age < 0) return false;
+  if (mode === 'file') return age < PAST_FILE_DAYS;
+  if (age < PAST_DAILY_DAYS) return true;
+  return age < PAST_MAX_DAYS && day % 7 === 0;
+}
+
+/**
+ * Where farms are kept: files (the default, and what a machine with no
+ * database keys uses) or the database. The key is the farm's id, never a
+ * session id.
  */
 export interface FarmStore {
+  readonly kind: 'file' | 'db';
   /** The farm as it was kept (not yet upgraded), or null if there is none. Throws `BrokenFarmError` if it can't be read. */
   get(farmId: string): Promise<unknown>;
-  put(farmId: string, farm: StoredFarm): Promise<void>;
+  /** Make a farm for an owner. Throws `FarmLimitError` when the account has no room. */
+  create(farmId: string, owner: Owner, farm: StoredFarm, facts: FarmFacts): Promise<void>;
+  /** Keep a changed farm. Throws `SaveConflictError` when `options.expect` is not its version now. */
+  put(farmId: string, farm: StoredFarm, options?: PutOptions): Promise<void>;
   delete(farmId: string): Promise<void>;
   /** Move a farm that can't be read out of the way, kept under another name. */
   setAside(farmId: string): Promise<void>;
@@ -104,13 +186,24 @@ export interface FarmStore {
   touch(farmId: string): Promise<void>;
   /** How many farms there are. */
   count(): Promise<number>;
-  /** Remove every farm (and every farm set aside) last used before `before`, ms. Returns how many went. */
+  /** Remove stale farms. The file store removes those last used before `before` (ms); the database applies its own 30 days for guests. Returns how many went. */
   prune(before: number): Promise<number>;
+  /** The farm's version now, cheaply. A store shared between servers has it, so a cached copy can be checked. */
+  version?(farmId: string): Promise<string | null>;
+  /** An owner's farms, most recently played first. */
+  list(owner: Owner): Promise<FarmListItem[]>;
+  /** Who owns a farm, or null if there is no such farm (or the store does not know). */
+  ownerOf(farmId: string): Promise<Owner | null>;
+  /** The farm on a past day, or null. */
+  past(farmId: string, day: number): Promise<PastDayWire | null>;
+  /** The days that have a picture kept, newest first. */
+  pastDays(farmId: string): Promise<number[]>;
 }
 
 const ID = /^[0-9a-f]{32}$/;
 const FARM_FILE = /^[0-9a-f]{32}\.json$/;
 const ASIDE_FILE = /^[0-9a-f]{32}\.broken-\d+\.json$/;
+const PAST_DIR = /^[0-9a-f]{32}\.past$/;
 
 function checkId(farmId: string): void {
   if (!ID.test(farmId)) throw new Error('That is not a farm id.');
@@ -118,11 +211,17 @@ function checkId(farmId: string): void {
 
 /** One JSON file for each farm, in a folder that git ignores. */
 export class FileFarmStore implements FarmStore {
+  readonly kind = 'file' as const;
   constructor(private readonly dir: string) {}
 
   private file(farmId: string): string {
     checkId(farmId);
     return join(this.dir, `${farmId}.json`);
+  }
+
+  private pastDir(farmId: string): string {
+    checkId(farmId);
+    return join(this.dir, `${farmId}.past`);
   }
 
   async get(farmId: string): Promise<unknown> {
@@ -140,7 +239,7 @@ export class FileFarmStore implements FarmStore {
     }
   }
 
-  async put(farmId: string, farm: StoredFarm): Promise<void> {
+  private async write(farmId: string, farm: StoredFarm): Promise<void> {
     const file = this.file(farmId);
     await mkdir(this.dir, { recursive: true });
     // Write beside it, then rename, so a crash never leaves half a farm.
@@ -149,8 +248,30 @@ export class FileFarmStore implements FarmStore {
     await rename(temp, file);
   }
 
+  async create(farmId: string, _owner: Owner, farm: StoredFarm): Promise<void> {
+    await this.write(farmId, farm);
+  }
+
+  async put(farmId: string, farm: StoredFarm, options: PutOptions = {}): Promise<void> {
+    await this.write(farmId, farm);
+    if (options.past) await this.keepPast(farmId, options.past);
+  }
+
+  private async keepPast(farmId: string, past: PastDayWire): Promise<void> {
+    const dir = this.pastDir(farmId);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `${past.day}.json`), JSON.stringify(past), 'utf8');
+    for (const name of await readdir(dir)) {
+      const m = /^(\d+)\.json$/.exec(name);
+      if (m && !pastKept(Number(m[1]), past.day, 'file')) {
+        await rm(join(dir, name), { force: true });
+      }
+    }
+  }
+
   async delete(farmId: string): Promise<void> {
     await rm(this.file(farmId), { force: true });
+    await rm(this.pastDir(farmId), { recursive: true, force: true });
   }
 
   async setAside(farmId: string): Promise<void> {
@@ -160,6 +281,7 @@ export class FileFarmStore implements FarmStore {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
     }
+    await rm(this.pastDir(farmId), { recursive: true, force: true });
   }
 
   async touch(farmId: string): Promise<void> {
@@ -192,22 +314,81 @@ export class FileFarmStore implements FarmStore {
       try {
         if ((await stat(path)).mtimeMs < before) {
           await rm(path, { force: true });
-          gone++;
+          if (FARM_FILE.test(f)) {
+            await rm(join(this.dir, `${f.slice(0, 32)}.past`), { recursive: true, force: true });
+            gone++;
+          } else gone++;
         }
       } catch {
         // Gone already, or in use: leave it for the next time.
       }
     }
+    // Pictures whose farm is gone.
+    const names = new Set(await this.names());
+    for (const f of names) {
+      if (PAST_DIR.test(f) && !names.has(`${f.slice(0, 32)}.json`)) {
+        await rm(join(this.dir, f), { recursive: true, force: true });
+      }
+    }
     return gone;
   }
+
+  /** Files hold no accounts: the file store is for guests, so a list is the one farm there is, found by the caller. */
+  async list(): Promise<FarmListItem[]> {
+    return [];
+  }
+
+  async ownerOf(): Promise<Owner | null> {
+    return null;
+  }
+
+  async past(farmId: string, day: number): Promise<PastDayWire | null> {
+    if (!Number.isInteger(day) || day < 0) return null;
+    try {
+      return JSON.parse(
+        await readFile(join(this.pastDir(farmId), `${day}.json`), 'utf8'),
+      ) as PastDayWire;
+    } catch {
+      return null;
+    }
+  }
+
+  async pastDays(farmId: string): Promise<number[]> {
+    try {
+      return (await readdir(this.pastDir(farmId)))
+        .map((n) => /^(\d+)\.json$/.exec(n))
+        .flatMap((m) => (m ? [Number(m[1])] : []))
+        .sort((a, b) => b - a);
+    } catch {
+      return [];
+    }
+  }
+}
+
+interface Kept {
+  text: string;
+  used: number;
+  owner: Owner | null;
+  name: string;
+  districtName: string;
+  day: number;
+  version: string;
 }
 
 /** Farms in memory only. For tests. */
 export class MemoryFarmStore implements FarmStore {
-  private readonly farms = new Map<string, { text: string; used: number }>();
-  private readonly aside: { text: string; used: number }[] = [];
+  readonly kind: 'file' | 'db' = 'file';
+  private readonly farms = new Map<string, Kept>();
+  private readonly aside: Kept[] = [];
+  private readonly pasts = new Map<string, Map<number, PastDayWire>>();
   /** The clock this store reads, so a test can move it. */
   now: () => number = () => Date.now();
+  /** For tests: refuse a write whose expected version is not the farm's, as the database store does. Off, as the file store is. */
+  enforceVersions = false;
+  /** For tests: make the next `put` calls fail this way. */
+  failPuts: { times: number; error: Error } | null = null;
+  /** For tests: how many writes were made. */
+  writes = 0;
 
   async get(farmId: string): Promise<unknown> {
     checkId(farmId);
@@ -220,20 +401,62 @@ export class MemoryFarmStore implements FarmStore {
     }
   }
 
-  async put(farmId: string, farm: StoredFarm): Promise<void> {
+  private keep(farmId: string, farm: StoredFarm, owner: Owner | null, facts?: FarmFacts): void {
+    const before = this.farms.get(farmId);
+    this.farms.set(farmId, {
+      text: JSON.stringify(farm),
+      used: this.now(),
+      owner: owner ?? before?.owner ?? null,
+      name: farm.name,
+      districtName: facts?.districtName ?? before?.districtName ?? '',
+      day: facts?.day ?? before?.day ?? 0,
+      version: farm.version,
+    });
+  }
+
+  async create(farmId: string, owner: Owner, farm: StoredFarm, facts: FarmFacts): Promise<void> {
     checkId(farmId);
-    this.farms.set(farmId, { text: JSON.stringify(farm), used: this.now() });
+    this.keep(farmId, farm, owner, facts);
+  }
+
+  async put(farmId: string, farm: StoredFarm, options: PutOptions = {}): Promise<void> {
+    checkId(farmId);
+    if (this.failPuts && this.failPuts.times > 0) {
+      this.failPuts.times--;
+      throw this.failPuts.error;
+    }
+    const there = this.farms.get(farmId);
+    if (this.enforceVersions && options.expect !== undefined && there?.version !== options.expect) {
+      throw new SaveConflictError('The farm changed.');
+    }
+    this.writes++;
+    this.keep(farmId, farm, null, options.facts);
+    if (options.past) {
+      const m = this.pasts.get(farmId) ?? new Map();
+      m.set(options.past.day, options.past);
+      for (const d of m.keys()) if (!pastKept(d, options.past.day, 'file')) m.delete(d);
+      this.pasts.set(farmId, m);
+    }
   }
 
   /** For tests: keep this text as the farm, as if the file had been damaged. */
   putRaw(farmId: string, text: string): void {
     checkId(farmId);
-    this.farms.set(farmId, { text, used: this.now() });
+    this.farms.set(farmId, {
+      text,
+      used: this.now(),
+      owner: null,
+      name: '',
+      districtName: '',
+      day: 0,
+      version: '',
+    });
   }
 
   async delete(farmId: string): Promise<void> {
     checkId(farmId);
     this.farms.delete(farmId);
+    this.pasts.delete(farmId);
   }
 
   async setAside(farmId: string): Promise<void> {
@@ -241,6 +464,7 @@ export class MemoryFarmStore implements FarmStore {
     const f = this.farms.get(farmId);
     if (f) this.aside.push(f);
     this.farms.delete(farmId);
+    this.pasts.delete(farmId);
   }
 
   /** For tests: how many farms were set aside. */
@@ -263,9 +487,40 @@ export class MemoryFarmStore implements FarmStore {
     for (const [id, f] of this.farms) {
       if (f.used < before) {
         this.farms.delete(id);
+        this.pasts.delete(id);
         gone++;
       }
     }
     return gone;
+  }
+
+  async list(owner: Owner): Promise<FarmListItem[]> {
+    const same = (o: Owner | null): boolean =>
+      o !== null &&
+      o.kind === owner.kind &&
+      (o.kind === 'guest' ? o.session === (owner as { session: string }).session : o.id === (owner as { id: string }).id);
+    return [...this.farms.entries()]
+      .filter(([, f]) => same(f.owner))
+      .map(([id, f]) => ({
+        id,
+        name: f.name,
+        districtName: f.districtName,
+        day: f.day,
+        lastPlayed: f.used,
+        current: false,
+      }))
+      .sort((a, b) => b.lastPlayed - a.lastPlayed);
+  }
+
+  async ownerOf(farmId: string): Promise<Owner | null> {
+    return this.farms.get(farmId)?.owner ?? null;
+  }
+
+  async past(farmId: string, day: number): Promise<PastDayWire | null> {
+    return this.pasts.get(farmId)?.get(day) ?? null;
+  }
+
+  async pastDays(farmId: string): Promise<number[]> {
+    return [...(this.pasts.get(farmId)?.keys() ?? [])].sort((a, b) => b - a);
   }
 }

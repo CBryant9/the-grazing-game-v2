@@ -301,6 +301,21 @@ export const MATRIX: Record<string, TableSpec> = {
     },
     delete: { sql: `delete from public.farm_actions where farm_id = '${ID.farmA}'`, pass: [] },
   },
+  // m3.2: the view of a past day, and a save kept aside. Server only.
+  farm_snapshot_views: serverOnly(
+    'farm_snapshot_views',
+    `farm_id = '${ID.farmA}'`,
+    `with s as (insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 7, '2026-11-07', 'db:7') returning 1) insert into public.farm_snapshot_views (farm_id, day, view) values ('${ID.farmA}', 7, '{}')`,
+    `view = '{"a":1}'`,
+    `insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 8, '2026-11-08', 'db:8') on conflict do nothing; insert into public.farm_snapshot_views (farm_id, day, view) values ('${ID.farmA}', 8, '{}');`,
+  ),
+  farm_saves_aside: serverOnly(
+    'farm_saves_aside',
+    `farm_id = '${ID.farmA}'`,
+    `insert into public.farm_saves_aside (farm_id, owner_id) values ('${ID.farmA}', '${ID.a}')`,
+    `reason = 'x'`,
+    `insert into public.farm_saves_aside (farm_id, owner_id) values ('${ID.farmA}', '${ID.a}');`,
+  ),
   farm_scores: {
     select: {
       sql: `select 1 from public.farm_scores where farm_id = '${ID.farmA}'`,

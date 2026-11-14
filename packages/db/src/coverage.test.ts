@@ -22,6 +22,8 @@ afterAll(async () => {
 const SERVER_ONLY = [
   'farm_saves',
   'farm_actions',
+  'farm_snapshot_views',
+  'farm_saves_aside',
   'guest_sessions',
   'leaderboard_entries',
   'rate_limit_rules',

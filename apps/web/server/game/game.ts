@@ -41,7 +41,9 @@ import type {
   ActionRequest,
   ActResponse,
   DayResponse,
+  FarmListItem,
   JobCardWire,
+  PastDayWire,
   PreviewResponse,
   RecordResponse,
   SetupChoices,
@@ -80,16 +82,22 @@ import { buildSnapshot, buildSummary, dateParts } from './snapshot';
 import {
   BrokenFarmError,
   DONE_KEPT,
-  FileFarmStore,
+  FarmLimitError,
+  SaveConflictError,
   STORED_FORMAT,
+  StoreUnavailableError,
   upgradeStored,
+  type ActionLogEntry,
   type DoneRequest,
+  type FarmFacts,
   type FarmStore,
+  type Owner,
   type StoredFarm,
 } from './store';
+import { setupOptions } from './setup';
+import { configuredStore } from '../db/farmstore';
 import { dateText, doneWord, todoKey } from './words';
 import { pastYears, soFarView, yearView } from './years';
-import { join } from 'node:path';
 
 /**
  * The farm days a pay day was missed in a day or skip, one for each hand left
@@ -121,12 +129,24 @@ export function missedDays(
 /** A refusal the route turns into a plain message with this status. Never carries a stack. */
 export class GameError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409 | 413 | 503,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 503,
     message: string,
+    /** A short word the browser can act on (for example `save_failed`), beside the plain message. */
+    readonly code?: string,
   ) {
     super(message);
   }
 }
+
+/** What the player reads when a save did not go through, after the retries. */
+export const SAVE_FAILED_MESSAGE =
+  'That was not saved, so nothing on your farm has changed. Try again in a moment.';
+/** What the player reads when the farm can not be reached right now. Nothing is lost. */
+export const UNREACHABLE_MESSAGE =
+  'Your farm could not be reached just now. Nothing has been lost. Try again in a moment.';
+/** What the player reads when the account has no room for another farm. */
+export const NO_ROOM_MESSAGE =
+  'You already have the most farms this account can have. Delete one first, or open one you have.';
 
 /** Farms start on the 1st of this month (0 is January): September, as the first game did. */
 export const START_MONTH = 8;
@@ -156,6 +176,10 @@ export const BROKEN_MESSAGE =
 /** A new farm version: a short random string, so an old one never comes back. */
 const newVersion = (): string => randomBytes(6).toString('hex');
 const SESSION = /^[0-9a-f]{32}$/;
+const FARM_KEY = /^farm:[0-9a-f]{32}$/;
+
+/** The key the routes give the game server for an account's farm. */
+export const farmKey = (farmId: string): string => `farm:${farmId}`;
 
 export const isSessionId = (id: unknown): id is string =>
   typeof id === 'string' && SESSION.test(id);
@@ -165,13 +189,29 @@ export const isSessionId = (id: unknown): id is string =>
  * disk never reveals the cookie, and one session can only reach its own.
  */
 export function farmIdFor(sessionId: string): string {
+  // An account's farm is named directly: `farm:` and its 32-hex id (the server checked it is theirs).
+  if (FARM_KEY.test(sessionId)) return sessionId.slice(5);
   if (!isSessionId(sessionId)) throw new GameError(400, 'That session is not valid.');
   return createHash('sha256').update(`gg-farm:${sessionId}`).digest('hex').slice(0, 32);
+}
+
+/** The part of a day's snapshot that is kept for "see the farm on a past day". */
+function pastOf(snap: Snapshot): PastDayWire {
+  return {
+    version: 1,
+    day: snap.day,
+    date: snap.date,
+    season: snap.season,
+    view: snap.view,
+    paddocks: snap.paddocks,
+  };
 }
 
 interface Held {
   stored: StoredFarm;
   farm: FarmState;
+  /** The snapshot of this farm as it stands, built once. */
+  snap?: Snapshot;
 }
 
 /** What an act request carries beyond the job: the farm it was shown on, and its one-use id. */
@@ -190,6 +230,8 @@ export interface GameServerOptions {
   maxFarms?: number;
   /** The clock, in ms. The real one unless a test sets it. */
   now?: () => number;
+  /** Waits (ms) between the tries of a save that fails. One more try for each. Tests set zeros. */
+  saveRetryMs?: readonly number[];
 }
 
 const realYears = (c: SetupChoices): boolean => c.years !== 'random';
@@ -481,8 +523,11 @@ export class GameServer {
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly maxFarms: number;
   private readonly now: () => number;
+  private readonly retryMs: readonly number[];
+  private readonly touched = new Map<string, number>();
 
   constructor(options: GameServerOptions) {
+    this.retryMs = options.saveRetryMs ?? [150, 600];
     this.store = options.store;
     this.seed = options.seed ?? (() => randomInt(1, 2 ** 31 - 1));
     this.maxFarms = options.maxFarms ?? MAX_FARMS;
@@ -490,9 +535,22 @@ export class GameServer {
   }
 
   /** Run one thing at a time for a farm, so two quick taps never save over each other. */
-  private async locked<T>(farmId: string, run: () => Promise<T>): Promise<T> {
+  private async locked<T>(
+    farmId: string,
+    run: () => Promise<T>,
+    /** What to answer when the save was refused because the farm had changed under it. */
+    onConflict?: () => Promise<T>,
+  ): Promise<T> {
     const before = this.queues.get(farmId) ?? Promise.resolve();
-    const next = before.catch(() => undefined).then(run);
+    const guarded = async (): Promise<T> => {
+      try {
+        return await run();
+      } catch (e) {
+        if (onConflict && e instanceof SaveConflictError) return onConflict();
+        throw e;
+      }
+    };
+    const next = before.catch(() => undefined).then(guarded);
     this.queues.set(farmId, next);
     try {
       return await next;
@@ -512,8 +570,28 @@ export class GameServer {
 
   private async load(farmId: string): Promise<Held | null> {
     const hit = this.cache.get(farmId);
-    if (hit) return hit;
-    const raw = await this.store.get(farmId);
+    if (hit) {
+      // A store shared by several servers can be changed from another one (or another tab
+      // that reached another server). Check the version before trusting what is held.
+      if (!this.store.version || (await this.store.version(farmId)) === hit.stored.version) {
+        const last = this.touched.get(farmId) ?? 0;
+        if (this.now() - last > 3600_000) {
+          this.touched.set(farmId, this.now());
+          await this.store.touch(farmId).catch(() => undefined);
+        }
+        return hit;
+      }
+      this.cache.delete(farmId);
+    }
+    let raw: unknown;
+    try {
+      raw = await this.store.get(farmId);
+    } catch (e) {
+      if (e instanceof StoreUnavailableError) {
+        throw new GameError(503, UNREACHABLE_MESSAGE, 'unavailable');
+      }
+      throw e;
+    }
     if (raw === null || raw === undefined) return null;
     let held: Held;
     try {
@@ -522,9 +600,45 @@ export class GameServer {
     } catch (e) {
       throw e instanceof BrokenFarmError ? e : new BrokenFarmError('The save would not load.');
     }
-    await this.store.touch(farmId);
+    // Marking the farm as used is a courtesy. If it fails the player still plays.
+    await this.store.touch(farmId).catch(() => undefined);
+    this.touched.set(farmId, this.now());
     this.remember(farmId, held);
     return held;
+  }
+
+  /**
+   * Run a write to the store. A write that fails is tried again after a short
+   * wait, twice. A write refused because the farm changed under it is not
+   * tried again (the caller reloads). Failing for good, the held copy is
+   * dropped and the player is told plainly it was not saved: a job is never
+   * reported done before it is stored.
+   */
+  private async persist(farmId: string, write: () => Promise<void>): Promise<void> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await write();
+        return;
+      } catch (e) {
+        if (e instanceof SaveConflictError || e instanceof FarmLimitError) {
+          this.cache.delete(farmId);
+          throw e;
+        }
+        const wait = this.retryMs[attempt];
+        if (wait === undefined) {
+          this.cache.delete(farmId);
+          console.error('Saving a farm failed:', e instanceof Error ? e.message : e);
+          throw new GameError(503, SAVE_FAILED_MESSAGE, 'save_failed');
+        }
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+
+  /** The farm as another tab left it, after a save was refused because it had changed. */
+  private async reload(farmId: string): Promise<Held> {
+    this.cache.delete(farmId);
+    return this.need(farmId);
   }
 
   /** The farm, or a plain refusal when there is none or it can't be opened. */
@@ -548,6 +662,7 @@ export class GameServer {
     done?: DoneRequest,
     filings: readonly Filing[] = [],
     missed: readonly number[] = [],
+    extra: { past?: boolean; action?: ActionLogEntry } = {},
   ): Promise<Held> {
     // Pay days missed: only the last year's are kept, for the standing's fact line.
     const before = held.stored.missedWages ?? [];
@@ -561,24 +676,65 @@ export class GameServer {
     };
     if (kept.length) stored.missedWages = kept;
     else delete stored.missedWages;
-    await this.store.put(farmId, stored);
-    const next = { stored, farm };
+    const next: Held = { stored, farm };
+    const snap = this.snapshotOf(next);
+    await this.persist(farmId, () =>
+      this.store.put(farmId, stored, {
+        expect: held.stored.version,
+        facts: this.factsOf(stored, snap),
+        diaryDays: filings.map((f) => f.day),
+        action: extra.action,
+        past: extra.past ? pastOf(snap) : undefined,
+      }),
+    );
     this.remember(farmId, next);
     return next;
   }
 
+  /** What the store keeps beside the save: the facts the database and the farm list show. */
+  private factsOf(stored: StoredFarm, snap: Snapshot): FarmFacts {
+    return {
+      name: stored.name,
+      district: stored.setup.district,
+      districtName: snap.farm.setup.districtName,
+      size: stored.setup.size,
+      sizeHa: snap.farm.setup.farmHa,
+      enterprise: stored.setup.enterprise,
+      startType: stored.setup.startType,
+      difficulty: stored.setup.difficulty,
+      years: stored.setup.years,
+      engineVersion: stored.saved.engineVersion,
+      day: snap.day,
+      date: snap.date,
+      over: snap.over ? snap.over.text : null,
+    };
+  }
+
   /** Remember an act request that changed nothing (a refusal), so a repeat gets the same answer. */
-  private async note(farmId: string, held: Held, done: DoneRequest): Promise<void> {
+  private async note(
+    farmId: string,
+    held: Held,
+    done: DoneRequest,
+    extra?: ActionLogEntry,
+  ): Promise<Held> {
+    // The version stays: a refused job changed nothing the player was looking at, so a card
+    // shown before it is still good. A server holding an older copy only misses that this id
+    // was answered, and would answer it the same way (refused) again.
     const stored: StoredFarm = {
       ...held.stored,
       done: [...held.stored.done, done].slice(-DONE_KEPT),
     };
-    await this.store.put(farmId, stored);
-    this.remember(farmId, { stored, farm: held.farm });
+    await this.persist(farmId, () =>
+      this.store.put(farmId, stored, { expect: held.stored.version, action: extra }),
+    );
+    const next: Held = { stored, farm: held.farm, snap: held.snap };
+    this.remember(farmId, next);
+    return next;
   }
 
   private snapshotOf(held: Held): Snapshot {
-    return buildSnapshot(held.farm, held.stored, envFor(held.stored.setup));
+    held.snap ??= buildSnapshot(held.farm, held.stored, envFor(held.stored.setup));
+    return held.snap;
   }
 
   /** The answer when the browser was looking at an older farm: the plain message and the latest snapshot. */
@@ -627,8 +783,11 @@ export class GameServer {
   }
 
   /** Start the session's farm from the setup choices. A session has one farm. */
-  async create(sessionId: string, choices: SetupChoices): Promise<Snapshot> {
+  async create(sessionId: string, choices: SetupChoices, owner?: Owner): Promise<Snapshot> {
     const id = farmIdFor(sessionId);
+    const who: Owner | null =
+      owner ?? (isSessionId(sessionId) ? { kind: 'guest', session: sessionId } : null);
+    if (!who) throw new GameError(400, 'That session is not valid.');
     return this.locked(id, async () => {
       let there: Held | null;
       try {
@@ -651,10 +810,17 @@ export class GameServer {
         done: [],
         diary: [],
       };
-      await this.store.put(id, stored);
-      const held = { stored, farm };
+      const held: Held = { stored, farm };
+      const snap = this.snapshotOf(held);
+      try {
+        await this.persist(id, () =>
+          this.store.create(id, who, stored, this.factsOf(stored, snap)),
+        );
+      } catch (e) {
+        throw e instanceof FarmLimitError ? new GameError(409, NO_ROOM_MESSAGE) : e;
+      }
       this.remember(id, held);
-      return this.snapshotOf(held);
+      return snap;
     });
   }
 
@@ -903,20 +1069,32 @@ export class GameServer {
       const x = this.extras(held.farm, held.stored, action);
       const result = applyAction(held.farm, action, envFor(held.stored.setup));
       if (!result.ok) {
+        let shown = held;
         if (meta.requestId) {
-          await this.note(id, held, {
-            id: meta.requestId,
-            ok: false,
-            reason: result.reason,
-            message: result.message,
-            card: null,
-          });
+          shown = await this.note(
+            id,
+            held,
+            {
+              id: meta.requestId,
+              ok: false,
+              reason: result.reason,
+              message: result.message,
+              card: null,
+            },
+            {
+              day: held.farm.day,
+              requestId: meta.requestId,
+              action: req,
+              ok: false,
+              reason: result.reason,
+            },
+          );
         }
         return {
           ok: false,
           reason: result.reason,
           message: result.message,
-          snapshot: this.snapshotOf(held),
+          snapshot: this.snapshotOf(shown),
         };
       }
       if (result.job) {
@@ -940,8 +1118,28 @@ export class GameServer {
               },
             ]
           : [],
+        [],
+        { action: { day: held.farm.day, requestId: meta.requestId, action: req, ok: true } },
       );
       return { ok: true, message, card, snapshot: this.snapshotOf(next) };
+    }, async () => {
+      // Another tab saved first. If it was this very request (a retry after a lost
+      // reply), give the answer it got. Otherwise the farm has changed: say so.
+      const held = await this.reload(id);
+      const seen = meta.requestId ? held.stored.done.find((d) => d.id === meta.requestId) : undefined;
+      if (seen) {
+        const snapshot = this.snapshotOf(held);
+        return seen.ok
+          ? { ok: true as const, message: seen.message, card: seen.card, snapshot, repeat: true }
+          : {
+              ok: false as const,
+              reason: seen.reason ?? 'refused',
+              message: seen.message,
+              snapshot,
+              repeat: true,
+            };
+      }
+      return this.stale(held);
     });
   }
 
@@ -955,11 +1153,11 @@ export class GameServer {
       const to = Math.max(held.stored.inboxRead ?? 0, Math.min(upTo, newest));
       if (to === (held.stored.inboxRead ?? 0)) return this.snapshotOf(held);
       const stored: StoredFarm = { ...held.stored, inboxRead: to };
-      await this.store.put(id, stored);
+      await this.persist(id, () => this.store.put(id, stored, { expect: held.stored.version }));
       const next = { stored, farm: held.farm };
       this.remember(id, next);
       return this.snapshotOf(next);
-    });
+    }, async () => this.snapshotOf(await this.reload(id)));
   }
 
   /** The last year that closed among these events, and how many closed. */
@@ -994,6 +1192,39 @@ export class GameServer {
     });
   }
 
+  /** The picture of the farm on a past day, read only (milestone 3.2, PRD 5.2). */
+  async pastDay(sessionId: string, day: number): Promise<PastDayWire> {
+    const id = farmIdFor(sessionId);
+    const found = await this.store.past(id, day);
+    if (!found) throw new GameError(404, 'There is no picture of the farm kept for that day.');
+    return found;
+  }
+
+  /** The farm days that have a picture kept, newest first. */
+  async pastDays(sessionId: string): Promise<number[]> {
+    return this.store.pastDays(farmIdFor(sessionId));
+  }
+
+  /** The farms an owner has, most recently played first, with `currentId` marked. */
+  async farms(owner: Owner, currentId: string | null): Promise<FarmListItem[]> {
+    const names = new Map(setupOptions().districts.map((d) => [d.id as string, d.name]));
+    return (await this.store.list(owner)).map((f) => ({
+      ...f,
+      districtName: names.get(f.districtName) ?? f.districtName,
+      current: f.id === currentId,
+    }));
+  }
+
+  /** Who owns this farm, or null. A guest's secret is not kept, so a guest owner carries its hash. */
+  async ownerOf(farmId: string): Promise<Owner | null> {
+    return this.store.ownerOf(farmId);
+  }
+
+  /** Is this a database store (accounts and shared saves), or files? */
+  get storeKind(): 'file' | 'db' {
+    return this.store.kind;
+  }
+
   /** Next day: the daily tick runs and the new day starts at first light. */
   async endDay(sessionId: string): Promise<DayResponse>;
   async endDay(sessionId: string, version: string): Promise<DayResponse | StaleResponse>;
@@ -1019,6 +1250,7 @@ export class GameServer {
         undefined,
         periodFilings(end.farm, seq0, summary, [end.day]),
         missedDays(end.farm, held.farm.labour?.nextPayDay ?? null, end.dawn),
+        { past: true, action: { day: held.farm.day, action: { type: 'day' }, ok: true } },
       );
       return {
         ok: true,
@@ -1026,7 +1258,7 @@ export class GameServer {
         summary,
         ...this.yearsClosed(next, end.day.events),
       };
-    });
+    }, async () => this.stale(await this.reload(id)));
   }
 
   /** Skip a week, a month or a year. It stops early for the reasons the engine gives. */
@@ -1067,6 +1299,10 @@ export class GameServer {
               undefined,
               periodFilings(result.farm, seq0, summary, result.days),
               missedDays(result.farm, held.farm.labour?.nextPayDay ?? null, result.dawn),
+              {
+                past: true,
+                action: { day: held.farm.day, action: { type: 'skip', length, anyway }, ok: true },
+              },
             )
           : held;
       return {
@@ -1075,7 +1311,7 @@ export class GameServer {
         summary,
         ...this.yearsClosed(next, ticks),
       };
-    });
+    }, async () => this.stale(await this.reload(id)));
   }
 }
 
@@ -1092,7 +1328,13 @@ declare global {
 export function gameServer(): GameServer {
   // Kept on globalThis so a dev reload does not lose the cache.
   shared ??= globalThis.__ggGameServer ??= new GameServer({
-    store: new FileFarmStore(process.env.GG_FARMS_DIR ?? join(process.cwd(), '.farms')),
+    store: configuredStore(),
   });
   return shared;
+}
+
+/** For tests: use this game server (or `undefined` to go back to the configured one). */
+export function setGameServer(game: GameServer | undefined): void {
+  shared = game;
+  globalThis.__ggGameServer = game;
 }

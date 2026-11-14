@@ -738,6 +738,44 @@ export interface FarmResponse {
   snapshot: Snapshot | null;
   /** Set when the farm is there but can not be opened: what to tell the player. */
   broken?: string;
+  /** Set when the player is signed in and has more than one farm: the picker is shown first. */
+  pick?: FarmListItem[];
+}
+
+/** One farm in the picker (milestone 3.2). The id is the one the browser sends back to open or delete it. */
+export interface FarmListItem {
+  id: string;
+  name: string;
+  districtName: string;
+  /** Farm day, from 0. The screens show day + 1. */
+  day: number;
+  /** When the farm was last played, ms since 1970. */
+  lastPlayed: number;
+  /** True for the farm that /play opens. */
+  current: boolean;
+}
+
+export interface FarmsResponse {
+  farms: FarmListItem[];
+  /** Fast Farms the account may have at once, and how many are going. */
+  limit: number;
+  going: number;
+  signedIn: boolean;
+}
+
+/** The farm on a past day: the map and the paddock figures, read only (milestone 3.2, PRD 5.2). */
+export interface PastDayWire {
+  version: 1;
+  day: number;
+  date: DateParts;
+  season: string;
+  view: FarmView;
+  paddocks: PaddockWire[];
+}
+
+export interface PastDaysResponse {
+  /** Farm days that have a picture kept, newest first. */
+  days: number[];
 }
 
 // ---- Setup

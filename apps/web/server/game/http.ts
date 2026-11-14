@@ -1,9 +1,18 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
+import { jarFor, type CookieJar, type CookieToSet } from '../auth/provider';
+import { identify, type Player } from '../player';
+import { clearCookieText, cookieText, csrfRefusal } from '../security';
 import { GameError, isSessionId } from './game';
+import { gameStoreKind } from './kind';
 
 export const SESSION_COOKIE = 'gg_session';
-const SESSION_DAYS = 90;
+/**
+ * How long a guest's cookie lasts, renewed each time the farm is played. With files it is
+ * 90 days (the file store removes a farm not used for 90 days). With the database it is 30,
+ * because the database removes a guest not seen for 30 days (docs/DATABASE.md, "Guests").
+ */
+const sessionDays = (): number => (gameStoreKind() === 'db' ? 30 : 90);
 /** A line of fence is up to 400 segments, each about 30 bytes, so a request can be long. */
 export const BODY_LIMIT = 32 * 1024;
 
@@ -37,8 +46,9 @@ export function fail(
   status: number,
   message: string,
   extra: Record<string, string> = {},
+  code?: string,
 ): Response {
-  return json({ error: message }, status, extra);
+  return json(code ? { error: message, code } : { error: message }, status, extra);
 }
 
 function cookieOf(req: Request, name: string): string | null {
@@ -57,11 +67,7 @@ export function sessionFrom(req: Request): string | null {
 }
 
 function setCookie(req: Request, id: string): string {
-  const secure =
-    req.url.startsWith('https:') || req.headers.get('x-forwarded-proto') === 'https'
-      ? '; Secure'
-      : '';
-  return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secure}`;
+  return cookieText(req, SESSION_COOKIE, id, sessionDays() * 86400);
 }
 
 const TOO_BIG = 'That request was too big.';
@@ -184,19 +190,17 @@ export interface RouteOptions {
 
 export interface RouteContext {
   req: Request;
-  /** The session, or null for a visitor with none yet. */
+  /**
+   * What names the farm for the game server: the guest session, or `farm:` and
+   * the id of the account's open farm. Null when there is none yet.
+   */
   sessionId: string | null;
-}
-
-/** The same site only: a browser that names another origin is refused. */
-function sameSite(req: Request): boolean {
-  const origin = req.headers.get('origin');
-  if (!origin) return true;
-  try {
-    return new URL(origin).host === (req.headers.get('host') ?? new URL(req.url).host);
-  } catch {
-    return false;
-  }
+  /** Who is asking (signed in or a guest), and which farm is theirs. */
+  player: Player;
+  /** The sign-in cookie jar, for routes that talk to the sign-in provider. */
+  jar: CookieJar & { out: CookieToSet[] };
+  /** Cookies to set on the answer, as full Set-Cookie text. */
+  setCookies: string[];
 }
 
 const SLOW_DOWN = 'That was a lot of requests. Wait a few seconds and try again.';
@@ -211,9 +215,9 @@ export function route(
 ): (req: Request) => Promise<Response> {
   return async (req) => {
     try {
-      if (options.write && !sameSite(req)) {
-        return fail(403, 'That request came from another site.');
-      }
+      // One CSRF rule for every state-changing route, game and account (server/security.ts).
+      const refusal = options.write ? csrfRefusal(req) : null;
+      if (refusal) return fail(403, refusal);
       const existing = sessionFrom(req);
       // The limit's key is worked out before any session is made, and never
       // from a session the caller could have made up to get a fresh count.
@@ -226,19 +230,34 @@ export function route(
           'Retry-After': '60',
         });
       }
-      const minted = !existing && options.mint ? randomBytes(16).toString('hex') : null;
-      const sessionId = existing ?? minted;
-      const out = await handler({ req, sessionId });
-      const fresh = minted ?? (options.renew ? existing : null);
-      const extra: Record<string, string> = fresh ? { 'Set-Cookie': setCookie(req, fresh) } : {};
-      if (out instanceof Response) {
-        for (const [k, v] of Object.entries(extra)) out.headers.set(k, v);
-        out.headers.set('Cache-Control', 'no-store');
-        return out;
+      const jar = jarFor(req);
+      const player = await identify(req, jar, existing);
+      // A signed-in player's farm is named by their account, so no guest session is made for them.
+      const minted =
+        !existing && options.mint && !player.user ? randomBytes(16).toString('hex') : null;
+      const setCookies: string[] = [];
+      const out = await handler({
+        req,
+        sessionId: player.user && player.key ? player.key : (existing ?? minted),
+        player: { ...player, guestSession: existing ?? minted },
+        jar,
+        setCookies,
+      });
+      const fresh = minted ?? (options.renew && !player.user ? existing : null);
+      if (fresh) setCookies.push(setCookie(req, fresh));
+      for (const c of jar.out) {
+        setCookies.push(
+          c.value === '' || c.maxAge === 0
+            ? clearCookieText(req, c.name)
+            : cookieText(req, c.name, encodeURIComponent(c.value), c.maxAge ?? 400 * 86400),
+        );
       }
-      return json(out, 200, extra);
+      const res = out instanceof Response ? out : json(out, 200);
+      for (const c of setCookies) res.headers.append('Set-Cookie', c);
+      res.headers.set('Cache-Control', 'no-store');
+      return res;
     } catch (e) {
-      if (e instanceof GameError) return fail(e.status, e.message);
+      if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
       // The detail stays in the server log. The player gets a plain line.
       console.error('Game route failed:', e instanceof Error ? e.message : e);
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
