@@ -159,6 +159,10 @@ export class FakeAuth implements AuthProvider {
     for (const [t, u] of this.sessions) if (u === userId) this.sessions.delete(t);
   }
 
+  async emailOf(userId: string): Promise<string | null> {
+    return this.users.get(userId)?.email ?? null;
+  }
+
   async removeFiles(files: { bucket: string; path: string }[]): Promise<void> {
     if (this.fail.removeFiles) throw new Error('storage is down');
     this.removed.push(...files);

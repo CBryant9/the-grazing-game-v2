@@ -2,6 +2,7 @@ import { logFailure } from '../logging';
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { jarFor, type CookieJar, type CookieToSet } from '../auth/provider';
+import { MAINTENANCE_CODE, maintenanceNotice } from '../admin/maintenance';
 import { identify, type Player } from '../player';
 import { clearCookieText, cookieText, csrfRefusal } from '../security';
 import { GameError, gameServer, isSessionId } from './game';
@@ -235,6 +236,10 @@ export function route(
       }
       const jar = jarFor(req);
       const player = await identify(req, jar, existing);
+      // Maintenance mode (admin switch): everyone but an admin is told the game is down, before
+      // anything on the farm is touched. See server/admin/maintenance.ts.
+      const down = await maintenanceNotice(player.user?.id ?? null);
+      if (down) throw new GameError(503, down, MAINTENANCE_CODE);
       // A signed-in player with a finished account has farms named by the account, so no guest
       // session is made for them. Anyone else (a visitor, a sign-in not finished, a sign-in
       // refused as under 14) plays as a guest, with a session made and renewed as for anyone.

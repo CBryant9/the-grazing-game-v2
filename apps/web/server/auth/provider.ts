@@ -55,6 +55,11 @@ export interface AuthProvider {
   signOut(jar: CookieJar, scope: 'local' | 'global'): Promise<void>;
   /** Remove the account from Auth. The database cascades the rest. */
   deleteUser(userId: string): Promise<void>;
+  /**
+   * The sign-in email of an account, for an admin ban's hash only (it is never shown or stored).
+   * Null when it can not be found.
+   */
+  emailOf(userId: string): Promise<string | null>;
   /** Remove files from Storage buckets (before an account is deleted). */
   removeFiles(files: { bucket: string; path: string }[]): Promise<void>;
 }

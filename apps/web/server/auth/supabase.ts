@@ -97,6 +97,10 @@ export function supabaseProvider(
       const { error } = await admin().auth.admin.deleteUser(userId);
       if (error) throw error;
     },
+    async emailOf(userId) {
+      const { data, error } = await admin().auth.admin.getUserById(userId);
+      return error ? null : (data.user?.email ?? null);
+    },
     async removeFiles(files) {
       const byBucket = new Map<string, string[]>();
       for (const f of files) byBucket.set(f.bucket, [...(byBucket.get(f.bucket) ?? []), f.path]);

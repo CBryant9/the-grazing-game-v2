@@ -30,6 +30,13 @@ create table auth.users (
   updated_at timestamptz default now()
 );
 
+-- Sessions, as Supabase keeps them (only what the admin sign-out needs).
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz default now()
+);
+
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(
     nullif(current_setting('request.jwt.claim.sub', true), ''),
