@@ -61,8 +61,10 @@
  *
  * 0.14.0 (m2.5, calf growth): stock under 200 kg pay the measured energy
  * cost for a kg of gain (Sekine and Asahida 1990), moving to the grown
- * animal's cost in a straight line from 100 to 200 kg (`mjPerKgGain`). A
- * deliberate cattle model change: calves grow faster. Logged in
+ * animal's cost in a straight line from 100 to 200 kg (`mjPerKgGain`); and
+ * a cow's milk falls with her condition (to none at CS 1.5), not with the
+ * feed's ME (`milkMJ`, `MILK`). Deliberate cattle model changes: calves
+ * grow faster. Logged in
  * docs/CALIBRATION.md (the m2.5 entry); the no-hands digests were taken
  * again. No stored field changed, so the save format stays 9.
  */

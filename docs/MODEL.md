@@ -340,7 +340,7 @@ Mob intake is then limited by what the paddock supplies (`f` = supplied ÷ deman
 ```
 maintenance  = 0.45 × LW^0.75 × (1 + walk),  walk = 0.05 + 0.12 × min(1, distance to water / 3000)
 pregnancy    = + 0.13 × LW^0.75 × (days − 190)/93 after day 190
-milk MJ/day  = 24 × (1 until 60 days, then falling to 0 by 280) × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((ME − 6)/3, 0.45, 1)
+milk MJ/day  = 24 × (1 until 60 days, then falling to 0 by 280) × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((CS − 1.5)/(2.25 − 1.5), 0, 1)   (engine 0.14.0)
 lactation    = + milk / 0.65
 calf energy  = its pasture + its dam's milk
 balance      = ME intake − needs
@@ -358,7 +358,8 @@ Details from the code (milestone 1.2a):
 - The daily gain shown for an animal is smoothed: 93% of yesterday's figure plus 7% of today's.
 - Calves are worked out after the adults in their mob, so a calf gets its dam's milk for the same day. The milk energy is added to the calf's intake as it is.
 - **The cost of a kg of gain for light stock (engine 0.14.0, m2.5).** The MVP charged every animal 20 + 0.045 × LW MJ for each kg it gained. For a 60 kg calf that is about 1,050 kJ per kg LW^0.75, about twice the 510 to 520 kJ Sekine and Asahida (1990) measured in calves under 100 kg. The rebuild charges 0.52 × LW^0.75 MJ up to 100 kg and the MVP's figure from 200 kg, with a straight line between, so the cost never steps: not at weaning, not at any weight. Weight decides it, not age or kind. The move is finished by 200 kg because the paper's data stop at 195 kg and the steer benchmarks hold the grown figure from there. Constants: `YOUNG_GAIN_COST` in `data/cattle.ts`; function `mjPerKgGain` in `cattle/gains.ts`, used by the daily step and `gainOn`. The MVP comparisons load the MVP with this rule put in its place (`REBUILD_RULES` in `test-support/mvp.ts`, which keeps the MVP's own line as the record).
-- In the feedlot the ration is DMD 0.77, ME 11.6, CP 14%. Milk in the lot is worked from the DMD (ME about 11.5).
+- **Milk falls with the cow's condition, not the feed (engine 0.14.0, m2.5).** The MVP multiplied milk by clamp((ME − 6)/3, 0.45, 1), so on feed of ME 7.35 or less a cow gave 45% of her milk whatever her condition, and her calf sat near maintenance from about 100 days. Brahman cows on tropical pasture are measured giving about 6.2 kg of milk a day over 216 days (DATA.md). Now the feed does not cut milk directly. The cow pays for her milk (milk / 0.65 on her needs), so on poor feed she loses condition milking, and her milk falls in a straight line from full at CS 2.25 to nothing at CS 1.5, above the CS 1.4 where deaths start to rise, so she does not milk herself to death. Both CS figures are stand-ins (`MILK` in `data/cattle.ts`), the lowest tried that keep every herd benchmark in its band; with no fall at all, Tablelands herd deaths run 4.4% against 1.5 to 3.6%. The MVP comparisons load the MVP with this rule in place (`REBUILD_RULES`).
+- In the feedlot the ration is DMD 0.77, ME 11.6, CP 14%. (Up to engine 0.13.0 milk in the lot was worked from the DMD, ME about 11.5; milk no longer reads the feed.)
 - Each animal carries a running cost for the stock book: its feed, plus the district's health cost a day.
 
 ### Breeding

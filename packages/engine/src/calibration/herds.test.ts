@@ -74,12 +74,19 @@ interface CalfBand {
 const NORTH_QLD: Pick<CalfBand, 'adg' | 'kg'> = { adg: [0.6, 0.95], kg: [140, 225] };
 const MLA_TOOL_505: Pick<CalfBand, 'adg' | 'kg'> = { adg: [0.6, 1.1], kg: [150, 260] };
 
-const MILK_RULE = 'the milk rule still cuts milk by the ME of the feed';
+/*
+ * Open rows, engine 0.14.0 (docs/CALIBRATION.md, the m2.5 entry). Each is
+ * under its band on gain a day. What probably closes the gap is on
+ * Claudia's list: calving at the district's usual time (half these herds
+ * calve August to November from the May start, the rest late November to
+ * March), and herd paddocks whose feed runs at ME 7 to 8, under the
+ * source's lowest pasture (ME 9.0).
+ */
 const CALF_BANDS: Record<DistrictId, CalfBand> = {
-  cq: { ...NORTH_QLD, open: `0.40 kg a day, 115 kg; ${MILK_RULE}` },
-  nsw: { ...MLA_TOOL_505, open: `0.46 kg a day, 127 kg; ${MILK_RULE}` },
-  cw: { ...MLA_TOOL_505, open: `0.43 kg a day, 123 kg; ${MILK_RULE}` },
-  wv: { ...MLA_TOOL_505, open: `0.52 kg a day, 141 kg; ${MILK_RULE}` },
+  cq: { ...NORTH_QLD, open: '0.53 kg a day and 142 kg; under 0.6 kg a day' },
+  nsw: { ...MLA_TOOL_505, open: '0.54 kg a day and 144 kg; under 0.6 kg a day and 150 kg' },
+  cw: { ...MLA_TOOL_505, open: '0.57 kg a day and 149 kg; under 0.6 kg a day and 150 kg' },
+  wv: { ...MLA_TOOL_505 },
 };
 
 function calfFigures(runs: readonly HerdRun[]): { n: number; adg: number; kg: number } {

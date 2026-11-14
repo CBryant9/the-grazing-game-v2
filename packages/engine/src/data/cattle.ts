@@ -130,6 +130,23 @@ export const BARREN_CHANCE = 0.04;
  */
 export const YOUNG_GAIN_COST = { mjPerKg075: 0.52, youngToKg: 100, grownFromKg: 200 } as const;
 
+/**
+ * How a cow's milk falls as she gets thin (`milkMJ` in cattle/gains.ts;
+ * docs/MODEL.md, section 3). Full milk for her condition (the MVP's
+ * 0.55 + 0.15 x CS) at `fullCS` and above, falling in a straight line to
+ * none at `stopCS`. She pays for what she gives (milk / 0.65 on her energy
+ * needs), so on poor feed she loses condition milking, and stops before she
+ * is thin enough to die of it: deaths start to rise under CS 1.4
+ * (MODEL.md, "Deaths").
+ *
+ * STAND-IN, for Claudia: no published figure was found for the condition at
+ * which a beef cow's milk falls away. 2.25 and 1.5 were picked inside that
+ * limit, the lowest stop tried that keeps every herd benchmark in its band
+ * (docs/CALIBRATION.md, the m2.5 entry: 2.5 and 1.6, 3.0 and 1.8, and 2.25
+ * and 1.5 all pass; no fall at all fails the Tablelands deaths band).
+ */
+export const MILK = { fullCS: 2.25, stopCS: 1.5 } as const;
+
 /** A calf at foot bought with its dam weighs this at birth, plus the gain a day below. */
 export const BOUGHT_CALF = { birthKg: 36, kgPerDay: 0.8 } as const;
 

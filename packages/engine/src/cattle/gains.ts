@@ -6,7 +6,7 @@
  * every warning can say why (CLAUDE.md, rule 5) in wording the screens own.
  */
 
-import { YOUNG_GAIN_COST, type CattleClassId } from '../data/cattle';
+import { MILK, YOUNG_GAIN_COST, type CattleClassId } from '../data/cattle';
 import type { Supplement } from '../data/feed';
 import { clamp } from '../num';
 import { meFromDmd } from '../pasture/quality';
@@ -15,13 +15,20 @@ import { dietOf, intakeOf, type Diet } from './graze';
 import type { GainForecast, GainReason } from './notes';
 import type { Animal, CattleMob, GrazingArea, GrazingLand } from './types';
 
-/** Milk energy a cow gives, MJ a day, on feed of the given ME. Poor feed means less milk. */
-export function milkMJ(a: Animal, me: number): number {
+/**
+ * Milk energy a cow gives, MJ a day. Her feed does not cut it directly: she
+ * pays for her milk in her energy needs (milk / 0.65), so on poor feed she
+ * milks off her back and loses condition, and her milk falls away as she
+ * gets thin, to nothing at `MILK.stopCS` (engine 0.14.0). The MVP cut milk
+ * by a share of the feed's ME, to 45% at ME 7.35 or less, which left calves
+ * short on ordinary dry feed (docs/CALIBRATION.md, the m2.5 entry).
+ */
+export function milkMJ(a: Animal): number {
   return (
     24 *
     (a.lact < 60 ? 1 : Math.max(0, 1 - (a.lact - 60) / 220)) *
     clamp(0.55 + 0.15 * a.cond, 0.6, 1.2) *
-    clamp((me - 6) / 3, 0.45, 1)
+    clamp((a.cond - MILK.stopCS) / (MILK.fullCS - MILK.stopCS), 0, 1)
   );
 }
 
@@ -49,7 +56,7 @@ export function gainOn(a: Animal, diet: Diet, supp: Supplement): number {
   const m75 = Math.pow(a.wt, 0.75);
   let req = 0.45 * m75 * (1.05 + 0.12 * Math.min(1, diet.dist / 3000));
   if (a.preg > 190) req += (0.13 * m75 * (a.preg - 190)) / 93;
-  if (a.lact >= 0 && a.calf) req += milkMJ(a, meFromDmd(diet.dmd)) / 0.65;
+  if (a.lact >= 0 && a.calf) req += milkMJ(a) / 0.65;
   const cap = a.kind === 'steer' ? 1.6 : a.kind === 'bull' ? 1.4 : 1.1;
   const bal = mei - req;
   return clamp(bal > 0 ? bal / mjPerKgGain(a.wt) : bal / 22, -1.5, cap);
@@ -64,7 +71,7 @@ export function gainWhy(a: Animal, diet: Diet, supp: Supplement): GainReason[] {
   if (meF < 8) why.push({ reason: 'lowMe', me: meF });
   if (diet.cp < 7 && supp !== 'lick') why.push({ reason: 'lowProtein' });
   if (a.lact >= 0 && a.calf) {
-    const milk = milkMJ(a, meF);
+    const milk = milkMJ(a);
     why.push({ reason: 'milking', milkMJ: milk / 0.65, ownMJ: 0.45 * Math.pow(a.wt, 0.75) });
   }
   if (a.preg > 190) why.push({ reason: 'latePregnancy' });

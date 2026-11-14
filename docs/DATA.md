@@ -833,7 +833,9 @@ All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose
 
 ## Calf growth to weaning (m2.5, 15 Nov 2026)
 
-Looked up for the calf growth benchmark (CALIBRATION.md, the m2.5 entry). In the engine: `YOUNG_GAIN_COST` (`data/cattle.ts`) is 0.52 MJ per kg LW^0.75 for each kg of gain up to 100 kg, moving in a straight line to the grown figure (20 + 0.045 × LW) by 200 kg: from Sekine and Asahida below (510 to 520 kJ for calves under 100 kg; the 200 kg end is where their data stop, at 195 kg). To change it, change the three numbers there. The weaning figures are the benchmark bands in `calibration/herds.test.ts`. "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
+Looked up for the calf growth benchmark (CALIBRATION.md, the m2.5 entry). In the engine: `YOUNG_GAIN_COST` (`data/cattle.ts`) is 0.52 MJ per kg LW^0.75 for each kg of gain up to 100 kg, moving in a straight line to the grown figure (20 + 0.045 × LW) by 200 kg: from Sekine and Asahida below (510 to 520 kJ for calves under 100 kg; the 200 kg end is where their data stop, at 195 kg). To change it, change the three numbers there. The weaning figures are the benchmark bands in `calibration/herds.test.ts`.
+
+**Milk and condition, `MILK` (`data/cattle.ts`): STAND-IN, for Claudia.** A cow gives full milk for her condition at CS 2.25 and above, falling in a straight line to none at CS 1.5 (engine 0.14.0). No published figure was found for the condition at which a beef cow's milk falls away. The stop sits above CS 1.4, where deaths start to rise, so a cow does not milk herself to death; 2.25 and 1.5 is the lowest stop tried that keeps every herd benchmark in its band (CALIBRATION.md, the m2.5 entry). Searched and not found: a beef trial giving milk yield by body condition (MLA, FutureBeef, NSW DPI and peer-reviewed searches turned up only general statements that thin cows give less milk). "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
 
 **Growth to weaning and weaning weight**
 

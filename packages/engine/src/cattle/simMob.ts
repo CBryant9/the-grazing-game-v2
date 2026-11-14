@@ -19,7 +19,8 @@
  * MVP faults fixed here (BUILD_PLAN 2.4): the no-water count clears in the
  * feedlot, a cow whose calf dies is dried off, and stock under 200 kg pay
  * the measured cost for a kg of gain, not the grown animal's
- * (`mjPerKgGain`, engine 0.14.0).
+ * (`mjPerKgGain`, engine 0.14.0), and a cow's milk falls with her
+ * condition, not with the feed's ME (`milkMJ`, engine 0.14.0).
  */
 
 import type { Supplement } from '../data/feed';
@@ -257,7 +258,7 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
     let req = 0.45 * m75 * (1 + walk);
     if (a.preg > 190) req += (0.13 * m75 * (a.preg - 190)) / 93;
     if (a.lact >= 0 && a.calf) {
-      a.milk = milkMJ(a, me);
+      a.milk = milkMJ(a);
       req += a.milk / 0.65;
     } else a.milk = 0;
     if (a.kind === 'calf') {

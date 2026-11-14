@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { YOUNG_GAIN_COST } from '../src/data/cattle';
+import { MILK, YOUNG_GAIN_COST } from '../src/data/cattle';
 
 const MVP_PATH = fileURLToPath(
   new URL('../../../reference/mvp/grazing-game.html', import.meta.url),
@@ -265,6 +265,9 @@ export const REBUILD_TUNES: readonly {
  * `helpers` is script added before the MVP's own, for the rebuilt lines to
  * call; it must do the same arithmetic in the same order as the engine.
  */
+/** The rebuild's milk fall with condition, as MVP script text (milkMJ). */
+const MILK_FALL = `clamp((a.cond-${MILK.stopCS})/(${MILK.fullCS}-${MILK.stopCS}),0,1)`;
+
 export const REBUILD_RULES: readonly {
   name: string;
   why: string;
@@ -282,6 +285,24 @@ export const REBUILD_RULES: readonly {
     why: 'The same rule in gainOn.',
     mvp: 'return clamp(bal>0?bal/(20+.045*a.wt):bal/22,-1.5,cap);',
     rebuild: 'return clamp(bal>0?bal/__ggGainCost(a.wt):bal/22,-1.5,cap);',
+  },
+  {
+    name: 'milk falls with condition, daily step',
+    why: 'The MVP cut milk by the feed ME, to 45% at ME 7.35 or less, which left calves near 80 kg at weaning. Milk now falls only as the cow gets thin (MILK). Engine: milkMJ.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((me-6)/3,.45,1);',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL};`,
+  },
+  {
+    name: 'milk falls with condition, expected gain',
+    why: 'The same rule in gainOn.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((ME(diet.dmd)-6)/3,.45,1)/.65;',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL}/.65;`,
+  },
+  {
+    name: 'milk falls with condition, reasons',
+    why: 'The same rule in gainWhy.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((meF-6)/3,.45,1);',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL};`,
   },
 ];
 
