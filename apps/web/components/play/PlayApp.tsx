@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
+import { wireTour } from '@/lib/game/helpstore';
 import { useGame } from '@/lib/game/store';
 import { PlayScreen } from './PlayScreen';
 import { SetupFlow } from './SetupFlow';
@@ -19,6 +20,8 @@ export function PlayApp() {
   const load = useGame((s) => s.load);
 
   useEffect(() => {
+    // Watch for a new farm, so the guided first day starts with it. Before load, so no change is missed.
+    wireTour();
     void load();
   }, [load]);
 

@@ -12,6 +12,7 @@ import {
 } from '@/lib/game/lists';
 import { useGame } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
+import { EmptyState } from './EmptyState';
 import { CHIP } from './PaddockSheet';
 import styles from './play.module.css';
 
@@ -89,6 +90,7 @@ const gainText = (g: number | null): string =>
 /** The Herd tab: every mob, with where it is, head, CS and daily gain. Tap one to open its card. */
 export function HerdList({ snapshot }: { snapshot: Snapshot }) {
   const openMob = useGame((s) => s.openMob);
+  const setTab = useGame((s) => s.setTab);
   const [key, dir, pick] = useSort<MobSortKey>('name');
   const rows = sortMobs(snapshot.mobs, key, dir);
   return (
@@ -98,7 +100,9 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
         {plural(snapshot.totals.head, 'head', 'head')} in {plural(snapshot.mobs.length, 'mob')}.
       </p>
       {rows.length === 0 ? (
-        <p className="muted">There are no cattle on the farm.</p>
+        <EmptyState action="Go to the Market" onAction={() => setTab('market')}>
+          There are no cattle on the farm. {snapshot.market.saleLine}
+        </EmptyState>
       ) : (
         <>
           <SortBar label="Sort the herd" keys={MOB_KEYS} active={key} dir={dir} onPick={pick} />
@@ -131,6 +135,7 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
 /** The Paddocks tab: every paddock, with hectares, label, feed and the mob in it. Tap one to open its sheet. */
 export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
   const openPaddock = useGame((s) => s.openPaddock);
+  const selectTool = useGame((s) => s.selectTool);
   const [key, dir, pick] = useSort<PaddockSortKey>('name');
   const rows = sortPaddocks(snapshot.paddocks, snapshot.mobs, key, dir);
   return (
@@ -139,7 +144,19 @@ export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
       <p className="muted">
         {plural(snapshot.paddocks.length, 'paddock')}, {num(snapshot.farm.setup.farmHa)} ha.
       </p>
-      <SortBar label="Sort the paddocks" keys={PADDOCK_KEYS} active={key} dir={dir} onPick={pick} />
+      {rows.length === 0 ? (
+        <EmptyState action="Build a fence" onAction={() => selectTool('fence')}>
+          This farm has no paddocks yet. A fence round some land makes one.
+        </EmptyState>
+      ) : (
+        <SortBar
+          label="Sort the paddocks"
+          keys={PADDOCK_KEYS}
+          active={key}
+          dir={dir}
+          onPick={pick}
+        />
+      )}
       <ul className={styles.rows}>
         {rows.map((p) => {
           const mob = snapshot.mobs.find((m) => p.mobs.includes(m.id));

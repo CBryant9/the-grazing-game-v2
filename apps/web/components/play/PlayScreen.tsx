@@ -7,11 +7,13 @@ import { pickable } from '@/lib/game/lists';
 import { mapBadges } from '@/lib/game/plans';
 import { pickDraft } from '@/lib/game/sow';
 import { useLayout, useReducedMotion, useTheme } from '@/lib/game/hooks';
+import { useHelp } from '@/lib/game/helpstore';
 import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
 import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
 import { FarmMap } from './FarmMap';
+import { HelpPanel } from './HelpPanel';
 import { HerdList, PaddockList } from './Lists';
 import { MarketPanel } from './MarketPanel';
 import { MobCard } from './MobCard';
@@ -24,6 +26,7 @@ import { PlansPanel } from './PlansPanel';
 import { SummaryCard } from './SummaryCard';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
 import { TopBar } from './TopBar';
+import { TourStrip } from './TourStrip';
 import styles from './play.module.css';
 
 /** A little after last light the map is dusk: the farm goes dark and can still be looked at. */
@@ -150,6 +153,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const buildTap = useGame((s) => s.buildTap);
   const buildEnd = useGame((s) => s.buildEnd);
   const startFix = useGame((s) => s.startFix);
+  const helpOpen = useHelp((s) => s.helpOpen);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
@@ -175,9 +179,11 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   }, [build, buildEnd]);
 
   const pc = layout === 'pc';
+  // The help screen is a full screen panel on a phone, so what is under it is not drawn.
   const sheetOpen =
     tab === 'farm' &&
     !pc &&
+    !helpOpen &&
     (move !== null || plan !== null || mobId !== null || paddockId !== null);
 
   // While the move tool asks for a paddock, a tap picks it. Otherwise a tap opens it.
@@ -213,7 +219,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
     (plan.phase === 'edit' || plan.phase === 'refused' || plan.phase === 'confirm');
   const anchor = useMemo(() => buildAnchor(build), [build]);
   // The tool bar and the card show on the farm tab, when no sheet is open.
-  const showBuild = tab === 'farm' && !sheetOpen;
+  const showBuild = tab === 'farm' && !sheetOpen && !(helpOpen && !pc);
 
   return (
     <div className={styles.screen} data-layout={layout} data-evening={clock.evening}>
@@ -223,11 +229,14 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         </div>
       )}
       <TopBar snapshot={snapshot} />
+      <TourStrip hasCattle={snapshot.mobs.length > 0} />
       <div className={styles.body}>
         {pc && (
           <aside className={styles.side} aria-label="Farm panel">
             <Nav />
-            {tab === 'farm' ? (
+            {helpOpen ? (
+              <HelpPanel />
+            ) : tab === 'farm' ? (
               <FarmPanel snapshot={snapshot} />
             ) : (
               <TabPanel tab={tab} snapshot={snapshot} />
@@ -279,7 +288,9 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
           />
           <NoticeBar />
           <GameOver />
-          {!pc && tab === 'farm' && !sheetOpen && !build && <TodoBanner snapshot={snapshot} />}
+          {!pc && tab === 'farm' && !sheetOpen && !build && !helpOpen && (
+            <TodoBanner snapshot={snapshot} />
+          )}
           {sheetOpen && <Opened snapshot={snapshot} />}
           {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
           {!pc && showBuild && (
@@ -288,7 +299,8 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
               <BuildBar build={snapshot.build} docked={false} />
             </div>
           )}
-          {!pc && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
+          {!pc && helpOpen && <HelpPanel />}
+          {!pc && !helpOpen && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
         </main>
         {!pc && <Nav />}
       </div>
