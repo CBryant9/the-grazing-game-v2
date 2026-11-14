@@ -41,11 +41,16 @@ function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20
   writeFileSync(join(chunks, 'account.js'), randomBytes(accountKb * 1024));
   mkdirSync(join(app, 'sign-in'), { recursive: true });
   mkdirSync(join(app, 'sign-up'), { recursive: true });
+  mkdirSync(join(app, 'purchase'), { recursive: true });
   for (const file of [
     'sign-in.html',
     'sign-in/check-email.html',
     'sign-up/finish.html',
     'account.html',
+    // The store and the Stripe return pages (milestone 5.2).
+    'store.html',
+    'purchase/success.html',
+    'purchase/cancelled.html',
   ]) {
     writeFileSync(join(app, file), page('account'));
   }
@@ -98,7 +103,15 @@ describe('the JavaScript budget check', () => {
   it('gives each sign-in and account page its own line, and fails one that grows past it', () => {
     const ok = run(pretend(0, 100, false, 20));
     expect(ok.status).toBe(0);
-    for (const path of ['/sign-in', '/sign-in/check-email', '/sign-up/finish', '/account']) {
+    for (const path of [
+      '/sign-in',
+      '/sign-in/check-email',
+      '/sign-up/finish',
+      '/account',
+      '/store',
+      '/purchase/success',
+      '/purchase/cancelled',
+    ]) {
       expect(ok.stdout).toContain(path);
     }
     const over = run(pretend(0, 100, false, 200));
