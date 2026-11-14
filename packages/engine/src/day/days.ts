@@ -28,6 +28,7 @@ import type { FarmEvent } from '../sim/events';
 import type { FarmState, GameOverReason, YearTotals } from '../sim/state';
 import { mobSummaries, type MobSummary } from '../sim/summary';
 import { stepDay, type DayResult, type TickEnv } from '../sim/tick';
+import { dawn } from './dawn';
 
 /** What the working day can be given: the tick's sources. */
 export type DayEnv = TickEnv;
@@ -80,6 +81,10 @@ export interface PeriodSummary {
   mobs: MobSummary[];
   /** How many of each kind of event happened. */
   events: Record<string, number>;
+  /** Cattle that landed in the yards, bought on a sale day. Head, not counting calves at foot. */
+  arrived: { head: number; calves: number };
+  /** Booked stock sold at first light on a sale day: head, calves at foot and dollars banked. */
+  bookedSold: { head: number; calvesAtFoot: number; net: number };
 }
 
 /** Why a skip stopped early. */
@@ -112,6 +117,8 @@ export interface DayEnd {
   farm: FarmState;
   /** What the daily tick reported. */
   day: DayResult;
+  /** What happened at first light on the new day: cattle landing in the yards, booked stock sold. */
+  dawn: FarmEvent[];
   /** Minutes of light left unused when the day ended. */
   lightLeftMin: number;
   /** Everything that would stop a skip, had this day been part of one. */
@@ -130,6 +137,8 @@ export interface SkipResult {
   stops: SkipStop[];
   /** What the daily tick reported, day by day. */
   days: DayResult[];
+  /** What happened at first light on each new day, in order. */
+  dawn: FarmEvent[];
   summary: PeriodSummary;
 }
 
@@ -216,7 +225,12 @@ function snapshot(farm: FarmState): Snapshot {
   };
 }
 
-function summarise(a: Snapshot, farm: FarmState, days: readonly DayResult[]): PeriodSummary {
+function summarise(
+  a: Snapshot,
+  farm: FarmState,
+  days: readonly DayResult[],
+  dawnEvents: readonly FarmEvent[],
+): PeriodSummary {
   const b = snapshot(farm);
   const change = (
     k:
@@ -235,6 +249,19 @@ function summarise(a: Snapshot, farm: FarmState, days: readonly DayResult[]): Pe
   for (const day of days) {
     for (const d of day.deaths) deathsByCause[d.cause] = (deathsByCause[d.cause] ?? 0) + 1;
     for (const e of day.events as readonly FarmEvent[]) counts[e.type] = (counts[e.type] ?? 0) + 1;
+  }
+  const arrived = { head: 0, calves: 0 };
+  const bookedSold = { head: 0, calvesAtFoot: 0, net: 0 };
+  for (const e of dawnEvents) {
+    counts[e.type] = (counts[e.type] ?? 0) + 1;
+    if (e.type === 'cattle-arrived') {
+      arrived.head += e.head;
+      arrived.calves += e.calves;
+    } else if (e.type === 'cattle-sold' && e.booked) {
+      bookedSold.head += e.head;
+      bookedSold.calvesAtFoot += e.calvesAtFoot;
+      bookedSold.net += e.net;
+    }
   }
   return {
     fromDay: a.day,
@@ -268,6 +295,8 @@ function summarise(a: Snapshot, farm: FarmState, days: readonly DayResult[]): Pe
     },
     mobs: mobSummaries(farm),
     events: counts,
+    arrived,
+    bookedSold,
   };
 }
 
@@ -363,12 +392,15 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
   const next = workingCopy(farm);
   const lightLeftMin = lightLeft(farm);
   const day = stepDay(next, env);
+  // First light on the new day: cattle land, booked stock sells. Before the player can act.
+  const atDawn = dawn(next);
   return {
     farm: next,
     day,
+    dawn: atDawn,
     lightLeftMin,
     stops: farm.over ? [{ type: 'game-over', reason: farm.over.reason }] : stopsIn(day),
-    summary: summarise(before, next, [day]),
+    summary: summarise(before, next, [day], atDawn),
   };
 }
 
@@ -400,7 +432,8 @@ export function skipDays(
     daysRun: 0,
     stops,
     days: [],
-    summary: summarise(before, farm, []),
+    dawn: [],
+    summary: summarise(before, farm, [], []),
   });
   if (farm.over) return nothing([{ type: 'game-over', reason: farm.over.reason }]);
   if (!options.anyway) {
@@ -410,10 +443,12 @@ export function skipDays(
 
   const cur = workingCopy(farm);
   const days: DayResult[] = [];
+  const atDawn: FarmEvent[] = [];
   let stops: SkipStop[] = [];
   for (let i = 0; i < asked; i++) {
     const day = stepDay(cur, env);
     days.push(day);
+    atDawn.push(...dawn(cur));
     stops = stopsIn(day);
     if (stops.length) break;
   }
@@ -423,6 +458,7 @@ export function skipDays(
     daysRun: days.length,
     stops,
     days,
-    summary: summarise(before, cur, days),
+    dawn: atDawn,
+    summary: summarise(before, cur, days, atDawn),
   };
 }

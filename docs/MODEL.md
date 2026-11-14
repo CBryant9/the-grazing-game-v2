@@ -654,7 +654,7 @@ Everything a player does is an action: a plain record that `applyAction(farm, ac
 
 From milestone 1.5a every action is a job on the farm clock: it takes its work off the day's light, and it fits today or it does not (section 9). The rules below say what each action does. They are unchanged, and live in `actions/apply.ts` (`tryAction`), which knows nothing about time. Section 9 says whether a job fits and how much of a line is built.
 
-The actions: buy cattle straight into an area or a mob (an instant buy for tests and calibration; sale days and delivery to the yards come later); sell animals, a group from a mob, or a market class across the farm; move a whole mob or part of one by class and number, into an area or the feedlot; set a supplement; wean; mark calves; build and pull down fence; roll up tape; hang, open, shut and remove a gate; fix a knocked-down fence; lay pipe; place, move and remove a trough; both kinds of water hub; place, move, refill and sell a portable trough; sow; harvest.
+The actions: buy cattle (on the clock, only on a sale day, arriving in the yards at first light the next day; straight into an area or a mob on the instant path used for tests and calibration: section 9); sell animals, a group from a mob, or a market class across the farm (booked onto the next sale on a day with no sale), and cancel a booking; move a whole mob or part of one by class and number, into an area or the feedlot; set a supplement; wean; mark calves; build and pull down fence; roll up tape; hang, open, shut and remove a gate; fix a knocked-down fence; lay pipe; place, move and remove a trough; both kinds of water hub; place, move, refill and sell a portable trough; sow; harvest.
 
 Moving cattle onto ground with no water, or onto a crop that is not ready to graze, is allowed. The events say so as data (`no-water`, `crop-risks`), and the screen asks first.
 
@@ -662,7 +662,7 @@ Rules that were screen code in the MVP are actions here: buying a sowing, removi
 
 ### Stock yards (a stand-in)
 
-Deliveries to the yards are the next part of milestone 1.5. Until then no action puts a mob in the yards. So the engine can carry such a mob, the tick gives it water and lets it graze only the square the yards stand on. The water is Claudia's rule (the yards have water). The grazing is a placeholder.
+Bought cattle land in the yards at first light the day after they are bought (section 9, "Buying and selling on sale days"). The tick gives a mob in the yards water and lets it graze only the square the yards stand on. The water is Claudia's rule (the yards have water). The grazing is a placeholder.
 
 ### Random streams
 
@@ -759,7 +759,7 @@ There are three kinds of job (`day/spec.ts`):
 
 ### Next day and skips
 
-**Next day** (`endDay`): the daily tick runs (section 8) and the clock goes back to first light. It is exactly the daily tick on a copy of the farm. Nothing is built: there is nothing to carry on.
+**Next day** (`endDay`): the daily tick runs (section 8), the clock goes back to first light, and first light's work is done (cattle bought the day before land in the yards and booked stock sells: "Buying and selling on sale days" below). It is the daily tick and first light's work on a copy of the farm. Nothing is built: there is nothing to carry on.
 
 **A skip** (`skipDays`) runs a week (7 days), a month (30, as in the MVP) or a year (365), or a number of days. It is Next day that many times, and it stops after any day that held a reason to.
 
@@ -812,11 +812,50 @@ Each item names the action that deals with it, and gives that action ready to se
 
 ### Saves
 
-The clock is part of the farm: saved, loaded and hashed. The save format is 4. A format 1 or 2 save (before the clock) loads at first light. Format 3 was the first cut of this milestone and was never released: such a save loads with the player's place, the travel switches, the jobs in progress and the bookings dropped. From any older save the homestead is dropped and the stock yards are kept, and a mob in the yards stays in the yards. A save made part-way through a day keeps its time of day. Save, load and carry on equals running straight through.
+The clock is part of the farm: saved, loaded and hashed. The save format was 4 for the clock; it is now 5 (arrivals and sale bookings, above). A format 1 or 2 save (before the clock) loads at first light. Format 3 was the first cut of this milestone and was never released: such a save loads with the player's place, the travel switches, the jobs in progress and the bookings dropped. From any older save the homestead is dropped and the stock yards are kept, and a mob in the yards stays in the yards. A save made part-way through a day keeps its time of day. Save, load and carry on equals running straight through.
+
+### Buying and selling on sale days
+
+Built in milestone 1.5b (engine 0.8.0, save format 5), on Claudia's rule that **the stock yards are the place bought cattle arrive** and she does not want the player made to watch the clock. Everything here runs on the farm clock. The instant path is unchanged (below).
+
+**A sale calendar for every farm.** `saleDayOn(farm, env, day)` and `nextSaleDay(farm, env, from, type?)` answer for both kinds of farm, with the same names and shape as before.
+
+- A farm that plays real years reads its district yard's real sale days (docs/DATA.md, "Sale calendars"). It needs the real data in `env`.
+- A farm with random seasons has a weekly prime sale at its district's yard on a set weekday, with no sale from 16 December to 7 January (`STAND_IN_BREAK`, the same rule as the real calendar's stand-ins). Central Queensland Wednesday, Northern Tablelands Thursday, Central West Thursday, Western Victoria Monday. These are the weekdays each yard sold on in its most recent records. **Builder's choice, for Claudia** (docs/DATA.md). It needs no data, and the day's weekday comes from the date the game reports.
+- `marketView(farm, env)` (read-only) gives: whether today is a sale day; the next sale after today (farm day, date, days from today); the stock booked onto a sale (by sale day, with head and tag numbers); and the cattle on their way to the yards.
+
+**Buying.** `{ type: 'buyCattle', cls, qty }` is done only on a sale day.
+
+- On any other day it is refused (reason `not-a-sale-day`), nothing changes, and the message names the next sale: "Cattle can only be bought on a sale day. The next cattle sale is on Thursday 7 September, in 6 days." The job card shows the same refusal.
+- On a sale day the price is today's, shown on the job card before the money is spent, as before. Buying takes none of the day's light (`free`). The money is spent now: cash goes down by the cost, freight included.
+- The cattle are **not** put on any ground. They go on the farm's books as an arrival (`farm.arrivals`): paid for, counted in net worth at what was paid, grazing nothing, and not able to die. The `to` field is not used.
+- **At first light the next day** they land in the stock yards as a mob with `where: { kind: 'yards', since: <day> }`. If a mob is already in the yards they join it (one mob in the yards, which keeps its name and its `since`). A `cattle-arrived` event is reported the day they land.
+- The player moves them out with the ordinary `moveMob`. `thingsToDo` lists `in-yards` for a mob in the yards: the mob, its head (calves at foot included) and how many days it has been there. It is a fact. `does: 'moveMob'`, `action: null`, because the player picks the paddock.
+- While in the yards the mob has water and grazes only the square the yards stand on (the tick is unchanged: section 8).
+
+**Selling.** `sellAnimals`, `sellGroup` and `sellClass` choose animals as they always did.
+
+- **On a sale day** the stock is sold today at today's price, as before.
+- **On any other day** the stock is **booked onto the next sale** (`sale-booked` event). Nothing is paid, the job card says so and names the sale day (`booking`), and the stock stay where they are and graze as usual. They can be moved about; they are sold wherever they are. Asking again books further animals, never the same ones twice.
+- **At first light on the sale day**, booked animals that are still alive and still on the farm are sold at that day's price, with the usual selling costs (commission and freight, the same function as a sale on the day). A `cattle-sold` event with `booked: true` reports the head and the money. An animal that has died or was already sold is skipped without fuss: if none is left, nothing is sold and nothing is said. Calves at foot go with their booked mothers, as they do in any sale.
+- `cancelSale` takes stock off the sale any day before it: the tag numbers given, or every booking if none. It takes none of the day. With nothing booked it is refused (`nothing-booked`).
+- **The time for selling** (1 hour and 1 minute for each 10 head, `data/jobTimes.ts`) is spent on the day the player asks, whether the sale is today or booked. Calves at foot count in the head.
+- Booked animals show as booked in `marketView` and on the mob (`MobSummary.booked`), so a screen can mark them.
+
+**The state** (kept small): `farm.arrivals` is a list of `{ arriveDay, cls, cost, animals }`. `farm.saleBookings` is a list of `{ saleDay, animalIds }` with one entry for each sale day. In play there is only ever one, for the next sale. `animalIds` is a whole-number array, smallest first, packed in a save like the other numeric arrays. Tag numbers are stable. Both lists are empty when nothing is on the way and nothing is booked.
+
+**First light** (`day/dawn.ts`, `dawn(farm)`). Arrivals landing and booked sales selling happen once, at the start of the farm day they are due, in this one function. `endDay` and `skipDays` call it after the daily tick for each new day, so it is done before the player can act, and a skip does the same as stepping a day at a time. Arrivals land first, then booked stock sells. Their events go to the inbox and to `DayEnd.dawn` and `SkipResult.dawn`. The period summary adds `arrived` (head and calves that landed) and `bookedSold` (head, calves at foot and dollars banked) and counts the events. **A skip does not stop for a sale day or an arrival.** The daily tick (`stepDay`) is unchanged and does nothing about either: what it does to grass and cattle is exactly what it was.
+
+**Net worth** counts what was paid for cattle on their way (`arrivalsWorth`) until they land, then their net sale value.
+
+**The instant path** (`applyInstant`, calibration and the comparisons with the old game) is unchanged: `buyCattle` with `to` buys straight into a paddock or a mob on any day, and the sell actions sell at once. The job card and the real job both run on the clock, where these rules apply.
+
+**Saves.** Format 5. A save from an older format loads with nothing on the way and nothing booked. Save, load and carry on equals running straight through, across a buy, an arrival, a booking and its sale day. Nothing here reads the clock or `Math.random`. The cattle that turn up with a buy are drawn from the farm's own `buying` stream when the buy is made.
+
+**Not built (questions for Claudia, DEVELOPMENT_LOG):** whether cattle left in the yards need hay (PRD 5.13 proposed "after one day"); store and prime sales are not told apart (any sale day takes any cattle); no limit on the head that can be booked.
 
 ### What it does not do
 
-- Buying is still straight into a paddock. Sale days, and delivery into the stock yards for the player to move out, are the next part.
 - Putting a mob on a supplement still takes 30 minutes. Claudia has said that in Fast Farm it is switched on at a daily price with no daylight cost, and that in Daily Farm feed is stock on hand in a feeder or a lick block. That is a later part.
 - Nothing a mob eats depends on the time of day yet.
 - There are no farm hands and no contractor fencing (Stage 2).

@@ -52,12 +52,16 @@ export interface MobSummary {
   day: MobDay | null;
   /** What the mob would put in the bank if sold today, dollars. */
   saleValue: number;
+  /** Head in the mob (calves at foot included) that are booked onto a sale, so a screen can mark them. */
+  booked: number;
 }
 
 /** Every mob's figures, in the farm's order. */
 export function mobSummaries(farm: FarmState): MobSummary[] {
   const survey = surveyOf(farm);
   const prices = pricesOf(farm);
+  const booked = new Set<number>();
+  for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
   return farm.mobs.map((m) => {
     const areaId = areaIdOf(survey, m);
     let head = 0;
@@ -88,6 +92,7 @@ export function mobSummaries(farm: FarmState): MobSummary[] {
       dryDays: m.dry,
       day: m.st,
       saleValue,
+      booked: m.animals.reduce((n, a) => n + (booked.has(a.id) ? 1 : 0), 0),
     };
   });
 }

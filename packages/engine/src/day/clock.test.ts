@@ -5,6 +5,7 @@ import {
   atLastLight,
   busyFarm,
   cell,
+  toSaleDay,
   turnedDown,
   withLightLeft,
   work,
@@ -199,6 +200,7 @@ describe('looking is free', () => {
       dateOn: (f) => engine.dateOn(f, f.day + 3),
       nextSaleDay: (f, env) => engine.nextSaleDay(f, env),
       saleDayOn: (f, env) => engine.saleDayOn(f, env),
+      marketView: (f, env) => engine.marketView(f, env),
       plantingsNow: (f, env) => engine.plantingsNow(f, env),
       pricesOf: (f) => engine.pricesOf(f),
       realPlanOf: (f) => engine.realPlanOf(f),
@@ -420,14 +422,11 @@ describe('when the light is used up', () => {
     const off = work(fed, { type: 'setSupplement', mob: b.steers, supp: 'none' });
     expect(off.job.outcome).toBe('free');
     expect(off.job.workMin).toBe(0);
-    const bought = work(farm, {
-      type: 'buyCattle',
-      cls: 'yearSteer',
-      qty: 5,
-      to: { cell: b.emptyCell },
-    });
+    // On a sale day, so cattle can be bought, even at last light.
+    const market = atLastLight(toSaleDay(b.farm));
+    const bought = work(market, { type: 'buyCattle', cls: 'yearSteer', qty: 5 });
     expect(bought.job.outcome).toBe('free');
-    expect(bought.farm.clock.used).toBe(farm.clock.used);
+    expect(bought.farm.clock.used).toBe(market.clock.used);
   });
 
   it('the next day starts at first light again', () => {

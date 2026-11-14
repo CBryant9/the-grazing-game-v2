@@ -15,7 +15,7 @@ import { surveyLayout, type FarmLayout, type Survey } from '../farm/layout';
 import { areaWatered } from '../farm/water';
 import type { Prices, PriceSource } from '../market/prices';
 import { realMarket, type RealMarket } from '../market/realMarket';
-import type { SaleDay, SaleType } from '../market/saleCalendar';
+import { weekdayOf, weeklySaleOn, type SaleDay, type SaleType } from '../market/saleCalendar';
 import { standInMarket } from '../market/standIn';
 import type { Plantings } from '../pasture/plantings';
 import type { DistrictRealData, RealData } from '../real/realData';
@@ -226,8 +226,10 @@ const NEXT_SALE_LOOK_AHEAD_DAYS = 120;
 
 /**
  * The cattle sale at the district yard on a farm day, or null when the
- * yard holds none that day. Real-year farms only: a farm with random
- * seasons has no real sale calendar and this stops with an error.
+ * yard holds none that day. A farm that plays real years reads the yard's
+ * real sale days (and needs the real data in `env`). A farm with random
+ * seasons has a weekly prime sale on its district's weekday, with none from
+ * 16 December to 7 January, and needs no data.
  */
 export function saleDayOn(
   farm: FarmState,
@@ -235,9 +237,42 @@ export function saleDayOn(
   day: number = farm.day,
 ): FarmSaleDay | null {
   const real = realSourcesOf(farm, env);
-  if (!real) throw new Error('Only a real-year farm has a real sale calendar.');
-  const sale = real.data.cattleSales.saleOn(real.plan.realDateOn(day));
+  const sale = real
+    ? real.data.cattleSales.saleOn(real.plan.realDateOn(day))
+    : weeklySaleOn(farm.district, dateOn(farm, day));
   return sale ? { ...sale, day } : null;
+}
+
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** A sale day in words, for a message: "Thursday 14 March, in 3 days". */
+export function saleDayText(now: Pick<FarmState, 'day'>, sale: FarmSaleDay): string {
+  const away = sale.day - now.day;
+  const when = away === 0 ? 'today' : away === 1 ? 'tomorrow' : `in ${away} days`;
+  const { date } = sale;
+  return `${WEEKDAY_NAMES[weekdayOf(date)]!} ${date.date} ${MONTH_NAMES[date.month]!}, ${when}`;
 }
 
 /**
@@ -245,6 +280,7 @@ export function saleDayOn(
  * if no day is given), of a given type if one is asked for. It follows the
  * farm's own days, so it carries on into the next game year whatever real
  * year that is. Null when the yard holds none in the next 120 days.
+ * Both kinds of farm answer (see `saleDayOn`).
  */
 export function nextSaleDay(
   farm: FarmState,

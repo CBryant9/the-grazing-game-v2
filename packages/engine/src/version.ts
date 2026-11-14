@@ -12,8 +12,15 @@
  * is built as far as fits. No grass, cattle, crop or price
  * formula changed: a farm driven without the clock (calibration) runs
  * exactly as it did on 0.6.0.
+ *
+ * 0.8.0 (milestone 1.5b): sale days and the yards. Every farm has a sale
+ * calendar. On the clock, cattle are bought only on a sale day and land in
+ * the stock yards at first light the next day. Stock sold on another day
+ * is booked onto the next sale. No grass, cattle, crop or price formula
+ * changed: a farm driven without the clock (calibration) runs exactly as
+ * it did on 0.7.0.
  */
-export const ENGINE_VERSION = '0.7.0';
+export const ENGINE_VERSION = '0.8.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -31,5 +38,10 @@ export const ENGINE_VERSION = '0.7.0';
  * homestead is gone and the stock yards stay. A format 1 or 2 save loads
  * at first light. A format 3 save loads with the homestead, the player's
  * place, the switches, the jobs in progress and the bookings dropped.
+ *
+ * 5: sale days and the yards (milestone 1.5b). A farm has `arrivals`
+ * (cattle bought and on their way to the yards) and `saleBookings` (stock
+ * booked onto a sale day), and a mob in the yards may say the day it came.
+ * An older save loads with none of them.
  */
-export const SAVE_FORMAT_VERSION = 4;
+export const SAVE_FORMAT_VERSION = 5;

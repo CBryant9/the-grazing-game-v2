@@ -106,6 +106,26 @@ function finish(
   card: Pick<JobCard, 'outcome' | 'totalWorkMin' | 'parts' | 'cost'> &
     Partial<Pick<JobCard, 'line' | 'notToday'>>,
 ): Worked {
+  // Stock booked onto a sale, and cattle on their way: the card says so.
+  const sale = did.find((e) => e.type === 'sale-booked');
+  const buy = did.find((e) => e.type === 'cattle-on-the-way');
+  const extra: Partial<Pick<JobCard, 'booking' | 'arrival'>> = {};
+  if (sale?.type === 'sale-booked') {
+    extra.booking = {
+      head: sale.head,
+      calvesAtFoot: sale.calvesAtFoot,
+      saleDay: sale.saleDay,
+      date: sale.saleDate,
+      daysAway: sale.daysAway,
+    };
+  }
+  if (buy?.type === 'cattle-on-the-way') {
+    extra.arrival = {
+      arriveDay: buy.arriveDay,
+      date: buy.arriveDate,
+      head: buy.qty,
+    };
+  }
   const start = light.now;
   const end = start + workMin;
   spendLight(next, workMin);
@@ -148,6 +168,7 @@ function finish(
       // is less than its next piece needs.
       usesRestOfDay: card.outcome === 'part' || (card.outcome === 'done' && leftAfter <= NO_TIME),
       costToday: before.cash - next.cash,
+      ...extra,
       ...card,
     },
   };
@@ -260,7 +281,7 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
   const no = refusedOutright(farm, action, env);
   if (no) return no;
   // Try it all at once, with no clock: the rules, the bank and the cost.
-  const trial = tryAction(farm, action, env);
+  const trial = tryAction(farm, action, env, { clocked: true });
   if (!trial.ok) return trial;
   const spec = specFor(farm, action, trial);
   switch (spec.kind) {

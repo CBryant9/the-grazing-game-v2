@@ -6,6 +6,7 @@
  * checking and the work.
  */
 
+import type { CalendarDate } from '../calendar';
 import type { CropRefusalReason } from '../crops/fields';
 import type { CattleClassId, GroupId, MarketClassId, SaleClassId } from '../data/cattle';
 import type { Supplement } from '../data/feed';
@@ -24,17 +25,30 @@ export type MoveTarget = { cell: number } | 'lot';
 export type Action =
   // ---- Cattle
   /**
-   * Buy a saleyard class straight into a grazing area or an existing mob.
-   * An instant buy, kept for tests and calibration: sale days and delivery
-   * to the yards come in a later milestone.
+   * Buy a saleyard class. In the game this can be done only on a sale day.
+   * The cattle are paid for at once, are on the farm's books, and arrive in
+   * the stock yards at first light the next day. `to` is not used there.
+   * Without the farm clock (calibration and tests) `to` is needed: the
+   * cattle go straight into a grazing area or an existing mob, on any day.
    */
-  | { type: 'buyCattle'; cls: SaleClassId; qty: number; to: { cell: number } | { mob: number } }
-  /** Sell the animals with these tag numbers. Calves at foot go with their mothers. */
+  | {
+      type: 'buyCattle';
+      cls: SaleClassId;
+      qty: number;
+      to?: { cell: number } | { mob: number };
+    }
+  /**
+   * Sell the animals with these tag numbers. Calves at foot go with their
+   * mothers. On a sale day they are sold today. On any other day they are
+   * booked onto the next sale and sold at first light that day.
+   */
   | { type: 'sellAnimals'; ids: number[] }
-  /** Sell from one mob by group: steers and heifers heaviest first, cows and bulls lowest condition first. */
+  /** Sell from one mob by group: steers and heifers heaviest first, cows and bulls lowest condition first. Booked the same way. */
   | { type: 'sellGroup'; mob: number; group: GroupId; qty: number }
-  /** Sell a market class from across the farm. */
+  /** Sell a market class from across the farm. Booked the same way. */
   | { type: 'sellClass'; cls: MarketClassId; qty: number }
+  /** Take stock off the sale they are booked onto: these tag numbers, or every booking if none are given. */
+  | { type: 'cancelSale'; ids?: number[] }
   /** Move a whole mob into a grazing area, or send it to the feedlot. */
   | { type: 'moveMob'; mob: number; to: MoveTarget }
   /** Move part of one or more mobs, by class and number. Calves go with their mothers. */
@@ -94,6 +108,10 @@ export type ActionRefusalReason =
   | 'no-such-mob'
   | 'no-such-animal'
   | 'nothing-to-sell'
+  /** Cattle can only be bought on a sale day, and there is none today. */
+  | 'not-a-sale-day'
+  /** Nothing is booked onto a sale, so there is nothing to cancel. */
+  | 'nothing-booked'
   | 'nothing-to-move'
   | 'already-there'
   | 'no-calves-to-wean'
@@ -196,6 +214,19 @@ export interface JobCard {
     fits: { pieces: JobPiece[]; metres: number };
     doesNotFit: { pieces: JobPiece[]; metres: number };
   };
+  /**
+   * For stock sold on a day with no sale: they are booked onto the next
+   * sale, nothing is paid yet and they stay where they are.
+   */
+  booking?: {
+    head: number;
+    calvesAtFoot: number;
+    saleDay: number;
+    date: CalendarDate;
+    daysAway: number;
+  };
+  /** For cattle bought: they arrive in the stock yards at first light on this farm day. */
+  arrival?: { arriveDay: number; date: CalendarDate; head: number };
   /**
    * For a line cut short: the reason the rest was not built, in plain
    * words. It is not remembered. The player draws it again another day.

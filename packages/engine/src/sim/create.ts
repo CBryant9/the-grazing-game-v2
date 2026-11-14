@@ -244,6 +244,8 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     mobs: [],
     animalIds: { next: 1 },
     nextMobId: 1,
+    arrivals: [],
+    saleBookings: [],
     seasons: real ? real.spec : { kind: 'random' },
     market,
     priceHistory: [],

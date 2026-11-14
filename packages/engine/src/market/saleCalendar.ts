@@ -7,11 +7,12 @@
  * Christmas. The stand-ins are listed below and in docs/DATA.md ("Sale
  * calendars"). They are tuning, for Claudia.
  *
- * Booking stock onto a sale, and delivery, are milestone 1.5. This module
- * only answers "is there a sale on this date" and "when is the next one".
+ * Booking stock onto a sale, and delivery, are in sim/derived.ts and
+ * actions/apply.ts. This module only answers "is there a sale on this date" and "when is the next one".
  * Nothing here reads a file or the clock.
  */
 
+import type { DistrictId } from '@gg/shared';
 import type { CalendarDate } from '../calendar';
 import type { SaleSpecies, YardId } from '../data/yards';
 import { FIRST_REAL_YEAR } from '../season/realYears';
@@ -68,6 +69,34 @@ export const STAND_IN_BREAK = {
   from: { month: 11, date: 16 },
   to: { month: 0, date: 7 },
 } as const;
+
+/**
+ * The weekday (0 is Sunday) of the weekly prime sale a farm with random
+ * seasons has, for each district. These are the weekdays each district's
+ * yard sold on in its most recent records (docs/DATA.md, "Sale days
+ * pulled"). The builder's choice, for Claudia: see docs/DATA.md.
+ */
+export const RANDOM_SEASON_SALE_WEEKDAY: Readonly<Record<DistrictId, number>> = {
+  cq: 3,
+  nsw: 4,
+  cw: 4,
+  wv: 1,
+};
+
+/** The weekday of a date, 0 for Sunday. 1 January 1970 was a Thursday. */
+export function weekdayOf(date: CalendarDate): number {
+  return (((daySerial(date) + 4) % 7) + 7) % 7;
+}
+
+/**
+ * The sale a farm with random seasons has on a date: a weekly prime sale on
+ * its district's weekday, with none from 16 December to 7 January (the
+ * stand-in rule). Null on any other day.
+ */
+export function weeklySaleOn(district: DistrictId, date: CalendarDate): SaleDay | null {
+  if (inBreak(date) || weekdayOf(date) !== RANDOM_SEASON_SALE_WEEKDAY[district]) return null;
+  return { date, types: ['prime'], head: null, standIn: true };
+}
 
 export interface SaleCalendar {
   yard: YardId;
@@ -206,8 +235,7 @@ export function buildSaleCalendar(
     const stretch = standInFor(serial);
     if (!stretch || inBreak(date)) return null;
     // 1 January 1970 was a Thursday.
-    const weekday = (((serial + 4) % 7) + 7) % 7;
-    if (weekday !== stretch.weekday) return null;
+    if (weekdayOf(date) !== stretch.weekday) return null;
     return { date, types: ['prime'], head: null, standIn: true };
   };
 

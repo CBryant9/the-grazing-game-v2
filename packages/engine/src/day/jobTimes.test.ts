@@ -8,6 +8,7 @@ import {
   down,
   farmWithCropReady,
   setUp,
+  toSaleDay,
   withLightLeft,
   work,
 } from '../../test-support/workingDay';
@@ -446,18 +447,14 @@ describe('what takes none of the day', () => {
 
   it('buying: there is no trip to the saleyard', () => {
     const b = busyFarm();
-    const buy = work(b.farm, {
-      type: 'buyCattle',
-      cls: 'yearSteer',
-      qty: 5,
-      to: { cell: b.emptyCell },
-    });
+    // Cattle are bought on a sale day, and arrive in the yards at first light the next day.
+    const buy = work(toSaleDay(b.farm), { type: 'buyCattle', cls: 'yearSteer', qty: 5 });
     expect(buy.job.outcome).toBe('free');
     expect(buy.job.workMin).toBe(0);
     expect(buy.job.parts).toEqual([]);
     expect(buy.farm.clock.used).toBe(0);
     expect(buy.job.costToday).toBeGreaterThan(1000);
-    expect(buy.events.map((e) => e.type)).toEqual(['cattle-bought']);
+    expect(buy.events.map((e) => e.type)).toEqual(['cattle-on-the-way']);
   });
 
   it('sowing happens at once: it costs money and none of the day, with no contractor to wait for', () => {

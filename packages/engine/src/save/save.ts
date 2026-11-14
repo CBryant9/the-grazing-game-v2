@@ -254,6 +254,9 @@ function upgrade(f: Record<string, unknown>): void {
   farm.priceHistory ??= [];
   farm.years ??= [];
   farm.energiser ??= false;
+  // Sale days and the yards (format 5): a farm saved before it had nothing on the way and nothing booked.
+  farm.arrivals ??= [];
+  farm.saleBookings ??= [];
   farm.ledger = { ...emptyLedger(), ...(farm.ledger ?? {}) };
   for (const m of farm.mobs ?? []) {
     m.lastBreak ??= null;

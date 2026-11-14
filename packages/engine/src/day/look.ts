@@ -12,7 +12,9 @@ import { SPECIES, type SpeciesId } from '../data/species';
 import { EDGE, H_EDGES, V_EDGES, type EdgeRef } from '../farm/topology';
 import { PORTABLE_CAPACITY_L, PORTABLE_LOW_SHARE } from '../farm/water';
 import { dayMinutes, lightLeft, timeNow } from '../sim/clock';
-import { areaIdOf, dateOn, surveyOf } from '../sim/derived';
+import { areaIdOf, dateOn, nextSaleDay, saleDayOn, surveyOf, type SourceEnv } from '../sim/derived';
+import { animalLookup } from '../cattle/types';
+import type { SaleClassId } from '../data/cattle';
 import type { FarmState, LoggedAction } from '../sim/state';
 import { NO_TIME } from './act';
 
@@ -97,6 +99,12 @@ export type ThingToDo =
       }
     /** A grain crop ready to harvest. `count` is its hectares. */
     | { type: 'crop-ready'; fieldId: number; sp: SpeciesId; count: number }
+    /**
+     * A mob in the stock yards, where bought cattle arrive. `count` is its
+     * head, calves at foot included, and `days` is how many days it has
+     * been there. The player picks the paddock to move it to.
+     */
+    | { type: 'in-yards'; mob: number; mobName: string; count: number; days: number }
     /** A fence segment that has been knocked down. `count` is 1. */
     | { type: 'fence-down'; edge: EdgeRef; fence: 'electric' | 'tape'; count: number }
     /** A portable trough that is empty, or under a quarter full. `count` is the litres left. */
@@ -152,6 +160,17 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
 
   // Stock.
   for (const m of farm.mobs) {
+    if (m.where.kind === 'yards' && m.animals.length) {
+      out.push({
+        type: 'in-yards',
+        mob: m.id,
+        mobName: m.name,
+        count: m.animals.length,
+        days: Math.max(0, farm.day - (m.where.since ?? farm.day)),
+        does: 'moveMob',
+        action: null,
+      });
+    }
     const area = areaName(areaIdOf(survey, m));
     let toMark = 0;
     let youngBulls = 0;
@@ -222,4 +241,72 @@ export function jobsToday(farm: FarmState): LoggedAction[] {
     if (entry.at) out.push(entry);
   }
   return out.reverse();
+}
+
+/** A day of sale, as the screens need it. */
+export interface SaleDayView {
+  /** The farm day, and the date the game reports. */
+  day: number;
+  date: CalendarDate;
+  /** Days from today. 0 for today. */
+  daysAway: number;
+}
+
+/** Stock booked onto a sale day. */
+export interface BookedView extends SaleDayView {
+  /** Head booked that are still on the farm, calves at foot not counted unless they were picked. */
+  head: number;
+  /** Their tag numbers, smallest first. Animals that have died or been sold are left out. */
+  animalIds: number[];
+}
+
+/** Cattle bought and on their way to the yards. */
+export interface OnTheWayView extends SaleDayView {
+  cls: SaleClassId;
+  /** Head, calves at foot included. */
+  head: number;
+  /** Dollars paid, freight included. */
+  cost: number;
+}
+
+/** What the saleyard looks like today, for the market screen. Looking is free. */
+export interface MarketView {
+  /** True when the district yard holds a cattle sale today. Cattle can be bought only today if so. */
+  isSaleDay: boolean;
+  /** The next sale after today, or null when there is none in the next few months. */
+  nextSale: SaleDayView | null;
+  /** Stock booked onto a sale, by sale day. */
+  booked: BookedView[];
+  /** Cattle bought and on their way to the yards. */
+  onTheWay: OnTheWayView[];
+}
+
+/**
+ * Where the farm stands with the saleyard: whether today is a sale day,
+ * the next one, the stock booked onto a sale and the cattle on their way.
+ * A farm that plays real years needs the real data in `env`. Nothing
+ * changes: looking is free.
+ */
+export function marketView(farm: FarmState, env: SourceEnv = {}): MarketView {
+  const view = (day: number): SaleDayView => ({
+    day,
+    date: dateOn(farm, day),
+    daysAway: day - farm.day,
+  });
+  const next = nextSaleDay(farm, env, farm.day + 1);
+  const all = animalLookup(farm.mobs);
+  return {
+    isSaleDay: saleDayOn(farm, env) !== null,
+    nextSale: next ? view(next.day) : null,
+    booked: farm.saleBookings.map((b) => {
+      const animalIds = [...b.animalIds].filter((id) => all.has(id));
+      return { ...view(b.saleDay), head: animalIds.length, animalIds };
+    }),
+    onTheWay: farm.arrivals.map((a) => ({
+      ...view(a.arriveDay),
+      cls: a.cls,
+      head: a.animals.length,
+      cost: a.cost,
+    })),
+  };
 }

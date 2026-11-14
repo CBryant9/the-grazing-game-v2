@@ -205,14 +205,23 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'buyCattle':
       // There is no trip to the saleyard: buying is a decision.
       return { kind: 'free' };
+    case 'cancelSale':
+      // Taking stock off a sale is a decision too.
+      return { kind: 'free' };
 
     // ---- Stock, where the mob is
     case 'sellAnimals':
     case 'sellGroup':
     case 'sellClass': {
       // Done where the mob is, with no muster: draft and load.
+      // The time is spent on the day the player asks, whether the stock are
+      // sold today or booked onto the next sale.
+      const booked = trial.events.find((e) => e.type === 'sale-booked');
       const lost = mobsThatLost(before, trial.farm);
-      const head = lost.reduce((n, l) => n + l.head, 0);
+      const head =
+        booked?.type === 'sale-booked'
+          ? booked.head + booked.calvesAtFoot
+          : lost.reduce((n, l) => n + l.head, 0);
       return whole([
         part('draft-and-load', T.sellBaseMin.value),
         part('head', (head / 10) * T.sellMinPer10Head.value),

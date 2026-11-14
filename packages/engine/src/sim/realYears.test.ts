@@ -777,9 +777,10 @@ describe('sale days on a real-year farm', () => {
     expect(nextSaleDay(farm, env, 0, 'store')).toBeNull();
   });
 
-  it('is only for a real-year farm', () => {
+  it('a farm with random seasons has a weekly sale of its own, and needs no data', () => {
+    // Milestone 1.5b: this used to stop with an error. See the tests in day/saleDays.test.ts.
     const random = createFarm({ ...options(), years: undefined });
-    expect(() => saleDayOn(random, env)).toThrow(/Only a real-year farm has a real sale calendar/);
-    expect(() => nextSaleDay(random, env)).toThrow(/Only a real-year farm/);
+    expect(nextSaleDay(random, {})).not.toBeNull();
+    expect(saleDayOn(random, {}, nextSaleDay(random, {})!.day)).not.toBeNull();
   });
 });

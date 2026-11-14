@@ -87,14 +87,19 @@ import { rngFromState } from '../rng';
 import {
   areaIdOf,
   cropContextOf,
+  dateOn,
   keepSources,
   keepSurvey,
+  nextSaleDay,
   placeAnchor,
   plantingsNow,
   pricesOf,
   realSourcesOf,
+  saleDayOn,
+  saleDayText,
   seasonsOf,
   surveyOf,
+  type FarmSaleDay,
   type SourceEnv,
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
@@ -155,6 +160,13 @@ export type ActionEnv = SourceEnv;
 export interface PartOptions {
   /** The job name to report, when the part is done by another action (rolling up part of a run of tape). */
   label?: string;
+  /**
+   * True for a job done on the farm clock (`applyAction`): cattle are bought
+   * only on a sale day and arrive in the yards, and stock sold on a day
+   * with no sale is booked onto the next one. Left out for the instant
+   * path (calibration and tests), where both happen at once.
+   */
+  clocked?: boolean;
 }
 
 /** The work of one action, on a farm that may be changed freely. */
@@ -243,26 +255,47 @@ type Out = ActionRefusal | null;
 // Cattle
 // ---------------------------------------------------------------------------
 
+/**
+ * The refusal for something that can only be done on a sale day, when
+ * today is not one. It names the next sale. Null on a sale day.
+ */
+function notSaleDay(j: Job, what: string): ActionRefusal | null {
+  const { farm, env } = j;
+  if (saleDayOn(farm, env)) return null;
+  const next = nextSaleDay(farm, env);
+  if (!next) {
+    return refuse('not-a-sale-day', `${what} There is no cattle sale in the next few months.`);
+  }
+  return refuse('not-a-sale-day', `${what} The next cattle sale is on ${saleDayText(farm, next)}.`);
+}
+
 function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   const { farm } = j;
+  const clocked = j.part.clocked === true;
   if (!Object.hasOwn(SALE_CLASSES, a.cls)) {
     return refuse('bad-request', 'That class is not sold at the saleyards.');
   }
   if (!isCount(a.qty) || a.qty > MAX_BUY) {
     return refuse('bad-request', `Buy between 1 and ${MAX_BUY} head at a time.`);
   }
-  if (!a.to || typeof a.to !== 'object') {
+  if (clocked) {
+    const no = notSaleDay(j, 'Cattle can only be bought on a sale day.');
+    if (no) return no;
+  } else if (!a.to || typeof a.to !== 'object') {
     return refuse('bad-request', 'Say which paddock or mob the cattle are going to.');
   }
   const s = j.survey;
   let m: FarmMob | undefined;
   let where: MobWhere | null = null;
-  if ('mob' in a.to) {
-    m = j.mob(a.to.mob);
-    if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
-  } else {
-    if (!isCell(a.to.cell)) return refuse('bad-request', 'That square is off the farm.');
-    where = { kind: 'paddock', anchor: placeAnchor(s, s.topology.areaOf[a.to.cell]!) };
+  if (!clocked) {
+    const to = a.to!;
+    if ('mob' in to) {
+      m = j.mob(to.mob);
+      if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+    } else {
+      if (!isCell(to.cell)) return refuse('bad-request', 'That square is off the farm.');
+      where = { kind: 'paddock', anchor: placeAnchor(s, s.topology.areaOf[to.cell]!) };
+    }
   }
   const rng = rngFromState(farm.rng.buying);
   const list = makeSaleBatch(farm.animalIds, rng, a.cls as SaleClassId, a.qty);
@@ -281,6 +314,22 @@ function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   const total = price + units * HEAD_FEE + (unitFreight ? units * unitFreight : 0);
   const no = j.bankSays(total, 'cattle');
   if (no) return no;
+  if (clocked) {
+    // Paid for now, in the yards at first light tomorrow. Not on any ground until then.
+    const arriveDay = farm.day + 1;
+    farm.arrivals.push({ arriveDay, cls: a.cls as SaleClassId, cost: total, animals: list });
+    farm.year.buys += total;
+    j.events.push({
+      type: 'cattle-on-the-way',
+      cls: a.cls as SaleClassId,
+      qty: a.qty,
+      total,
+      indicator: prices.indicator,
+      arriveDay,
+      arriveDate: dateOn(farm, arriveDay),
+    });
+    return null;
+  }
   if (!m) m = newMob(farm, where!);
   for (const b of list) m.animals.push(b);
   farm.year.buys += total;
@@ -307,10 +356,17 @@ function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   return null;
 }
 
-/** Sell a list of animals. Calves at foot go with their mothers. */
-function sell(j: Job, list: readonly Animal[]): Out {
-  const { farm } = j;
-  if (!list.length) return refuse('nothing-to-sell', 'There are no cattle there to sell.');
+/**
+ * Sell a list of animals at today's price, on a farm that may be changed
+ * freely. Calves at foot go with their mothers. Reports the sale in
+ * `events`. The list must not be empty.
+ */
+export function sellList(
+  farm: FarmState,
+  list: readonly Animal[],
+  events: FarmEvent[],
+  booked = false,
+): void {
   const prices = pricesOf(farm);
   const all = animalLookup(farm.mobs);
   const gone = new Set<number>();
@@ -349,14 +405,123 @@ function sell(j: Job, list: readonly Animal[]): Out {
   farm.cash += net;
   farm.year.sales += net;
   farm.mobs = farm.mobs.filter((m) => m.animals.length);
-  j.events.push({
+  events.push({
     type: 'cattle-sold',
+    ...(booked ? { booked: true as const } : {}),
     head: n,
     calvesAtFoot: atFoot,
     avgKg: Math.round(kg / n),
     net,
     profit,
   });
+}
+
+/** What selling does today: sell now, or book onto the next sale. */
+type SalePlan = { kind: 'sell' } | { kind: 'book'; sale: FarmSaleDay };
+
+/**
+ * On the farm clock, stock is sold today if today is a sale day and
+ * booked onto the next sale if it is not. Without the clock it is always
+ * sold at once.
+ */
+function salePlan(j: Job): SalePlan | ActionRefusal {
+  if (!j.part.clocked || saleDayOn(j.farm, j.env)) return { kind: 'sell' };
+  const sale = nextSaleDay(j.farm, j.env);
+  if (!sale) {
+    return refuse(
+      'not-a-sale-day',
+      'There is no cattle sale in the next few months to book these cattle onto.',
+    );
+  }
+  return { kind: 'book', sale };
+}
+
+/** Tag numbers already booked onto a sale. */
+function bookedIds(farm: Pick<FarmState, 'saleBookings'>): Set<number> {
+  const out = new Set<number>();
+  for (const b of farm.saleBookings) for (const id of b.animalIds) out.add(id);
+  return out;
+}
+
+/** What is done with a list of animals: sold, or booked onto the next sale. */
+function settle(j: Job, plan: SalePlan, list: readonly Animal[]): Out {
+  if (plan.kind === 'sell') return sell(j, list);
+  return book(j, plan.sale, list);
+}
+
+/** Book animals onto a sale. Nothing is paid and the stock stay where they are. */
+function book(j: Job, sale: FarmSaleDay, list: readonly Animal[]): Out {
+  const { farm } = j;
+  if (!list.length) return refuse('nothing-to-sell', 'There are no cattle there to sell.');
+  const already = bookedIds(farm);
+  const fresh = list.filter((a) => !already.has(a.id));
+  if (!fresh.length) {
+    return refuse(
+      'nothing-to-sell',
+      `Those cattle are already booked onto the sale on ${saleDayText(farm, sale)}.`,
+    );
+  }
+  const all = animalLookup(farm.mobs);
+  const seen = new Set<number>();
+  let head = 0;
+  let atFoot = 0;
+  for (const a of fresh) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+    head++;
+    const c = a.calf ? all.get(a.calf) : undefined;
+    if (c && !seen.has(c.id)) {
+      seen.add(c.id);
+      atFoot++;
+    }
+  }
+  const mine = farm.saleBookings.find((b) => b.saleDay === sale.day);
+  const ids = new Set<number>(mine ? mine.animalIds : []);
+  for (const a of fresh) ids.add(a.id);
+  const animalIds = Int32Array.from([...ids].sort((x, y) => x - y));
+  if (mine) mine.animalIds = animalIds;
+  else farm.saleBookings.push({ saleDay: sale.day, animalIds });
+  j.events.push({
+    type: 'sale-booked',
+    head,
+    calvesAtFoot: atFoot,
+    saleDay: sale.day,
+    saleDate: sale.date,
+    daysAway: sale.day - farm.day,
+  });
+  return null;
+}
+
+/** Sell a list of animals. Calves at foot go with their mothers. */
+function sell(j: Job, list: readonly Animal[]): Out {
+  if (!list.length) return refuse('nothing-to-sell', 'There are no cattle there to sell.');
+  sellList(j.farm, list, j.events);
+  return null;
+}
+
+function cancelSale(j: Job, a: Extract<Action, { type: 'cancelSale' }>): Out {
+  const { farm } = j;
+  if (a.ids !== undefined && !Array.isArray(a.ids)) {
+    return refuse('bad-request', 'No cattle were picked.');
+  }
+  const pick = a.ids === undefined ? null : new Set<number>(a.ids);
+  let head = 0;
+  let saleDay = -1;
+  for (const b of farm.saleBookings) {
+    const keep: number[] = [];
+    for (const id of b.animalIds) {
+      if (pick === null || pick.has(id)) {
+        head++;
+        if (saleDay < 0) saleDay = b.saleDay;
+      } else keep.push(id);
+    }
+    b.animalIds = Int32Array.from(keep);
+  }
+  if (!head) {
+    return refuse('nothing-booked', 'None of those cattle are booked onto a sale.');
+  }
+  farm.saleBookings = farm.saleBookings.filter((b) => b.animalIds.length > 0);
+  j.events.push({ type: 'sale-cancelled', head, saleDay, saleDate: dateOn(farm, saleDay) });
   return null;
 }
 
@@ -373,7 +538,9 @@ function sellAnimals(j: Job, a: Extract<Action, { type: 'sellAnimals' }>): Out {
     if (!x) return refuse('no-such-animal', `Tag ${String(id)} is not on the farm.`);
     list.push(x);
   }
-  return sell(j, list);
+  const plan = salePlan(j);
+  if ('ok' in plan) return plan;
+  return settle(j, plan, list);
 }
 
 function sellGroup(j: Job, a: Extract<Action, { type: 'sellGroup' }>): Out {
@@ -382,23 +549,33 @@ function sellGroup(j: Job, a: Extract<Action, { type: 'sellGroup' }>): Out {
   if (!Object.hasOwn(GROUPS, a.group) || !isCount(a.qty)) {
     return refuse('bad-request', 'Pick a class and how many to sell.');
   }
-  const pool = m.animals.filter((x) => x.kind !== 'calf' && groupKey(x) === a.group);
+  const plan = salePlan(j);
+  if ('ok' in plan) return plan;
+  const taken = plan.kind === 'book' ? bookedIds(j.farm) : new Set<number>();
+  const pool = m.animals.filter(
+    (x) => x.kind !== 'calf' && groupKey(x) === a.group && !taken.has(x.id),
+  );
   if (a.group === 'steer' || a.group === 'heifer' || a.group === 'heiferP') pool.sort(byWeight);
   else pool.sort(byCondThenAge);
-  return sell(j, pool.slice(0, a.qty));
+  return settle(j, plan, pool.slice(0, a.qty));
 }
 
 function sellClass(j: Job, a: Extract<Action, { type: 'sellClass' }>): Out {
   if (!Object.hasOwn(MARKET_CLASSES, a.cls) || !isCount(a.qty)) {
     return refuse('bad-request', 'Pick a class and how many to sell.');
   }
+  const plan = salePlan(j);
+  if ('ok' in plan) return plan;
+  const taken = plan.kind === 'book' ? bookedIds(j.farm) : new Set<number>();
   const pool: Animal[] = [];
   for (const m of j.farm.mobs) {
-    for (const x of m.animals) if (x.kind !== 'calf' && marketClass(x) === a.cls) pool.push(x);
+    for (const x of m.animals) {
+      if (x.kind !== 'calf' && marketClass(x) === a.cls && !taken.has(x.id)) pool.push(x);
+    }
   }
   if (a.cls === 'cow' || a.cls === 'bull') pool.sort(byCondThenAge);
   else pool.sort(byWeight);
-  return sell(j, pool.slice(0, a.qty));
+  return settle(j, plan, pool.slice(0, a.qty));
 }
 
 /** True if a mob is already where `where` would put it. */
@@ -978,6 +1155,8 @@ function run(j: Job, a: Action): Out {
       return sellGroup(j, a);
     case 'sellClass':
       return sellClass(j, a);
+    case 'cancelSale':
+      return cancelSale(j, a);
     case 'moveMob':
       return moveMob(j, a);
     case 'moveCattle':

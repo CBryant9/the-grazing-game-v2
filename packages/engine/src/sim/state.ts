@@ -10,9 +10,9 @@
 
 import type { DistrictId } from '@gg/shared';
 import type { FarmStart } from '../calendar';
-import type { AnimalIds, CattleMob } from '../cattle/types';
+import type { Animal, AnimalIds, CattleMob } from '../cattle/types';
 import type { CropState } from '../crops/fields';
-import type { MarketClassId } from '../data/cattle';
+import type { MarketClassId, SaleClassId } from '../data/cattle';
 import type { FarmBuildings, StartType } from '../farm/generate';
 import type { FarmLayout } from '../farm/layout';
 import type { RealMarket } from '../market/realMarket';
@@ -31,7 +31,11 @@ export type MobWhere =
   /** In the feedlot, on the ration. */
   | { kind: 'lot' }
   /** In the stock yards, where bought cattle arrive. They have water. The player moves stock out to a paddock. */
-  | { kind: 'yards' };
+  | {
+      kind: 'yards';
+      /** The farm day the mob came to the yards. Left out on a mob put there before this was kept. */
+      since?: number;
+    };
 
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
 export interface FarmMob extends CattleMob {
@@ -41,6 +45,32 @@ export interface FarmMob extends CattleMob {
   where: MobWhere;
   /** The farm day the mob last pushed through tape, or null. */
   lastBreak: number | null;
+}
+
+/**
+ * Cattle that were bought on a sale day and are on their way to the yards.
+ * They are paid for and on the farm's books at what was paid. They graze
+ * nothing and can not die. They land at first light on `arriveDay`.
+ */
+export interface Arrival {
+  /** The farm day they land in the yards. */
+  arriveDay: number;
+  cls: SaleClassId;
+  /** Dollars paid, freight included. */
+  cost: number;
+  /** The cattle, with their tag numbers already given. */
+  animals: Animal[];
+}
+
+/**
+ * Cattle booked onto a sale day, by tag number. At first light on
+ * `saleDay` those still alive and still on the farm are sold at that day's
+ * price. There is one booking for each sale day.
+ */
+export interface SaleBooking {
+  saleDay: number;
+  /** Tag numbers, smallest first. A whole-number array, so a save keeps it small. */
+  animalIds: Int32Array;
 }
 
 /** The running totals for a farm year. The first five are the cattle step's totals. */
@@ -296,6 +326,10 @@ export interface FarmState {
   animalIds: AnimalIds;
   /** The id the next mob gets. */
   nextMobId: number;
+  /** Cattle bought on a sale day and not yet in the yards. Empty when none are on the way. */
+  arrivals: Arrival[];
+  /** Stock booked onto a sale day. Empty when none is booked. */
+  saleBookings: SaleBooking[];
 
   seasons: SeasonSpec;
   market: MarketState;

@@ -18,6 +18,7 @@ import type { StartImprovements } from '../farm/generate';
 import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
 import type { ActionType } from '../actions/types';
+import type { CalendarDate } from '../calendar';
 import type { GameOverReason, MobWhere, YearRecord } from './state';
 
 /** Where a mob is, with the grazing area's name when it is on pasture. */
@@ -91,8 +92,37 @@ export type ActionEvent =
       mob: number;
       mobName: string;
     }
+  /**
+   * Cattle bought on a sale day. They are paid for and on their way. They
+   * land in the yards at first light on `arriveDay`.
+   */
+  | {
+      type: 'cattle-on-the-way';
+      cls: SaleClassId;
+      qty: number;
+      /** Dollars, freight included. */
+      total: number;
+      /** The young cattle indicator on the day, c/kg. */
+      indicator: number;
+      arriveDay: number;
+      arriveDate: CalendarDate;
+    }
+  /** Stock booked onto the next sale. Nothing is paid until that day. */
+  | {
+      type: 'sale-booked';
+      /** Head booked, not counting calves at foot. */
+      head: number;
+      calvesAtFoot: number;
+      saleDay: number;
+      saleDate: CalendarDate;
+      daysAway: number;
+    }
+  /** Stock taken off a sale. */
+  | { type: 'sale-cancelled'; head: number; saleDay: number; saleDate: CalendarDate }
   | {
       type: 'cattle-sold';
+      /** True for stock sold at first light on the sale day they were booked onto. */
+      booked?: true;
       /** Head sold, not counting calves at foot. */
       head: number;
       /** Calves that went with their mothers. */
@@ -159,6 +189,26 @@ export type ActionEvent =
     }
   | WorkEvent;
 
+/**
+ * Events from the start of a farm day, before the player can act: cattle
+ * landing in the yards. A booked sale reports as a `cattle-sold` event with
+ * `booked: true`.
+ */
+export type DawnEvent = {
+  type: 'cattle-arrived';
+  cls: SaleClassId;
+  /** Head, not counting calves at foot. */
+  head: number;
+  calves: number;
+  /** Dollars paid, freight included. */
+  cost: number;
+  /** The mob in the yards they are in now. */
+  mob: number;
+  mobName: string;
+  /** True when they joined a mob that was already in the yards. */
+  joined: boolean;
+};
+
 /** Events from the working day. */
 export type WorkEvent =
   /**
@@ -204,4 +254,4 @@ export interface FarmStarted {
   season: { label: string; factor: number };
 }
 
-export type FarmEvent = FarmStarted | TickEvent | ActionEvent;
+export type FarmEvent = FarmStarted | TickEvent | ActionEvent | DawnEvent;

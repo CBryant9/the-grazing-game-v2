@@ -7,6 +7,7 @@ import {
   down,
   farmWithCropReady,
   setUp,
+  toSaleDay,
   turnedDown,
   withLightLeft,
   work,
@@ -433,13 +434,12 @@ describe('the job card and the job agree, for every kind of action', () => {
     expect(fallow.length).toBeGreaterThan(4);
 
     // Every kind of action, each on a farm where it can be done.
+    // Cattle can be bought on a sale day only. Selling on a day with no sale books the stock onto the next.
+    const saleDay = toSaleDay(b.farm);
+    const booked = work(b.farm, { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 4 }).farm;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
-      buyCattle: [
-        {
-          farm: b.farm,
-          action: { type: 'buyCattle', cls: 'yearSteer', qty: 5, to: { cell: b.emptyCell } },
-        },
-      ],
+      buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
+      cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
       sellAnimals: [
         {
           farm: b.farm,
@@ -518,8 +518,8 @@ describe('the job card and the job agree, for every kind of action', () => {
       sow: [{ farm: june, action: { type: 'sow', species: 'barley', cells: fallow } }],
       harvest: [{ farm: ready.farm, action: { type: 'harvest', field: ready.field } }],
     };
-    // 29 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(29);
+    // 30 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(30);
 
     const outcomes = new Set<string>();
     let refusals = 0;

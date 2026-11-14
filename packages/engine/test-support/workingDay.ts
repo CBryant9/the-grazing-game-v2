@@ -15,6 +15,8 @@ import type { CreateFarmOptions } from '../src/sim/create';
 import { surveyOf } from '../src/sim/derived';
 import { cloneFarm, type FarmState } from '../src/sim/state';
 import { stepDay } from '../src/sim/tick';
+import { endDay } from '../src/day/days';
+import { saleDayOn } from '../src/sim/derived';
 import { applyInstantly } from './instant';
 import { openFarm } from './wholeFarm';
 
@@ -64,6 +66,19 @@ export const cell = (x: number, y: number): number => y * GRID_W + x;
 export function boreXY(farm: FarmState): [number, number] {
   const b = farm.layout.water.bore;
   return [b % GRID_W, Math.floor(b / GRID_W)];
+}
+
+/**
+ * Run the days on, by Next day, to the next cattle sale day (today, if it is one),
+ * and give the farm at first light that day. Stops after 40 days with an error.
+ */
+export function toSaleDay(farm: FarmState, env: ActionEnv = {}): FarmState {
+  let f = farm;
+  for (let i = 0; i < 40; i++) {
+    if (saleDayOn(f, env)) return f;
+    f = endDay(f, env).farm;
+  }
+  throw new Error('no sale day in 40 days');
 }
 
 /** Use up today's light, as if the player had worked until last light where they stand. */

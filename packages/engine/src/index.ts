@@ -459,13 +459,21 @@ export type {
 } from './market/realPrices';
 export { REAL_PRICE_DOLLARS, realMarket, realPricesOn } from './market/realMarket';
 export type { PriceDollars, RealMarket, RealMarketOptions } from './market/realMarket';
-export { CATTLE_SALE_STAND_INS, STAND_IN_BREAK, buildSaleCalendar } from './market/saleCalendar';
+export {
+  CATTLE_SALE_STAND_INS,
+  RANDOM_SEASON_SALE_WEEKDAY,
+  STAND_IN_BREAK,
+  buildSaleCalendar,
+  weekdayOf,
+  weeklySaleOn,
+} from './market/saleCalendar';
 export type { SaleCalendar, SaleDay, SaleType, StandInStretch } from './market/saleCalendar';
 export { RAW_TABLE_PATHS, buildRealData, districtTablePaths, tablesVersion } from './real/realData';
 export type { DistrictRealData, RawTableReader, RealData } from './real/realData';
 
 export { INBOX_LIMIT, PLAY_STREAMS, PRICE_HISTORY_DAYS, cloneFarm, emptyLedger } from './sim/state';
 export type {
+  Arrival,
   FarmMob,
   FarmState,
   GameOverReason,
@@ -477,6 +485,7 @@ export type {
   PlayStream,
   PriceDay,
   RealYearsSpec,
+  SaleBooking,
   SeasonSpec,
   YearRecord,
   YearScore,
@@ -484,6 +493,7 @@ export type {
 } from './sim/state';
 export type {
   ActionEvent,
+  DawnEvent,
   FarmEvent,
   FarmStarted,
   MobPlaceNote,
@@ -577,5 +587,6 @@ export type {
   SkipResult,
   SkipStop,
 } from './day/days';
-export { SHORTEST_JOB_MIN, clockView, jobsToday, thingsToDo } from './day/look';
+export { SHORTEST_JOB_MIN, clockView, jobsToday, marketView, thingsToDo } from './day/look';
+export type { BookedView, MarketView, OnTheWayView, SaleDayView } from './day/look';
 export type { ClockView, ThingToDo } from './day/look';

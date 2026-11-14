@@ -419,7 +419,7 @@ The restocker steer indicator at Dubbo, yearly average, c/kg, as reported and in
 
 ### Sale calendars (milestone 1.4)
 
-For each district's cattle yard the engine answers "is there a cattle sale on this real date, and of what type" (`packages/engine/src/market/saleCalendar.ts`). Booking stock onto a sale and delivery are milestone 1.5.
+For each district's cattle yard the engine answers "is there a cattle sale on this real date, and of what type" (`packages/engine/src/market/saleCalendar.ts`). Booking stock onto a sale and delivery of bought cattle to the yards are built (milestone 1.5b: docs/MODEL.md, section 9).
 
 - **Source:** `mla/yardings/<yard>-cattle.csv`, the yardings report as served: one row for each sale type on a day, `Prime` or `Store`, with the head yarded. `mla/sales/<yard>-cattle.csv` is the same days with the types added together. A test checks that every day in the sales table is a sale day in the calendar with the same head, and that no other day is unless it is a stand-in.
 - **A sale day** has its date, its types (prime first), the head yarded and whether it is a stand-in.
@@ -439,6 +439,17 @@ For each district's cattle yard the engine answers "is there a cattle sale on th
 - Public holidays are not allowed for.
 - A real record inside a stand-in stretch stops the build, so a stand-in can never cover up a real sale day.
 - Armidale and Dubbo have records for every year from 1997 and nothing there is a stand-in.
+
+**A farm with random seasons has no real years to read, so it has a weekly sale of its own** (milestone 1.5b: `RANDOM_SEASON_SALE_WEEKDAY` in `market/saleCalendar.ts`). A prime sale every week at its district's yard on the weekday below, with no sale from 16 December to 7 January (the same `STAND_IN_BREAK`). **Builder's choice, for Claudia.** Each weekday is the one that yard sold on in its most recent records, from "Sale days pulled" above.
+
+| District | Yard | Weekday | Where it comes from |
+|---|---|---|---|
+| Central Queensland (`cq`) | Gracemere | Wednesday | Prime sales on Wednesdays from 2020 |
+| Northern Tablelands (`nsw`) | Armidale | Thursday | Prime sales on Thursdays |
+| Central West (`cw`) | Dubbo | Thursday | Prime sales on Thursdays only, from 2005 |
+| Western Victoria (`wv`) | Mortlake | Monday | Prime sales on Mondays |
+
+The days are in the game's own calendar. Public holidays are not allowed for. No head count and no store sales, as for a stand-in.
 
 ### The data version (milestone 1.4)
 

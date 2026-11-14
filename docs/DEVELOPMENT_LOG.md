@@ -734,6 +734,35 @@ After the realism check (same milestone, before the push):
 - **Joined to the real-years line:** the view now reports the real date and the light for that date on a real-year farm.
 - Joined to the farm clock (1.5a): the homestead is gone from the view and the map, the yards stay, and the view's version is 3.
 
+### 14 Nov 2026: milestone 1.5b, sale days and the yards
+
+Engine 0.8.0, save format 5. Engine work only, no screens. Branch `m1.5b-sale-days`, on top of `m1.6b-map-on-clock`. The second part of milestone 1.5 ("The working day"). The rules as built are in docs/MODEL.md, section 9, "Buying and selling on sale days".
+
+Built, all in `packages/engine`:
+
+- **A sale calendar for every farm.** `saleDayOn` and `nextSaleDay` work for a farm with random seasons too: a weekly prime sale on a set weekday for its district, none from 16 December to 7 January. A real-year farm reads the yard's real days, as before. `marketView(farm, env)` is the read-only view for a screen.
+- **Buying only on a sale day.** On any other day the buy is refused with the next sale named. On a sale day the money is spent at once and the cattle arrive in the stock yards at first light the next day, joining the mob already there if there is one. Until then they are on the books (`farm.arrivals`) at what was paid. `thingsToDo` lists `in-yards` for a mob there, with its head and days there. The player moves it out with `moveMob`.
+- **Selling books onto the next sale** on a day with no sale. Nothing is paid and the stock stay and graze. At first light on the sale day the booked stock still on the farm sells at that day's price with the usual costs. `cancelSale` takes stock off. The selling time is spent on the day the player asks.
+- **First light is one function** (`day/dawn.ts`), called by `endDay` and `skipDays` for each new day. The daily tick is untouched. A skip does not stop for a sale day. The period summary reports `arrived` and `bookedSold`.
+- **Saves:** format 5. `farm.arrivals` and `farm.saleBookings` are saved and hashed. Older saves load with none.
+- Net worth counts cattle on their way at what was paid.
+
+How it was tested: `day/saleDays.test.ts` (23 tests) covers the calendar for both kinds of farm, the refusal and the card, the buy, the landing, the yards item and moving out, two buys in one mob, a sale day and a booked sale worked out with the engine's own valuing function, a booked animal that died, cancelling, skips against stepping, save and load at every step, the instant path, and looking being free. `marketView` is in the "looking is free" list in `day/clock.test.ts`. Existing tests that bought or sold on the clock on a day with no sale were changed to do it on a sale day, or to expect a booking (`day/jobs.test.ts`, `day/jobTimes.test.ts`, `day/clock.test.ts`, `day/saves.test.ts`, `sim/realYears.test.ts`). No expected figure in the calibration or comparison suites changed, and they pass untouched. Break-it checks are listed in the report to the lead.
+
+Not done:
+
+- Cattle left in the yards need nothing yet: no hay, and no rule that they go hungry (PRD 5.13 proposed "after one day").
+- Store and prime sales are not told apart: any sale day takes any cattle, and a real-year farm's store-only days count as sale days.
+- Nothing limits the head that can be booked, and no commission differs for a booked sale.
+- No screens: the market, the yards item and the booking mark are for Stage 1's game screens.
+
+Questions for Claudia:
+
+1. **Buy only on a sale day, or any day?** Built: only on a sale day, with the next one named. Or any day, with the cattle arriving the next morning?
+2. **Book a sale ahead, or sell only on the day?** Built: on a day with no sale the stock is booked onto the next one and sold at first light that day at that day's price, and can be cancelled. Or only sell on the sale day?
+3. **Should cattle left in the yards need hay?** PRD 5.13 proposed "after one day". Built: they have water and graze the yards' own square, and nothing else.
+4. **The weekdays for farms not playing real years.** Built: Central Queensland Wednesday, Northern Tablelands Thursday, Central West Thursday, Western Victoria Monday, each the day its yard sold on most recently. Right?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

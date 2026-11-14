@@ -64,11 +64,22 @@ export function stockWorth(farm: Pick<FarmState, 'mobs'>, prices: Prices): numbe
 }
 
 /**
+ * What was paid for cattle bought and not yet in the yards. They are
+ * counted at what was paid until they land, then at net sale value.
+ */
+export function arrivalsWorth(farm: Pick<FarmState, 'arrivals'>): number {
+  let v = 0;
+  for (const a of farm.arrivals) v += a.cost;
+  return v;
+}
+
+/**
  * Net worth: cash, plus 80% of what has been spent on infrastructure still
- * in place, plus the cattle at net sale value.
+ * in place, plus the cattle at net sale value, plus what was paid for
+ * cattle on their way to the yards.
  */
 export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): number {
-  let v = farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE;
+  let v = farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm);
   for (const m of farm.mobs) for (const a of m.animals) v += Math.max(0, netSaleValue(a, prices));
   return v;
 }
@@ -83,7 +94,7 @@ export function netWorthParts(farm: FarmState): {
   const prices = pricesOf(farm);
   return {
     cash: farm.cash,
-    stock: stockWorth(farm, prices),
+    stock: stockWorth(farm, prices) + arrivalsWorth(farm),
     infrastructure: infraInPlace(farm) * INFRA_WORTH_SHARE,
     total: netWorth(farm, prices),
   };
