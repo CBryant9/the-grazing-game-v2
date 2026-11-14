@@ -128,6 +128,7 @@ export function sampleView(): FarmView {
       pipeDry: [],
       troughs: [{ kind: 'fixed', cell: cell(5, 5), id: 0, levelPct: 100 }],
       hubs: [],
+      squareHubs: [],
     },
     trees: [],
     buildings: [{ kind: 'yards', cell: cell(2, 22) }],

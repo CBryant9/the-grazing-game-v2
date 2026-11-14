@@ -18,6 +18,7 @@ const view = {
       { kind: 'portable', cell: 60, id: 3, levelPct: 40 },
     ],
     hubs: [],
+    squareHubs: [],
   },
 } as unknown as FarmView;
 

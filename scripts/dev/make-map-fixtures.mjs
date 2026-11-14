@@ -55,11 +55,14 @@ registerHooks({
 
 const {
   applyAction,
+  classOf,
   createFarm,
+  endDay,
   farmTotals,
   farmView,
   hEdge,
   knockDownTape,
+  saleDayOn,
   stepDay,
   surveyOf,
   vEdge,
@@ -93,6 +96,47 @@ function act(farm, action) {
   return farm;
 }
 
+/**
+ * Buy cattle and put them where each buy's `to` says. Cattle are bought on a
+ * sale day only and land in the stock yards at first light the next day, so
+ * this runs days up to the next sale, makes every buy, runs one more day and
+ * moves each new mob out of the yards. Returns the farm, or null if a buy was
+ * refused and `must` is false.
+ */
+function buy(farm, actions, env = {}, must = true) {
+  const list = Array.isArray(actions) ? actions : [actions];
+  for (let d = 0; d < 21 && !saleDayOn(farm, env); d++) farm = endDay(farm, env).farm;
+  const bought = [];
+  for (const action of list) {
+    if (farm.clock) farm.clock.used = 0;
+    const rest = { ...action };
+    delete rest.to;
+    const done = applyAction(farm, rest, env);
+    if (!done.ok) {
+      if (must) throw new Error(`buyCattle was refused (${done.reason}): ${done.message}`);
+      return null;
+    }
+    farm = done.farm;
+    bought.push(new Set(farm.arrivals[farm.arrivals.length - 1].animals.map((a) => a.id)));
+  }
+  farm = endDay(farm, env).farm;
+  // Cattle landing on the same day join one mob in the yards: move each buy out by class.
+  list.forEach((action, i) => {
+    if (!action.to) return;
+    const mob = farm.mobs.find((m) => m.where.kind === 'yards');
+    if (!mob) return;
+    const counts = new Map();
+    for (const a of mob.animals) {
+      if (!bought[i].has(a.id) || a.kind === 'calf') continue;
+      const c = classOf(a);
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    const picks = [...counts].map(([cls, qty]) => ({ mob: mob.id, cls, qty }));
+    if (picks.length) farm = act(farm, { type: 'moveCattle', picks, to: action.to });
+  });
+  return farm;
+}
+
 function run(farm, days, env) {
   for (let d = 0; d < days && !farm.over; d++) stepDay(farm, env);
   return farm;
@@ -120,13 +164,13 @@ function stockUp(farm, target, perArea) {
   for (const r of s.topology.areas) {
     if (farmTotals(farm).head > target) break;
     if (!s.points.areaTroughs[r.id].length) continue;
-    const done = applyAction(farm, {
-      type: 'buyCattle',
-      cls: 'weanerSteer',
-      qty: perArea,
-      to: { cell: r.cells[0] },
-    });
-    if (done.ok) farm = done.farm;
+    const done = buy(
+      farm,
+      { type: 'buyCattle', cls: 'weanerSteer', qty: perArea, to: { cell: r.cells[0] } },
+      {},
+      false,
+    );
+    if (done) farm = done;
   }
   return farm;
 }
@@ -345,12 +389,17 @@ const FIXTURES = [
         farm = act(farm, { type: 'buildFence', edges, fence: 'tape' });
       }
       farm = act(farm, { type: 'placePortable', cell: cellAt(x0 + 1, y0 + 2) });
+      // A second, dry box for a small mob: the "no water" case.
+      const dryX = x0 < W / 2 ? x0 + 12 : x0 - 8;
       farm = act(farm, {
-        type: 'buyCattle',
-        cls: 'yearSteer',
-        qty: 120,
-        to: { cell: cellAt(x0 + 1, y0 + 3) },
+        type: 'buildFence',
+        edges: boxEdges(dryX, y0 + 12, dryX + 3, y0 + 14),
+        fence: 'electric',
       });
+      farm = buy(farm, [
+        { type: 'buyCattle', cls: 'yearSteer', qty: 120, to: { cell: cellAt(x0 + 1, y0 + 3) } },
+        { type: 'buyCattle', cls: 'dryCow', qty: 24, to: { cell: cellAt(dryX + 1, y0 + 13) } },
+      ]);
       // A gate into the box, and an electric fence with two gates beside it.
       farm = act(farm, { type: 'placeGate', edge: hEdge(y0 + 6, x0 + 1) });
       const ey = y0 + 9;
@@ -375,16 +424,6 @@ const FIXTURES = [
         type: 'placeFenceHub',
         vertex: by * (W + 1) + bx + dir * 2 + (dir < 0 ? 1 : 0),
       });
-      // A second, dry box with a small mob in it: the "no water" case.
-      const dryX = x0 < W / 2 ? x0 + 12 : x0 - 8;
-      farm = act(farm, {
-        type: 'buildFence',
-        edges: boxEdges(dryX, y0 + 12, dryX + 3, y0 + 14),
-        fence: 'electric',
-      });
-      farm = act(farm, { type: 'buyCattle', cls: 'dryCow', qty: 24, to: { cell: bore } });
-      const cows = farm.mobs[farm.mobs.length - 1];
-      farm = act(farm, { type: 'moveMob', mob: cows.id, to: { cell: cellAt(dryX + 1, y0 + 13) } });
       // One day: the steers drink the portable trough down, and the cows go a day without water.
       run(farm, 1);
       // One length of the middle tape lying down.

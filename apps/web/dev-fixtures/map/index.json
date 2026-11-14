@@ -9,7 +9,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 2,
-    "bytes": 40624
+    "bytes": 40640
   },
   {
     "name": "cq-large-running",
@@ -21,7 +21,7 @@
     "calves": 265,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 43913
+    "bytes": 43909
   },
   {
     "name": "nsw-small-running",
@@ -33,7 +33,7 @@
     "calves": 13,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 42865
+    "bytes": 42862
   },
   {
     "name": "nsw-large-scratch",
@@ -45,7 +45,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 41214
+    "bytes": 41230
   },
   {
     "name": "cw-small-scratch",
@@ -57,7 +57,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 40057
+    "bytes": 40073
   },
   {
     "name": "cw-large-running",
@@ -69,7 +69,7 @@
     "calves": 259,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 44620
+    "bytes": 44636
   },
   {
     "name": "wv-small-running",
@@ -81,7 +81,7 @@
     "calves": 8,
     "mobs": 2,
     "paddocks": 4,
-    "bytes": 42811
+    "bytes": 42807
   },
   {
     "name": "wv-large-scratch",
@@ -93,7 +93,7 @@
     "calves": 0,
     "mobs": 0,
     "paddocks": 1,
-    "bytes": 41446
+    "bytes": 41462
   },
   {
     "name": "cw-mixed-crops",
@@ -105,7 +105,7 @@
     "calves": 110,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 43506
+    "bytes": 43522
   },
   {
     "name": "cq-dry-season",
@@ -117,7 +117,7 @@
     "calves": 238,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 40614
+    "bytes": 40629
   },
   {
     "name": "wv-green-season",
@@ -129,7 +129,7 @@
     "calves": 34,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 42585
+    "bytes": 42602
   },
   {
     "name": "nsw-tape-cells",
@@ -141,7 +141,7 @@
     "calves": 0,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 42300
+    "bytes": 42320
   },
   {
     "name": "cq-4000-head",
@@ -149,10 +149,10 @@
     "note": "The speed test farm: a running station topped up with steers on every watered paddock.",
     "district": "cq",
     "farmHa": 12000,
-    "head": 4141,
+    "head": 4137,
     "calves": 268,
     "mobs": 3,
     "paddocks": 3,
-    "bytes": 43174
+    "bytes": 43414
   }
 ]

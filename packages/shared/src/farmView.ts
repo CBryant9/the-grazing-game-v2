@@ -17,7 +17,7 @@ import type { DistrictId, PaddockLabelId } from './index';
  * The version of the view's shape. It goes up whenever a field is added,
  * removed or changes meaning, so a browser holding an old map can tell.
  */
-export const FARM_VIEW_VERSION = 3;
+export const FARM_VIEW_VERSION = 4;
 
 /** Every farm is this many squares, whatever its size in hectares. */
 export const FARM_GRID_W = 40;
@@ -149,10 +149,9 @@ export interface FarmViewWater {
   /**
    * Water hubs on a square, by square: a fixed trough with a gate on every
    * side that is not the boundary. Each is in `troughs` too, as a fixed
-   * trough. The engine always fills this in. It is optional here only so a
-   * view made before it existed still type-checks.
+   * trough. Added in version 4.
    */
-  squareHubs?: number[];
+  squareHubs: number[];
 }
 
 /**

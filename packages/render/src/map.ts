@@ -172,6 +172,8 @@ export interface MapToolTapEvent extends MapPointerEvent {
   corner: Corner | null;
   /** True when a water hub stands on that corner. */
   hub: boolean;
+  /** True when the tapped square holds a water hub (a trough with a gate on every side). */
+  squareHub: boolean;
 }
 
 /** A tap on a fence that is down, in Look: it offers to put it back up. */
@@ -1123,12 +1125,16 @@ class PixiFarmMap implements FarmMap {
     this.fan = this.sprite('windmill.fan', bx, by - (tower.h * tower.ay - 34) / tower.ppu);
     boreRow.addChild(this.fan);
 
+    const squareHubs = new Set(view.water.squareHubs);
     for (const t of view.water.troughs) {
       const x = colOf(t.cell) + 0.5;
       const y = (rowOf(t.cell) + 0.7) * K;
       const things = at(rowOf(t.cell));
       if (t.kind === 'fixed') {
-        things.addChild(this.sprite('trough.fixed', x, y));
+        // A hub on a square is a trough with a gate on every side: drawn as a hub, so it reads as one.
+        if (squareHubs.has(t.cell))
+          things.addChild(this.sprite('hub', x, (rowOf(t.cell) + 0.5) * K));
+        else things.addChild(this.sprite('trough.fixed', x, y));
         continue;
       }
       things.addChild(this.sprite('trough.portable', x, y));
@@ -1666,6 +1672,7 @@ class PixiFarmMap implements FarmMap {
     );
     const corner = nearestCorner(this.cam, this.vp, x, y, TOUCH_PX);
     const hub = corner ? view.water.hubs.includes(cornerVertex(corner)) : false;
+    const squareHub = !!h && view.water.squareHubs.includes(h.square);
     const base: MapPointerEvent = h ?? {
       square: -1,
       col: -1,
@@ -1683,6 +1690,7 @@ class PixiFarmMap implements FarmMap {
       edgeDistPx: edge ? edge.distPx : Infinity,
       corner: corner ? { vx: corner.vx, vy: corner.vy } : null,
       hub,
+      squareHub,
     };
     for (const fn of this.handlers.toolTap) fn(e);
   }
