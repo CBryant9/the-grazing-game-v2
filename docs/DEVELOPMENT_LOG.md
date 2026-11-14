@@ -1132,6 +1132,35 @@ Branch `m2.3-sheep-model`, from `m2.1-hands-and-contractors` (fd01165), with `do
 
 **Not done.** Everything in MODEL section 12, "Not built yet": the market, setup choice, netting fence, shearing and crutching jobs and wool income, sheep supplements, sheep on the map (milestone 2.4). Speed is checked for cattle only (`pnpm test:speed`); a large sheep flock was not timed.
 
+### 15 Nov 2026: m2.3 Sheep model, second pass, and the engine half of m2.4
+
+Same branch. The hands review fixes (b4e8b75) merged in first. Engine 0.15.0, save format 11. Engine and docs only. Claudia was away: every open call below was made, built and is listed here for her.
+
+**Review fixes.** SB-53 back to the document's band (1.8 to 2.2%), measured on 100,000 ewes; every other band checked against the document. SB-43 tested on both breeds (first-cross a known open gap). One mob to a paddock holds by itself across species (breakouts both ways). Weaner deaths carry the cause `weaner`. The losing-weight note gives its reasons. One DSE figure (8.4). The unmarked figures named and listed in DATA. CALIBRATION says which rows pass by construction. Speed: sheep are records with head counts; the largest flock runs at 2.65 ms a day (before: about a second a day).
+
+**Built (engine half of 2.4).** Sheep feeding (lick, grain, hay); contractor shearing and crutching on dates with wool sold at shearing; sheep health costs and deaths in the year score; rams in and out with the joining; the sheep market (buy and sell at MLA indicators, sale days, freight); netting fence and sheep that get through cattle fences; the cattle, sheep or mix choice at setup with start flocks; reads for the screens (`sheepMarketRead`, `fenceKindsRead`, `nettingEdges`, `sheepYearRead`, and on `sheepMobsRead` the feed and the contractors' days).
+
+**Tested.** Every benchmark row as before, the Tablelands and Central West year rows un-skipped (with winter feeding); known open gaps as expected failures; rule tests for counts, feeding, contractors, the market, netting, breakouts, setup, the score and old saves; the sheep speed test.
+
+**Calls for Claudia (second pass), added to the list above:**
+
+18. **The Tablelands winter (the top grass question, C18).** Unfed ewes there lamb at CS 1.4 and 19% die, whatever the stocking. The grass model's native July and August give sheep 24 to 44 kg/ha green, about 1,000 kg/ha dead at 50% digestibility, ME 7.0, CP 5.5%. S57 says unimproved native pasture there carries 5 DSE/ha. The grass model was not changed; the year rows run with winter feeding. Evidence in CALIBRATION (15 Nov 2026, second pass).
+19. **One DSE figure, 8.4, for every display (C3).** `data/stocking.ts`. The cattle screens' DSE figures move by 5% (AE × 8.4, not × 8): `mobSummaries`, `farmTotals` and the paddock summary's DSE per ha. No cattle benchmark moved. To go back: set `DSE_PER_AE` to 8.
+20. **Breakouts across species.** Cattle never push into a paddock with sheep, sheep never into one with cattle; they take another fence or stay put. The other option was letting them box up together.
+21. **Sheep get through every cattle fence** (permanent, electric, tape) when hungry or thirsty, by the cattle rule and chance; only netting, gates and the boundary hold them. Gates holding sheep is a builder's call.
+22. **Joining dates sourced (C27 replaced):** Central West 5 January (June lambing), Tablelands 7 April (September lambing), Western Victoria 1 April. The NSW calendar's generic March joining was not used.
+23. **Shearing and crutching days** follow the joining: crutch 60 days before lambing, shear 80 days after (NSW calendar). The shed hands, classer and presser are not charged (only the 2024 award shearing and crutching rates).
+24. **Wool income** is its own line (`year.wool`); shearing, crutching and animal health go in running costs; sheep sales and purchases go in the cattle `sales` and `buys` lines.
+25. **Sheep deaths in the score** count as one DSE's share of a beast each (÷ 8.4), so a sheep farm's score is not swamped by lamb deaths.
+26. **Feeding** fills the energy gap up to Agriculture Victoria's full ration; the year benchmarks feed when CS falls under 2.7 (weaners under 50 g a day). Grain is charged at the game's pellet price and hay at its hay price (no dated feed prices were read).
+27. **Stand-ins:** netting $10 a metre (C26), rams $1,200, Merino breeding sheep at 1.5 times mutton value, sheep freight $3 a head, health $3.57 a head a year, grain protein 11%, a sheep lick at the cattle rule and cost ÷ 8.4, start flock 1.5 DSE a ewe, young sheep frame under 540 days, the bought-sheep defaults.
+28. **Refit:** adult deaths outside lambing 0.4% a year (was 0.8%), refitted to SB-43 when sheep became records.
+29. **Known open gaps** (expected failures, figures in their names): first-cross ewe deaths (SB-43) 4.2 to 4.7% against 2 to 4% (S67's 3.25% at lambing alone leaves no room); Western Victoria weaner deaths (SB-47) 1.65% against 2 to 6% (worms left out, C22).
+30. **SB-43's "never over 4.5%"** is held on the mean over the blocks, as every year band is; one 675-ewe block in eight went over.
+31. **Flystrike counts strikes**, so a ewe struck twice in a year counts twice (records do not keep which ewe).
+
+**Not done.** Real-year sheep prices (the indicators are pulled; the loader is not wired); booking sheep onto a later sale; Dubbo and Hamilton sheep sale days (the cattle calendar stands in); the marking job and its cost; the map and screens (another milestone). Timings were taken on a busy machine.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

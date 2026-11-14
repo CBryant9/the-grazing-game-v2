@@ -927,3 +927,37 @@ The game keeps the cattle rule (every sheep dies on day 4 without water). The 48
 
 - Making More From Sheep, chapter 3.2, "Manage the production system to meet market specifications" (no date): lambs dress at 45 to 50% hot standard carcase weight; Merino and Border Leicester × Merino lambs dress 1.5 to 3.5% below second-cross lambs; low-digestibility pasture can lower it by up to 3%. https://www.makingmorefromsheep.com.au/manual/module-3-market-focused-lamb-and-sheepmeat-production/chapter-3-2-manage-the-production-system-to-meet-market-specifications/
 - MLA, "Making the most of mutton" (July 2001, reprinted March 2005), table 3, p. 11: dressing percentage by fat score for Merinos 2 to 3 hours off feed with about 50 mm of wool, as in the table above; sheep dress at 35 to 50%, about 2% a fat score; crossbreds 1.5 to 3.5% above Merinos; shorn sheep higher, pregnant ewes lower. https://www.makingmorefromsheep.com.au/globalassets/mmfs/manual/module-3/mla_making-the-most-of-mutton.pdf (dated 2001: check against a current MLA figure before sheep are sold).
+
+## Sheep in the game (milestone 2.3 second pass and 2.4, engine half)
+
+Constants in `packages/engine/src/data/sheep.ts`, `data/sheepMarket.ts`, `data/stocking.ts` and `money/costs.ts`. Sources read on 15 Nov 2026 unless they are SHEEP_BENCHMARKS sources (S-numbers).
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| DSE to the AE, every display | 8.4 (the MVP's 8 kept as a record) | Sourced, call C3 | S1, S2 |
+| Joining start, Central West | 5 January (lambing from 1 June) | Sourced | NSW DPIRD, "Sheep \| Merino" climate vulnerability page (no date): June lambing is typical of the wheat-sheep zone. https://www.dpird.nsw.gov.au/dpi/climate/climate-vulnerability-assessment/commodity-pages/sheep-merino |
+| Joining start, Northern Tablelands | 7 April (lambing from 1 September) | Sourced | Same page: September lambing is typical of the high rainfall zone |
+| Joining start, Western Victoria | 1 April (lambing from 26 August) | Sourced | EverGraze Hamilton, S54: August to September lambing |
+| Crutching, shearing | 60 days before lambing starts; 80 days after | Sourced (my arithmetic) | NSW Government, "Sheep calendar of operations" (12 Nov 2025): crutch mid-June before an August lambing, shear in November. https://www.nsw.gov.au/regional-and-primary-industries/livestock/sheep/calendar |
+| Shearing, crutching rates | $381.58 a 100 sheep, $763.16 a 100 rams; full crutch $110.66 a 100 | Sourced, dated 2024 (C16) | S47 |
+| Wool price by micron | 17 µm 2,569 to 30 µm 605 c/kg clean | Sourced, dated stand-in (C20) | S53 |
+| Grain ration cap (wheat) | dry 0.54, late pregnancy 0.74, with lambs 1.07 kg a day; 12 MJ ME a kg; +10% each 5 kg over 45 kg | Sourced | Agriculture Victoria, "Drought Feeding and Management of Sheep" (CS 1717 V4), ch. 4, table 4.5. https://www.feedinglivestock.vic.gov.au/wp-content/uploads/2025/06/CS-1717-Drought-Feeding-and-Management-of-Sheep_V4_Chapter-4.pdf |
+| Hay ration cap | dry 0.77, late pregnancy 1.29, with lambs 1.71 kg a day; 8.5 MJ ME a kg (46 MJ ÷ 5.4 kg, my arithmetic) | Sourced | Same table |
+| Young sheep fed for growth | 50 g a day | Sourced | MMFS ch. 10.4, S17 |
+| Grain protein; grain and hay prices | 11%; the game's pellet ($0.50/kg) and hay ($0.28/kg) prices | Stand-in | No dated feed price read (only search summaries) |
+| Sheep lick | the cattle lick's rule, at the cattle cost a head ÷ 8.4 | Stand-in | No sheep lick intake or price read |
+| Winter feeding in the year benchmarks | grain while a mob's CS is under 2.7 (to 2.9); weaners while under 50 g a day (to 70) | Sourced targets, the harness's management | S18 (CS 2.7+ joining to lambing), S17 |
+| MLA national sheep indicators, c/kg cwt | light lamb 1,152.61; trade 1,169.05; heavy 1,156.65; Merino lamb 1,083.55; restocker 1,259.4; mutton 872.92 | Sourced, dated 12 Nov 2026 | MLA statistics service tables in the repo, `packages/engine/data/raw/mla/national/*.csv` (`pnpm data:mla`) |
+| First-cross ewes, 1.5 years | $556 a head | Sourced | MLA, "Weekly cattle and sheep market wrap", 13 Nov 2026 (Bendigo First X Blue Ribbon sale, 6 Nov 2026) |
+| Merino breeding ewes and wethers | mutton value × 1.5 | Stand-in | No Online Sheep (AuctionsPlus) figure read |
+| Rams | $1,200 a head | Stand-in | — |
+| Sheep selling commission; head fee | 5% (the cattle figure); $3 a head each way | Model; stand-in | No dated sheep freight found |
+| Animal health | $30 ÷ 8.4 = $3.57 a head a year | Stand-in | The cattle district figure scaled by one DSE's share; the NSW DPIRD sheep budgets refused automatic reading |
+| Netting fence | $10 a metre (cattle permanent $7) | Stand-in, Claudia's (C26) | S49, S69 give netting fence costs but not beside a cattle fence |
+| Start flock | 1.5 DSE a ewe for the year | Stand-in | The DSE tables (S5, S6) for a dry, pregnant and milking ewe |
+| Adult deaths outside lambing | 0.4% a year (was 0.8%) | Fitted | SB-43 (S19, S67) |
+| Young sheep put gain into frame | under 540 days (cattle 900) | Stand-in | S25 joins maidens young; no figure found |
+| Sheep bought when age and weight are not given | adults 3 years, hoggets 15 months, weaners 5 months; weaners 0.6 and hoggets 0.8 of mature weight; weaned 40 and 300 days ago; weaned at 45% of SRW | Stand-in; the last sourced | S17 for the weaning weight |
+| Sheep bought by class (age, weight share) | Merino ewes and wethers 3 years, 1.0; first-cross ewes 548 days, 0.95; rams 3 years, 1.0; store weaners and lambs 150 days, 0.55 | Stand-in | — |
+
+**MLA indicators the real-year sheep prices need** (pulled, not yet wired into the real-data bundle): National Light Lamb, Trade Lamb, Heavy Lamb, Merino Lamb, Restocker Lamb and Mutton (S52); and for store and breeding ewes by the head, Online Sheep and Online Lamb (AuctionsPlus), not pulled.
