@@ -1,87 +1,15 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { dateText, num, plural, priceText, shortDate } from '@/lib/game/format';
 import { sellLimits } from '@/lib/game/lists';
 import { useGame } from '@/lib/game/store';
 import type { MobWire, SellGroupId, Snapshot, SuppId } from '@/lib/game/types';
 import { JobBox } from './JobBox';
+import { Fact, Job, WhereLine, signed } from './MobParts';
+import { SheepCard } from './SheepCard';
 import { Sheet } from './Sheet';
 import styles from './play.module.css';
-
-const signed = (n: number, places: number): string =>
-  `${n > 0 ? '+' : n < 0 ? '-' : ''}${num(Math.abs(n), places)}`;
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-/** One husbandry button, with its reason beside it when it is off, and its job card under it. */
-function Job({
-  slot,
-  label,
-  reason,
-  hint,
-  onStart,
-  confirmLabel,
-  children,
-}: {
-  slot: string;
-  label: string;
-  /** Why the button is off, or null. */
-  reason: string | null;
-  hint?: string | null;
-  onStart: () => void;
-  confirmLabel: string;
-  children?: ReactNode;
-}) {
-  const job = useGame((s) => s.acts[slot]);
-  const busy = useGame((s) => s.busy > 0);
-  const confirmAct = useGame((s) => s.confirmAct);
-  const dismissAct = useGame((s) => s.dismissAct);
-  const reasonId = useId();
-  return (
-    <li className={styles.hrow}>
-      {!job && (
-        <div className={styles.hbtn}>
-          <button
-            type="button"
-            className="btn sm"
-            disabled={reason !== null}
-            aria-describedby={reason ? reasonId : undefined}
-            onClick={onStart}
-          >
-            {label}
-          </button>
-          {reason ? (
-            <p id={reasonId} className={styles.hreason}>
-              {reason}
-            </p>
-          ) : (
-            hint && <p className={styles.hhint}>{hint}</p>
-          )}
-        </div>
-      )}
-      {!job && children}
-      {job && (
-        <JobBox
-          title={label}
-          job={job}
-          confirmLabel={confirmLabel}
-          busy={busy}
-          onConfirm={() => void confirmAct(slot)}
-          onCancel={() => dismissAct(slot)}
-          onDismiss={() => dismissAct(slot)}
-        />
-      )}
-    </li>
-  );
-}
 
 function SellPicker({ mob, snapshot }: { mob: MobWire; snapshot: Snapshot }) {
   const startAct = useGame((s) => s.startAct);
@@ -232,20 +160,6 @@ function SuppSwitch({ mob }: { mob: MobWire }) {
   );
 }
 
-/** Where the mob is, as words. */
-function WhereLine({ mob, snapshot }: { mob: MobWire; snapshot: Snapshot }) {
-  const openPaddock = useGame((s) => s.openPaddock);
-  if (mob.where === 'yards') return <span>In the stock yards</span>;
-  if (mob.where === 'lot') return <span>In the feedlot</span>;
-  const p = snapshot.paddocks.find((x) => x.mobs.includes(mob.id));
-  if (!p) return <span>{mob.area ?? 'On pasture'}</span>;
-  return (
-    <button type="button" className={styles.linkbtn} onClick={() => openPaddock(p.id)}>
-      {p.name}
-    </button>
-  );
-}
-
 /**
  * The mob card. Quick view first: name, where, head, AE and DSE, weight, CS
  * and daily gain, with a plain sentence on why when the mob is losing weight
@@ -267,6 +181,7 @@ export function MobCard({
   const cancelling = useGame((s) => s.acts[`${mobId}:cancel`] !== undefined);
   const mob = snapshot.mobs.find((m) => m.id === mobId);
   if (!mob) return null;
+  if (mob.species === 'sheep') return <SheepCard snapshot={snapshot} mob={mob} onClose={onClose} />;
   const gain = mob.adgKg;
   return (
     <Sheet title={mob.name} onClose={onClose}>

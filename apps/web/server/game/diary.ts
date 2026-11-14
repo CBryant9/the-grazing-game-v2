@@ -99,6 +99,7 @@ export function summaryLines(s: SummaryWire): string[] {
     );
   }
   const m = s.money;
+  if (m.wool > 0) out.push(`Wool sold at shearing: ${money(m.wool)}${over}.`);
   if (m.sales > 0) out.push(`Sales: ${money(m.sales)}${over}.`);
   if (m.buys > 0) out.push(`Cattle bought: ${money(m.buys)}${over}.`);
   if (m.feed > 0) out.push(`Feed: ${money(m.feed)}${over}.`);
@@ -154,6 +155,7 @@ export function periodFilings(
     // First light brings cattle in, sells booked stock and does the workforce's pay day, leavings and fencing.
     const dawn =
       m.event.type === 'cattle-arrived' ||
+      m.event.type === 'sheep-arrived' ||
       m.event.type === 'cattle-sold' ||
       (isLabourEvent(m.event) && DAWN_LABOUR.has(m.event.type));
     if (!dawn) continue;

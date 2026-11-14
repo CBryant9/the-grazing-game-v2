@@ -112,12 +112,18 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
                 <button type="button" className={styles.row} onClick={() => openMob(m.id)}>
                   <span className={styles.rowtop}>
                     <b>{m.name}</b>
-                    <span>{plural(m.head, 'head', 'head')}</span>
+                    <span>
+                      {m.species === 'sheep'
+                        ? `${plural(m.head, 'sheep', 'sheep')}${m.calves > 0 ? `, ${plural(m.calves, 'lamb')}` : ''}`
+                        : plural(m.head, 'head', 'head')}
+                    </span>
                   </span>
                   <span className={styles.rowsub}>
                     {m.where === 'yards' ? 'Stock yards' : (m.area ?? 'Feedlot')}
                     {m.cs !== null ? `, CS ${num(m.cs, 1)}` : ''}, {gainText(m.adgKg)}
+                    {m.species === 'sheep' ? `, ${num(m.dse)} DSE` : ''}
                     {m.pticText ? `. ${m.pticText}` : ''}
+                    {m.sheep?.shearing ? `. ${m.sheep.shearing.split('.')[0]}` : ''}
                     {!m.hasWater && m.where === 'paddock' && (
                       <span className={styles.warntag}>No water</span>
                     )}

@@ -15,7 +15,7 @@ function PaddockPicker({ snapshot, mob }: { snapshot: Snapshot; mob: MobWire }) 
   const rows = pickable(snapshot.paddocks, snapshot.mobs, mob);
   return (
     <ul className={styles.pickrows} aria-label="Paddocks to move into">
-      {rows.map(({ paddock: p, holds, dry }) => (
+      {rows.map(({ paddock: p, holds, otherKind, dry }) => (
         <li key={p.id}>
           <button type="button" className={styles.pickrow} onClick={() => void pick(p.id)}>
             <span className={styles.pickname}>
@@ -25,7 +25,11 @@ function PaddockPicker({ snapshot, mob }: { snapshot: Snapshot; mob: MobWire }) 
             <span className={styles.pickfacts}>
               {num(p.ha, 1)} ha, {num(p.massKgHa)} kg DM/ha
               {dry && <span className={styles.warntag}>No water</span>}
-              {holds && <span className={styles.holdtag}>{holds} is here</span>}
+              {holds && (
+                <span className={styles.holdtag}>
+                  {otherKind ? `Holds ${otherKind}` : `${holds} is here`}
+                </span>
+              )}
             </span>
           </button>
         </li>
@@ -76,7 +80,11 @@ function PartPicker({ mob }: { mob: MobWire }) {
               </li>
             );
           })}
-          <li className="muted">Calves go with their mothers.</li>
+          <li className="muted">
+            {mob.species === 'sheep'
+              ? 'Lambs go with their ewes. One class at a time.'
+              : 'Calves go with their mothers.'}
+          </li>
         </ul>
       )}
     </fieldset>
@@ -107,6 +115,7 @@ export function MoveFlow({ snapshot }: { snapshot: Snapshot }) {
   const mob = snapshot.mobs.find((m) => m.id === move.mobId) ?? null;
   const target = snapshot.paddocks.find((p) => p.id === move.target) ?? null;
   const name = mob?.name ?? move.mobName ?? 'The mob';
+  const kind = mob?.species === 'sheep' ? 'Move sheep' : 'Move cattle';
 
   let body;
   if (move.mobId === null) {
@@ -194,13 +203,16 @@ export function MoveFlow({ snapshot }: { snapshot: Snapshot }) {
       ref={ref}
       tabIndex={-1}
       className={styles.moveflow}
-      aria-label="Move cattle"
+      aria-label={kind}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && move.phase !== 'applying') end();
       }}
     >
       <header className={styles.sheethead}>
-        <h2 className={`px ${styles.sheettitle}`}>Move cattle{mob ? `: ${mob.name}` : ''}</h2>
+        <h2 className={`px ${styles.sheettitle}`}>
+          {kind}
+          {mob ? `: ${mob.name}` : ''}
+        </h2>
         {move.phase !== 'done' && (
           <button type="button" className="btn sm ghost" onClick={end}>
             Cancel

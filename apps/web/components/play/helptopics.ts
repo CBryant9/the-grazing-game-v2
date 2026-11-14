@@ -142,3 +142,49 @@ export const HELP_TERMS: readonly HelpTerm[] = [
   { term: 'CP', means: 'Crude protein, as a % of the feed. How much protein is in the feed.' },
   { term: 'kg DM/ha', means: 'Kilograms of dry matter on each hectare. The feed on offer.' },
 ];
+
+/**
+ * Help for sheep (milestone 2.8). Shown only on a farm that shows sheep, so a cattle farm's
+ * help is exactly as it was. Facts about what the player sees and can do, no figures.
+ */
+export const SHEEP_HELP_TOPICS: readonly HelpTopic[] = [
+  {
+    id: 'sheep',
+    title: 'Sheep',
+    lines: [
+      'Sheep run in mobs, as cattle do. Open a sheep mob from the Herd tab or its paddock. Its card shows head and lambs at foot, DSE and AE, weight, CS, where the flock is up to, its wool and the contractors’ days.',
+      'Joining, scanning, lambing, marking and weaning happen by themselves on their dates. The record on the card shows each count once it is taken.',
+      'Cattle and sheep run in separate paddocks. A move into a paddock that holds the other kind is refused, and the card says so.',
+      'A cattle fence does not hold sheep. Hungry or thirsty sheep can get through permanent, electric or tape fence. Netting, gates and the farm boundary hold them. Things to do says when a sheep mob is behind a fence that does not hold it.',
+      'Things to do also says when a mob has no water, and when a mob’s average CS is under the floor for where the ewes are up to, with the reasons.',
+    ],
+  },
+  {
+    id: 'wool',
+    title: 'Shearing and wool',
+    lines: [
+      'Contractors shear and crutch each mob by themselves on its days. The card says when, and about what it costs a head.',
+      'To move the shearing day, open the mob and tap Move shearing. It takes none of the day.',
+      'Wool is sold by itself at shearing. The summary and the diary say the clip per head, the micron, what the wool made and what shearing cost. Wool is its own money line on the Scores tab.',
+    ],
+  },
+  {
+    id: 'sheepfeed',
+    title: 'Feeding and selling sheep',
+    lines: [
+      'Open a sheep mob and look at Feed. The choices are None, Lick, Grain and Hay, each with what it costs a day for that mob. A card shows the cost before you confirm.',
+      'Sheep are bought and sold on a sale day, from the Market tab (Sheep) or the mob card. The card shows the money before anything is spent. Bought sheep arrive in the stock yards the next morning.',
+      'Ewes sold with lambs at foot take their lambs with them.',
+    ],
+  },
+];
+
+export const SHEEP_HELP_TERMS: readonly HelpTerm[] = [
+  { term: 'Micron', means: 'How fine the wool is. A lower micron is finer wool.' },
+  { term: 'Clean wool kg', means: 'The weight of wool once grease and dirt are washed out.' },
+  {
+    term: 'Hoggets',
+    means: 'Young sheep from about a year to two years old that have not lambed.',
+  },
+  { term: 'Wethers', means: 'Male sheep that have been marked.' },
+];

@@ -144,6 +144,8 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
     .map(([cause, n]) => `${n} from ${cause}`)
     .join(', ');
   const m = summary.money;
+  // A day with sheep in it names the cattle's figures as the cattle's.
+  const sheepy = summary.sheepLines.length > 0 || m.wool > 0;
 
   return (
     <div
@@ -233,9 +235,15 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
               {summary.births > 0 && <li>{plural(summary.births, 'calf', 'calves')} born.</li>}
               <li>
                 {summary.deaths === 0
-                  ? 'No deaths.'
-                  : `${plural(summary.deaths, 'head', 'head')} died: ${causes}.`}
+                  ? sheepy
+                    ? 'No cattle deaths.'
+                    : 'No deaths.'
+                  : `${plural(summary.deaths, 'head', 'head')} ${sheepy ? 'of cattle ' : ''}died: ${causes}.`}
               </li>
+              {summary.sheepLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+              {m.wool > 0 && <li>Wool: {money(m.wool)}, sold at shearing.</li>}
               {m.sales > 0 && <li>Sales: {money(m.sales)}.</li>}
               {m.buys > 0 && <li>Cattle bought: {money(m.buys)}.</li>}
               {m.feed > 0 && <li>Feed: {money(m.feed)}.</li>}

@@ -118,6 +118,8 @@ export interface PickableRow {
   paddock: PaddockWire;
   /** The mob already in it, if any: moving here joins the two. */
   holds: string | null;
+  /** "cattle" or "sheep" when the mob in it is the other kind: the move is refused, one kind to a paddock. */
+  otherKind: 'cattle' | 'sheep' | null;
   dry: boolean;
 }
 
@@ -129,9 +131,16 @@ export function pickable(
 ): PickableRow[] {
   return paddocks
     .filter((p) => !moving || !p.mobs.includes(moving.id))
-    .map((p) => ({
-      paddock: p,
-      holds: mobs.find((m) => m.id !== moving?.id && p.mobs.includes(m.id))?.name ?? null,
-      dry: p.water === 'none',
-    }));
+    .map((p) => {
+      const there = mobs.find((m) => m.id !== moving?.id && p.mobs.includes(m.id));
+      return {
+        paddock: p,
+        holds: there?.name ?? null,
+        otherKind:
+          there && moving && (there.species ?? 'cattle') !== (moving.species ?? 'cattle')
+            ? (there.species ?? 'cattle')
+            : null,
+        dry: p.water === 'none',
+      };
+    });
 }

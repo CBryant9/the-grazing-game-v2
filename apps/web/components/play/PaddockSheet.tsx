@@ -70,7 +70,9 @@ export function PaddockSheet({
       </p>
       <h3 className={`px ${styles.minihead}`}>{here.length > 1 ? 'Mobs here' : 'Mob here'}</h3>
       {here.length === 0 ? (
-        <p className="muted">No cattle in this paddock.</p>
+        <p className="muted">
+          {snapshot.market.sheep ? 'No stock in this paddock.' : 'No cattle in this paddock.'}
+        </p>
       ) : (
         <ul className={styles.mobs}>
           {here.map((m) => (
@@ -78,8 +80,9 @@ export function PaddockSheet({
               <button type="button" className={styles.mobbtn} onClick={() => openMob(m.id)}>
                 <b>{m.name}</b>
                 <span>
-                  {plural(m.head, 'head', 'head')}
-                  {m.calves > 0 ? `, ${plural(m.calves, 'calf', 'calves')}` : ''}
+                  {m.species === 'sheep'
+                    ? `${plural(m.head, 'sheep', 'sheep')}${m.calves > 0 ? `, ${plural(m.calves, 'lamb')} at foot` : ''}, ${num(m.dse)} DSE`
+                    : `${plural(m.head, 'head', 'head')}${m.calves > 0 ? `, ${plural(m.calves, 'calf', 'calves')}` : ''}`}
                 </span>
               </button>
             </li>

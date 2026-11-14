@@ -1244,7 +1244,8 @@
 }
 .fencechoice {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Three cattle fences, or four with netting on a farm that shows sheep. */
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 6px;
 }
 .fencebtn {

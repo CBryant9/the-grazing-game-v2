@@ -3,8 +3,9 @@
 import { useEffect, useRef } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
 import { useLayout } from '@/lib/game/hooks';
+import { useGame } from '@/lib/game/store';
 import { Sheet } from './Sheet';
-import { HELP_TERMS, HELP_TOPICS } from './helptopics';
+import { HELP_TERMS, HELP_TOPICS, SHEEP_HELP_TERMS, SHEEP_HELP_TOPICS } from './helptopics';
 import helpStyles from './help.module.css';
 import styles from './play.module.css';
 
@@ -101,6 +102,10 @@ function HelpSidePanel({ onClose }: { onClose: () => void }) {
 
 function HelpContent() {
   const replay = useHelp((s) => s.tourReplay);
+  // Sheep topics only on a farm that shows sheep (the server sends the sheep market then).
+  const sheep = useGame((s) => !!s.snapshot?.market.sheep);
+  const topics = sheep ? [...HELP_TOPICS, ...SHEEP_HELP_TOPICS] : HELP_TOPICS;
+  const terms = sheep ? [...HELP_TERMS, ...SHEEP_HELP_TERMS] : HELP_TERMS;
   return (
     <>
       <p className="muted">Short answers about how the game works. Tap a topic to open it.</p>
@@ -110,7 +115,7 @@ function HelpContent() {
         </button>
       </div>
       <ul className={helpStyles.topics}>
-        {HELP_TOPICS.map((t, i) => (
+        {topics.map((t, i) => (
           <li key={t.id}>
             <details className={helpStyles.topic} open={i === 0}>
               <summary>
@@ -131,7 +136,7 @@ function HelpContent() {
             </summary>
             <div className={helpStyles.topicbody}>
               <dl className={helpStyles.terms}>
-                {HELP_TERMS.map((t) => (
+                {terms.map((t) => (
                   <div key={t.term}>
                     <dt>{t.term}</dt>
                     <dd>{t.means}</dd>

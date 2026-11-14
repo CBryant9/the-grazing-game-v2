@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
-import { HELP_TERMS, HELP_TOPICS } from './helptopics';
+import { HELP_TERMS, HELP_TOPICS, SHEEP_HELP_TERMS, SHEEP_HELP_TOPICS } from './helptopics';
 
 const all = [
-  ...HELP_TOPICS.flatMap((t) => [t.title, ...t.lines]),
-  ...HELP_TERMS.flatMap((t) => [t.term, t.means]),
+  ...[...HELP_TOPICS, ...SHEEP_HELP_TOPICS].flatMap((t) => [t.title, ...t.lines]),
+  ...[...HELP_TERMS, ...SHEEP_HELP_TERMS].flatMap((t) => [t.term, t.means]),
 ];
+
+describe('the sheep help (milestone 2.8)', () => {
+  it('is kept apart, so a cattle farm shows none of it, and keeps to a few short lines', () => {
+    const cattle = [...HELP_TOPICS, ...HELP_TERMS].map((t) => JSON.stringify(t)).join(' ');
+    expect(cattle).not.toMatch(/\b(wool|netting|ewes?|shearing)\b/i);
+    expect(SHEEP_HELP_TOPICS.map((t) => t.id)).toEqual(['sheep', 'wool', 'sheepfeed']);
+    for (const t of SHEEP_HELP_TOPICS) {
+      expect(t.lines.length).toBeGreaterThanOrEqual(3);
+      expect(t.lines.length).toBeLessThanOrEqual(6);
+      for (const l of t.lines) {
+        expect(l.length).toBeLessThan(420);
+        expect(l).not.toMatch(/you should|best to/i);
+      }
+    }
+  });
+});
 
 const tourWords = [...Object.values(TOUR_TEXT).flatMap((t) => [t.title, t.body]), TOUR_FINISHED];
 const everyWord = [...all, ...tourWords];

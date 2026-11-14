@@ -12,6 +12,7 @@ import type {
   SetupOptions,
   SetupSize,
   SetupStart,
+  SetupStock,
   SetupYears,
 } from '@/lib/game/types';
 import type { DistrictId } from '@gg/shared';
@@ -25,6 +26,7 @@ type StepId =
   | 'arable'
   | 'years'
   | 'start'
+  | 'stock'
   | 'difficulty'
   | 'name'
   | 'summary';
@@ -33,6 +35,7 @@ interface Draft {
   district?: DistrictId;
   size?: SetupSize;
   enterprise?: SetupEnterprise;
+  stock?: SetupStock;
   arablePct?: number;
   croppedPct?: number;
   years?: SetupYears;
@@ -88,6 +91,7 @@ const TITLES: Record<StepId, string> = {
   arable: 'How much is arable?',
   years: 'How do the years play?',
   start: 'How does the farm start?',
+  stock: 'Cattle, sheep or both?',
   difficulty: 'How hard should it be?',
   name: 'Name your farm',
   summary: 'Take the farm',
@@ -122,6 +126,11 @@ export function SetupFlow() {
     load();
   };
 
+  // The stock step shows only where the server offers sheep (the switch on, a sheep district)
+  // and on a running farm: a farm from scratch starts with no stock.
+  const offersSheep =
+    !!options?.districts.find((d) => d.id === draft.district)?.sheep &&
+    draft.startType === 'running';
   const steps = useMemo<StepId[]>(
     () => [
       'district',
@@ -130,11 +139,12 @@ export function SetupFlow() {
       ...(draft.enterprise === 'mixed' ? (['arable'] as StepId[]) : []),
       'years',
       'start',
+      ...(offersSheep ? (['stock'] as StepId[]) : []),
       'difficulty',
       'name',
       'summary',
     ],
-    [draft.enterprise],
+    [draft.enterprise, offersSheep],
   );
   const step = steps[Math.min(index, steps.length - 1)]!;
 
@@ -179,6 +189,7 @@ export function SetupFlow() {
     arable: draft.arablePct !== undefined && draft.croppedPct !== undefined,
     years: !!draft.years,
     start: !!draft.startType,
+    stock: !!draft.stock,
     difficulty: !!draft.difficulty,
     name: draft.name.trim().length > 0,
     summary: true,
@@ -207,6 +218,7 @@ export function SetupFlow() {
       startType: draft.startType,
       difficulty: draft.difficulty,
       name: draft.name,
+      ...(offersSheep && draft.stock && draft.stock !== 'cattle' ? { stock: draft.stock } : {}),
     };
     setTaking(true);
     setError(null);
@@ -340,6 +352,22 @@ export function SetupFlow() {
             cards={options.starts.map((s) => ({ value: s.id, title: s.label, text: s.text }))}
           />
         )}
+        {step === 'stock' && district && (
+          <>
+            <Cards
+              name="stock"
+              legend="Stock"
+              value={draft.stock}
+              onChange={(v) => set({ stock: v as SetupStock })}
+              cards={options.stocks.map((s) => ({ value: s.id, title: s.label, text: s.text }))}
+            />
+            {draft.stock && draft.stock !== 'cattle' && (
+              <p className="muted">
+                {district.flock.find((f) => f.stock === draft.stock)?.text ?? ''}
+              </p>
+            )}
+          </>
+        )}
         {step === 'difficulty' && (
           <>
             <Cards
@@ -410,6 +438,12 @@ export function SetupFlow() {
               <dt>Start</dt>
               <dd>{label(options.starts, draft.startType)}</dd>
             </div>
+            {offersSheep && draft.stock && (
+              <div>
+                <dt>Stock</dt>
+                <dd>{label(options.stocks, draft.stock)}</dd>
+              </div>
+            )}
             <div>
               <dt>Difficulty</dt>
               <dd>{label(options.difficulties, draft.difficulty)}</dd>

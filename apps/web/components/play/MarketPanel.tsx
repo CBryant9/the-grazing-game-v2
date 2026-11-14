@@ -9,6 +9,7 @@ import type { MarketWire, MobWire, SellGroupId, SimpleAction, Snapshot } from '@
 import { ActJob } from './ActJob';
 import { EmptyState } from './EmptyState';
 import { QtyField } from './QtyField';
+import { SheepMarket } from './SheepMarket';
 import styles from './play.module.css';
 
 type View = 'prices' | 'buy' | 'sell';
@@ -424,11 +425,45 @@ function SellView({ snapshot, onBuy }: { snapshot: Snapshot; onBuy: () => void }
  */
 export function MarketPanel({ snapshot }: { snapshot: Snapshot }) {
   const [view, setView] = useState<View>('prices');
+  const [kind, setKind] = useState<'cattle' | 'sheep'>('cattle');
   const { market } = snapshot;
+  // Sheep show only on a farm that shows them (the server sends null otherwise).
+  const sheep = market.sheep !== null && kind === 'sheep';
   return (
     <section className={styles.listpanel} aria-label="Market">
       <h2 className={`px ${styles.soontitle}`}>Market</h2>
       <p className={styles.saleline}>{market.saleLine}</p>
+      {market.sheep && (
+        <div className={styles.seg} role="group" aria-label="Cattle or sheep">
+          <button type="button" aria-pressed={!sheep} onClick={() => setKind('cattle')}>
+            Cattle
+          </button>
+          <button type="button" aria-pressed={sheep} onClick={() => setKind('sheep')}>
+            Sheep
+          </button>
+        </div>
+      )}
+      {sheep ? (
+        <SheepMarket snapshot={snapshot} />
+      ) : (
+        <CattleViews snapshot={snapshot} view={view} setView={setView} />
+      )}
+    </section>
+  );
+}
+
+function CattleViews({
+  snapshot,
+  view,
+  setView,
+}: {
+  snapshot: Snapshot;
+  view: View;
+  setView: (v: View) => void;
+}) {
+  const { market } = snapshot;
+  return (
+    <>
       <div className={styles.seg3} role="group" aria-label="Market view">
         {(['prices', 'buy', 'sell'] as const).map((v) => (
           <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>
@@ -439,6 +474,6 @@ export function MarketPanel({ snapshot }: { snapshot: Snapshot }) {
       {view === 'prices' && <PricesView market={market} />}
       {view === 'buy' && <BuyView market={market} />}
       {view === 'sell' && <SellView snapshot={snapshot} onBuy={() => setView('buy')} />}
-    </section>
+    </>
   );
 }
