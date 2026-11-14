@@ -2,6 +2,7 @@ import { logFailure } from '@/server/logging';
 import { NOT_SET_UP, authRoute } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
 import { SESSION_COOKIE, readJson } from '@/server/game/http';
+import { removeAllDevices } from '@/server/notify/store';
 import { FARM_COOKIE } from '@/server/player';
 import { clearCookieText } from '@/server/security';
 
@@ -17,6 +18,15 @@ export const POST = authRoute(
   async (ctx) => {
     if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
     const body = (await readJson(ctx.req, 512)) as { everywhere?: unknown } | null;
+    // Signing out everywhere also forgets every device this account had for notifications.
+    if (body?.everywhere === true) {
+      const who = await ctx.deps.provider.session(ctx.jar).catch(() => null);
+      if (who && !who.anonymous) {
+        await removeAllDevices(ctx.deps.sql, who.id).catch((e) =>
+          logFailure({ route: 'auth-signout', reason: 'devices_not_cleared' }, e),
+        );
+      }
+    }
     try {
       await ctx.deps.provider.signOut(ctx.jar, body?.everywhere === true ? 'global' : 'local');
     } catch (e) {

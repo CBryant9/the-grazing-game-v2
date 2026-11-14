@@ -24,6 +24,8 @@ export function AccountSection() {
   const signOut = async (): Promise<void> => {
     setOut('working');
     try {
+      // This device stops getting this account's notifications (it never asks for anything).
+      await import('@/lib/notify/device').then((m) => m.forgetThisDevice()).catch(() => undefined);
       await authApi.signOut(false);
       // This browser forgets the farm it kept for this player.
       clearAllLastFarms();
@@ -49,6 +51,9 @@ export function AccountSection() {
             </button>
             <Link href="/account" className="btn ghost">
               Your account
+            </Link>
+            <Link href="/account/notifications" className="btn ghost">
+              Notifications
             </Link>
             <button
               type="button"

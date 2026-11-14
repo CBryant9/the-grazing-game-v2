@@ -85,6 +85,8 @@ export function Account() {
     setWorking(everywhere ? 'everywhere' : 'here');
     setError(null);
     try {
+      // This device stops getting this account's notifications (it never asks for anything).
+      await import('@/lib/notify/device').then((m) => m.forgetThisDevice()).catch(() => undefined);
       await authApi.signOut(everywhere);
       // This browser forgets every farm it kept, so nobody else on this device sees it.
       clearAllLastFarms();
@@ -99,6 +101,7 @@ export function Account() {
     setWorking('delete');
     setError(null);
     try {
+      await import('@/lib/notify/device').then((m) => m.forgetThisDevice()).catch(() => undefined);
       await authApi.deleteAccount(typed);
       clearAllLastFarms();
       useMe.getState().reset();
@@ -220,6 +223,9 @@ export function Account() {
           {error}
         </p>
       )}
+      <Link href="/account/notifications" className={`btn ghost ${styles.linkbtn}`}>
+        Notifications
+      </Link>
       <Link href="/play" className={`btn ghost ${styles.linkbtn}`}>
         Back to your farm
       </Link>

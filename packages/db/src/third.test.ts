@@ -390,7 +390,7 @@ describe('N4. an unlisted push host is refused with a code the screens can word'
     const o = await as(
       db,
       'a',
-      `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret) values ('${ID.a}', 'https://fcm.googleapis.com/fcm/send/x', 'k', 'a')`,
+      `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret) values ('${ID.a}', 'https://push.example.org/send/x', 'k', 'a')`,
     );
     expect(errorOf(o)).toMatch(/^push_host_not_allowed:/);
   });
