@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import { buildAnchor, buildDraft, mapToolFor } from '@/lib/game/build';
 import { pickable } from '@/lib/game/lists';
+import { mapBadges } from '@/lib/game/plans';
+import { pickDraft } from '@/lib/game/sow';
 import { useLayout, useReducedMotion, useTheme } from '@/lib/game/hooks';
 import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
@@ -16,6 +18,8 @@ import { MobCard } from './MobCard';
 import { MoveFlow } from './MoveFlow';
 import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
+import { PlanFlow } from './PlanFlow';
+import { PlansPanel } from './PlansPanel';
 import { SummaryCard } from './SummaryCard';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
 import { TopBar } from './TopBar';
@@ -72,9 +76,11 @@ function Opened({ snapshot }: { snapshot: Snapshot }) {
   const paddockId = useGame((s) => s.paddockId);
   const mobId = useGame((s) => s.mobId);
   const move = useGame((s) => s.move);
+  const plan = useGame((s) => s.plan);
   const closePaddock = useGame((s) => s.closePaddock);
   const closeMob = useGame((s) => s.closeMob);
   if (move) return <MoveFlow snapshot={snapshot} />;
+  if (plan) return <PlanFlow snapshot={snapshot} />;
   if (mobId !== null) {
     return <MobCard key={`mob-${mobId}`} snapshot={snapshot} mobId={mobId} onClose={closeMob} />;
   }
@@ -93,7 +99,9 @@ function Opened({ snapshot }: { snapshot: Snapshot }) {
 
 /** The farm side panel on a PC: what is open, or things to do. */
 function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
-  const open = useGame((s) => s.move !== null || s.mobId !== null || s.paddockId !== null);
+  const open = useGame(
+    (s) => s.move !== null || s.plan !== null || s.mobId !== null || s.paddockId !== null,
+  );
   if (open) return <Opened snapshot={snapshot} />;
   return (
     <div className={styles.sidebody}>
@@ -111,6 +119,7 @@ function TabPanel({ tab, snapshot }: { tab: Tab; snapshot: Snapshot }) {
   if (tab === 'herd') return <HerdList snapshot={snapshot} />;
   if (tab === 'paddocks') return <PaddockList snapshot={snapshot} />;
   if (tab === 'market') return <MarketPanel snapshot={snapshot} />;
+  if (tab === 'plans') return <PlansPanel snapshot={snapshot} />;
   return <ComingSoon tab={tab} />;
 }
 
@@ -127,6 +136,10 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const paddockId = useGame((s) => s.paddockId);
   const mobId = useGame((s) => s.mobId);
   const move = useGame((s) => s.move);
+  const plan = useGame((s) => s.plan);
+  const sow = useGame((s) => s.sow);
+  const planTap = useGame((s) => s.planTap);
+  const sowDrag = useGame((s) => s.sowDrag);
   const openPaddock = useGame((s) => s.openPaddock);
   const moveTargetPicked = useGame((s) => s.moveTargetPicked);
   const summary = useGame((s) => s.summary);
@@ -161,7 +174,9 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
 
   const pc = layout === 'pc';
   const sheetOpen =
-    tab === 'farm' && !pc && (move !== null || mobId !== null || paddockId !== null);
+    tab === 'farm' &&
+    !pc &&
+    (move !== null || plan !== null || mobId !== null || paddockId !== null);
 
   // While the move tool asks for a paddock, a tap picks it. Otherwise a tap opens it.
   const picking = move !== null && move.mobId !== null && move.phase !== 'done';
@@ -180,8 +195,20 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   );
 
   // The build tools: what the map's pointer does, and the line about to be built.
-  const mapTool = mapToolFor(build);
-  const draft = useMemo(() => buildDraft(build, snapshot.view), [build, snapshot.view]);
+  // Picking squares to sow takes the same squares tool; the numbers of a plan sit over the map.
+  const sowing = sow?.picking === true;
+  const mapTool = sowing ? 'squares' : mapToolFor(build);
+  const draft = useMemo(
+    () => (sowing ? pickDraft(sow) : buildDraft(build, snapshot.view)),
+    [sowing, sow, build, snapshot.view],
+  );
+  const badges = useMemo(
+    () => mapBadges(plan?.draft ?? null, snapshot.paddocks),
+    [plan?.draft, snapshot.paddocks],
+  );
+  const planning =
+    plan !== null &&
+    (plan.phase === 'edit' || plan.phase === 'refused' || plan.phase === 'confirm');
   const anchor = useMemo(() => buildAnchor(build), [build]);
   // The tool bar and the card show on the farm tab, when no sheet is open.
   const showBuild = tab === 'farm' && !sheetOpen;
@@ -214,14 +241,27 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             pickable={pickables}
             reduceMotion={reduceMotion}
             onTapPaddock={
-              picking ? (id) => void moveTargetPicked(id) : move ? () => {} : openPaddock
+              picking
+                ? (id) => void moveTargetPicked(id)
+                : move
+                  ? () => {}
+                  : planning
+                    ? planTap
+                    : plan
+                      ? () => {}
+                      : openPaddock
             }
             tool={mapTool}
             draft={draft}
+            badges={badges}
             anchor={anchor}
             anchorEl={cardRef}
             floating={pc}
-            onDrag={(e) => buildDrag({ phase: e.phase, corner: e.corner, square: e.square })}
+            onDrag={(e) =>
+              sowing
+                ? sowDrag({ phase: e.phase, square: e.square })
+                : buildDrag({ phase: e.phase, corner: e.corner, square: e.square })
+            }
             onToolTap={(e) =>
               void buildTap({
                 square: e.square,

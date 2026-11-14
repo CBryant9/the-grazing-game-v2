@@ -128,6 +128,9 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
           <Change label="Live weight" c={summary.liveWeightKg} unit=" kg" />
         </dl>
         <ul className={styles.sumfacts}>
+          {summary.planMoves.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
           {summary.births > 0 && <li>{plural(summary.births, 'calf', 'calves')} born.</li>}
           <li>
             {summary.deaths === 0

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import type { FarmView } from '@gg/shared';
+import { FARM_GRID_W, type FarmView } from '@gg/shared';
 // Types only: these lines load nothing. The renderer (and PixiJS with it) is
 // loaded below, once the page is on screen, so it is not in the first load.
 import type {
@@ -15,6 +15,8 @@ import type {
 import type { MapToolName } from '@/lib/game/build';
 import type { ThemeName } from '@/lib/game/hooks';
 import styles from './play.module.css';
+
+const NO_BADGES: readonly { cell: number; text: string }[] = [];
 
 /** Put the build card beside a point on the ground, inside the map. With no anchor it goes back to the stylesheet's place. */
 function placeCard(
@@ -62,7 +64,10 @@ export function FarmMap({
   onDrag,
   onToolTap,
   onFenceTap,
+  badges = NO_BADGES,
 }: {
+  /** Numbers to show on paddocks, such as the order of a grazing plan. */
+  badges?: readonly { cell: number; text: string }[];
   view: FarmView;
   theme: ThemeName;
   /** The time of day to light the map for, minutes after midnight. */
@@ -168,6 +173,34 @@ export function FarmMap({
     if (ready) mapRef.current?.setDraft(draft);
   }, [ready, draft]);
 
+  // Numbers on paddocks follow the map as it moves. They never take a tap.
+  const [badgePos, setBadgePos] = useState<{ text: string; x: number; y: number }[]>([]);
+  const badgesRef = useRef(badges);
+  const placeBadges = (): void => {
+    const map = mapRef.current;
+    const list = badgesRef.current;
+    if (!map || (list.length === 0 && badgePos.length === 0)) return;
+    setBadgePos(
+      list.map((b) => {
+        const p = map.groundToScreen(
+          (b.cell % FARM_GRID_W) + 0.5,
+          Math.floor(b.cell / FARM_GRID_W) + 0.5,
+        );
+        return { text: b.text, x: Math.round(p.x), y: Math.round(p.y) };
+      }),
+    );
+  };
+  useLayoutEffect(() => {
+    badgesRef.current = badges;
+    placeBadges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, badges]);
+  useEffect(() => {
+    if (!ready) return;
+    return mapRef.current?.on('camera', placeBadges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   // Keep the build card beside the line, inside the map, as the map moves.
   const wrapRef = useRef<HTMLDivElement>(null);
   const placing = useRef({ anchor, floating });
@@ -193,6 +226,15 @@ export function FarmMap({
   return (
     <div ref={wrapRef} className={styles.mapwrap}>
       <div ref={hostRef} className={styles.maphost} data-testid="map-host" />
+      {badgePos.length > 0 && (
+        <div className={styles.badges} aria-hidden="true">
+          {badgePos.map((b, i) => (
+            <span key={`${b.text}-${i}`} className={styles.badge} style={{ left: b.x, top: b.y }}>
+              {b.text}
+            </span>
+          ))}
+        </div>
+      )}
       {!ready && !failed && (
         <p className={styles.maploading} role="status">
           Loading the map

@@ -11,6 +11,15 @@ import {
 } from './build';
 import { latestOnly } from './latest';
 import { movePicks } from './lists';
+import {
+  draftAction,
+  draftFromPlan,
+  newDraft,
+  moveStop,
+  toggleStop,
+  type PlanDraft,
+} from './plans';
+import { dragPick, newPick, type SowPick } from './sow';
 import { choiceJob, moveJob, tapOutcome, type TapInfo } from './taps';
 import type {
   EdgeWire,
@@ -59,6 +68,16 @@ export interface MoveState {
   message?: string;
 }
 
+/** Making or changing a grazing plan: the form, then the server's card, then the result. */
+export interface PlanState {
+  draft: PlanDraft;
+  phase: 'edit' | 'previewing' | 'confirm' | 'applying' | 'done' | 'refused';
+  card?: JobCardWire;
+  message?: string;
+  /** Kept for the result line, since the form is gone once it is done. */
+  mobName?: string;
+}
+
 /** A drawing drag on the map: the corner (a fence) or the square (pipe) it has reached. */
 export interface DragInfo {
   phase: 'start' | 'move' | 'end';
@@ -86,6 +105,10 @@ interface GameState {
   /** Husbandry jobs on the mob card, by slot ("12:mark"), the same flow as the things to do. */
   acts: Record<string, JobState>;
   move: MoveState | null;
+  /** The plan form, or null. */
+  plan: PlanState | null;
+  /** Squares picked for sowing on the paddock sheet, or null. */
+  sow: SowPick | null;
   /** The build tool in use: null is Look. */
   build: BuildState | null;
 
@@ -115,6 +138,22 @@ interface GameState {
   moveBack: () => void;
   /** Leave the move tool: back to Look. */
   moveEnd: () => void;
+  /** Open the plan form on the farm: for a mob, or to change a plan. */
+  startPlan: (from: { mobId?: number; planId?: number }) => void;
+  planEdit: (patch: Partial<PlanDraft>) => void;
+  /** A paddock tapped on the map or in the list: it joins the order, or leaves it. */
+  planTap: (paddockId: number) => void;
+  planMoveStop: (index: number, by: -1 | 1) => void;
+  planCheck: () => Promise<void>;
+  planConfirm: () => Promise<void>;
+  /** Back from the card to the form, keeping what was picked. */
+  planBack: () => void;
+  planEnd: () => void;
+  /** Start picking squares to sow on the map, or stop. */
+  sowPicking: (paddockId: number, on: boolean) => void;
+  sowDrag: (e: { phase: 'start' | 'move' | 'end'; square: number }) => void;
+  sowClear: () => void;
+  sowEnd: () => void;
   /** Pick a build tool. 'look' goes back to Look. */
   selectTool: (tool: BuildTool | 'look') => void;
   setFence: (fence: FenceKindId) => void;
@@ -287,6 +326,8 @@ export const useGame = create<GameState>()((set, get) => {
     jobs: {},
     acts: {},
     move: null,
+    plan: null,
+    sow: null,
     build: null,
 
     async load() {
@@ -310,6 +351,8 @@ export const useGame = create<GameState>()((set, get) => {
         jobs: {},
         acts: {},
         move: null,
+        plan: null,
+        sow: null,
         build: null,
         summary: null,
       });
@@ -326,6 +369,8 @@ export const useGame = create<GameState>()((set, get) => {
             jobs: {},
             acts: {},
             move: null,
+            plan: null,
+            sow: null,
             build: null,
             summary: null,
             paddockId: null,
@@ -343,7 +388,16 @@ export const useGame = create<GameState>()((set, get) => {
         async () => {
           const { snapshot, summary } = await api.day();
           lineChecker.cancel();
-          set({ ...adopt(snapshot), summary, jobs: {}, acts: {}, move: null, build: null });
+          set({
+            ...adopt(snapshot),
+            summary,
+            jobs: {},
+            acts: {},
+            move: null,
+            plan: null,
+            sow: null,
+            build: null,
+          });
         },
       );
     },
@@ -361,6 +415,8 @@ export const useGame = create<GameState>()((set, get) => {
             jobs: ran ? {} : get().jobs,
             acts: ran ? {} : get().acts,
             move: ran ? null : get().move,
+            plan: ran ? null : get().plan,
+            sow: ran ? null : get().sow,
             build: ran ? null : get().build,
           });
         },
@@ -452,12 +508,19 @@ export const useGame = create<GameState>()((set, get) => {
 
     openPaddock: (id) => {
       lineChecker.cancel();
-      set({ paddockId: id, mobId: null, tab: 'farm', build: null });
+      set((s) => ({
+        paddockId: id,
+        mobId: null,
+        tab: 'farm',
+        build: null,
+        plan: null,
+        sow: s.sow?.paddockId === id ? s.sow : null,
+      }));
     },
-    closePaddock: () => set({ paddockId: null }),
+    closePaddock: () => set({ paddockId: null, sow: null }),
     openMob: (id) => {
       lineChecker.cancel();
-      set({ mobId: id, tab: 'farm', acts: {}, build: null });
+      set({ mobId: id, tab: 'farm', acts: {}, build: null, plan: null, sow: null });
     },
     closeMob: () => set({ mobId: null, acts: {} }),
 
@@ -465,6 +528,8 @@ export const useGame = create<GameState>()((set, get) => {
       lineChecker.cancel();
       set({
         build: null,
+        plan: null,
+        sow: null,
         move: {
           mobId: mobId ?? null,
           target: paddockId ?? null,
@@ -525,6 +590,128 @@ export const useGame = create<GameState>()((set, get) => {
     moveBack: () => setMove({ phase: 'pick', target: null, card: undefined, message: undefined }),
     moveEnd: () => set({ move: null }),
 
+    startPlan({ mobId, planId }) {
+      const snapshot = get().snapshot;
+      if (!snapshot) return;
+      lineChecker.cancel();
+      const plan = planId === undefined ? undefined : snapshot.plans.find((p) => p.id === planId);
+      const draft = plan
+        ? draftFromPlan(
+            snapshot.planForm,
+            plan,
+            mobId ?? plan.mobs[0]?.mob ?? null,
+            snapshot.paddocks,
+          )
+        : newDraft(snapshot.planForm, mobId ?? null);
+      set({
+        plan: { draft, phase: 'edit' },
+        build: null,
+        move: null,
+        sow: null,
+        paddockId: null,
+        mobId: null,
+        tab: 'farm',
+      });
+    },
+
+    planEdit(patch) {
+      set((s) =>
+        s.plan
+          ? {
+              plan: {
+                ...s.plan,
+                draft: { ...s.plan.draft, ...patch },
+                phase: 'edit',
+                card: undefined,
+                message: undefined,
+              },
+            }
+          : {},
+      );
+    },
+
+    planTap(paddockId) {
+      const p = get().plan;
+      if (!p || p.phase === 'applying' || p.phase === 'done') return;
+      get().planEdit({ stops: toggleStop(p.draft.stops, paddockId) });
+    },
+
+    planMoveStop(index, by) {
+      const p = get().plan;
+      if (!p || p.phase === 'applying' || p.phase === 'done') return;
+      get().planEdit({ stops: moveStop(p.draft.stops, index, by) });
+    },
+
+    async planCheck() {
+      const { plan, snapshot } = get();
+      if (!plan || !snapshot || plan.phase === 'previewing' || plan.phase === 'applying') return;
+      const action = draftAction(plan.draft, snapshot.paddocks, snapshot.planForm);
+      if (!action) return;
+      const mobName = snapshot.mobs.find((m) => m.id === plan.draft.mobId)?.name;
+      set({ plan: { ...plan, phase: 'previewing', mobName, message: undefined } });
+      try {
+        const r = await api.preview({ action });
+        const now = get().plan;
+        if (!now || now.phase !== 'previewing') return;
+        if (r.ok) set({ plan: { ...now, phase: 'confirm', card: r.card } });
+        else set({ plan: { ...now, phase: 'refused', message: r.message } });
+      } catch (e) {
+        const now = get().plan;
+        if (now) set({ plan: { ...now, phase: 'refused', message: messageOf(e) } });
+      }
+    },
+
+    async planConfirm() {
+      const { plan, snapshot } = get();
+      if (!plan || !snapshot || plan.phase !== 'confirm' || get().busy > 0) return;
+      const action = draftAction(plan.draft, snapshot.paddocks, snapshot.planForm);
+      if (!action) return;
+      set({ plan: { ...plan, phase: 'applying' } });
+      set((s) => ({ busy: s.busy + 1 }));
+      try {
+        const r = await api.act({ action });
+        const now = get().plan;
+        if (r.ok) {
+          set({ ...adopt(r.snapshot) });
+          if (now)
+            set({ plan: { ...now, phase: 'done', message: r.message, card: r.card ?? now.card } });
+        } else if (now) set({ plan: { ...now, phase: 'refused', message: r.message } });
+      } catch (e) {
+        const now = get().plan;
+        if (now) set({ plan: { ...now, phase: 'refused', message: messageOf(e) } });
+      } finally {
+        set((s) => ({ busy: s.busy - 1 }));
+      }
+    },
+
+    planBack() {
+      set((s) =>
+        s.plan ? { plan: { ...s.plan, phase: 'edit', card: undefined, message: undefined } } : {},
+      );
+    },
+
+    planEnd: () => set({ plan: null }),
+
+    sowPicking(paddockId, on) {
+      lineChecker.cancel();
+      set((s) => ({
+        sow: { ...(s.sow?.paddockId === paddockId ? s.sow : newPick(paddockId)), picking: on },
+        build: null,
+      }));
+    },
+
+    sowDrag(e) {
+      const { sow, snapshot } = get();
+      if (!sow || !snapshot) return;
+      set({ sow: dragPick(sow, snapshot.view, e) });
+    },
+
+    sowClear() {
+      set((s) => (s.sow ? { sow: { ...s.sow, cells: [], live: [], from: null } } : {}));
+    },
+
+    sowEnd: () => set({ sow: null }),
+
     selectTool(tool) {
       lineChecker.cancel();
       if (tool === 'look') {
@@ -536,6 +723,8 @@ export const useGame = create<GameState>()((set, get) => {
         paddockId: null,
         mobId: null,
         move: null,
+        plan: null,
+        sow: null,
         tab: 'farm',
       });
     },
@@ -678,7 +867,15 @@ export const useGame = create<GameState>()((set, get) => {
         corner: null,
         style: 'ok' as const,
       };
-      set({ build: newBuild('fix'), paddockId: null, mobId: null, move: null, tab: 'farm' });
+      set({
+        build: newBuild('fix'),
+        paddockId: null,
+        mobId: null,
+        move: null,
+        plan: null,
+        sow: null,
+        tab: 'farm',
+      });
       await previewPicked(job);
     },
 
@@ -686,7 +883,15 @@ export const useGame = create<GameState>()((set, get) => {
       const snapshot = get().snapshot;
       if (!snapshot) return;
       lineChecker.cancel();
-      set({ build: newBuild('gate'), paddockId: null, mobId: null, move: null, tab: 'farm' });
+      set({
+        build: newBuild('gate'),
+        paddockId: null,
+        mobId: null,
+        move: null,
+        plan: null,
+        sow: null,
+        tab: 'farm',
+      });
       const out = tapOutcome('gate', 'corner', snapshot.view, {
         square: -1,
         edge,

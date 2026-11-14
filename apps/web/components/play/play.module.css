@@ -1501,3 +1501,128 @@
   font-size: 9px;
   font-family: var(--font-body);
 }
+
+/* Plans */
+.plancard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.leg {
+  display: grid;
+  gap: 2px;
+}
+.chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  align-items: baseline;
+  font-weight: 700;
+}
+.planmob {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+.planhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.statetag {
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  white-space: nowrap;
+}
+.statetag[data-kind='run'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.statetag[data-kind='paused'],
+.statetag[data-kind='wait'] {
+  border-color: var(--coral);
+}
+.stoplist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.stoplist li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.stopname {
+  flex: 1 1 90px;
+  min-width: 0;
+  font-weight: 700;
+}
+.stoplist :global(.btn) {
+  min-height: var(--tap);
+}
+.stopno {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  font-size: 0.8125rem;
+}
+.check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+/* The order of the paddocks, drawn over the map. It never takes a tap. */
+.badges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid #000;
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
