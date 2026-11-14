@@ -8,6 +8,7 @@ import { stepDay } from '../sim/tick';
 import { SAVE_FORMAT_VERSION } from '../version';
 import { addSheepMob, occupiedAreas, sheepMobsOf, sheepWaterLitres } from './farm';
 import { sheepMobsRead, stockingRead } from './reads';
+import { headOf } from './simFlock';
 
 /* Sheep on a farm: putting them on, the daily tick, saves, and the rule of one mob to an area. */
 
@@ -93,7 +94,7 @@ describe('sheep on a farm', () => {
       stepDay(b);
     }
     expect(farmHash(a)).toBe(farmHash(b));
-    expect(sheepMobsOf(a).reduce((n, m) => n + m.sheep.length, 0)).toBeGreaterThan(200);
+    expect(sheepMobsOf(a).reduce((n, m) => n + headOf(m.sheep), 0)).toBeGreaterThan(200);
     const c = loadFarm(JSON.parse(JSON.stringify(saveFarm(a))));
     expect(farmHash(c)).toBe(farmHash(a));
     for (let d = 0; d < 30; d++) {
@@ -110,7 +111,7 @@ describe('sheep on a farm', () => {
     // Joining starts on 1 April (day 31); weaning is 14 weeks after lambing starts.
     for (let d = 0; d < 300; d++) {
       const r = stepDay(farm);
-      lambs += r.lambs?.length ?? 0;
+      lambs += (r.lambs ?? []).reduce((t, x) => t + x.count, 0);
       for (const e of r.events) {
         if (e.type === 'sheep') types.add(e.note.type);
         else types.add(e.type);

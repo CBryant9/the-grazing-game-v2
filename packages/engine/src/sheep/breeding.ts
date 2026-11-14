@@ -26,6 +26,7 @@ import {
 } from '../data/sheep';
 import { clamp } from '../num';
 import type { Rng } from '../rng';
+import { binomial } from './counts';
 import type { Sheep } from './types';
 
 /** Rams a joining needs: 1% of the ewes plus one (call C13). */
@@ -124,29 +125,42 @@ export function lambingRisk(
 }
 
 /**
- * A newborn lamb's fate, drawn at birth (one draw). Of the lambs that die
- * before marking, `LAMB_EARLY_SHARE` die in the first 3 days: `doomed` is
- * the days it has left after its first (0 or 1), or -1. The rest die at a daily `risk` from
- * 3 days to `MARK_DAYS` old.
+ * How newborn lambs die before marking, for a survival to marking. Of the
+ * lambs that die, `LAMB_EARLY_SHARE` die in their first 3 days (`early`, a
+ * share of the lambs born); the rest die at a daily `risk` from 3 days to
+ * `MARK_DAYS` old.
  */
-export function lambFate(survival: number, rng: Rng): { doomed: number; risk: number } {
+export function lambLoss(survival: number): { early: number; risk: number } {
   const loss = 1 - survival;
   const early = loss * LAMB_EARLY_SHARE;
-  const u = rng.next();
-  // The day of an early death comes from the same draw, so it costs nothing extra.
-  // `doomed` 0 dies on its first day after birth, 1 on its second: inside its first 3 days.
-  if (u < early) return { doomed: Math.min(1, Math.floor((u / early) * 2)), risk: 0 };
   const late = (loss - early) / Math.max(1e-9, 1 - early);
-  return { doomed: -1, risk: 1 - Math.pow(1 - late, 1 / (MARK_DAYS - 3)) };
+  return { early, risk: 1 - Math.pow(1 - late, 1 / (MARK_DAYS - 3)) };
 }
 
-/** A new lamb. Ram lambs are entire until the marking count. */
+/**
+ * The fate of `count` lambs just born: how many die on their first and
+ * second day after birth (counts from the seeded stream), and the daily risk
+ * for the rest to marking.
+ */
+export function lambFates(
+  count: number,
+  survival: number,
+  rng: Rng,
+): { doomed: number; doomed2: number; risk: number } {
+  const { early, risk } = lambLoss(survival);
+  const e = binomial(count, early, rng);
+  const d1 = binomial(e, 0.5, rng);
+  return { doomed: d1, doomed2: e - d1, risk };
+}
+
+/** A record of `n` new lambs of one sex. Ram lambs are entire until the marking count. */
 export function newLamb(
   ids: AnimalIds,
   dam: Sheep,
   sire: { breed: SheepBreed; srw: number },
   litter: number,
   female: boolean,
+  n = 1,
 ): Sheep {
   const breed: SheepBreed = dam.breed === 'merino' && sire.breed === 'merino' ? 'merino' : 'xb';
   const srw = (dam.srw + sire.srw) / 2;
@@ -154,6 +168,7 @@ export function newLamb(
   const csLost = dam.csJoin > 0 && dam.csScan > 0 ? dam.csJoin - dam.csScan : 0;
   return {
     id: ids.next++,
+    n,
     sex: female ? 'F' : 'M',
     breed,
     srw,
@@ -165,7 +180,8 @@ export function newLamb(
     preg: -1,
     litter: 0,
     lact: -1,
-    reared: 0,
+    // For a lamb: the litter it was born in.
+    reared: litter,
     parity: 0,
     oes: -1,
     csJoin: 0,
@@ -179,7 +195,8 @@ export function newLamb(
     woolDays: 0,
     flyCover: 0,
     struck: -1,
-    doomed: -1,
+    doomed: 0,
+    doomed2: 0,
     lambRisk: 0,
     paid: 0,
     cost: 0,

@@ -2,9 +2,12 @@
  * Sheep, and a sheep mob (milestone 2.3).
  *
  * The sheep model has the cattle model's shape (docs/MODEL.md, section 3,
- * and the sheep section): each animal is kept on its own, eats from the one
- * grass model, and gains, breeds, grows wool and may die. A sheep mob is
- * kept apart from the cattle mobs (`farm.sheep`), so a farm with no sheep
+ * and the sheep section): animals eat from the one grass model, and gain,
+ * breed, grow wool and may die. Sheep are run in mobs, not tagged one by
+ * one, so a sheep record stands for `n` like animals (same class, age,
+ * pregnancy, litter, lambs at foot, history) and the figures on it are each
+ * animal's. Deaths, conceptions and strikes are drawn as counts. A sheep mob
+ * is kept apart from the cattle mobs (`farm.sheep`), so a farm with no sheep
  * plays exactly as it did before sheep existed.
  */
 
@@ -23,8 +26,10 @@ export type SheepSex = 'F' | 'M' | 'W';
 export type SheepClass = 'lamb' | 'weaner' | 'hogget' | 'ewe' | 'wether' | 'ram';
 
 export interface Sheep {
-  /** Tag number. Shares the farm's tag numbers with the cattle. Never 0. */
+  /** The record's number, from the farm's tag count (shared with the cattle). Never 0. */
   id: number;
+  /** Head this record stands for. A record with none left is taken out. */
+  n: number;
   sex: SheepSex;
   breed: SheepBreed;
   /** Standard reference weight, kg: the mature weight of a ewe of its kind at CS 3. */
@@ -37,7 +42,7 @@ export interface Sheep {
   cond: number;
   /** False while a lamb is at foot. */
   weaned: boolean;
-  /** A lamb's dam, by tag number. 0 means none. */
+  /** Lambs at foot: the record of their dams. 0 means none (an orphan, or not a lamb). */
   dam: number;
   /**
    * Days pregnant, -1 when not. NOT FOR THE PLAYER'S SCREENS: the reads show
@@ -48,7 +53,7 @@ export interface Sheep {
   litter: number;
   /** Days since lambing while she has lambs at foot. -1 means dry. */
   lact: number;
-  /** Lambs she has had at foot at the last lambing (for her milk). */
+  /** Lambs each ewe had at the last lambing; for a lamb, the litter it was born in. */
   reared: number;
   /** Times she has lambed. */
   parity: number;
@@ -76,15 +81,17 @@ export interface Sheep {
   flyCover: number;
   /** Days since a flystrike, 0 to 6, or -1 when not struck in the last 7 days. */
   struck: number;
-  /** A newborn lamb that will die in its first 3 days: the days it has left, else -1. */
+  /** Newborn lambs of this record that die on their first day after birth (drawn at birth). */
   doomed: number;
+  /** ...and on their second day. Both inside the first 3 days of life. */
+  doomed2: number;
   /** A lamb's daily death risk from 3 days old to marking, worked out at birth. 0 for others. */
   lambRisk: number;
   /** What was paid for the sheep, dollars. 0 if bred on the farm. */
   paid: number;
   /** Running cost for the stock book, dollars. */
   cost: number;
-  /** Died today. Taken out of the mob at the end of the day. */
+  /** True when every head of the record died today. Taken out at the end of the day. */
   dead: boolean;
   /** What it ate today, kg DM, pasture only. Undefined until its first day. */
   di: number | undefined;

@@ -211,6 +211,7 @@ interface PackedSheep {
 
 const SHEEP_INTS = [
   'id',
+  'n',
   'age',
   'dam',
   'preg',
@@ -224,6 +225,7 @@ const SHEEP_INTS = [
   'flyCover',
   'struck',
   'doomed',
+  'doomed2',
 ] as const satisfies readonly (keyof Sheep)[];
 const SHEEP_NUMS = [
   'srw',

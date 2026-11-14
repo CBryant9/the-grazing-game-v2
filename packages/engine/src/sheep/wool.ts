@@ -91,10 +91,10 @@ export function shearMob(m: SheepMob, day: number): ShearResult {
   let days = 0;
   for (const s of m.sheep) {
     if (s.dead || !s.weaned) continue;
-    head++;
-    clean += s.fleece;
-    mk += s.micronKg;
-    days += s.woolDays;
+    head += s.n;
+    clean += s.fleece * s.n;
+    mk += s.micronKg * s.n;
+    days += s.woolDays * s.n;
     s.fleece = 0;
     s.micronKg = 0;
     s.woolDays = 0;
@@ -115,7 +115,7 @@ export function crutchMob(m: SheepMob, day: number): number {
   let head = 0;
   for (const s of m.sheep) {
     if (s.dead || !s.weaned) continue;
-    head++;
+    head += s.n;
     s.flyCover = FLYSTRIKE.protectDays;
   }
   m.crutched = day;

@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  flock,
-  heldRun,
-  pastJoining,
-  testMob,
-  testSheep,
-  testRngs,
-} from '../../test-support/sheep';
+import { heldRun, pastJoining, testMob, testSheep, testRngs } from '../../test-support/sheep';
 import type { SheepBreed } from '../data/sheep';
-import { drawLitter, foetusesPerEwe, lambingRisk, ramsNeeded } from '../sheep/breeding';
+import {
+  foetusesPerEwe,
+  lambingRisk,
+  litterMean,
+  litterShares,
+  ramsNeeded,
+} from '../sheep/breeding';
+import { multinomial } from '../sheep/counts';
 import { heldDiet, type SheepDiet } from '../sheep/graze';
-import type { FlockDayResult } from '../sheep/simFlock';
+import { headOf, type FlockDayResult } from '../sheep/simFlock';
 import { fleeceMicron } from '../sheep/wool';
 import type { Sheep, SheepMob } from '../sheep/types';
 
@@ -43,12 +43,9 @@ interface JoinResult {
 
 /** A 5-week joining from day 0, ewes held at their CS, rams at 1% plus one. */
 function joinRun(breed: SheepBreed, cs: number, n: number, seed: number, days = 81): JoinResult {
-  const ewes = flock(n, () => ({ sex: 'F', breed, cond: cs }));
-  const rams = flock(ramsNeeded(n), () => ({ sex: 'M', breed })).map((r, i) => ({
-    ...r,
-    id: n + 1 + i,
-  }));
-  const m = testMob([...ewes, ...rams]);
+  const ewes = testSheep({ id: 1, sex: 'F', breed, cond: cs, n });
+  const rams = testSheep({ id: 2, sex: 'M', breed, n: ramsNeeded(n) });
+  const m = testMob([ewes, rams]);
   const out: JoinResult = { joined: 0, pregnant: 0, foetuses: 0, firstLamb: -1 };
   heldRun(m, days, {
     start: APRIL,
@@ -69,29 +66,33 @@ function joinRun(breed: SheepBreed, cs: number, n: number, seed: number, days = 
   return out;
 }
 
-interface LambRecord {
+/** What happened to one lamb record (or a part split off it), by head. */
+interface LambRec {
   litter: number;
+  /** Lambs born in the record (0 for a part split off later). */
   born: number;
-  died: number | null;
-  cause: string | null;
-  bornKg: number;
+  /** Deaths before 3 days old, before 42 days old, and from 42 days to weaning. */
+  early: number;
+  to42: number;
+  after42: number;
+  /** Weight at 42 days old, at weaning, and age at weaning, or null. */
   at42: number | null;
   weanKg: number | null;
   weanAge: number | null;
+  weaned: number;
 }
 
 interface LambingResult {
   ewes: number;
   eweDeaths: number;
-  eweDeathsBy: Map<number, { ewes: number; died: number }>;
-  lambs: LambRecord[];
+  lambs: LambRec[];
   mob: SheepMob;
 }
 
 /**
- * Ewes `preg` days pregnant, with `litter` lambs each (or drawn for their
- * CS), held at their CS, run for `days`. Lambs are weaned when due unless
- * `wean` is false.
+ * Ewes `preg` days pregnant, with `litter` lambs each (or shared out over
+ * litters for their CS at joining), held at their CS unless told otherwise,
+ * run for `days`. Lambs are weaned when due.
  */
 function lambingRun(o: {
   breed: SheepBreed;
@@ -107,77 +108,97 @@ function lambingRun(o: {
   holdCs?: boolean;
 }): LambingResult {
   const rng = testRngs(o.seed + 1000);
-  const ewes = flock(o.n, () => ({
-    sex: 'F',
+  const base = {
+    sex: 'F' as const,
     breed: o.breed,
     cond: o.cs,
     preg: o.preg ?? 146,
-    litter: o.litter ?? drawLitter(o.litterCs ?? o.cs, o.breed, rng.breeding),
     csScan: o.cs,
     csJoin: o.cs,
-  }));
-  const byLitter = new Map<number, { ewes: number; died: number }>();
-  const litterOf = new Map<number, number>();
-  for (const e of ewes) {
-    litterOf.set(e.id, e.litter);
-    const r = byLitter.get(e.litter) ?? { ewes: 0, died: 0 };
-    r.ewes++;
-    byLitter.set(e.litter, r);
+  };
+  const ewes: Sheep[] = [];
+  if (o.litter !== undefined) ewes.push(testSheep({ ...base, id: 1, n: o.n, litter: o.litter }));
+  else {
+    const sh = litterShares(litterMean(o.litterCs ?? o.cs, o.breed));
+    const by = multinomial(o.n, [sh[1], sh[2], sh[3]], rng.breeding);
+    by.forEach((c, i) => {
+      if (c > 0) ewes.push(testSheep({ ...base, id: i + 1, n: c, litter: i + 1 }));
+    });
   }
   const m = testMob(ewes);
   m.join = pastJoining(o.n);
-  const lambs = new Map<number, LambRecord>();
+  const lambs = new Map<number, LambRec>();
+  const rec = (s: Sheep): LambRec => {
+    let r = lambs.get(s.id);
+    if (!r) {
+      r = {
+        litter: s.reared,
+        born: 0,
+        early: 0,
+        to42: 0,
+        after42: 0,
+        at42: null,
+        weanKg: null,
+        weanAge: null,
+        weaned: 0,
+      };
+      lambs.set(s.id, r);
+    }
+    return r;
+  };
   let eweDeaths = 0;
   heldRun(m, o.days, {
     start: APRIL,
     diet: o.diet ?? GOOD,
     seed: o.seed,
     holdCs: o.holdCs ?? true,
-    each: (day, r: FlockDayResult, mob) => {
+    each: (_day, r: FlockDayResult, mob) => {
       for (const b of r.births) {
-        lambs.set(b.id, {
-          litter: litterOf.get(b.dam) ?? 0,
-          born: day,
-          died: null,
-          cause: null,
-          bornKg: b.wt,
-          at42: null,
-          weanKg: null,
-          weanAge: null,
-        });
+        // Lambs of ewes that died lambing are left out, as lamb survival leaves them out.
+        if (b.dead) continue;
+        rec(b).born += b.n;
       }
       for (const d of r.deaths) {
-        const rec = lambs.get(d.sheep.id);
-        if (rec) {
-          rec.died = day;
-          rec.cause = d.cause;
-        } else if (litterOf.has(d.sheep.id)) {
-          eweDeaths++;
-          byLitter.get(litterOf.get(d.sheep.id)!)!.died++;
+        const s = d.sheep;
+        if (d.cause === 'lambing' && !s.weaned) continue;
+        if (s.age > 300) {
+          eweDeaths += d.count;
+          continue;
         }
+        if (s.weaned) continue;
+        const x = rec(s);
+        if (s.age < 3) x.early += d.count;
+        if (s.age < 42) x.to42 += d.count;
+        else x.after42 += d.count;
       }
       for (const s of mob.sheep) {
-        const rec = lambs.get(s.id);
-        if (!rec) continue;
-        if (s.age === 42) rec.at42 = s.wt;
-        if (s.weaned && rec.weanKg === null) {
-          rec.weanKg = s.wwt;
-          rec.weanAge = s.wage;
+        if (s.age > 300) continue;
+        const x = rec(s);
+        if (s.age === 42 && !s.weaned) x.at42 = s.wt;
+        if (s.weaned && x.weanKg === null) {
+          x.weanKg = s.wwt;
+          x.weanAge = s.wage;
+          x.weaned = s.n;
         }
       }
     },
   });
-  return { ewes: o.n, eweDeaths, eweDeathsBy: byLitter, lambs: [...lambs.values()], mob: m };
+  return { ewes: o.n, eweDeaths, lambs: [...lambs.values()], mob: m };
 }
 
 /** Lambs alive at marking (42 days old) as a share of lambs born, leaving out lambs whose ewe died lambing. */
-function survival(lambs: LambRecord[], litter?: number): number {
-  const l = lambs.filter(
-    (x) => (litter === undefined || x.litter === litter) && x.cause !== 'lambing',
-  );
-  const alive = l.filter((x) => x.died === null || x.died - x.born >= 42).length;
-  return alive / l.length;
+function survival(lambs: LambRec[], litter?: number): number {
+  const l = lambs.filter((x) => litter === undefined || x.litter === litter);
+  const born = l.reduce((t, x) => t + x.born, 0);
+  const lost = l.reduce((t, x) => t + x.to42, 0);
+  return (born - lost) / born;
 }
+
+/** Head-weighted mean of `v` over records with weight `w`. */
+const wmean = (pairs: [number, number][]): number => {
+  const w = pairs.reduce((t, [, k]) => t + k, 0);
+  return pairs.reduce((t, [v, k]) => t + v * k, 0) / w;
+};
 
 describe('sheep benchmarks: mob', () => {
   it('SB-29 the first lambs come about day 150 from the start of joining (147 days gestation)', () => {
@@ -246,16 +267,17 @@ describe('sheep benchmarks: mob', () => {
 
   it('SB-38 70% or more of lamb deaths from birth to weaning are in the first 3 days', () => {
     const r = lambingRun({ breed: 'merino', cs: 3, n: 3000, seed: 17, days: 110 });
-    const dead = r.lambs.filter((x) => x.died !== null && x.cause !== 'lambing');
-    const early = dead.filter((x) => x.died! - x.born < 3).length;
-    expect(early / dead.length).toBeGreaterThanOrEqual(0.7);
+    const early = r.lambs.reduce((t, x) => t + x.early, 0);
+    const all = r.lambs.reduce((t, x) => t + x.to42 + x.after42, 0);
+    expect(early / all).toBeGreaterThanOrEqual(0.7);
   });
 
   it('SB-39 lamb deaths from marking to weaning are under 1%', () => {
     const r = lambingRun({ breed: 'merino', cs: 3, n: 3000, seed: 18, days: 110 });
-    const marked = r.lambs.filter((x) => x.died === null || x.died - x.born >= 42);
-    const lost = marked.filter((x) => x.died !== null && x.weanKg === null).length;
-    expect(lost / marked.length).toBeLessThan(0.01);
+    const born = r.lambs.reduce((t, x) => t + x.born, 0);
+    const marked = born - r.lambs.reduce((t, x) => t + x.to42, 0);
+    const lost = r.lambs.reduce((t, x) => t + x.after42, 0);
+    expect(lost / marked).toBeLessThan(0.01);
   });
 
   it('SB-42 ewe deaths from scanning to marking: singles 0.5 to 3.0%, twins 1.2 to 5.0%, triplets 1.8 to 14.5%', () => {
@@ -313,15 +335,14 @@ describe('sheep benchmarks: mob', () => {
    * weight path.
    */
   function weanerYear(wwt: number, g: number, seed: number, n = 6000): number {
-    const sheep = flock(n, () => ({ sex: 'W', wt: wwt, age: 98, wwt, wage: 98, adg: g / 1000 }));
-    const m = testMob(sheep);
+    const m = testMob([testSheep({ sex: 'W', wt: wwt, age: 98, wwt, wage: 98, adg: g / 1000, n })]);
     let f = 0.5;
     heldRun(m, 365, {
       start: { year: 2021, month: 11 },
       diet: GOOD,
       seed,
       f: (day, mob) => {
-        const s = mob.sheep[0]!;
+        const s = mob.sheep.find((x) => x.struck < 0) ?? mob.sheep[0]!;
         const target = wwt + (g / 1000) * (day + 1);
         f = Math.min(1, Math.max(0.05, f + (target - s.wt) * 0.2));
         return f;
@@ -331,7 +352,7 @@ describe('sheep benchmarks: mob', () => {
         for (const s of mob.sheep) s.flyCover = 1;
       },
     });
-    return ((n - m.sheep.length) / n) * 100;
+    return ((n - headOf(m.sheep)) / n) * 100;
   }
 
   it('SB-45 Merino weaners weaned at about 24 kg and growing about 60 g a day lose 0 to 2% in the first year', () => {
@@ -354,8 +375,7 @@ describe('sheep benchmarks: mob', () => {
         diet: heldDiet(foo - 300, 0.72),
         holdCs: false,
       });
-      const w = r.lambs.filter((x) => x.weanKg !== null).map((x) => x.weanKg!);
-      return w.reduce((a, b) => a + b, 0) / w.length;
+      return wmean(r.lambs.filter((x) => x.weanKg !== null).map((x) => [x.weanKg!, x.weaned]));
     };
     within(wean(800, 41), 11, 17);
     within(wean(3000, 42), 25, 31);
@@ -373,8 +393,11 @@ describe('sheep benchmarks: mob', () => {
     });
     for (const lit of [1, 2]) {
       const l = r.lambs.filter((x) => x.litter === lit && x.weanKg !== null && x.at42 !== null);
-      const g = l.map((x) => ((x.weanKg! - x.at42!) / (x.weanAge! - 42)) * 1000);
-      within(g.reduce((a, b) => a + b, 0) / g.length, 175, 220);
+      within(
+        wmean(l.map((x) => [((x.weanKg! - x.at42!) / (x.weanAge! - 42)) * 1000, x.weaned])),
+        175,
+        220,
+      );
     }
   });
 

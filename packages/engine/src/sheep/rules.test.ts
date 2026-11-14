@@ -18,7 +18,8 @@ import {
   birthKg,
   canJoin,
   cycleConception,
-  lambFate,
+  lambFates,
+  lambLoss,
   lambSurvival,
   lambingRisk,
   litterShares,
@@ -36,6 +37,7 @@ import {
   pregnancyMJ,
   sheepClassOf,
 } from './energy';
+import { binomial, multinomial } from './counts';
 import { heldDiet } from './graze';
 import { dressingShare, carcaseKg, fleeceOf } from './reads';
 import { dailyDeathRisk, weanerDailyRisk } from './simFlock';
@@ -151,20 +153,37 @@ describe('sheep breeding', () => {
     expect(lambSurvival(1, 3, 'merino')).toBeGreaterThanOrEqual(0.05);
   });
 
-  it("a lamb's fate: early deaths are 80% of the losses, inside the first days", () => {
+  it("lambs' fates: early deaths are 80% of the losses, on the first or second day", () => {
     const rng = testRngs(9).breeding;
-    let early = 0;
-    let lateRisk = 0;
-    const n = 20000;
-    for (let i = 0; i < n; i++) {
-      const f = lambFate(0.8, rng);
-      if (f.doomed >= 0) {
-        early++;
-        expect(f.doomed).toBeLessThanOrEqual(1);
-      } else lateRisk = f.risk;
+    const n = 200_000;
+    const f = lambFates(n, 0.8, rng);
+    expect((f.doomed + f.doomed2) / n).toBeCloseTo(0.2 * LAMB_EARLY_SHARE, 2);
+    expect(f.doomed / (f.doomed + f.doomed2)).toBeCloseTo(0.5, 1);
+    expect(f.risk).toBeGreaterThan(0);
+    expect(lambLoss(0.8).early).toBeCloseTo(0.16, 9);
+  });
+
+  it('counts: draws on head counts are exact in the mean and repeatable from the seed', () => {
+    for (const [n, p] of [
+      [30, 0.3],
+      [5000, 0.002],
+      [5000, 0.4],
+      [100_000, 0.9],
+    ] as const) {
+      const a = testRngs(3).deaths;
+      const b = testRngs(3).deaths;
+      let t = 0;
+      for (let i = 0; i < 400; i++) {
+        const k = binomial(n, p, a);
+        expect(k).toBe(binomial(n, p, b));
+        expect(k).toBeGreaterThanOrEqual(0);
+        expect(k).toBeLessThanOrEqual(n);
+        t += k;
+      }
+      expect(t / 400 / (n * p)).toBeCloseTo(1, 1);
     }
-    expect(early / n).toBeCloseTo(0.2 * LAMB_EARLY_SHARE, 2);
-    expect(lateRisk).toBeGreaterThan(0);
+    const shares = multinomial(10_000, [0.2, 0.3, 0.5], testRngs(4).breeding);
+    expect(shares.reduce((x, y) => x + y, 0)).toBe(10_000);
   });
 
   it('lambing risk is higher for twins, crossbreds, thin ewes and ewes losing condition', () => {
@@ -223,7 +242,7 @@ describe('sheep breeding', () => {
 
   it('a ewe whose last lamb dies is dried off', () => {
     const ewe = testSheep({ id: 1, lact: 0, reared: 1 });
-    const lamb = testSheep({ id: 2, weaned: false, dam: 1, wt: 4, age: 0, doomed: 0 });
+    const lamb = testSheep({ id: 2, weaned: false, dam: 1, wt: 4, age: 0, doomed: 1 });
     const m = testMob([ewe, lamb]);
     m.join = pastJoining(1);
     heldRun(m, 1, { diet: heldDiet(1500, 0.7), seed: 1 });

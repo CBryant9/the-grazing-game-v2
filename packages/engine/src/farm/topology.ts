@@ -265,6 +265,28 @@ export function areaEdges(
   return out;
 }
 
+/**
+ * The grazing area on the other side of an edge from `areaId`, or -1 for
+ * the farm boundary. A new helper (milestone 2.3): no existing rule reads it.
+ */
+export function areaAcross(topology: Topology, e: EdgeRef, areaId: number): number {
+  const of = topology.areaOf;
+  let a: number;
+  let b: number;
+  if (e.line === 'h') {
+    const vy = Math.floor(e.index / GRID_W);
+    const x = e.index % GRID_W;
+    a = vy > 0 ? of[(vy - 1) * GRID_W + x]! : -1;
+    b = vy < GRID_H ? of[vy * GRID_W + x]! : -1;
+  } else {
+    const y = Math.floor(e.index / (GRID_W + 1));
+    const vx = e.index % (GRID_W + 1);
+    a = vx > 0 ? of[y * GRID_W + vx - 1]! : -1;
+    b = vx < GRID_W ? of[y * GRID_W + vx]! : -1;
+  }
+  return a === areaId ? b : a;
+}
+
 /** How the grazing areas changed between two layouts. */
 export interface AreaChanges {
   /**

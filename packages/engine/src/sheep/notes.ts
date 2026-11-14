@@ -10,8 +10,14 @@ export type SheepNote =
   | { type: 'shortOfFeed'; f: number }
   /** Average CS is under 2 (at most once a month). */
   | { type: 'lowCondition'; cs: number }
-  /** The mob has lost weight for 10 days running, on feed of this energy and protein. */
-  | { type: 'losingWeight'; me: number; cp: number }
+  /**
+   * The mob has lost weight for 10 days running, on feed of this energy and
+   * protein, with the reasons that apply, in this order (the cattle
+   * warnings' reasons): not enough feed where they graze, low energy (ME
+   * under 8), protein under 7%, ewes milking, ewes in late pregnancy. An
+   * empty list means intake is just short of needs.
+   */
+  | { type: 'losingWeight'; me: number; cp: number; why: SheepLossReason[] }
   /** Joining started: ewes ready to join, rams in the mob, rams the joining needs. */
   | { type: 'joiningStarted'; ewes: number; rams: number; ramsNeeded: number }
   /** The 5 weeks of joining are over. */
@@ -28,6 +34,20 @@ export type SheepNote =
   /** Sheep struck by flies today. */
   | { type: 'flystrike'; count: number };
 
-/** Why a sheep died. */
+/** Why a sheep mob is losing weight (see `losingWeight`). */
+export type SheepLossReason = 'lowFeed' | 'lowEnergy' | 'lowProtein' | 'milking' | 'latePregnancy';
+
+/**
+ * Why a sheep died. `weaner` is a weaner in its first year after weaning
+ * dying of being light or not growing (MMFS ch. 10.4, S17: deaths rise as
+ * weaning weight and growth after weaning fall).
+ */
 export type SheepDeathCause =
-  'noWater' | 'poorCondition' | 'lambing' | 'newborn' | 'orphaned' | 'flystrike' | 'natural';
+  | 'noWater'
+  | 'poorCondition'
+  | 'lambing'
+  | 'newborn'
+  | 'orphaned'
+  | 'flystrike'
+  | 'weaner'
+  | 'natural';

@@ -20,10 +20,11 @@ import {
   type SheepGroupSpec,
 } from '../src/sheep/farm';
 import { crutchMob, shearMob, type ShearResult } from '../src/sheep/wool';
+import { headOf } from '../src/sheep/simFlock';
 import { createFarm } from '../src/sim/create';
 import { surveyOf } from '../src/sim/derived';
 import type { FarmState } from '../src/sim/state';
-import { stepDay } from '../src/sim/tick';
+import { stepDay, type DayResult } from '../src/sim/tick';
 import type { SheepDiet } from '../src/sheep/graze';
 import {
   settleSheepDeaths,
@@ -59,8 +60,10 @@ export interface SheepYearCase {
   /** Farm days to shear and crutch on. Shorn on day 0 if left out. */
   shear?: number[];
   crutch?: number[];
+  /** Called with each day's result. */
+  onDay?: (res: DayResult) => void;
   /** Called after each day, to read figures part way. */
-  probe?: (day: number, farm: FarmState, startIds: ReadonlySet<number>) => void;
+  probe?: (day: number, farm: FarmState, isStart: (s: Sheep) => boolean) => void;
 }
 
 export interface SheepYearRun {
@@ -131,23 +134,24 @@ export function sheepYearRun(
   }
   if (c.stock === 'ewes') {
     const ramBreed = c.ramBreed ?? c.breed;
-    const n = ramsNeeded(m.sheep.length);
-    for (let i = 0; i < n; i++) {
-      m.sheep.push(
-        makeSheep(farm.animalIds.next++, {
-          sex: 'M',
-          breed: ramBreed,
-          srw: ramBreed === 'xb' ? SRW.xb : SRW.merino,
-          age: 1095,
-          cs: 3,
-          wt: matureKg({ srw: ramBreed === 'xb' ? SRW.xb : SRW.merino, sex: 'M' }),
-          weaned: true,
-        }),
-      );
-    }
+    m.sheep.push(
+      makeSheep(farm.animalIds.next++, {
+        sex: 'M',
+        breed: ramBreed,
+        srw: ramBreed === 'xb' ? SRW.xb : SRW.merino,
+        age: 1095,
+        cs: 3,
+        wt: matureKg({ srw: ramBreed === 'xb' ? SRW.xb : SRW.merino, sex: 'M' }),
+        weaned: true,
+        n: ramsNeeded(headOf(m.sheep)),
+      }),
+    );
   }
-  const start = new Set(m.sheep.filter((s) => s.sex !== 'M').map((s) => s.id));
-  const head = start.size;
+  // The sheep put on at the start, not the rams: records split as the year goes, so they
+  // are told apart from the lambs born on the farm by their age.
+  const age0 = m.sheep[0]!.age;
+  const isStart = (s: Sheep, day: number): boolean => s.sex !== 'M' && s.age >= age0 + day;
+  const head = headOf(m.sheep.filter((s) => s.sex !== 'M'));
   const shorn: ShearResult[] = [];
   const shearDays = new Set(c.shear ?? [0]);
   const crutchDays = new Set(c.crutch ?? []);
@@ -158,26 +162,28 @@ export function sheepYearRun(
       if (shearDays.has(d)) shorn.push(shearMob(mob, d));
       if (crutchDays.has(d)) crutchMob(mob, d);
       if (csAtLambing === null && mob.join && mob.join.lambingStart >= 0) {
-        const ewes = mob.sheep.filter((s) => s.sex === 'F' && start.has(s.id));
-        csAtLambing = ewes.reduce((t, s) => t + s.cond, 0) / ewes.length;
+        const ewes = mob.sheep.filter((s) => s.sex === 'F' && isStart(s, d));
+        csAtLambing = ewes.reduce((t, s) => t + s.cond * s.n, 0) / headOf(ewes);
       }
     }
-    stepDay(farm, env);
-    c.probe?.(d, farm, start);
+    const res = stepDay(farm, env);
+    c.onDay?.(res);
+    c.probe?.(d, farm, (s) => isStart(s, d + 1));
   }
-  const alive = sheepMobsOf(farm).flatMap((x) => x.sheep.filter((s) => start.has(s.id)));
-  const fleece = alive.reduce((t, s) => t + s.fleece, 0);
-  const mk = alive.reduce((t, s) => t + s.micronKg, 0);
+  const alive = sheepMobsOf(farm).flatMap((x) => x.sheep.filter((s) => isStart(s, c.days)));
+  const aliveHead = headOf(alive);
+  const fleece = alive.reduce((t, s) => t + s.fleece * s.n, 0);
+  const mk = alive.reduce((t, s) => t + s.micronKg * s.n, 0);
   const own = sheepMobsOf(farm).find((x) => x.id === m.id) ?? null;
   return {
     seed,
     farm,
     head,
-    deathsPct: ((head - alive.length) / head) * 100,
+    deathsPct: ((head - aliveHead) / head) * 100,
     join: own ? own.join : null,
     csAtLambing,
     shorn,
-    fleeceKg: alive.length ? fleece / alive.length : 0,
+    fleeceKg: aliveHead ? fleece / aliveHead : 0,
     micron: fleece > 0 ? mk / fleece : 0,
   };
 }
@@ -273,7 +279,12 @@ export function heldRun(m: SheepMob, days: number, o: HeldRunOptions): { ids: { 
   const start = o.start ?? { year: 2021, month: 2 };
   const rng = testRngs(o.seed ?? 1);
   const ids = { next: m.sheep.reduce((x, s) => Math.max(x, s.id), 0) + 1 };
-  const hold = o.holdCs ? new Map(m.sheep.map((s) => [s.id, { wt: s.wt, cond: s.cond }])) : null;
+  // Held figures by kind (records split and take new numbers): sex, breed and SRW.
+  const kind = (s: Sheep): string => s.sex + s.breed + s.srw;
+  const age0 = Math.min(...m.sheep.filter((s) => s.weaned).map((s) => s.age));
+  const hold = o.holdCs
+    ? new Map(m.sheep.filter((s) => s.weaned).map((s) => [kind(s), { wt: s.wt, cond: s.cond }]))
+    : null;
   for (let k = 0; k < days; k++) {
     const day = (o.day0 ?? 0) + k;
     if (o.wean !== false && sheepWeaningDue(m, day)) weanLambs(m);
@@ -294,10 +305,10 @@ export function heldRun(m: SheepMob, days: number, o: HeldRunOptions): { ids: { 
       ids,
       rng,
     });
-    settleSheepDeaths([m], res.deaths, byId);
+    settleSheepDeaths([m], res.deaths, byId, ids, rng.deaths);
     if (hold) {
       for (const s of m.sheep) {
-        const h = hold.get(s.id);
+        const h = s.weaned && s.age >= age0 + k + 1 ? hold.get(kind(s)) : undefined;
         if (h) {
           s.wt = h.wt;
           s.cond = h.cond;

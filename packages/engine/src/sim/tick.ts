@@ -33,7 +33,7 @@ import { fieldTick } from '../crops/tick';
 import { HEALTH_COST_PER_HEAD_YEAR } from '../data/cattle';
 import { DISTRICTS } from '../data/districts';
 import { knockDownTape, type Survey } from '../farm/layout';
-import { EDGE, areaEdges } from '../farm/topology';
+import { EDGE, areaAcross, areaEdges } from '../farm/topology';
 import { drainPortables, waterNeedPerHead } from '../farm/water';
 import { GRID_N } from '../grid';
 import { INTEREST, overheadsPerYear } from '../money/costs';
@@ -58,7 +58,13 @@ import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { runPlans, stopsToday } from './plans';
-import { mergeSheepShared, sheepDay, sheepMobsOf, sheepWaterLitres } from '../sheep/farm';
+import {
+  mergeSheepShared,
+  sheepAreas,
+  sheepDay,
+  sheepMobsOf,
+  sheepWaterLitres,
+} from '../sheep/farm';
 import type { SheepDeathCause } from '../sheep/notes';
 import {
   PLAY_STREAMS,
@@ -105,10 +111,10 @@ export interface DayResult {
   deaths: { id: number; kind: AnimalKind; mob: number; cause: DeathCause }[];
   /** Every calf born today. */
   births: { id: number; mob: number }[];
-  /** Every sheep that died today. Left out on a farm with no sheep. */
-  sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause }[];
-  /** Every lamb born today. Left out on a farm with no sheep. */
-  lambs?: { id: number; mob: number }[];
+  /** Sheep that died today, head by record, mob and cause. Left out on a farm with no sheep. */
+  sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause; count: number }[];
+  /** Lambs born today, by record and mob. Left out on a farm with no sheep. */
+  lambs?: { id: number; mob: number; count: number }[];
 }
 
 /** Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its area and the day's stops. */
@@ -381,7 +387,16 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       );
     if (rng.breakouts.next() > chance) continue;
     const areaId = survey.topology.areaOf[m.where.anchor]!;
-    const edges = areaEdges(survey.topology, farm.layout.fences, areaId, [EDGE.tape]);
+    let edges = areaEdges(survey.topology, farm.layout.fences, areaId, [EDGE.tape]);
+    // Cattle never push into a paddock that holds sheep: they take another
+    // tape, or stay put if every one leads to sheep (call, 15 Nov 2026). A
+    // farm with no sheep draws exactly as before.
+    if (farm.sheep && edges.length) {
+      const withSheep = sheepAreas(farm, survey);
+      if (withSheep.size) {
+        edges = edges.filter((e) => !withSheep.has(areaAcross(survey.topology, e, areaId)));
+      }
+    }
     if (!edges.length) continue;
     const edge = rng.breakouts.pick(edges);
     const down = knockDownTape(farm.layout, edge);

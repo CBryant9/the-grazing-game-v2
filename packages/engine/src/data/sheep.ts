@@ -60,8 +60,8 @@ export const RAM = { srwFactor: 1.8, maintFactor: 1.25 } as const;
  */
 export const DSE_MJ = 8.3;
 
-/** DSE to the AE: 8.4 (MLA S1, WA DPIRD S2; call C3). The cattle screens still say AE × 8. */
-export const DSE_PER_AE = 8.4;
+/** DSE to the AE: the one figure for every display, 8.4 (`data/stocking.ts`, call C3). */
+export { DSE_PER_AE } from './stocking';
 
 /**
  * The walk in the reference DSE, as the cattle walk factor reads it
@@ -149,6 +149,15 @@ export const GAIN_MJ = { base: 2, perShare: 50 } as const;
 
 /** MJ a kg of weight lost: the cattle model's 22 (MODEL.md, section 3). */
 export const LOSS_MJ = 22;
+
+/**
+ * Sheep younger than this, days, put most of a gain into frame, not
+ * condition (× 0.3 of a gain goes to CS, the cattle rule's share). STAND-IN:
+ * cattle use 900 days; sheep reach mature size younger (MMFS S25 joins
+ * maiden Merinos at 75 to 80% of SRW, ewe lambs at 7 to 10 months), so 18
+ * months is used. No figure was found.
+ */
+export const YOUNG_FRAME_DAYS = 540;
 
 /** The most a sheep gains in a day, kg. STAND-IN: a ceiling, not a target. */
 export const GAIN_CAP = 0.4;
@@ -332,12 +341,13 @@ export const JOIN_START: Partial<Record<DistrictId, { month: number; date: numbe
 // ---------------------------------------------------------------------------
 
 /**
- * Adult deaths outside lambing, a day: 0.8% a year. FITTED so breeding ewes
+ * Adult deaths outside lambing, a day: 0.4% a year. FITTED so breeding ewes
  * near CS 3 lose 2 to 4% a year with lambing and flystrike (Lifetime Wool
  * S19: 3.2% at the CS 3 baseline; AWI and MLA S67: under 4.5% a year;
- * SB-43). Wethers and rams take it too (call C7).
+ * SB-43). Refitted from 0.8% when sheep became records (the year runs then
+ * gave Merino ewes 4.2%). Wethers and rams take it too (call C7).
  */
-export const ADULT_DAILY = 0.008 / 365;
+export const ADULT_DAILY = 0.004 / 365;
 
 /**
  * A ewe's risk of dying at lambing, by litter: singles 1.35%, twins 3.05%,
@@ -484,6 +494,26 @@ export const SHEEP_WATER_L = {
  * 2026; docs/DATA.md). For the screens: it is not how long a sheep lives.
  */
 export const WATER_WELFARE_HOURS = 48;
+
+// ---------------------------------------------------------------------------
+// Sheep put on a farm (start flocks, and `addSheepMob` until the market)
+// ---------------------------------------------------------------------------
+
+/**
+ * A group put on the farm, when its age and weight are not given. All
+ * STAND-INS except the weaning weight:
+ * - age, days: adults 3 years, hoggets 15 months, weaners 5 months;
+ * - live weight as a share of mature weight at that CS: weaners 0.6,
+ *   hoggets 0.8 (adults are their mature weight);
+ * - weaned this many days ago: weaners 40, hoggets 300;
+ * - weaned at 45% of SRW (MMFS ch. 10.4, S17: wean at 45% of SRW or more).
+ */
+export const BOUGHT = {
+  ageDays: { adult: 1095, hogget: 455, weaner: 150 },
+  wtShare: { weaner: 0.6, hogget: 0.8 },
+  weanedDaysAgo: { weaner: 40, hogget: 300 },
+  weanShareOfSrw: 0.45,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Fences

@@ -18,7 +18,15 @@ import type { CalendarDate } from '../calendar';
 import type { GrazingLand } from '../cattle/types';
 import { squareGrazed } from '../crops/fields';
 import type { Survey } from '../farm/layout';
-import { JOIN_START, SHEEP_WATER_L, SRW, sheepDistrict, type SheepBreed } from '../data/sheep';
+import {
+  BOUGHT,
+  JOIN_START,
+  KG_PER_CS_SHARE,
+  SHEEP_WATER_L,
+  SRW,
+  sheepDistrict,
+  type SheepBreed,
+} from '../data/sheep';
 import { rngFromState, rngStream } from '../rng';
 import { areaIdOf, areaNameOf, grazingArea, placeAnchor } from '../sim/derived';
 import type { TickEvent } from '../sim/events';
@@ -26,7 +34,9 @@ import type { FarmState, MobWhere } from '../sim/state';
 import { matureKg } from './energy';
 import type { SheepDeathCause } from './notes';
 import {
+  headOf,
   lambsByDam,
+  lambsPerEwe,
   settleSheepDeaths,
   sheepWeaningDue,
   simFlock,
@@ -95,7 +105,7 @@ export type AddSheepResult =
   | { ok: true; mob: SheepMob }
   | { ok: false; reason: 'not-a-sheep-district' | 'area-occupied' | 'bad-request' };
 
-/** Make one sheep. Uses no random numbers. */
+/** Make a sheep record of `n` like animals (1 if left out). Uses no random numbers. */
 export function makeSheep(
   id: number,
   o: {
@@ -106,10 +116,12 @@ export function makeSheep(
     cs: number;
     wt: number;
     weaned: boolean;
+    n?: number;
   },
 ): Sheep {
   return {
     id,
+    n: o.n ?? 1,
     sex: o.sex,
     breed: o.breed,
     srw: o.srw,
@@ -135,7 +147,8 @@ export function makeSheep(
     woolDays: 0,
     flyCover: 0,
     struck: -1,
-    doomed: -1,
+    doomed: 0,
+    doomed2: 0,
     lambRisk: 0,
     paid: 0,
     cost: 0,
@@ -213,28 +226,28 @@ export function addSheepMob(farm: FarmState, survey: Survey, spec: AddSheepSpec)
   for (const g of spec.groups) {
     const sex: SheepSex = g.sex ?? (g.cls === 'wether' ? 'W' : g.cls === 'ram' ? 'M' : 'F');
     const adult = g.cls === 'ewe' || g.cls === 'wether' || g.cls === 'ram';
-    const age = g.ageDays ?? (adult ? 1095 : g.cls === 'hogget' ? 455 : 150);
+    const young = g.cls === 'hogget' ? 'hogget' : 'weaner';
+    const age = g.ageDays ?? (adult ? BOUGHT.ageDays.adult : BOUGHT.ageDays[young]);
     const cs = g.cs ?? 3;
     const mature = matureKg({ srw, sex });
-    const atCs = mature * (1 + 0.19 * (cs - 3));
-    const wt = g.wt ?? (adult ? atCs : atCs * (g.cls === 'hogget' ? 0.8 : 0.6));
-    for (let i = 0; i < g.head; i++) {
-      const s = makeSheep(farm.animalIds.next++, {
-        sex,
-        breed: spec.breed,
-        srw,
-        age,
-        cs,
-        wt,
-        weaned: true,
-      });
-      if (!adult) {
-        // Bought-in young sheep: weaned at about 45% of SRW (S17) some time ago.
-        s.wwt = 0.45 * srw;
-        s.wage = Math.max(1, age - (g.cls === 'weaner' ? 40 : 300));
-      }
-      m.sheep.push(s);
+    const atCs = mature * (1 + KG_PER_CS_SHARE * (cs - 3));
+    const wt = g.wt ?? (adult ? atCs : atCs * BOUGHT.wtShare[young]);
+    // One record for the group: like animals.
+    const s = makeSheep(farm.animalIds.next++, {
+      sex,
+      breed: spec.breed,
+      srw,
+      age,
+      cs,
+      wt,
+      weaned: true,
+      n: g.head,
+    });
+    if (!adult) {
+      s.wwt = BOUGHT.weanShareOfSrw * srw;
+      s.wage = Math.max(1, age - BOUGHT.weanedDaysAgo[young]);
     }
+    m.sheep.push(s);
   }
   state.mobs.push(m);
   return { ok: true, mob: m };
@@ -244,24 +257,30 @@ export function addSheepMob(farm: FarmState, survey: Survey, spec: AddSheepSpec)
 export function sheepWaterLitres(m: SheepMob, month: number): number {
   const summer = month === 11 || month <= 1;
   const lambsOf = lambsByDam(m.sheep);
+  const pick = (row: { average: number; summer: number }): number =>
+    summer ? row.summer : row.average;
   let l = 0;
   for (const s of m.sheep) {
-    if (s.dead || !s.weaned) continue;
-    const row =
-      (lambsOf.get(s.id) ?? 0) > 0
-        ? SHEEP_WATER_L.ewesWithLambs
-        : s.age < 365
-          ? SHEEP_WATER_L.weaner
-          : SHEEP_WATER_L.dry;
-    l += summer ? row.summer : row.average;
+    if (s.dead || !s.weaned || s.n <= 0) continue;
+    if (s.age < 365) {
+      l += pick(SHEEP_WATER_L.weaner) * s.n;
+      continue;
+    }
+    // The share of the record's ewes with a lamb at foot drinks the ewes-with-lambs figure.
+    const withLambs = Math.min(1, lambsPerEwe(s, lambsOf));
+    l +=
+      (pick(SHEEP_WATER_L.ewesWithLambs) * withLambs + pick(SHEEP_WATER_L.dry) * (1 - withLambs)) *
+      s.n;
   }
   return l;
 }
 
 /** What the sheep step reports back to the tick. */
 export interface SheepDayResult {
-  deaths: { id: number; mob: number; cause: SheepDeathCause }[];
-  births: { id: number; mob: number }[];
+  /** Head that died today, by record, mob and cause. */
+  deaths: { id: number; mob: number; cause: SheepDeathCause; count: number }[];
+  /** Lambs born today, by record and mob. */
+  births: { id: number; mob: number; count: number }[];
 }
 
 /** Where a sheep mob's weaners go: another empty grazing area with water, the best feed first. Null when there is none. */
@@ -312,16 +331,15 @@ export function sheepDay(
     if (m.where.kind !== 'paddock') continue;
     if (sheepWeaningDue(m, day)) {
       const lambs = weanLambs(m);
-      const avgKg = lambs.length
-        ? Math.round(lambs.reduce((t, s) => t + s.wt, 0) / lambs.length)
-        : 0;
+      const weaned = headOf(lambs);
+      const avgKg = weaned ? Math.round(lambs.reduce((t, s) => t + s.wt * s.n, 0) / weaned) : 0;
       const dest = lambs.length ? sheepWeanDest(farm, survey, m) : null;
       if (dest === null) {
         events.push({
           type: 'sheep-weaned',
           mob: m.id,
           mobName: m.name,
-          count: lambs.length,
+          count: weaned,
           avgKg,
           into: null,
         });
@@ -341,7 +359,7 @@ export function sheepDay(
           type: 'sheep-weaned',
           mob: m.id,
           mobName: m.name,
-          count: lambs.length,
+          count: weaned,
           avgKg,
           into: { mob: t.id, mobName: t.name, where: t.where, area: areaNameOf(survey, t) },
         });
@@ -365,18 +383,20 @@ export function sheepDay(
       if (event) events.push({ type: 'crop-grazed', mob: m.id, mobName: m.name, event });
     }
     if (res.births.length) {
-      events.push({ type: 'lambs-born', mob: m.id, mobName: m.name, count: res.births.length });
+      let born = 0;
       for (const s of res.births) {
         byId.set(s.id, s);
-        out.births.push({ id: s.id, mob: m.id });
+        born += s.n;
+        out.births.push({ id: s.id, mob: m.id, count: s.n });
       }
+      events.push({ type: 'lambs-born', mob: m.id, mobName: m.name, count: born });
     }
     if (res.deaths.length) {
       const by = new Map<SheepDeathCause, number>();
       for (const d of res.deaths) {
         deaths.push(d);
-        by.set(d.cause, (by.get(d.cause) ?? 0) + 1);
-        out.deaths.push({ id: d.sheep.id, mob: m.id, cause: d.cause });
+        by.set(d.cause, (by.get(d.cause) ?? 0) + d.count);
+        out.deaths.push({ id: d.sheep.id, mob: m.id, cause: d.cause, count: d.count });
       }
       for (const [cause, count] of by) {
         events.push({ type: 'sheep-deaths', mob: m.id, mobName: m.name, cause, count });
@@ -385,7 +405,7 @@ export function sheepDay(
   }
   // Sheep deaths stay out of the year's cattle totals (and its score) until
   // milestone 2.4 decides how sheep score.
-  settleSheepDeaths(state.mobs, deaths, byId);
+  settleSheepDeaths(state.mobs, deaths, byId, farm.animalIds, rng.deaths);
   state.mobs = state.mobs.filter((m) => m.sheep.length);
   state.rng = {
     breeding: rng.breeding.state(),

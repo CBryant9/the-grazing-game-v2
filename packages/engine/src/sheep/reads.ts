@@ -9,7 +9,7 @@ import { DRESSING, DSE_PER_AE } from '../data/sheep';
 import { surveyOf, areaNameOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { aeFromDse, dseOf, sheepClassOf } from './energy';
-import { lambsByDam } from './simFlock';
+import { headOf, lambsByDam, lambsPerEwe } from './simFlock';
 import { fleeceMicron } from './wool';
 import { sheepMobsOf, sheepWaterLitres } from './farm';
 import type { Sheep, SheepClass, SheepMob } from './types';
@@ -110,27 +110,32 @@ export function sheepMobsRead(farm: FarmState, month: number): SheepMobRead[] {
     let micronKg = 0;
     let days = 0;
     let head = 0;
+    let lambs = 0;
     let adg = 0;
     for (const s of m.sheep) {
       const c = sheepClassOf(s);
       const list = by.get(c);
       if (list) list.push(s);
       else by.set(c, [s]);
-      if (!s.weaned) continue;
-      head++;
-      dse += dseOf(s, lambsOf.get(s.id) ?? 0);
-      fleece += s.fleece;
-      micronKg += s.micronKg;
-      days += s.woolDays;
-      adg += s.adg;
+      if (!s.weaned) {
+        lambs += s.n;
+        continue;
+      }
+      head += s.n;
+      dse += dseOf(s, lambsPerEwe(s, lambsOf)) * s.n;
+      fleece += s.fleece * s.n;
+      micronKg += s.micronKg * s.n;
+      days += s.woolDays * s.n;
+      adg += s.adg * s.n;
     }
     const classes = CLASS_ORDER.filter((c) => by.has(c)).map((c) => {
       const l = by.get(c)!;
+      const h = headOf(l);
       return {
         cls: c,
-        head: l.length,
-        avgKg: l.reduce((t, s) => t + s.wt, 0) / l.length,
-        avgCs: l.reduce((t, s) => t + s.cond, 0) / l.length,
+        head: h,
+        avgKg: l.reduce((t, s) => t + s.wt * s.n, 0) / h,
+        avgCs: l.reduce((t, s) => t + s.cond * s.n, 0) / h,
       };
     });
     return {
@@ -139,7 +144,7 @@ export function sheepMobsRead(farm: FarmState, month: number): SheepMobRead[] {
       name: m.name,
       area: areaNameOf(survey, m),
       head,
-      lambs: m.sheep.length - head,
+      lambs,
       classes,
       dse,
       ae: aeFromDse(dse),
@@ -175,7 +180,7 @@ export function stockingRead(farm: FarmState): StockingRead {
   let sheepDse = 0;
   for (const m of sheepMobsOf(farm)) {
     const lambsOf = lambsByDam(m.sheep);
-    for (const s of m.sheep) if (s.weaned) sheepDse += dseOf(s, lambsOf.get(s.id) ?? 0);
+    for (const s of m.sheep) if (s.weaned) sheepDse += dseOf(s, lambsPerEwe(s, lambsOf)) * s.n;
   }
   return {
     cattleAe,

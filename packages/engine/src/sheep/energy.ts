@@ -80,9 +80,11 @@ export function lactationShape(lact: number): number {
  */
 export function milkPotentialMJ(s: Pick<Sheep, 'lact' | 'reared' | 'srw'>, lambs: number): number {
   if (s.lact < 0 || lambs <= 0) return 0;
-  let top = MILK.single;
-  if (lambs >= 2) top += (MILK.secondLamb * s.srw) / 50;
-  if (lambs >= 3) top += MILK.thirdLamb;
+  // `lambs` is lambs a ewe on the record, so it can be part of a lamb.
+  const top =
+    MILK.single * Math.min(1, lambs) +
+    ((MILK.secondLamb * s.srw) / 50) * clamp(lambs - 1, 0, 1) +
+    MILK.thirdLamb * clamp(lambs - 2, 0, 1);
   return top * lactationShape(s.lact);
 }
 
@@ -138,7 +140,12 @@ export function appetiteShare(
         1,
       );
   } else if (s.lact >= 0 && lambsAtFoot > 0) {
-    k = A.lactating + A.perExtraLamb * (lambsAtFoot - 1);
+    // Lambs a ewe on the record: under 1, that share of the ewes is milking.
+    const milkingShare = Math.min(1, lambsAtFoot);
+    k =
+      youngK +
+      (A.lactating - youngK) * milkingShare +
+      A.perExtraLamb * Math.max(0, lambsAtFoot - 1);
   } else {
     k = youngK;
   }

@@ -161,8 +161,8 @@ export function aeOf(a: Animal): number {
   return e;
 }
 
-/** Dry sheep equivalents in one adult equivalent. */
-export const DSE_PER_AE = 8;
+/** Dry sheep equivalents in one adult equivalent: the one figure in `data/stocking.ts` (call C3). */
+export { DSE_PER_AE } from '../data/stocking';
 
 /**
  * The cattle figures a paddock summary needs, for the mobs on one grazing
