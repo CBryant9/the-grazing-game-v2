@@ -393,13 +393,17 @@ export function MobCard({
           />
           <Fact label="Diet energy" value={mob.me === null ? '-' : `ME ${num(mob.me, 1)} MJ/kg`} />
           <Fact label="Diet protein" value={mob.cp === null ? '-' : `CP ${num(mob.cp, 1)}%`} />
-          <Fact label="In calf (PTIC)" value={`${num(mob.ptic)} head`} />
+          <Fact label="Known in calf (PTIC)" value={`${num(mob.ptic)} head`} />
           <Fact
             label="On the sale"
             value={mob.booked > 0 ? `${num(mob.booked)} head booked` : 'None booked'}
           />
         </dl>
-        {mob.joining && <p className={styles.joinline}>{mob.joining}</p>}
+        {mob.breeding.map((line) => (
+          <p key={line} className={styles.joinline}>
+            {line}
+          </p>
+        ))}
       </details>
     </Sheet>
   );

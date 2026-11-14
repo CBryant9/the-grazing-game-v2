@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createFarm, endDay, husbandryNow, supplementCosts } from '@gg/engine';
 import type { SetupChoices, Snapshot } from '../../lib/game/types';
 import { GameError, GameServer, parseAction } from './game';
+import { buildSnapshot } from './snapshot';
 import { MemoryFarmStore } from './store';
 
 const A = 'a'.repeat(32);
@@ -81,9 +83,10 @@ describe('the mob wire', () => {
     expect(s.mobs).toEqual([]);
     const running = await server().create(A, choices());
     for (const m of running.mobs) {
-      if (m.markCount === 0) expect(m.markReason).toBe('No bull calves or young bulls to mark.');
+      // The reason is the one the job itself gives (the engine's husbandryNow).
+      if (m.markCount === 0) expect(m.markReason).toMatch(/^There are no .*mark/);
       else expect(m.markReason).toBeNull();
-      if (m.weanCount === 0) expect(m.weanReason).toBe('No calves old enough to wean.');
+      if (m.weanCount === 0) expect(m.weanReason).toMatch(/wean/);
       else expect(m.weanReason).toBeNull();
     }
   });
@@ -312,4 +315,34 @@ describe('the words on screen', () => {
       expect(text, path).not.toMatch(/\bshould\b|overgraz|—|–/i);
     }
   }, 120_000);
+});
+
+describe('the mob card reads the engine, never a copy of it', () => {
+  it('supplement prices and marking and weaning come from supplementCosts and husbandryNow', () => {
+    let farm = createFarm({
+      seed: 3,
+      district: 'cw',
+      size: 'small',
+      start: { year: 2025, month: 8 },
+      startType: 'running',
+      difficulty: 'medium',
+    });
+    for (let i = 0; i < 40; i++) farm = endDay(farm).farm;
+    const snap = buildSnapshot(farm, { name: 'X', setup: choices(), version: 'v1' }, {});
+    const costs = supplementCosts(farm, {});
+    const hus = husbandryNow(farm, {});
+    let priced = 0;
+    for (const m of snap.mobs) {
+      const c = costs.find((x) => x.mob === m.id)!;
+      for (const o of m.suppOptions) {
+        expect(o.perDay).toBeCloseTo(c.perDay[o.id], 2);
+        priced++;
+      }
+      const h = hus.find((x) => x.mob === m.id)!;
+      expect(m.markCount).toBe(h.mark.count);
+      expect(m.weanCount).toBe(h.wean.count);
+      expect(m.markReason).toBe(h.mark.canDo ? null : (h.mark.why?.message ?? expect.any(String)));
+    }
+    expect(priced).toBeGreaterThan(0);
+  });
 });

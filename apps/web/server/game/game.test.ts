@@ -100,6 +100,18 @@ const DENY = [
   'sowDays',
   'latestPrice',
   'nextSales',
+  // Added in milestone 1.7f: live pregnancy and the summaries built for tests (rule 14).
+  'preg',
+  'pregnant',
+  'saleValue',
+  'conc',
+  'elig',
+  'joining',
+  'classOf',
+  'groupKey',
+  'knownInCalf',
+  'reports',
+  'animals',
 ];
 /**
  * The map's mob list carries a number the map uses to stand each beast in
