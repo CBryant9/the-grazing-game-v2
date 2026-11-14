@@ -156,7 +156,15 @@ export type Action =
   /** Buy sheep of a class into a paddock (not where cattle graze; never in Central Queensland). */
   | { type: 'buySheep'; cls: string; qty: number; to: { cell: number } }
   /** Sell sheep of a class from a sheep mob. Ewes with lambs at foot go with their share of the lambs. */
-  | { type: 'sellSheep'; mob: number; cls: string; qty: number };
+  | { type: 'sellSheep'; mob: number; cls: string; qty: number }
+  /** Move a whole sheep mob to a paddock (not where cattle graze). It pauses the mob's plan. */
+  | { type: 'moveSheep'; mob: number; to: { cell: number } }
+  /** Move part of a sheep mob, by class and head, to a paddock (ewes take their lambs at foot). */
+  | { type: 'moveSheepPart'; mob: number; cls: string; qty: number; to: { cell: number } }
+  /** Put a sheep mob on a grazing plan template, from a step. */
+  | { type: 'setSheepPlan'; mob: number; template: number; step?: number }
+  /** Take a sheep mob off its plan. */
+  | { type: 'clearSheepPlan'; mob: number };
 
 /** One leg of a plan as the player asks for it. `rounds` is 0 (keep going) if left out. */
 export interface PlanLegSpec {
@@ -214,7 +222,9 @@ export type ActionRefusalReason =
   /** There is no such contract fencing under way. */
   | 'no-such-run'
   /** Sheep graze the area cattle were to go to (one mob to an area, one species to a paddock). */
-  | 'sheep-there';
+  | 'sheep-there'
+  /** Cattle graze the area sheep were to go to. */
+  | 'cattle-there';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {

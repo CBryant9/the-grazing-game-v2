@@ -348,13 +348,22 @@ export const JOIN_START: Partial<Record<DistrictId, { month: number; date: numbe
 // ---------------------------------------------------------------------------
 
 /**
- * Adult deaths outside lambing, a day: 0.4% a year. FITTED so breeding ewes
- * near CS 3 lose 2 to 4% a year with lambing and flystrike (Lifetime Wool
- * S19: 3.2% at the CS 3 baseline; AWI and MLA S67: under 4.5% a year;
- * SB-43). Refitted from 0.8% when sheep became records (the year runs then
- * gave Merino ewes 4.2%). Wethers and rams take it too (call C7).
+ * Adult ewe and ram deaths outside lambing and flystrike, a day: 0.8% a
+ * year, DERIVED from the document's own figures: Lifetime Wool's 3.2% a
+ * year at the CS 3 baseline (S19) less 1.95% at lambing (AWI and MLA S67,
+ * SB-43a) leaves 1.25% a year; less flystrike (17% struck × 2% dying = 0.34%,
+ * S37; the review's probes measured 0.37 to 0.56%) leaves about 0.8%. (The
+ * second pass set 0.4% to make SB-43 pass; put back, third pass.)
  */
-export const ADULT_DAILY = 0.004 / 365;
+export const ADULT_DAILY = 0.008 / 365;
+
+/**
+ * Wethers' deaths, a day: 0.8% a year, DERIVED as the ewes' deaths outside
+ * lambing and flystrike (the working above), since wethers do not lamb and
+ * the document found no wether figure of its own (C7: the NSW wether
+ * budget's figure was seen only in a search summary).
+ */
+export const WETHER_DAILY = 0.008 / 365;
 
 /**
  * A ewe's risk of dying at lambing, by litter: singles 1.35%, twins 3.05%,

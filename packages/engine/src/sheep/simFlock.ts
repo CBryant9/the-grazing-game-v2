@@ -34,10 +34,12 @@ import {
   SHEEP_RATION,
   THIN_DEATHS,
   WEANER_DEATHS,
+  WETHER_DAILY,
   WOOL,
   YOUNG_FRAME_DAYS,
 } from '../data/sheep';
 import { FEED_COST, LICK } from '../data/feed';
+import { GRAIN_PER_KG } from '../data/sheepMarket';
 import { clamp } from '../num';
 import { meFromDmd } from '../pasture/quality';
 import type { Rng } from '../rng';
@@ -120,6 +122,9 @@ export interface FlockDayResult {
   gainKg: number;
 }
 
+/** The flystrike note comes at most once in this many days a mob. */
+export const FLY_NOTE_DAYS = 7;
+
 /** Live lambs at foot, by the record of their dams. */
 export function lambsByDam(sheep: readonly Sheep[]): Map<number, number> {
   const out = new Map<number, number>();
@@ -146,7 +151,7 @@ export function dailyDeathRisk(s: Sheep): number {
   } else if (inWeanerYear(s)) {
     p = weanerDailyRisk(s.adg * 1000, s.wwt / s.srw);
   } else {
-    p = ADULT_DAILY;
+    p = s.sex === 'W' ? WETHER_DAILY : ADULT_DAILY;
   }
   if (s.cond < THIN_DEATHS.below) p += (THIN_DEATHS.below - s.cond) * THIN_DEATHS.perCs;
   return p;
@@ -292,7 +297,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
           stage * (1 + SHEEP_RATION.perFiveKg * Math.max(0, (s.wt - SHEEP_RATION.refKg) / 5));
         fed = Math.min(cap, gap / R.me);
         mei += fed * R.me;
-        feedCost += fed * s.n * (m.feed === 'grain' ? FEED_COST.pelletKg : FEED_COST.hayKg);
+        feedCost += fed * s.n * (m.feed === 'grain' ? GRAIN_PER_KG : FEED_COST.hayKg);
       }
     }
     if (m.feed === 'lick' && s.weaned) {
@@ -480,7 +485,13 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     }
   }
   for (const p of added) m.sheep.push(p);
-  if (struckToday) notes.push({ type: 'flystrike', count: struckToday });
+  // Strikes are told at most once a week a mob, with the count since the last note.
+  m.flyCount += struckToday;
+  if (m.flyCount > 0 && day - m.flyNoted >= FLY_NOTE_DAYS) {
+    notes.push({ type: 'flystrike', count: m.flyCount });
+    m.flyCount = 0;
+    m.flyNoted = day;
+  }
 
   if (join) {
     if (lambing) {

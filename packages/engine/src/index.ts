@@ -703,13 +703,19 @@ export {
   fleeceOf,
   fenceKindsRead,
   nettingEdges,
+  sheepConditionFacts,
+  sheepFeedCosts,
   sheepJoiningRecord,
   sheepMarketRead,
   sheepMobsRead,
   sheepYearRead,
   stockingRead,
 } from './sheep/reads';
+export { CS_FLOOR } from './sheep/reads';
 export type {
+  SheepConditionFact,
+  SheepFeedCost,
+  SheepStage,
   FenceKindRead,
   SheepBuyRead,
   SheepClassRow,

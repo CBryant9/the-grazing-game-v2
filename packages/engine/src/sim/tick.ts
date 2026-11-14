@@ -67,6 +67,7 @@ import {
   sheepWaterLitres,
 } from '../sheep/farm';
 import type { SheepDeathCause } from '../sheep/notes';
+import { runSheepPlans } from '../sheep/moves';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -502,6 +503,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 8. Grazing plans move mobs here. Each move takes the move time off today's light.
   runPlans(farm, survey, landOf(farm, survey, plantings), events);
+  // 8b. Sheep plans, on a farm with sheep.
+  if (farm.sheep) runSheepPlans(farm, survey, landOf(farm, survey, plantings), events);
 
   // 9. The market moves and the day ends.
   farm.day++;

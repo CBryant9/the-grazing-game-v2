@@ -5,7 +5,13 @@
  */
 
 import { aeOf } from '../cattle/animal';
-import { DSE_PER_AE, fenceHoldsSheep, sheepDistrict, type SheepFeed } from '../data/sheep';
+import {
+  DSE_PER_AE,
+  SHEEP_FEEDS,
+  fenceHoldsSheep,
+  sheepDistrict,
+  type SheepFeed,
+} from '../data/sheep';
 import {
   SHEEP_INDICATORS_C_KG,
   SHEEP_PRICE_DATE,
@@ -16,10 +22,20 @@ import {
 import { EDGE, type EdgeRef } from '../farm/topology';
 import { COST_PER_M, NETTING_PER_M } from '../money/costs';
 import { SHEEP_BUY_CLASSES, sheepBuyPrice, type SheepBuyClassId } from './market';
-import { surveyOf, areaNameOf } from '../sim/derived';
+import {
+  areaNameOf,
+  dateOn,
+  grazingArea,
+  landOf,
+  plantingsNow,
+  surveyOf,
+  type SourceEnv,
+} from '../sim/derived';
+import { deepCopy } from '../sim/state';
+import { rngFromState } from '../rng';
 import type { FarmState } from '../sim/state';
 import { aeFromDse, dseOf, sheepClassOf } from './energy';
-import { headOf, lambsByDam, lambsPerEwe } from './simFlock';
+import { headOf, lambsByDam, lambsPerEwe, simFlock } from './simFlock';
 import { fleeceMicron } from './wool';
 import { sheepMobsOf, sheepWaterLitres } from './farm';
 import type { Sheep, SheepClass, SheepMob } from './types';
@@ -297,4 +313,123 @@ export function sheepYearRead(farm: Pick<FarmState, 'year'>): {
   sheepDeaths: number;
 } {
   return { wool: farm.year.wool ?? 0, sheepDeaths: farm.year.sheepDeaths ?? 0 };
+}
+
+/**
+ * The CS a stage should not fall under, from the document's sources:
+ * Lifetime Wool's targets for Merino ewes (southern slopes handbook, S19):
+ * joining 2.6, early to mid pregnancy 2.3, lambing 2.6, weaning 2.4; and for
+ * sheep that are not breeding, CS 2 (Agriculture Victoria S7: CS 2 or less
+ * carries a significant risk of death).
+ */
+export const CS_FLOOR = {
+  joining: 2.6,
+  pregnancy: 2.3,
+  lambing: 2.6,
+  lactation: 2.4,
+  other: 2,
+} as const;
+export type SheepStage = keyof typeof CS_FLOOR;
+
+/** A sheep mob under the floor for its stage: a fact for the to-do list, not advice. */
+export interface SheepConditionFact {
+  mob: number;
+  /** The mob's name. May be shown. */
+  mobName: string;
+  /** The stage most of its sheep are at, the mob's average CS, and the floor. May be shown. */
+  stage: SheepStage;
+  cs: number;
+  floor: number;
+}
+
+/** The stage most of a mob's weaned sheep are at, by head. */
+function stageOf(m: SheepMob): SheepStage {
+  const lambsOf = lambsByDam(m.sheep);
+  const by: Record<SheepStage, number> = {
+    joining: 0,
+    pregnancy: 0,
+    lambing: 0,
+    lactation: 0,
+    other: 0,
+  };
+  for (const s of m.sheep) {
+    if (!s.weaned || s.n <= 0) continue;
+    const st: SheepStage =
+      s.sex !== 'F' || s.age < 365
+        ? 'other'
+        : s.preg >= 0
+          ? s.preg >= 117
+            ? 'lambing'
+            : 'pregnancy'
+          : lambsPerEwe(s, lambsOf) > 0
+            ? 'lactation'
+            : 'joining';
+    by[st] += s.n;
+  }
+  return (Object.keys(by) as SheepStage[]).reduce((a, b) => (by[b] > by[a] ? b : a));
+}
+
+/**
+ * Sheep mobs whose average CS is under the floor for their stage
+ * (`CS_FLOOR`). Facts only: the screens word them, and what to do is the
+ * player's.
+ */
+export function sheepConditionFacts(farm: Pick<FarmState, 'sheep'>): SheepConditionFact[] {
+  const out: SheepConditionFact[] = [];
+  for (const m of sheepMobsOf(farm)) {
+    const w = m.sheep.filter((s) => s.weaned && s.n > 0);
+    const h = headOf(w);
+    if (!h) continue;
+    const cs = w.reduce((t, s) => t + s.cond * s.n, 0) / h;
+    const stage = stageOf(m);
+    const floor = CS_FLOOR[stage];
+    if (cs < floor) out.push({ mob: m.id, mobName: m.name, stage, cs, floor });
+  }
+  return out;
+}
+
+/** What each feed would cost a sheep mob today, dollars, for the feed chooser. */
+export interface SheepFeedCost {
+  mob: number;
+  /** Dollars today for each feed on today's pasture. May be shown. */
+  perDay: Record<SheepFeed, number>;
+}
+
+/**
+ * What a day of each feed would cost each sheep mob on today's pasture: the
+ * mob's day tried on a copy with each feed. The farm is not changed.
+ */
+export function sheepFeedCosts(farm: FarmState, env: SourceEnv = {}): SheepFeedCost[] {
+  const mobs = sheepMobsOf(farm);
+  if (!mobs.length) return [];
+  const survey = surveyOf(farm);
+  const date = dateOn(farm);
+  return mobs.map((m) => {
+    const perDay: Record<SheepFeed, number> = { none: 0, lick: 0, grain: 0, hay: 0 };
+    if (m.where.kind !== 'paddock') return { mob: m.id, perDay };
+    const areaId = survey.topology.areaOf[m.where.anchor]!;
+    for (const feed of SHEEP_FEEDS) {
+      if (feed === 'none') continue;
+      const copy = deepCopy({ pasture: farm.pasture, mob: m });
+      copy.mob.feed = feed;
+      const land = landOf({ ...farm, pasture: copy.pasture }, survey, plantingsNow(farm, env));
+      const byId = new Map<number, Sheep>();
+      for (const s of copy.mob.sheep) byId.set(s.id, s);
+      const r = simFlock(copy.mob, {
+        place: { kind: 'paddock', area: grazingArea(survey, areaId) },
+        land,
+        day: farm.day,
+        date,
+        byId,
+        ids: { next: farm.animalIds.next },
+        rng: {
+          breeding: rngFromState(farm.sheep!.rng.breeding),
+          deaths: rngFromState(farm.sheep!.rng.deaths),
+          flies: rngFromState(farm.sheep!.rng.flies),
+        },
+      });
+      perDay[feed] = r.feedCost;
+    }
+    return { mob: m.id, perDay };
+  });
 }

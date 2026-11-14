@@ -31,7 +31,7 @@ export type SheepNote =
   | { type: 'lambingStarted' }
   /** The marking count: lambs alive, and ewes joined. Ram lambs are marked (wethers) from today. */
   | { type: 'marked'; lambs: number; ewesJoined: number }
-  /** Sheep struck by flies today. */
+  /** Sheep struck by flies since the last such note (at most one a week a mob). */
   | { type: 'flystrike'; count: number };
 
 /** Why a sheep mob is losing weight (see `losingWeight`). */

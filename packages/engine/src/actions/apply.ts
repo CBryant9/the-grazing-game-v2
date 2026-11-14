@@ -115,6 +115,7 @@ import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
 import { sheepAreas } from '../sheep/farm';
 import { buySheep, sellSheep, setSheepDates, setSheepFeed } from '../sheep/actions';
+import { clearSheepPlan, moveSheep, moveSheepPart, setSheepPlan } from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
@@ -1691,6 +1692,14 @@ function run(j: Job, a: Action): Out {
       return buySheep(j.farm, j.events, a, j.env, j.part.clocked === true);
     case 'sellSheep':
       return sellSheep(j.farm, j.events, a, j.env, j.part.clocked === true);
+    case 'moveSheep':
+      return moveSheep(j.farm, j.events, a);
+    case 'moveSheepPart':
+      return moveSheepPart(j.farm, j.events, a);
+    case 'setSheepPlan':
+      return setSheepPlan(j.farm, j.events, a);
+    case 'clearSheepPlan':
+      return clearSheepPlan(j.farm, j.events, a);
     default:
       return refuse('bad-request', 'That is not something that can be done on a farm.');
   }

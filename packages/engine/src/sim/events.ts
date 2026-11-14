@@ -150,6 +150,16 @@ export type TickEvent =
       from: string;
       to: string;
     }
+  /** Sheep were moved by hand to an area: the mob they are in there, and the head moved. */
+  | { type: 'sheep-moved'; mob: number; mobName: string; head: number; area: string }
+  /** A sheep mob was put on a plan, or taken off one, or finished one. */
+  | { type: 'sheep-plan-set'; mob: number; mobName: string; template: number }
+  | { type: 'sheep-plan-cleared'; mob: number; mobName: string }
+  | { type: 'sheep-plan-finished'; mob: number; mobName: string }
+  /** A sheep plan's next stop has no water, or cattle in it: the plan waits (told once a stop). */
+  | { type: 'sheep-plan-waiting'; mob: number; mobName: string; why: PlanWaitReason; area: string }
+  /** A sheep plan moved its mob on. */
+  | { type: 'sheep-plan-moved'; mob: number; mobName: string; from: string; to: string }
   /** A sheep mob's feed was set. */
   | { type: 'sheep-feed-set'; mob: number; mobName: string; feed: SheepFeed }
   /** A sheep mob's joining, shearing and crutching days, as they now stand (null: not booked). */

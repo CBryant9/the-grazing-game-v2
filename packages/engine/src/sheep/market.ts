@@ -10,6 +10,7 @@ import {
   SHEEP_HEAD_PRICES,
   SHEEP_INDICATORS_C_KG,
   SHEEP_TRADE,
+  WOOL_HARVEST,
   lambIndicator,
   woolPriceCKg,
 } from '../data/sheepMarket';
@@ -154,6 +155,30 @@ export function sheepWorth(mobs: readonly { sheep: readonly Sheep[] }[]): number
   return v;
 }
 
-/** What a fleece of `cleanKg` at `micron` fetches, dollars (call C20, the dated stand-in). */
+/** What `cleanKg` of fleece wool at `micron` fetches, before selling costs, dollars (call C20). */
 export const woolValue = (cleanKg: number, micron: number): number =>
   (cleanKg * woolPriceCKg(micron)) / 100;
+
+/** A clip sold: gross, the selling costs and what is banked, dollars. */
+export interface WoolSale {
+  gross: number;
+  sellingCosts: number;
+  net: number;
+  bales: number;
+}
+
+/**
+ * Sell a clip of `cleanKg` (greasy `greasyKg`) at `micron`: oddments at
+ * their lower price, less the levy, broker, testing, cartage and packs
+ * (WOOL_HARVEST).
+ */
+export function sellClip(cleanKg: number, greasyKg: number, micron: number): WoolSale {
+  const H = WOOL_HARVEST;
+  const p = woolPriceCKg(micron) / 100;
+  const gross =
+    cleanKg * (1 - H.oddmentsShare) * p + cleanKg * H.oddmentsShare * p * H.oddmentsPrice;
+  const bales = Math.ceil(greasyKg / H.kgGreasyPerBale);
+  const sellingCosts =
+    gross * H.levyShare + bales * (H.sellingPerBale + H.cartagePerBale + H.packPerBale);
+  return { gross, sellingCosts, net: gross - sellingCosts, bales };
+}

@@ -13,7 +13,7 @@
 
 import type { SheepBreed, SheepFeed } from '../data/sheep';
 import type { Rng, RngState } from '../rng';
-import type { MobWhere } from '../sim/state';
+import type { MobWhere, PlanRun } from '../sim/state';
 
 /** F ewe (or ewe lamb), M ram (or ram lamb), W wether (a marked male). */
 export type SheepSex = 'F' | 'M' | 'W';
@@ -189,8 +189,13 @@ export interface SheepMob {
   lastThin: number;
   /** Days in a row losing more than 20 g a head a day. */
   lossDays: number;
+  /** Sheep struck by flies since the last flystrike note, and the day of that note (-99 for none). */
+  flyCount: number;
+  flyNoted: number;
   /** The farm day the mob last got through a fence, or null. */
   lastBreak: number | null;
+  /** The grazing plan the mob is running (`setSheepPlan`). Left out when it has none. */
+  plan?: PlanRun;
   /** What the mob is fed on top of the pasture (`setSheepFeed`). */
   feed: SheepFeed;
 }

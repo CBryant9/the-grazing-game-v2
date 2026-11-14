@@ -468,6 +468,14 @@ describe('the job card and the job agree, for every kind of action', () => {
     });
     if (!flockAdded.ok) throw new Error(flockAdded.reason);
     const flock = flockAdded.mob.id;
+    const sheepPlanned = cloneFarm(sheepy);
+    sheepPlanned.plans.push({
+      id: 99,
+      name: 'Sheep round',
+      legs: [{ stops: [b.emptyCell, b.openCell], rule: { mode: 'days', every: 3 }, rounds: 0 }],
+      after: 'repeat',
+    });
+    const sheepOnPlan = work(sheepPlanned, { type: 'setSheepPlan', mob: flock, template: 99 }).farm;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
       buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
       cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
@@ -583,9 +591,29 @@ describe('the job card and the job agree, for every kind of action', () => {
         },
       ],
       sellSheep: [{ farm: sheepy, action: { type: 'sellSheep', mob: flock, cls: 'ewe', qty: 5 } }],
+      // Moving sheep (third pass): the cattle move time; plans as for cattle.
+      moveSheep: [
+        { farm: sheepy, action: { type: 'moveSheep', mob: flock, to: { cell: b.openCell } } },
+      ],
+      moveSheepPart: [
+        {
+          farm: sheepy,
+          action: {
+            type: 'moveSheepPart',
+            mob: flock,
+            cls: 'ewe',
+            qty: 10,
+            to: { cell: b.openCell },
+          },
+        },
+      ],
+      setSheepPlan: [
+        { farm: sheepPlanned, action: { type: 'setSheepPlan', mob: flock, template: 99 } },
+      ],
+      clearSheepPlan: [{ farm: sheepOnPlan, action: { type: 'clearSheepPlan', mob: flock } }],
     };
-    // 45 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(45);
+    // 49 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(49);
 
     const outcomes = new Set<string>();
     let refusals = 0;

@@ -210,6 +210,21 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'cancelSale':
       // Taking stock off a sale is a decision too.
       return { kind: 'free' };
+    case 'moveSheep':
+    case 'moveSheepPart':
+    case 'setSheepPlan': {
+      // Sheep moved by hand or put on a plan's stop: the cattle move time (settle, and by the
+      // head), when the sheep really move. Setting the plan itself is a decision.
+      const moved = trial.events.find((e) => e.type === 'sheep-moved');
+      const head = moved?.type === 'sheep-moved' ? moved.head : 0;
+      if (action.type === 'setSheepPlan' && !moved) return { kind: 'free' };
+      return whole([
+        part('settle', T.moveMobSettleMin.value),
+        part('head', (head / 100) * T.moveMobMinPer100Head.value),
+      ]);
+    }
+    case 'clearSheepPlan':
+      return { kind: 'free' };
     case 'setSheepFeed':
     case 'setSheepDates':
     case 'buySheep':

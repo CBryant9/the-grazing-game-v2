@@ -94,17 +94,57 @@ export const SHEARING_RATE = { sheep: 3.8158, ram: 7.6316, crutch: 1.1066 } as c
  */
 export const SHEEP_HEALTH_PER_HEAD_YEAR = 30 / 8.4;
 
-/** Clean wool price for a micron, c/kg. */
+/**
+ * Call C20 names the sale commentary's Eastern Market Indicator, 1,890 c/kg
+ * clean (1 to 2 September 2026, S53), as the dated wool price. The micron
+ * guides above sit in the same page's ticker, which carries no date and an
+ * EMI of 1,722. So the price by micron is the guide's line scaled to the
+ * dated EMI: × 1,890 ÷ 1,722. The guide gives the spread across microns, the
+ * EMI the level (docs/DATA.md).
+ */
+export const WOOL_EMI = { dated: 1890, ticker: 1722 } as const;
+
+/** Clean wool price for a micron, c/kg (the guide's line at the dated EMI). */
 export function woolPriceCKg(micron: number): number {
   const t = WOOL_PRICE_C_KG;
-  if (micron <= t[0]![0]) return t[0]![1];
+  const k = WOOL_EMI.dated / WOOL_EMI.ticker;
+  if (micron <= t[0]![0]) return t[0]![1] * k;
   for (let i = 1; i < t.length; i++) {
     const [m1, p1] = t[i]!;
     const [m0, p0] = t[i - 1]!;
-    if (micron <= m1) return p0 + ((p1 - p0) * (micron - m0)) / (m1 - m0);
+    if (micron <= m1) return (p0 + ((p1 - p0) * (micron - m0)) / (m1 - m0)) * k;
   }
-  return t[t.length - 1]![1];
+  return t[t.length - 1]![1] * k;
 }
+
+/**
+ * What it costs to harvest and sell wool beyond the shearers' piece rate,
+ * all in one place. Every figure here is a STAND-IN: the pages that give
+ * them (the NSW DPIRD budgets, AWI's selling systems review, the Pastoral
+ * Award's shed hand rates) refused automatic reading on 15 Nov 2026, and the
+ * values were seen only in search summaries (docs/DATA.md lists each):
+ * - shed staff (wool handlers, presser, classer), dollars a head shorn;
+ * - the wool levy, a share of the sale (WoolPoll);
+ * - broker's commission, testing and warehousing, dollars a bale;
+ * - cartage to store and the pack, dollars a bale;
+ * - kg of greasy wool in a bale;
+ * - oddments (bellies, pieces, locks, crutchings): their share of the clip
+ *   and their price against fleece wool (Mecardo, "Merino wool categories",
+ *   9 June 2022, read: pieces about 125 c/kg clean, about 10%, under fleece).
+ */
+export const WOOL_HARVEST = {
+  shedStaffPerHead: 1.5,
+  levyShare: 0.015,
+  sellingPerBale: 40,
+  cartagePerBale: 16,
+  packPerBale: 14,
+  kgGreasyPerBale: 180,
+  oddmentsShare: 0.22,
+  oddmentsPrice: 0.9,
+} as const;
+
+/** Feed barley, dollars a kg: about $330 a tonne up-country (Grain Central, "Feedgrain Focus", 9 July 2026, read). */
+export const GRAIN_PER_KG = 0.33;
 
 /** The lamb indicator for a lamb's carcase weight and breed. */
 export function lambIndicator(carcaseKg: number, breed: SheepBreed): SheepIndicatorId {

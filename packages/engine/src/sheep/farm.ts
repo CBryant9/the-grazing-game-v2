@@ -32,9 +32,9 @@ import { rngFromState, rngStream } from '../rng';
 import { areaIdOf, areaNameOf, grazingArea, placeAnchor } from '../sim/derived';
 import type { TickEvent } from '../sim/events';
 import type { FarmState, MobWhere } from '../sim/state';
-import { SHEARING_RATE, SHEEP_HEALTH_PER_HEAD_YEAR } from '../data/sheepMarket';
+import { SHEARING_RATE, SHEEP_HEALTH_PER_HEAD_YEAR, WOOL_HARVEST } from '../data/sheepMarket';
 import { isAdultRam, matureKg } from './energy';
-import { woolValue } from './market';
+import { sellClip } from './market';
 import { crutchMob, shearMob } from './wool';
 import type { SheepDeathCause } from './notes';
 import {
@@ -219,6 +219,8 @@ export function createSheepMob(
     lossDays: 0,
     feed: 'none',
     lastBreak: null,
+    flyCount: 0,
+    flyNoted: -99,
   };
 }
 
@@ -319,8 +321,13 @@ export function shearToday(farm: FarmState, m: SheepMob, events: TickEvent[]): v
   for (const x of m.sheep) if (x.weaned && isAdultRam(x)) rams += x.n;
   const r = shearMob(m, farm.day);
   if (!r.head) return;
-  const cost = (r.head - rams) * SHEARING_RATE.sheep + rams * SHEARING_RATE.ram;
-  const income = woolValue(r.cleanKg, r.micron);
+  // Shearers' piece rates and the shed staff; the clip sold less its selling costs.
+  const cost =
+    (r.head - rams) * SHEARING_RATE.sheep +
+    rams * SHEARING_RATE.ram +
+    r.head * WOOL_HARVEST.shedStaffPerHead;
+  const sale = sellClip(r.cleanKg, r.greasyKg, r.micron);
+  const income = sale.net;
   farm.cash += income - cost;
   farm.year.wool = (farm.year.wool ?? 0) + income;
   farm.year.running += cost;

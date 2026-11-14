@@ -79,7 +79,9 @@ export interface PlanTemplate {
 export type PlanWaitReason =
   | 'no-water'
   /** Sheep graze the next stop: cattle never go in with sheep. */
-  | 'sheep-there';
+  | 'sheep-there'
+  /** Cattle graze the next stop of a sheep plan: sheep never go in with cattle. */
+  | 'cattle-there';
 
 /** A mob running a template: where it is on it, and the counts so far. */
 export interface PlanRun {

@@ -3,7 +3,7 @@ import { applyInstantly } from '../../test-support/instant';
 import { heldRun, testMob, testSheep } from '../../test-support/sheep';
 import { across } from '../../test-support/workingDay';
 import { SHEEP_RATION } from '../data/sheep';
-import { SHEARING_RATE, woolPriceCKg } from '../data/sheepMarket';
+import { SHEARING_RATE, WOOL_HARVEST, woolPriceCKg } from '../data/sheepMarket';
 import { DSE_PER_AE, MVP_DSE_PER_AE } from '../data/stocking';
 import { GRID_W } from '../grid';
 import { COST_PER_M, NETTING_PER_M, segmentCost } from '../money/costs';
@@ -16,8 +16,14 @@ import type { FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
 import { addSheepMob, occupiedAreas, sheepJobDates, sheepMobsOf } from './farm';
 import { heldDiet } from './graze';
-import { sheepBuyPrice, sheepWorth, woolValue } from './market';
-import { fenceKindsRead, nettingEdges, sheepMarketRead } from './reads';
+import { sellClip, sheepBuyPrice, sheepWorth, woolValue } from './market';
+import {
+  fenceKindsRead,
+  nettingEdges,
+  sheepConditionFacts,
+  sheepFeedCosts,
+  sheepMarketRead,
+} from './reads';
 import { headOf } from './simFlock';
 
 /* Sheep in the game (milestone 2.4, engine half): feeding, contractors, money, the market, netting and the setup choice. */
@@ -74,6 +80,41 @@ describe('feeding sheep', () => {
   });
 });
 
+describe('the facts a player gets to feed by', () => {
+  it('a mob under the CS floor for its stage is a fact for the to-do list', () => {
+    const farm = farmWithSheep();
+    for (const s of sheepMobsOf(farm)[0]!.sheep) s.cond = 1.8;
+    const facts = sheepConditionFacts(farm);
+    expect(facts.length).toBe(1);
+    expect(facts[0]!.floor).toBe(2);
+    expect(facts[0]!.cs).toBeCloseTo(1.8, 6);
+    for (const s of sheepMobsOf(farm)[0]!.sheep) s.cond = 3;
+    expect(sheepConditionFacts(farm)).toEqual([]);
+  });
+  it('says what each feed would cost the mob today, and changes nothing', () => {
+    const farm = farmWithSheep();
+    const before = JSON.stringify(saveFarm(farm));
+    const costs = sheepFeedCosts(farm);
+    expect(costs.length).toBe(1);
+    expect(costs[0]!.perDay.none).toBe(0);
+    expect(costs[0]!.perDay.lick).toBeGreaterThan(0);
+    expect(JSON.stringify(saveFarm(farm))).toBe(before);
+  });
+  it('flystrike is told at most once a week a mob', () => {
+    const m = testMob([testSheep({ sex: 'F', n: 20000 })]);
+    let notes = 0;
+    heldRun(m, 28, {
+      diet: heldDiet(1500, 0.7),
+      seed: 3,
+      each: (_d, r) => {
+        for (const n of r.notes) if (n.type === 'flystrike') notes++;
+      },
+    });
+    expect(notes).toBeGreaterThan(0);
+    expect(notes).toBeLessThanOrEqual(4);
+  });
+});
+
 describe('contractors: shearing and crutching on their days', () => {
   it('shear on the day by themselves: fleece off, wool sold, contractors paid, fly cover given', () => {
     const farm = farmWithSheep();
@@ -88,8 +129,13 @@ describe('contractors: shearing and crutching on their days', () => {
       for (const e of stepDay(farm).events) if (e.type === 'sheep-shorn') shorn = e;
     }
     expect(shorn).toBeDefined();
-    expect(shorn!.cost).toBeCloseTo(shorn!.head * SHEARING_RATE.sheep, 6);
-    expect(shorn!.woolIncome).toBeCloseTo((shorn!.cleanKg * woolPriceCKg(shorn!.micron)) / 100, 6);
+    expect(shorn!.cost).toBeCloseTo(
+      shorn!.head * (SHEARING_RATE.sheep + WOOL_HARVEST.shedStaffPerHead),
+      6,
+    );
+    const sale = sellClip(shorn!.cleanKg, shorn!.greasyKg, shorn!.micron);
+    expect(shorn!.woolIncome).toBeCloseTo(sale.net, 6);
+    expect(sale.net).toBeLessThan((shorn!.cleanKg * woolPriceCKg(shorn!.micron)) / 100);
     expect(shorn!.cleanKg / shorn!.head).toBeGreaterThan(1.5);
     expect(farm.year.wool ?? 0).toBeCloseTo(shorn!.woolIncome, 6);
     for (const s of sheepMobsOf(farm)[0]!.sheep) {
@@ -195,10 +241,16 @@ describe('the sheep market', () => {
     expect(netWorth(farm) - netWorth(without)).toBeCloseTo(sheepWorth(farm.sheep!.mobs), 6);
   });
 
-  it('wool fetches more for finer wool, a straight line between the guides', () => {
-    expect(woolPriceCKg(18.5)).toBeCloseTo((2443 + 2178) / 2, 6);
-    expect(woolValue(4, 19)).toBeCloseTo(4 * 21.78, 6);
-    expect(woolPriceCKg(35)).toBe(605);
+  it('wool fetches more for finer wool: the guide line at the dated EMI, less selling costs', () => {
+    const k = 1890 / 1722;
+    expect(woolPriceCKg(18.5)).toBeCloseTo(((2443 + 2178) / 2) * k, 6);
+    expect(woolValue(4, 19)).toBeCloseTo(4 * 21.78 * k, 6);
+    expect(woolPriceCKg(35)).toBeCloseTo(605 * k, 6);
+    // Selling costs: the levy, the broker, cartage and packs, and oddments at their lower price.
+    const clip = sellClip(1000, 1600, 19);
+    expect(clip.bales).toBe(9);
+    expect(clip.gross).toBeLessThan(1000 * 21.78 * k);
+    expect(clip.net).toBeCloseTo(clip.gross * 0.985 - 9 * 70, 6);
   });
 });
 

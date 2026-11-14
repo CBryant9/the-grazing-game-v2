@@ -440,6 +440,8 @@ function upgrade(f: Record<string, unknown>): void {
   // shearing and crutching days, and no fence got through yet.
   for (const m of farm.sheep?.mobs ?? []) {
     m.feed ??= 'none';
+    m.flyCount ??= 0;
+    m.flyNoted ??= -99;
     m.lastBreak ??= null;
     if (m.shearOn === undefined || m.crutchOn === undefined) {
       const d = sheepJobDates(m.joinOn);
