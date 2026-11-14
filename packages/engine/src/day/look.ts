@@ -4,9 +4,9 @@
  * changes the farm or moves the clock.
  */
 
-import type { Action, ActionType } from '../actions/types';
+import type { Action, ActionRefusalReason, ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
-import { MARK_NOTE_MIN_AGE } from '../cattle/breeding';
+import { MARK_NOTE_MIN_AGE, markable, weanable } from '../cattle/breeding';
 import { JOB_TIMES } from '../data/jobTimes';
 import { SPECIES, type SpeciesId } from '../data/species';
 import { EDGE, H_EDGES, V_EDGES, type EdgeRef } from '../farm/topology';
@@ -17,7 +17,7 @@ import { animalLookup } from '../cattle/types';
 import type { SaleClassId } from '../data/cattle';
 import { stepOf, templateOf } from '../sim/plans';
 import type { FarmState, LoggedAction, PlanWaitReason } from '../sim/state';
-import { NO_TIME } from './act';
+import { NO_TIME, previewAction } from './act';
 
 /**
  * The shortest job in the table that takes time and is done in one go:
@@ -281,6 +281,46 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
   down('h', farm.layout.fences.hE, H_EDGES);
   down('v', farm.layout.fences.vE, V_EDGES);
   return out;
+}
+
+/** Whether a stock job can be done on a mob now, and on how many head. */
+export interface HusbandryJob {
+  /** Calves `markCalves` would mark (bull calves and unmarked young bulls), or calves `wean` would wean (90 days or more). */
+  count: number;
+  /** True if the job can be done now. */
+  canDo: boolean;
+  /** Why not, as the job itself says it: a reason code and plain words. Left out when it can be done. */
+  why?: { reason: ActionRefusalReason; message: string };
+}
+
+/** Marking and weaning for one mob. */
+export interface MobHusbandry {
+  mob: number;
+  name: string;
+  mark: HusbandryJob;
+  wean: HusbandryJob;
+}
+
+/**
+ * For each mob: how many calves marking would mark and weaning would wean,
+ * and whether each can be done now with the plain reason if not. The counts
+ * are the actions' own lists (`markable`, `weanable`), and "can it be done"
+ * is the job card's own answer (`previewAction`), so the reason is the one
+ * the job would give: nothing to do, no light left, the bank, the game over.
+ */
+export function husbandryNow(farm: FarmState, env: SourceEnv = {}): MobHusbandry[] {
+  const job = (action: Action, count: number): HusbandryJob => {
+    const card = previewAction(farm, action, env);
+    return card.ok
+      ? { count, canDo: true }
+      : { count, canDo: false, why: { reason: card.reason, message: card.message } };
+  };
+  return farm.mobs.map((m) => ({
+    mob: m.id,
+    name: m.name,
+    mark: job({ type: 'markCalves', mob: m.id }, markable(m).length),
+    wean: job({ type: 'wean', mob: m.id }, weanable(m).length),
+  }));
 }
 
 /**

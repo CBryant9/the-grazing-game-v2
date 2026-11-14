@@ -214,6 +214,10 @@ describe('looking is free', () => {
       mobSummaries: (f) => engine.mobSummaries(f),
       materialsOnHand: (f) => engine.materialsOnHand(f),
       breedingReports: (f) => engine.breedingReports(f),
+      // Reads the web server needs (14 Nov 2026).
+      supplementCosts: (f, env) => engine.supplementCosts(f, env),
+      husbandryNow: (f, env) => engine.husbandryNow(f, env),
+      portableRefund: (f) => engine.portableRefund(f, f.layout.water.ports[0]?.id ?? 1),
       paddockSummaries: (f, env) => engine.paddockSummaries(f, env),
       farmHash: (f) => engine.farmHash(f),
       saveFarm: (f) => engine.saveFarm(f),

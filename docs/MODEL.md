@@ -683,6 +683,16 @@ Moving cattle onto ground with no water, or onto a crop that is not ready to gra
 
 Rules that were screen code in the MVP are actions here: buying a sowing, removing troughs, hubs and portable troughs, and changing a supplement.
 
+### Reads for the web server (14 Nov 2026)
+
+The web server had copied some engine logic because it could not ask the engine. Each of these reuses the engine's own code, returns plain facts, and is in the "looking is free" test:
+
+- `supplementCosts(farm, env)`: for each mob, dollars a day for each supplement as today's tick would charge it. It runs the start of the day (season, crop events, growth: `startOfDay`, the tick's own steps 1 to 3) on a copy, finds where the mob spends the day as the cattle step does (`placeFor`), and takes the day's diet from `dayDiet`, the function the cattle step uses. So a mob on a plan that moves it more than once a day is priced on the average of the day's stops with water, not on the paddock it stands in. In the feedlot every option is the ration's price. It prices the cattle in the mob now: a drop weaned at the start of the tick would be priced at the calf's share.
+- `husbandryNow(farm, env)`: for each mob, how many calves `markCalves` would mark and `wean` would wean (the actions' own lists, `markable` and `weanable`), and whether each can be done now with the job's own reason if not (from `previewAction`).
+- `portableRefund(farm, port)`: what removing a portable trough pays back ($300), or null if there is no such trough.
+- Whether a grazing area has water: `areaWatered(points, areaId)`, already exported.
+- `materialsOnHand(farm)` (fence materials) and `breedingReports(farm)` (what the player has been told) are in sections 5 and 3.
+
 ### Stock yards (a stand-in)
 
 Bought cattle land in the yards at first light the day after they are bought (section 9, "Buying and selling on sale days"). The tick gives a mob in the yards water and lets it graze only the square the yards stand on. The water is Claudia's rule (the yards have water). The grazing is a placeholder.

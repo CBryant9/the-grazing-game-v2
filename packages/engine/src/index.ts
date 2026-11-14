@@ -179,8 +179,15 @@ export {
 export type { CalveInputs, MarkResult } from './cattle/breeding';
 export { gainOn, gainWhy, milkMJ, predictGains } from './cattle/gains';
 export type { CattleNote, GainForecast, GainReason } from './cattle/notes';
-export { settleDeaths, simMob } from './cattle/simMob';
-export type { Death, DeathCause, MobDayResult, MobPlace, SimMobInputs } from './cattle/simMob';
+export { dayDiet, settleDeaths, simMob } from './cattle/simMob';
+export type {
+  DayDiet,
+  Death,
+  DeathCause,
+  MobDayResult,
+  MobPlace,
+  SimMobInputs,
+} from './cattle/simMob';
 // Milestone 1.2b: the farm (paddocks, fences, water, crops and farm layout).
 export { FARM_SIZES, farmScale } from './data/farms';
 export type { FarmScale } from './data/farms';
@@ -547,6 +554,9 @@ export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
 // What the player has been told about breeding (14 Nov 2026). Display state only.
 export { knownClassOf } from './sim/told';
+// Reads the web server needs, so it never copies a rule (14 Nov 2026).
+export { portableRefund, supplementCosts } from './sim/reads';
+export type { SupplementCost } from './sim/reads';
 export { perDay, plansView, positionOf, stepOf, stepsIn, stopsToday } from './sim/plans';
 export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
 export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
@@ -625,6 +635,20 @@ export type {
   SkipResult,
   SkipStop,
 } from './day/days';
-export { SHORTEST_JOB_MIN, clockView, jobsToday, marketView, thingsToDo } from './day/look';
-export type { BookedView, MarketView, OnTheWayView, SaleDayView } from './day/look';
+export {
+  SHORTEST_JOB_MIN,
+  clockView,
+  husbandryNow,
+  jobsToday,
+  marketView,
+  thingsToDo,
+} from './day/look';
+export type {
+  BookedView,
+  HusbandryJob,
+  MarketView,
+  MobHusbandry,
+  OnTheWayView,
+  SaleDayView,
+} from './day/look';
 export type { ClockView, ThingToDo } from './day/look';
