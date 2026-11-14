@@ -32,7 +32,13 @@ import {
   Text,
   Texture,
 } from 'pixi.js';
-import { FARM_VIEW_VERSION, PADDOCK_LABELS, VIEW_FENCE, type FarmView } from '@gg/shared';
+import {
+  FARM_VIEW_VERSION,
+  PADDOCK_LABELS,
+  VIEW_FENCE,
+  type FarmView,
+  type ViewEdge,
+} from '@gg/shared';
 import { STRUGGLE, frameStats, struggling, type BenchResult } from './bench';
 import {
   MAX_ZOOM,
@@ -71,11 +77,24 @@ import {
   WORLD_W,
   colOf,
   cornerXY,
+  edgeEnds,
   rowOf,
 } from './grid';
 import { GROUND_H, GROUND_W, paintGround } from './ground';
-import { hitTest, type MapHit } from './hit';
-import { attachInput } from './input';
+import { hitTest, squareAtScreen, type MapHit } from './hit';
+import { attachInput, type DragPhase, type InputHandle, type InputMode } from './input';
+import {
+  TOUCH_PX,
+  cornerJoinsFence,
+  cornerVertex,
+  fenceCodeAt,
+  isDownCode,
+  nearestCorner,
+  nearestEdge,
+  sameCorner,
+  type Corner,
+} from './lines';
+import type { DraftDot, DraftKind, MapDraft } from './draft';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
 import { easeFade, fadeStep, lodMode, type LodMode } from './lod';
@@ -121,6 +140,46 @@ export interface MapPointerEvent extends MapHit {
   y: number;
 }
 
+/**
+ * What a drawing tool does with the pointer.
+ * - `corners`: a drag draws a fence along the grid, corner to corner.
+ * - `squares`: a drag lays pipe across squares.
+ * - `edge`: a tap picks a fence segment or gate.
+ * - `square`: a tap picks a square.
+ * - `corner`: a tap picks a grid corner.
+ * - `look`: no tool. One finger pans and a tap opens a paddock.
+ */
+export type MapTool = 'look' | 'corners' | 'squares' | 'edge' | 'square' | 'corner';
+
+/** A drag in a drawing tool. `corner` is set for `corners`, `square` for `squares` (-1 off the farm). */
+export interface MapDragEvent {
+  phase: DragPhase;
+  corner: Corner | null;
+  square: number;
+  x: number;
+  y: number;
+}
+
+/** A tap in a tool: everything near it, and the tool decides which counts. */
+export interface MapToolTapEvent extends MapPointerEvent {
+  /** The nearest segment that holds a fence or gate within a touch, or null. */
+  edge: ViewEdge | null;
+  /** The VIEW_FENCE code on that segment. */
+  edgeCode: number;
+  /** The nearest grid corner within a touch, or null. */
+  corner: Corner | null;
+  /** True when a water hub stands on that corner. */
+  hub: boolean;
+}
+
+/** A tap on a fence that is down, in Look: it offers to put it back up. */
+export interface MapFenceTapEvent {
+  edge: ViewEdge;
+  edgeCode: number;
+  x: number;
+  y: number;
+}
+
 export interface MapEvents {
   /** A tap or click on the farm. It reports the square and paddock, never a cow. */
   tap: MapPointerEvent;
@@ -128,6 +187,12 @@ export interface MapEvents {
   hover: MapPointerEvent | null;
   /** The camera moved. */
   camera: Camera;
+  /** A drawing drag, in a `corners` or `squares` tool. */
+  drag: MapDragEvent;
+  /** A tap in a picking tool (`edge`, `square` or `corner`). */
+  toolTap: MapToolTapEvent;
+  /** A tap on a fence that is down, in Look. */
+  fenceTap: MapFenceTapEvent;
 }
 
 export interface MapStats {
@@ -174,6 +239,16 @@ export interface FarmMap {
   setHighlight(paddock: number | null): void;
   /** Outline the paddocks a tool can pick (light), and mark those with no water (red). Null clears it. */
   setPickable(paddocks: readonly PickablePaddock[] | null): void;
+  /**
+   * What the pointer does: Look, or one of the build tools (see `MapTool`).
+   * In a tool a drag draws (or a tap picks), the mouse shows what is under
+   * it, and the map is panned with two fingers, the space bar or the middle button.
+   */
+  setTool(tool: MapTool): void;
+  /** Draw a draft on top of the map (a line about to be built), or null to clear it. Only the overlay is redrawn. */
+  setDraft(draft: MapDraft | null): void;
+  /** Where a point on the ground is on screen, in CSS pixels. For placing a card beside a line. */
+  groundToScreen(gx: number, gy: number): Point;
   setAmbient(on: boolean): void;
   setReduceMotion(on: boolean): void;
   /** Draw every beast, or go back to sampling big mobs. For the speed test. */
@@ -194,6 +269,20 @@ export interface FarmMap {
   stats(): MapStats;
   destroy(): void;
 }
+
+type HoverTarget =
+  | { kind: 'edge'; edge: ViewEdge }
+  | { kind: 'square'; square: number }
+  | { kind: 'corner'; corner: Corner };
+
+/** The line colour a draft is drawn in: the same as the fence or pipe it will become. */
+const DRAFT_COLOUR: Record<DraftKind, number> = {
+  permanent: NATURAL.fencePermanent,
+  electric: NATURAL.fenceElectric,
+  tape: NATURAL.fenceTape,
+  pipe: NATURAL.pipe,
+  mark: 0xffffff,
+};
 
 const DEFAULT_FONT = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
 
@@ -306,6 +395,9 @@ class PixiFarmMap implements FarmMap {
     tap: new Set(),
     hover: new Set(),
     camera: new Set(),
+    drag: new Set(),
+    toolTap: new Set(),
+    fenceTap: new Set(),
   };
 
   private base = new Graphics();
@@ -314,6 +406,15 @@ class PixiFarmMap implements FarmMap {
   private footprints = new Graphics();
   private ring = new Graphics();
   private outlines = new Graphics();
+  /** The draft of a line about to be built, and what the mouse is over in a tool. Each redraws on its own. */
+  private draftG = new Graphics();
+  private hoverG = new Graphics();
+  private tool: MapTool = 'look';
+  private draft: MapDraft | null = null;
+  private hoverTool: HoverTarget | null = null;
+  /** The zoom the overlay was last drawn at. Line widths follow the zoom. */
+  private overlayZoom = 0;
+  private dragLast = '';
   private fenceFar = new Graphics();
   private fenceNear = new Graphics();
   private labelLayer = new Container();
@@ -369,7 +470,7 @@ class PixiFarmMap implements FarmMap {
   private slowFrames: number[] = [];
   private lastDrawnAt = 0;
   private lastStepDown = 0;
-  private detachInput: (() => void) | null = null;
+  private input: InputHandle | null = null;
   private observer: ResizeObserver | null = null;
   private destroyed = false;
 
@@ -435,7 +536,9 @@ class PixiFarmMap implements FarmMap {
     this.buildAtlas(this.options.sprites ?? defaultSprites());
     this.buildScene();
 
-    this.detachInput = attachInput(canvas, {
+    this.input = attachInput(canvas, {
+      mode: () => this.inputMode(),
+      drag: (phase, p) => this.onDrag(phase, p),
       camera: () => this.cam,
       viewport: () => this.vp,
       moveTo: (cam) => this.setCamera(cam),
@@ -548,6 +651,8 @@ class PixiFarmMap implements FarmMap {
       this.rows.push(row);
     }
 
+    // The draft and the hover sit on top of everything standing on the farm.
+    world.addChild(this.draftG, this.hoverG);
     this.rain.boundsArea = new Rectangle(0, 0, 4096, 4096);
     this.rain.visible = false;
     this.ui.addChild(this.labelLayer, this.rain);
@@ -683,6 +788,8 @@ class PixiFarmMap implements FarmMap {
       this.drawOutlines();
       this.drawRing();
     }
+    // The build overlay is sized in screen pixels, so it follows the zoom (only the overlay is redrawn).
+    if (this.overlayZoom !== cam.zoom && (this.draft || this.hoverTool)) this.drawOverlays();
     this.invalidate();
   }
 
@@ -1527,12 +1634,143 @@ class PixiFarmMap implements FarmMap {
   }
 
   private onTap(x: number, y: number): void {
+    const view = this.view;
+    if (this.tool === 'look') {
+      // A fence that is down offers to be put back up. Anything else opens the paddock.
+      if (view) {
+        const down = nearestEdge(this.cam, this.vp, x, y, TOUCH_PX * 0.7, (e) =>
+          isDownCode(fenceCodeAt(view, e)),
+        );
+        if (down) {
+          const e = { edge: down.edge, edgeCode: fenceCodeAt(view, down.edge), x, y };
+          for (const fn of this.handlers.fenceTap) fn(e);
+          return;
+        }
+      }
+      const h = this.hit(x, y);
+      if (!h) return;
+      for (const fn of this.handlers.tap) fn(h);
+      return;
+    }
+    if (!view) return;
     const h = this.hit(x, y);
-    if (!h) return;
-    for (const fn of this.handlers.tap) fn(h);
+    const edge = nearestEdge(
+      this.cam,
+      this.vp,
+      x,
+      y,
+      TOUCH_PX,
+      (e) => fenceCodeAt(view, e) !== VIEW_FENCE.none,
+    );
+    const corner = nearestCorner(this.cam, this.vp, x, y, TOUCH_PX);
+    const hub = corner ? view.water.hubs.includes(cornerVertex(corner)) : false;
+    const base: MapPointerEvent = h ?? {
+      square: -1,
+      col: -1,
+      row: -1,
+      paddock: -1,
+      paddockName: '',
+      area: -1,
+      x,
+      y,
+    };
+    const e: MapToolTapEvent = {
+      ...base,
+      edge: edge ? edge.edge : null,
+      edgeCode: edge ? fenceCodeAt(view, edge.edge) : VIEW_FENCE.none,
+      corner: corner ? { vx: corner.vx, vy: corner.vy } : null,
+      hub,
+    };
+    for (const fn of this.handlers.toolTap) fn(e);
+  }
+
+  /** What a one-finger drag does: draws in a drawing tool, pans otherwise. */
+  private inputMode(): InputMode {
+    return this.tool === 'corners' || this.tool === 'squares' ? 'draw' : 'pan';
+  }
+
+  private onDrag(phase: DragPhase, p: Point): void {
+    if (!this.view) return;
+    let corner: Corner | null = null;
+    let square = -1;
+    if (this.tool === 'corners') {
+      // Always the nearest corner on the farm, so a loose finger still draws.
+      const c = nearestCorner(this.cam, this.vp, p.x, p.y);
+      corner = c ? { vx: c.vx, vy: c.vy } : null;
+      if (!corner) return;
+    } else if (this.tool === 'squares') {
+      const raise = this.lod.far > 0.5 ? this.raise : null;
+      square = squareAtScreen(this.cam, this.vp, p.x, p.y, raise);
+      if (square < 0) return;
+    } else {
+      return;
+    }
+    // Only a new corner or square is news.
+    const key = corner ? `c${corner.vx},${corner.vy}` : `s${square}`;
+    if (phase === 'move' && key === this.dragLast) return;
+    this.dragLast = phase === 'end' ? '' : key;
+    const e: MapDragEvent = { phase, corner, square, x: p.x, y: p.y };
+    for (const fn of this.handlers.drag) fn(e);
+  }
+
+  /** The thing under the mouse in a tool, worked out from the tool. */
+  private toolTarget(p: Point | null): HoverTarget | null {
+    const view = this.view;
+    if (!p || !view) return null;
+    switch (this.tool) {
+      case 'edge': {
+        const e = nearestEdge(
+          this.cam,
+          this.vp,
+          p.x,
+          p.y,
+          TOUCH_PX * 0.7,
+          (edge) => fenceCodeAt(view, edge) !== VIEW_FENCE.none,
+        );
+        return e ? { kind: 'edge', edge: e.edge } : null;
+      }
+      case 'corners':
+      case 'corner': {
+        const c =
+          this.tool === 'corners'
+            ? nearestCorner(this.cam, this.vp, p.x, p.y)
+            : nearestCorner(this.cam, this.vp, p.x, p.y, TOUCH_PX);
+        return c ? { kind: 'corner', corner: { vx: c.vx, vy: c.vy } } : null;
+      }
+      case 'square':
+      case 'squares': {
+        const raise = this.lod.far > 0.5 ? this.raise : null;
+        const s = squareAtScreen(this.cam, this.vp, p.x, p.y, raise);
+        return s >= 0 ? { kind: 'square', square: s } : null;
+      }
+      default:
+        return null;
+    }
   }
 
   private onHover(p: Point | null): void {
+    if (this.tool !== 'look') {
+      const next = this.toolTarget(p);
+      const was = this.hoverTool;
+      const same =
+        (!next && !was) ||
+        (next &&
+          was &&
+          next.kind === was.kind &&
+          ((next.kind === 'edge' &&
+            was.kind === 'edge' &&
+            next.edge.line === was.edge.line &&
+            next.edge.index === was.edge.index) ||
+            (next.kind === 'square' && was.kind === 'square' && next.square === was.square) ||
+            (next.kind === 'corner' &&
+              was.kind === 'corner' &&
+              sameCorner(next.corner, was.corner))));
+      if (!same) {
+        this.hoverTool = next;
+        this.drawHover();
+      }
+      return;
+    }
     const h = p ? this.hit(p.x, p.y) : null;
     const square = h ? h.square : -1;
     if (square === this.hoverSquare) return;
@@ -1592,6 +1830,167 @@ class PixiFarmMap implements FarmMap {
   setPickable(paddocks: readonly PickablePaddock[] | null): void {
     this.pickable = paddocks;
     this.drawOutlines();
+  }
+
+  setTool(tool: MapTool): void {
+    if (tool === this.tool) return;
+    this.tool = tool;
+    this.hoverTool = null;
+    this.dragLast = '';
+    this.hoverPaddock = null;
+    this.hoverSquare = -1;
+    this.drawOutlines();
+    this.drawHover();
+    this.input?.refreshCursor();
+  }
+
+  setDraft(draft: MapDraft | null): void {
+    // Nothing to clear, nothing to draw: leave the overlay alone.
+    if (!draft && !this.draft) return;
+    this.draft = draft;
+    this.drawDraft();
+  }
+
+  groundToScreen(gx: number, gy: number): Point {
+    return worldToScreen(this.cam, this.vp, gx, gy * K);
+  }
+
+  /** Both overlays, after a zoom: line widths are set in screen pixels. */
+  private drawOverlays(): void {
+    this.drawDraft();
+    this.drawHover();
+  }
+
+  /** The draft of a line about to be built. Only this layer is redrawn. */
+  private drawDraft(): void {
+    const g = this.draftG.clear();
+    this.overlayZoom = this.cam.zoom;
+    const d = this.draft;
+    if (!d) {
+      this.invalidate();
+      return;
+    }
+    const u = 1 / this.cam.zoom;
+    const N = NATURAL;
+    const own = DRAFT_COLOUR[d.kind];
+    const trace = (edges: readonly ViewEdge[], dashed: boolean): void => {
+      for (const e of edges) {
+        const [x0, y0, x1, y1] = edgeEnds(e);
+        if (!dashed) {
+          g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+          continue;
+        }
+        const len = Math.hypot(x1 - x0, (y1 - y0) * K);
+        const dash = 7 * u;
+        const gap = 4.5 * u;
+        for (let s = 0; s < len; s += dash + gap) {
+          const a = s / len;
+          const b = Math.min(1, (s + dash) / len);
+          g.moveTo(x0 + (x1 - x0) * a, (y0 + (y1 - y0) * a) * K).lineTo(
+            x0 + (x1 - x0) * b,
+            (y0 + (y1 - y0) * b) * K,
+          );
+        }
+      }
+    };
+    for (const style of ['ok', 'late', 'remove'] as const) {
+      const edges = d.segments.filter((s) => s.style === style).map((s) => s.edge);
+      if (!edges.length) continue;
+      const colour = style === 'ok' ? own : N.fenceDown;
+      const dashed = style === 'ok' && d.kind === 'tape';
+      if (style === 'remove') {
+        trace(edges, false);
+        g.stroke({ color: N.fenceDown, width: 11 * u, alpha: 0.45, cap: 'round' });
+      }
+      trace(edges, dashed);
+      g.stroke({ color: N.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
+      trace(edges, dashed);
+      g.stroke({ color: style === 'remove' ? 0xffffff : colour, width: 4 * u, cap: 'round' });
+    }
+    // Squares (pipe, or a place for a trough): a tint, then a line through their middles.
+    for (const style of ['ok', 'late', 'remove'] as const) {
+      const list = d.squares.filter((s) => s.style === style);
+      if (!list.length) continue;
+      const colour = style === 'ok' ? own : N.fenceDown;
+      for (const s of list) g.rect(colOf(s.cell), rowOf(s.cell) * K, 1, K);
+      g.fill({ color: colour, alpha: 0.3 });
+    }
+    for (const style of ['ok', 'late', 'remove'] as const) {
+      const links: [number, number][] = [];
+      const ring: number[] = [];
+      for (let i = 0; i < d.squares.length; i++) {
+        const s = d.squares[i]!;
+        if (s.style !== style) continue;
+        ring.push(s.cell);
+        const prev = d.squares[i - 1];
+        if (
+          prev &&
+          Math.abs(colOf(prev.cell) - colOf(s.cell)) +
+            Math.abs(rowOf(prev.cell) - rowOf(s.cell)) ===
+            1
+        ) {
+          links.push([prev.cell, s.cell]);
+        }
+      }
+      if (!ring.length) continue;
+      const colour = style === 'ok' ? own : N.fenceDown;
+      const body = (): void => {
+        for (const [a, b] of links) {
+          g.moveTo(colOf(a) + 0.5, (rowOf(a) + 0.5) * K).lineTo(
+            colOf(b) + 0.5,
+            (rowOf(b) + 0.5) * K,
+          );
+        }
+        for (const c of ring) g.circle(colOf(c) + 0.5, (rowOf(c) + 0.5) * K, 2.2 * u);
+      };
+      body();
+      g.stroke({ color: N.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
+      body();
+      g.stroke({ color: colour, width: 4 * u, cap: 'round' });
+    }
+    for (const dot of d.dots) this.drawDot(g, dot, u);
+    this.invalidate();
+  }
+
+  /** A snap dot: green where a line joins a fence, a white ring on open ground. */
+  private drawDot(g: Graphics, dot: DraftDot, u: number): void {
+    const x = dot.vx;
+    const y = dot.vy * K;
+    if (dot.joins) {
+      g.circle(x, y, 7 * u).fill(0x58e07a);
+      g.circle(x, y, 7 * u).stroke({ color: NATURAL.fenceCasing, width: 2 * u });
+    } else {
+      g.circle(x, y, 6.5 * u).stroke({ color: NATURAL.fenceCasing, width: 5.5 * u, alpha: 0.9 });
+      g.circle(x, y, 6.5 * u).stroke({ color: 0xffffff, width: 2.6 * u });
+    }
+  }
+
+  /** What the mouse is over in a tool: a segment, a square or a corner, so the player sees what a click will pick. */
+  private drawHover(): void {
+    const g = this.hoverG.clear();
+    this.overlayZoom = this.cam.zoom;
+    const h = this.hoverTool;
+    if (!h || !this.view) {
+      this.invalidate();
+      return;
+    }
+    const u = 1 / this.cam.zoom;
+    if (h.kind === 'edge') {
+      const [x0, y0, x1, y1] = edgeEnds(h.edge);
+      g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+      g.stroke({ color: NATURAL.fenceCasing, width: 9 * u, alpha: 0.9, cap: 'round' });
+      g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+      g.stroke({ color: 0xffffff, width: 5 * u, cap: 'round' });
+    } else if (h.kind === 'square') {
+      g.rect(colOf(h.square), rowOf(h.square) * K, 1, K).fill({ color: 0xffffff, alpha: 0.14 });
+      g.rect(colOf(h.square), rowOf(h.square) * K, 1, K).stroke({
+        color: 0xffffff,
+        width: 2.5 * u,
+      });
+    } else {
+      this.drawDot(g, { ...h.corner, joins: cornerJoinsFence(this.view, h.corner) }, u);
+    }
+    this.invalidate();
   }
 
   setAmbient(on: boolean): void {
@@ -1797,7 +2196,7 @@ class PixiFarmMap implements FarmMap {
     if (this.destroyed) return;
     this.destroyed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
-    this.detachInput?.();
+    this.input?.detach();
     this.observer?.disconnect();
     for (const set of Object.values(this.handlers)) set.clear();
     const canvas = this.app.renderer ? this.app.canvas : null;

@@ -15,9 +15,13 @@ export type {
   BenchOptions,
   FarmMap,
   FarmMapOptions,
+  MapDragEvent,
   MapEvents,
+  MapFenceTapEvent,
   MapPointerEvent,
   MapStats,
+  MapTool,
+  MapToolTapEvent,
 } from './map';
 
 export {
@@ -78,3 +82,47 @@ export { cattleSprite, defaultSprites } from './sprites/painters';
 
 export { drawSward, swardCaption, swardParts, swardPlan } from './sward';
 export type { SwardPart, SwardPictureOptions, SwardPlan } from './sward';
+
+export {
+  CORNERS_ACROSS,
+  TOUCH_PX,
+  cornerJoinsFence,
+  cornerVertex,
+  edgeBetween,
+  edgeKey,
+  edgesAtCorner,
+  edgesOfPath,
+  extendPath,
+  extendSquares,
+  fenceCodeAt,
+  isDownCode,
+  isTapeCode,
+  nearestCorner,
+  nearestEdge,
+  sameCorner,
+  sameEdge,
+  startPath,
+  startSquares,
+  tapeRun,
+  vertexCorner,
+} from './lines';
+export type { Corner, CornerHit, EdgeHit } from './lines';
+
+export {
+  fenceDraft,
+  markDraft,
+  markSquares,
+  pipeDraft,
+  snapDots,
+  styleSegments,
+  styleSquares,
+} from './draft';
+export type {
+  DraftDot,
+  DraftKind,
+  DraftSegment,
+  DraftSquare,
+  DraftStyle,
+  MapDraft,
+  NotFit,
+} from './draft';

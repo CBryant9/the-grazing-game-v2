@@ -5,11 +5,24 @@
  * zoom at the pointer. Keyboard: arrows pan, plus and minus zoom, 0 shows
  * the whole farm. A press that does not move is a tap: the map reports the
  * square and paddock under it, never a cow (CLAUDE.md rule 7).
+ *
+ * In a drawing tool (`mode()` is `draw`) one finger or the left button
+ * draws instead of panning. Two fingers still pan and pinch. On a PC, hold
+ * the space bar or use the middle button to pan.
  */
 
 import { panBy, pinch, zoomAt, type Camera, type Point, type Viewport } from './camera';
 
+/** `pan`: a drag moves the map. `draw`: a drag draws, and the map is moved another way. */
+export type InputMode = 'pan' | 'draw';
+
+export type DragPhase = 'start' | 'move' | 'end';
+
 export interface InputTarget {
+  /** What a one-finger drag does now. */
+  mode(): InputMode;
+  /** A drawing drag, in screen pixels from the top left of the map. */
+  drag(phase: DragPhase, point: Point): void;
   camera(): Camera;
   viewport(): Viewport;
   /** Take a new camera from a gesture. */
@@ -23,12 +36,33 @@ export interface InputTarget {
 /** A press that moves less than this many pixels is a tap. Fingers get more slack than a mouse. */
 export const TAP_SLOP = { mouse: 5, touch: 12 } as const;
 
-/** Wire up the map's input on an element. Returns a function that removes it all. */
-export function attachInput(el: HTMLElement, target: InputTarget): () => void {
+export interface InputHandle {
+  /** Take the cursor for the current mode (call after the mode changes). */
+  refreshCursor(): void;
+  /** Remove everything. */
+  detach(): void;
+}
+
+const isFormTarget = (t: EventTarget | null): boolean =>
+  t instanceof HTMLElement &&
+  (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(t.tagName));
+
+/** Wire up the map's input on an element. */
+export function attachInput(el: HTMLElement, target: InputTarget): InputHandle {
   const pointers = new Map<number, Point>();
   let downAt: Point | null = null;
   let moved = false;
   let wasPinch = false;
+  /** This press draws (a drawing tool, one pointer, no space bar). */
+  let drawing = false;
+  let drawStarted = false;
+  let lastDraw: Point | null = null;
+  let space = false;
+  let over = false;
+
+  const refreshCursor = (): void => {
+    el.style.cursor = target.mode() === 'draw' && !space ? 'crosshair' : 'grab';
+  };
 
   const local = (e: { clientX: number; clientY: number }): Point => {
     const r = el.getBoundingClientRect();
@@ -36,7 +70,10 @@ export function attachInput(el: HTMLElement, target: InputTarget): () => void {
   };
 
   const onDown = (e: PointerEvent): void => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const middle = e.pointerType === 'mouse' && e.button === 1;
+    if (e.pointerType === 'mouse' && e.button !== 0 && !middle) return;
+    // The middle button pans in any tool (and would otherwise start the browser's auto-scroll).
+    if (middle) e.preventDefault();
     const p = local(e);
     pointers.set(e.pointerId, p);
     try {
@@ -48,7 +85,14 @@ export function attachInput(el: HTMLElement, target: InputTarget): () => void {
       downAt = p;
       moved = false;
       wasPinch = false;
+      drawing = target.mode() === 'draw' && !space && !middle;
+      drawStarted = false;
+      lastDraw = null;
     } else {
+      // A second finger: the line drawn so far stays, and the two fingers move the map.
+      if (drawing && drawStarted && lastDraw) target.drag('end', lastDraw);
+      drawing = false;
+      drawStarted = false;
       wasPinch = true;
     }
   };
@@ -64,6 +108,18 @@ export function attachInput(el: HTMLElement, target: InputTarget): () => void {
     if (pointers.size === 1) {
       const slop = e.pointerType === 'mouse' ? TAP_SLOP.mouse : TAP_SLOP.touch;
       if (!moved && downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) < slop) return;
+      if (drawing) {
+        if (!drawStarted) {
+          drawStarted = true;
+          moved = true;
+          target.hover(null);
+          target.drag('start', downAt ?? p);
+        }
+        lastDraw = p;
+        target.drag('move', p);
+        pointers.set(e.pointerId, p);
+        return;
+      }
       if (!moved) {
         moved = true;
         el.style.cursor = 'grabbing';
@@ -91,13 +147,43 @@ export function attachInput(el: HTMLElement, target: InputTarget): () => void {
     const p = local(e);
     pointers.delete(e.pointerId);
     if (pointers.size === 0) {
-      el.style.cursor = 'grab';
+      if (drawing && drawStarted) target.drag('end', e.type === 'pointerup' ? p : (lastDraw ?? p));
+      refreshCursor();
       if (!moved && !wasPinch && e.type === 'pointerup') target.tap(p.x, p.y);
       downAt = null;
+      drawing = false;
+      drawStarted = false;
+      lastDraw = null;
     }
   };
 
-  const onLeave = (): void => target.hover(null);
+  const onEnter = (): void => {
+    over = true;
+  };
+
+  const onLeave = (): void => {
+    over = false;
+    target.hover(null);
+  };
+
+  /** Holding the space bar pans in a drawing tool. It only counts over the map, and not from a button. */
+  const spaceKey = (e: KeyboardEvent, down: boolean): void => {
+    if (e.code !== 'Space' || isFormTarget(e.target)) return;
+    if (!over && document.activeElement !== el) return;
+    if (down !== space) {
+      space = down;
+      refreshCursor();
+    }
+    e.preventDefault();
+  };
+  const onSpaceDown = (e: KeyboardEvent): void => spaceKey(e, true);
+  const onSpaceUp = (e: KeyboardEvent): void => spaceKey(e, false);
+  const onBlur = (): void => {
+    if (space) {
+      space = false;
+      refreshCursor();
+    }
+  };
 
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault();
@@ -149,15 +235,26 @@ export function attachInput(el: HTMLElement, target: InputTarget): () => void {
   el.addEventListener('pointerup', onUp);
   el.addEventListener('pointercancel', onUp);
   el.addEventListener('pointerleave', onLeave);
+  el.addEventListener('pointerenter', onEnter);
   el.addEventListener('wheel', onWheel, { passive: false });
   el.addEventListener('keydown', onKey);
-  return () => {
-    el.removeEventListener('pointerdown', onDown);
-    el.removeEventListener('pointermove', onMove);
-    el.removeEventListener('pointerup', onUp);
-    el.removeEventListener('pointercancel', onUp);
-    el.removeEventListener('pointerleave', onLeave);
-    el.removeEventListener('wheel', onWheel);
-    el.removeEventListener('keydown', onKey);
+  window.addEventListener('keydown', onSpaceDown);
+  window.addEventListener('keyup', onSpaceUp);
+  window.addEventListener('blur', onBlur);
+  return {
+    refreshCursor,
+    detach() {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      el.removeEventListener('pointerleave', onLeave);
+      el.removeEventListener('pointerenter', onEnter);
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onSpaceDown);
+      window.removeEventListener('keyup', onSpaceUp);
+      window.removeEventListener('blur', onBlur);
+    },
   };
 }

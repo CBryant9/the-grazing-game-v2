@@ -6,7 +6,9 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./sward": "./src/sward.ts"
+    "./sward": "./src/sward.ts",
+    "./lines": "./src/lines.ts",
+    "./draft": "./src/draft.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
