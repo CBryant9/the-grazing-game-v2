@@ -75,6 +75,8 @@ export function mergeShared(farm: FarmState, survey: Survey, events?: FarmEvent[
       for (const a of o.animals) t.animals.push(a);
       o.animals = [];
       if (t.supp === 'none' && o.supp !== 'none') t.supp = o.supp;
+      // A mob that joins keeps its plan if the biggest has none, as in the old game.
+      if (!t.plan && o.plan) t.plan = o.plan;
       events?.push({
         type: 'mobs-joined',
         from: o.id,

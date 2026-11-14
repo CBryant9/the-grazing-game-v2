@@ -40,6 +40,7 @@ import {
   type SaleClassId,
 } from '../data/cattle';
 import { SUPPLEMENTS } from '../data/feed';
+import { MIN_EVERY_DAYS, PLAN_FIGURES } from '../data/plans';
 import { SPECIES } from '../data/species';
 import {
   buildFence,
@@ -104,6 +105,7 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
+import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
   deepCopy,
@@ -113,6 +115,8 @@ import {
   type FarmState,
   type LoggedAction,
   type MobWhere,
+  type PlanLeg,
+  type PlanTemplate,
 } from '../sim/state';
 import type {
   Action,
@@ -121,6 +125,7 @@ import type {
   ActionResult,
   FenceKind,
   MoveTarget,
+  PlanSpec,
 } from './types';
 
 /** The most cattle that can be bought in one go. */
@@ -604,6 +609,31 @@ function moveMob(j: Job, a: Extract<Action, { type: 'moveMob' }>): Out {
   m.where = where;
   const first = m.animals[0]!.id;
   const head = m.animals.length;
+  // Moving a mob by hand breaks its plan: it pauses (the feedlot ends it, as in
+  // the old game). The player resumes it from a step, or clears it.
+  const run = m.plan;
+  if (run && where.kind === 'lot') {
+    delete m.plan;
+    j.events.push({
+      type: 'plan-cleared',
+      mob: m.id,
+      mobName: m.name,
+      template: run.template,
+      because: 'to-lot',
+      report: reportOf(j.farm, run),
+    });
+  } else if (run && !run.paused) {
+    run.paused = true;
+    run.waiting = null;
+    j.events.push({
+      type: 'plan-paused',
+      mob: m.id,
+      mobName: m.name,
+      template: run.template,
+      step: stepOf(templateOf(j.farm, run)!, run.leg, run.idx),
+      because: 'manual-move',
+    });
+  }
   mergeShared(j.farm, j.survey, j.events);
   j.arrived(j.mobOf(first)!, head);
   return null;
@@ -660,6 +690,285 @@ function setSupplement(j: Job, a: Extract<Action, { type: 'setSupplement' }>): O
   if (!SUPPLEMENTS.includes(a.supp)) return refuse('bad-request', 'That is not a supplement.');
   m.supp = a.supp;
   j.events.push({ type: 'supplement-set', mob: m.id, mobName: m.name, supp: m.supp });
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Grazing plans
+// ---------------------------------------------------------------------------
+
+/** A plan as asked for, checked and made plain. A refusal says what is wrong. */
+function checkedLegs(spec: PlanSpec): PlanLeg[] | ActionRefusal {
+  const F = PLAN_FIGURES;
+  if (!spec || typeof spec !== 'object' || !Array.isArray(spec.legs) || !spec.legs.length) {
+    return refuse('bad-request', 'A plan needs at least one leg with paddocks in it.');
+  }
+  if (spec.legs.length > F.maxLegs.value) {
+    return refuse('bad-request', `A plan can have up to ${F.maxLegs.value} legs.`);
+  }
+  if (spec.after !== 'repeat' && spec.after !== 'stay') {
+    return refuse(
+      'bad-request',
+      'Say what the plan does when the last leg is done: repeat or stay.',
+    );
+  }
+  const out: PlanLeg[] = [];
+  for (const [n, leg] of spec.legs.entries()) {
+    const who = spec.legs.length > 1 ? `Leg ${n + 1}: ` : '';
+    if (!leg || !Array.isArray(leg.stops) || !leg.stops.length) {
+      return refuse('bad-request', `${who}Pick at least one paddock.`);
+    }
+    if (leg.stops.length > F.maxStops.value) {
+      return refuse('bad-request', `${who}A leg can have up to ${F.maxStops.value} stops.`);
+    }
+    if (!leg.stops.every(isCell)) return refuse('bad-request', `${who}A stop is off the farm.`);
+    const rounds = leg.rounds ?? 0;
+    if (!Number.isInteger(rounds) || rounds < 0 || rounds > F.maxRounds.value) {
+      return refuse(
+        'bad-request',
+        `${who}Rounds is a whole number from 0 (keep going) to ${F.maxRounds.value}.`,
+      );
+    }
+    const r = leg.rule;
+    if (r && r.mode === 'days') {
+      if (
+        typeof r.every !== 'number' ||
+        !Number.isFinite(r.every) ||
+        r.every < MIN_EVERY_DAYS ||
+        r.every > F.maxEveryDays.value
+      ) {
+        return refuse(
+          'bad-request',
+          `${who}Move every ${MIN_EVERY_DAYS} to ${F.maxEveryDays.value} days. The lowest is ${F.maxMovesADay.value} moves a day.`,
+        );
+      }
+      if (r.every < 1 && leg.stops.length < 2) {
+        return refuse(
+          'bad-request',
+          `${who}A plan that moves several times a day needs at least two paddocks.`,
+        );
+      }
+      out.push({ stops: leg.stops.slice(), rule: { mode: 'days', every: r.every }, rounds });
+    } else if (r && r.mode === 'kg') {
+      const maxDays = r.maxDays ?? 0;
+      if (
+        typeof r.kg !== 'number' ||
+        !Number.isFinite(r.kg) ||
+        r.kg < F.minKg.value ||
+        r.kg > F.maxKg.value
+      ) {
+        return refuse(
+          'bad-request',
+          `${who}Move when grazed down to between ${F.minKg.value} and ${F.maxKg.value} kg DM/ha.`,
+        );
+      }
+      if (!Number.isInteger(maxDays) || maxDays < 0 || maxDays > F.maxDaysLimit.value) {
+        return refuse(
+          'bad-request',
+          `${who}The day limit is a whole number of days from 0 (none) to ${F.maxDaysLimit.value}.`,
+        );
+      }
+      out.push({ stops: leg.stops.slice(), rule: { mode: 'kg', kg: r.kg, maxDays }, rounds });
+    } else
+      return refuse(
+        'bad-request',
+        `${who}Pick a rule: move every so many days, or when grazed down.`,
+      );
+  }
+  return out;
+}
+
+/** The area a plan's stop is in, as the stop's own square. */
+function stopAreaId(j: Job, cell: number): number {
+  return j.survey.topology.areaOf[cell]!;
+}
+
+/** Put a mob in the area of a plan's stop, at once. Refused if another mob is there. */
+function putOnStop(j: Job, m: FarmMob, cell: number): Out {
+  const s = j.survey;
+  const areaId = stopAreaId(j, cell);
+  const there = j.farm.mobs.find(
+    (o) =>
+      o !== m &&
+      o.animals.length > 0 &&
+      o.where.kind === 'paddock' &&
+      s.topology.areaOf[o.where.anchor] === areaId,
+  );
+  if (there) {
+    return refuse(
+      'area-occupied',
+      `${there.name} is already in ${s.topology.areas[areaId]!.name}, so ${m.name} can't be put there. One mob to a paddock.`,
+    );
+  }
+  const here = m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor] === areaId;
+  if (!here) {
+    m.where = { kind: 'paddock', anchor: cell };
+    j.arrived(m, m.animals.length);
+  }
+  return null;
+}
+
+/** The squares of a template whose area has no water, as area names, each once. */
+function dryAreasOf(j: Job, tpl: PlanTemplate): string[] {
+  const s = j.survey;
+  const names = new Set<string>();
+  for (const l of tpl.legs) {
+    for (const c of l.stops) {
+      const id = s.topology.areaOf[c]!;
+      if (!s.points.areaTroughs[id]!.length) names.add(s.topology.areas[id]!.name);
+    }
+  }
+  return [...names];
+}
+
+function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
+  const { farm } = j;
+  const m = j.mob(a.mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  if (!a.plan || typeof a.plan !== 'object') return refuse('bad-request', 'Say which plan.');
+  let tpl: PlanTemplate;
+  let changed = false;
+  if ('template' in a.plan) {
+    const found = farm.plans.find((t) => t.id === (a.plan as { template: number }).template);
+    if (!found) return refuse('no-such-plan', 'There is no such plan.');
+    tpl = found;
+  } else {
+    const spec = a.plan;
+    const legs = checkedLegs(spec);
+    if ('ok' in legs) return legs;
+    if (spec.id !== undefined) {
+      const found = farm.plans.find((t) => t.id === spec.id);
+      if (!found) return refuse('no-such-plan', 'There is no such plan to change.');
+      tpl = found;
+      changed = true;
+    } else {
+      if (farm.plans.length >= PLAN_FIGURES.maxTemplates.value) {
+        return refuse(
+          'bad-request',
+          `A farm can keep up to ${PLAN_FIGURES.maxTemplates.value} plans. Change one of them.`,
+        );
+      }
+      const id = farm.nextPlanId;
+      tpl = { id, name: '', legs, after: spec.after };
+      farm.plans.push(tpl);
+      farm.nextPlanId = id + 1;
+    }
+    if (spec.name !== undefined && typeof spec.name !== 'string') {
+      return refuse('bad-request', 'A plan name is text.');
+    }
+    tpl.name = (spec.name ?? '').trim() || tpl.name || 'Plan ' + tpl.id;
+    tpl.legs = legs;
+    tpl.after = spec.after;
+  }
+  const step = a.step ?? 0;
+  const pos = positionOf(tpl, step);
+  if (!pos) {
+    return refuse(
+      'bad-request',
+      `That plan has ${stepsIn(tpl)} stops, so step ${String(step)} is not on it.`,
+    );
+  }
+  // Mobs already running a changed template keep their place where it still exists.
+  if (changed) {
+    for (const o of farm.mobs) {
+      const r = o.plan;
+      if (!r || r.template !== tpl.id || o === m) continue;
+      if (r.leg >= tpl.legs.length || r.idx >= tpl.legs[r.leg]!.stops.length) {
+        r.leg = 0;
+        r.idx = 0;
+      }
+      r.round = 0;
+      r.waiting = null;
+    }
+  }
+  const no = putOnStop(j, m, tpl.legs[pos.leg]!.stops[pos.idx]!);
+  if (no) return no;
+  m.plan = newRun(farm, tpl, pos.leg, pos.idx);
+  j.events.push({
+    type: 'plan-set',
+    mob: m.id,
+    mobName: m.name,
+    template: tpl.id,
+    templateName: tpl.name,
+    changed,
+    step,
+    steps: stepsIn(tpl),
+    area: j.survey.topology.areas[stopAreaId(j, tpl.legs[pos.leg]!.stops[pos.idx]!)]!.name,
+    dryAreas: dryAreasOf(j, tpl),
+  });
+  return null;
+}
+
+function pausePlan(j: Job, a: Extract<Action, { type: 'pausePlan' }>): Out {
+  const m = j.mob(a.mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
+  if (run.paused) return refuse('already-paused', `${m.name}'s plan is already paused.`);
+  run.paused = true;
+  run.waiting = null;
+  j.events.push({
+    type: 'plan-paused',
+    mob: m.id,
+    mobName: m.name,
+    template: run.template,
+    step: stepOf(templateOf(j.farm, run)!, run.leg, run.idx),
+    because: 'asked',
+  });
+  return null;
+}
+
+function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
+  const m = j.mob(a.mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan to resume. Set one.`);
+  const tpl = templateOf(j.farm, run)!;
+  const step = a.step ?? stepOf(tpl, run.leg, run.idx);
+  const pos = positionOf(tpl, step);
+  if (!pos) {
+    return refuse(
+      'bad-request',
+      `That plan has ${stepsIn(tpl)} stops, so step ${String(step)} is not on it.`,
+    );
+  }
+  const cell = tpl.legs[pos.leg]!.stops[pos.idx]!;
+  const no = putOnStop(j, m, cell);
+  if (no) return no;
+  // The counts so far are kept. The place, the round and the days on the stop start again.
+  run.leg = pos.leg;
+  run.idx = pos.idx;
+  run.round = 0;
+  run.moved = j.farm.day;
+  run.noted = 0;
+  run.waiting = null;
+  run.paused = false;
+  const id = stopAreaId(j, cell);
+  j.events.push({
+    type: 'plan-resumed',
+    mob: m.id,
+    mobName: m.name,
+    template: tpl.id,
+    step,
+    area: j.survey.topology.areas[id]!.name,
+  });
+  return null;
+}
+
+function clearPlan(j: Job, a: Extract<Action, { type: 'clearPlan' }>): Out {
+  const m = j.mob(a.mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
+  delete m.plan;
+  j.events.push({
+    type: 'plan-cleared',
+    mob: m.id,
+    mobName: m.name,
+    template: run.template,
+    because: 'asked',
+    report: reportOf(j.farm, run),
+  });
   return null;
 }
 
@@ -1172,6 +1481,14 @@ function run(j: Job, a: Action): Out {
       return moveCattle(j, a);
     case 'setSupplement':
       return setSupplement(j, a);
+    case 'setPlan':
+      return setPlan(j, a);
+    case 'pausePlan':
+      return pausePlan(j, a);
+    case 'resumePlan':
+      return resumePlan(j, a);
+    case 'clearPlan':
+      return clearPlan(j, a);
     case 'wean':
       return wean(j, a);
     case 'markCalves':

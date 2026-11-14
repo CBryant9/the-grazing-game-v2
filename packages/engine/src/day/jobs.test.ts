@@ -437,6 +437,17 @@ describe('the job card and the job agree, for every kind of action', () => {
     // Cattle can be bought on a sale day only. Selling on a day with no sale books the stock onto the next.
     const saleDay = toSaleDay(b.farm);
     const booked = work(b.farm, { type: 'sellGroup', mob: b.steers, group: 'steer', qty: 4 }).farm;
+    // Plans are decisions: setting, pausing, resuming and clearing take none of the day.
+    const setPlan: Action = {
+      type: 'setPlan',
+      mob: b.steers,
+      plan: {
+        legs: [{ stops: [b.steerCell, b.emptyCell], rule: { mode: 'days', every: 3 }, rounds: 0 }],
+        after: 'repeat',
+      },
+    };
+    const planned = work(b.farm, setPlan).farm;
+    const paused = work(planned, { type: 'pausePlan', mob: b.steers }).farm;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
       buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
       cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
@@ -472,6 +483,10 @@ describe('the job card and the job agree, for every kind of action', () => {
           },
         },
       ],
+      setPlan: [{ farm: b.farm, action: setPlan }],
+      pausePlan: [{ farm: planned, action: { type: 'pausePlan', mob: b.steers } }],
+      resumePlan: [{ farm: paused, action: { type: 'resumePlan', mob: b.steers, step: 1 } }],
+      clearPlan: [{ farm: planned, action: { type: 'clearPlan', mob: b.steers } }],
       setSupplement: [
         { farm: b.farm, action: { type: 'setSupplement', mob: b.steers, supp: 'hay' } },
         { farm: b.farm, action: { type: 'setSupplement', mob: b.steers, supp: 'none' } },
@@ -518,8 +533,8 @@ describe('the job card and the job agree, for every kind of action', () => {
       sow: [{ farm: june, action: { type: 'sow', species: 'barley', cells: fallow } }],
       harvest: [{ farm: ready.farm, action: { type: 'harvest', field: ready.field } }],
     };
-    // 30 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(30);
+    // 34 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(34);
 
     const outcomes = new Set<string>();
     let refusals = 0;

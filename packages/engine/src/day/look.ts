@@ -15,7 +15,8 @@ import { dayMinutes, lightLeft, timeNow } from '../sim/clock';
 import { areaIdOf, dateOn, nextSaleDay, saleDayOn, surveyOf, type SourceEnv } from '../sim/derived';
 import { animalLookup } from '../cattle/types';
 import type { SaleClassId } from '../data/cattle';
-import type { FarmState, LoggedAction } from '../sim/state';
+import { stepOf, templateOf } from '../sim/plans';
+import type { FarmState, LoggedAction, PlanWaitReason } from '../sim/state';
 import { NO_TIME } from './act';
 
 /**
@@ -97,6 +98,21 @@ export type ThingToDo =
         /** Days in a row without water so far. */
         dryDays: number;
       }
+    /**
+     * A grazing plan that can not move a mob: the area it wants next has no
+     * water, or another mob is in it. `count` is the mob's head. `step`
+     * counts the stops of the plan from the first stop of the first leg.
+     * The plan tries again each day by itself.
+     */
+    | {
+        type: 'plan-waiting';
+        mob: number;
+        mobName: string;
+        area: string;
+        why: PlanWaitReason;
+        step: number;
+        count: number;
+      }
     /** A grain crop ready to harvest. `count` is its hectares. */
     | { type: 'crop-ready'; fieldId: number; sp: SpeciesId; count: number }
     /**
@@ -159,6 +175,26 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
       dryDays: m.dry,
       does: 'moveMob',
       action: null,
+    });
+  }
+  // Plans that are waiting. A paused plan is not waiting: it is stopped.
+  for (const m of farm.mobs) {
+    const run = m.plan;
+    if (!run?.waiting || run.paused || !m.animals.length) continue;
+    const tpl = templateOf(farm, run);
+    if (!tpl) continue;
+    const { target, why } = run.waiting;
+    const next = stepOf(tpl, run.leg, run.idx);
+    out.push({
+      type: 'plan-waiting',
+      mob: m.id,
+      mobName: m.name,
+      area: survey.topology.areas[survey.topology.areaOf[target]!]!.name,
+      why,
+      step: next,
+      count: m.animals.length,
+      does: 'pausePlan',
+      action: { type: 'pausePlan', mob: m.id },
     });
   }
   for (const pt of farm.layout.water.ports) {

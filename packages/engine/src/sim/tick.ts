@@ -14,7 +14,7 @@
  *   6. portable troughs drain, hungry or thirsty mobs may push through tape,
  *      and mobs that share an area join
  *   7. running costs and interest
- *   8. grazing plans move mobs (a later milestone; see plans.ts)
+ *   8. grazing plans move mobs (plans.ts)
  *   9. the market moves and the day ends
  *  10. the year closes every 365 days
  *  11. game-over checks
@@ -57,7 +57,7 @@ import {
 import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
-import { stopsToday } from './plans';
+import { runPlans, stopsToday } from './plans';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -245,6 +245,11 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       totals: farm.year,
     });
     if (res.feedCost > 0) farm.cash -= res.feedCost;
+    // What a mob on a plan ate today goes in the plan's report, as in the old game.
+    if (m.plan && !m.plan.paused && m.where.kind === 'paddock' && m.st) {
+      m.plan.eatenKg += m.st.demand * m.st.f;
+      m.plan.headDays += m.st.n;
+    }
     const area = areaNameOf(survey, m);
     for (const note of res.notes) {
       events.push({ type: 'cattle', mob: m.id, mobName: m.name, area, note });
@@ -346,7 +351,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   farm.year.running += run;
   farm.year.interest += interest;
 
-  // 8. Grazing plans move mobs here (a later milestone; see plans.ts).
+  // 8. Grazing plans move mobs here. Each move takes the move time off today's light.
+  runPlans(farm, survey, landOf(farm, survey, plantings), events);
 
   // 9. The market moves and the day ends.
   farm.day++;

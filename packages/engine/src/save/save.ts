@@ -257,6 +257,9 @@ function upgrade(f: Record<string, unknown>): void {
   // Sale days and the yards (format 5): a farm saved before it had nothing on the way and nothing booked.
   farm.arrivals ??= [];
   farm.saleBookings ??= [];
+  // Grazing plans (format 6): a farm saved before it had none, and no mob on one.
+  farm.plans ??= [];
+  farm.nextPlanId ??= farm.plans.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   farm.ledger = { ...emptyLedger(), ...(farm.ledger ?? {}) };
   for (const m of farm.mobs ?? []) {
     m.lastBreak ??= null;

@@ -520,7 +520,7 @@ A plan is one or more legs. Each leg has:
 - a rule: every N days (as low as 0.25 = 4 moves a day, which splits the day's grazing across the shifts), or move when grazed down to X kg DM/ha with an optional maximum days
 - a number of rounds (0 = keep going)
 
-After the last leg the plan either repeats or stays. Moves skip a paddock with no water and pause the clock. Each move predicts gains, and warns with the reason if any class will lose weight. The plan report shows days, moves, rounds, t DM eaten, kg gained, kg/head/day and average days per paddock.
+After the last leg the plan either repeats or stays. Moves skip a paddock with no water and pause the clock. (The rebuild, with one fix, is in section 10.) Each move predicts gains, and warns with the reason if any class will lose weight. The plan report shows days, moves, rounds, t DM eaten, kg gained, kg/head/day and average days per paddock.
 
 ## 7. Scoring (per year)
 
@@ -554,7 +554,7 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 5. **Deaths are settled** (a cow whose calf died is dried off).
 6. **Portable troughs drain.** If one runs dry, the watered squares are worked out again. Then **breakouts** (below). Then **mobs that share ground join** (below).
 7. **Running costs and interest.** Overheads are $4,000 + $0.60 a hectare a year. Animal health is the district's figure a head a year, counted on every head, calves included. Both are charged a 365th each day. Interest is worked on the balance after the day's feed bill and before the day's running costs: 9.5% a year on an overdraft, 3% a year earned on money in the bank.
-8. **Grazing plans** move mobs here. Plans are a later milestone. The place for them is `sim/plans.ts`: the cattle step already takes a mob's stops for the day.
+8. **Grazing plans** move mobs here (section 10). The cattle step in step 4 has already been given the day's stops for a mob whose plan moves it more than once a day. Each plan move takes the ordinary move time off the day's light.
 9. **The day counter goes up, then the market moves** to the new day. Mobs with no cattle left are dropped.
 10. **The year closes.** On a farm with random seasons that is every 365 farm days (not on a calendar date, and leap years make no difference). On a real-year farm it is when the game year ends, 365 or 366 days after it opened, so each scored year is one real year (section 1A, "The calendar on a real-year farm"). The year is scored and filed, and a new one opens at the farm's net worth.
 11. **Game over** if cash is at or past the bank's limit. Otherwise, if there are cattle on pasture, the feed cattle can reach is averaged over every square of the farm: `max(0, G + D − 250)`. Under 40 kg DM/ha counts as eaten out. A warning event goes out on the first day, and after 10 days in a row the game is over. Cattle in the feedlot don't count, and the count starts again on any day the farm is not eaten out or has no cattle on pasture.
@@ -859,3 +859,79 @@ Built in milestone 1.5b (engine 0.8.0, save format 5), on Claudia's rule that **
 - Putting a mob on a supplement still takes 30 minutes. Claudia has said that in Fast Farm it is switched on at a daily price with no daylight cost, and that in Daily Farm feed is stock on hand in a feeder or a lick block. That is a later part.
 - Nothing a mob eats depends on the time of day yet.
 - There are no farm hands and no contractor fencing (Stage 2).
+
+## 10. Grazing plans (rebuild, milestone 1.5c)
+
+Built in milestone 1.5c (engine 0.9.0, save format 6). Code: `sim/plans.ts` (the rules and `plansView`), `actions/apply.ts` (the four actions), `data/plans.ts` (figures), `sim/tick.ts` (step 4 reads the stops, step 8 runs the plans). The old game's plan code (`normPlan`, `perDayOf`, `planSubs`, `planStep` and the plan part of `stepDay`) is ported exactly. Tests: `sim/plans.mvp.test.ts` (the old game's own code run beside the engine, compared with no tolerance every day) and `sim/plans.test.ts`. No grass, cattle, crop or price formula changed, and a farm with no plan runs exactly as it did on 0.8.0.
+
+### What a plan is
+
+A plan is a **template** (`farm.plans`): one or more **legs**, and what to do after the last one.
+
+- A leg has the squares to graze, in order (`stops`, one square in each grazing area to visit), a **rule** for moving on, and a number of **rounds** (0 keeps going round that leg for ever).
+- After the last leg the plan either **repeats** (starts again at leg 1) or **stays** (the plan ends and the mob stays where it is).
+- A mob **runs** a template (`mob.plan`): the leg and stop it is on, the round it is in, the day its stay on the stop started (`moved`), and a report (the day the plan was set, moves, full rounds, feed eaten in kg DM and head-days). Any number of mobs can run one template, each from its own step.
+- A **step** counts the stops from the first stop of the first leg ("this is paddock 3 of the template" is step 2).
+
+### The rule options (the old game's)
+
+| Rule | Moves the mob |
+|---|---|
+| `days`, every N | when it has been N days on the stop. N can be a part of a day: under 1 the plan moves `round(1 ÷ N)` times a day (0.25 is 4 a day, the lowest), and the day's stops are grazed in turn (below). N is 0.25 to 60 |
+| `kg`, to X kg DM/ha, with a day limit | when the area has been grazed down to X kg DM/ha or less (green plus dead feed, averaged over the area's squares), after at least a day on it. With a day limit above 0 it moves on that day whatever is left. A note ("still here") is given once a week while it stays |
+
+Rounds and the order of legs are as the old game's. The figures (defaults, limits) are in `data/plans.ts` and DATA.md, "Grazing plans".
+
+### The order of events in the day
+
+1. **Step 4 (each mob's day).** If a plan moves a mob more than once a day, `stopsToday(farm, mob)` gives the cattle step the day's stops: the stop the mob is on and the ones after it (`stops[(idx + j) mod n]` for j under the moves a day; the same paddock can come up twice). With two or more of them with water the diet is the plain average and the day's grazing is split equally between them (section 2, "Several shifts a day"). With one watered stop or none, the mob grazes the area it is standing in. A paused plan, or a plan that moves once a day or less, gives no stops. After the mob's day, what a mob on a running plan ate (`st.demand × st.f`) and its head are added to the plan's report.
+2. **Step 8 (after the day's running costs and before the market moves).** For each mob in the farm's order, with a running plan (not paused), on pasture, with cattle:
+   - A rule under a day makes all of its moves for the day, one after another. It stops at the first move that can not be made.
+   - Any other rule is checked once. `days`: `stay = day + 1 − moved` and the mob moves when `stay` is at least N. `kg`: it moves when `stay` is at least 1 and the area's feed is at or under X, or when `stay` has reached the day limit.
+3. **A plan move** (`planStep`) works out the next stop. If the leg's stops are used up it is the first stop of the next round, and a round is done. When the leg's rounds are done it is the first stop of the next leg, or, after the last leg, of the first leg (repeat) or the plan **ends** (stay: the mob stays, a `plan-finished` event gives the report, the last round counts). Then the move is **made** unless it can not be (below). When it is made, the mob is put on the stop's square (`where.anchor` is that square, as the old game's `anchor`), the days on the stop start from tomorrow (`moved = day + 1`), the move is counted and the "still here" count starts again.
+
+### What stops a move, and the one fix
+
+A plan can not move a mob when the next area has **no water**, and (the rebuild's rule for "one mob to a paddock", CLAUDE.md rule 8) when **another mob is in it**. The old game moved the mob into an area with another mob and joined them. The engine waits and says so instead. Nothing else is checked: there is no route and no gate (Claudia, 14 Nov 2026).
+
+When a move can not be made:
+
+- The mob stays where it is. Nothing about the plan changes: not the stop, not the round, not the leg, not the counts. **This is the fix (BUILD_PLAN 2.4, "A plan stuck at a stop with no water keeps counting rounds"): rounds count only when the mob moves.** In the old game the round count, and with a finite number of rounds the leg, went up every day the plan was stuck.
+- A `plan-waiting` event gives the reason (`no-water` or `occupied`), the area wanted and the step. It is given **once for each stop and reason**, as the old game said it once for each stop. The plan records it (`waiting`) and tries again every day. The plan moves on the first day the area has water and no other mob.
+- `thingsToDo` lists it (`plan-waiting`: the mob, the area, the reason, the step and the head), and `plansView` shows it and `next: waiting`. A paused plan is not waiting.
+- **A skip stops for it** when the reason is no water, after the day, once for each stop (`SkipStop` `plan-waiting`). This is the old game's seventh stop (`U.queue=0` in `planStep`). It does not stop for `occupied`: the old game had no such reason.
+
+### What pauses a plan
+
+- **A mob moved by hand** (`moveMob`) pauses its plan (`plan-paused`, because `manual-move`). The old game ended the plan. The engine keeps its place on the template. Moving part of a mob (`moveCattle`) does not pause it: the plan stays with the mob that stays.
+- **Moving a mob to the feedlot** ends its plan (the old game's `toLot`), with a `plan-cleared` event.
+- `pausePlan` pauses it. A paused plan moves nothing, gives the cattle step no stops, and adds nothing to its report.
+- **`resumePlan`** (from a step, or where it was) puts the mob on that step's stop at once (refused if another mob is in the area), starts the days on the stop and the round again, clears any waiting, and keeps the report's counts. **`setPlan`** makes or changes a template, or picks one that exists (`{ template }`), and puts a mob on it at a step with its report at nothing. **`clearPlan`** takes the mob off its plan; the template stays and the event carries the report.
+- Mobs that join (`mergeShared`): the biggest keeps its own plan, or takes the other's if it has none (the old game's `mergeStrays`).
+
+### The light a plan move takes (builder's rule, for Claudia)
+
+PRD 5.15 says, **[Proposed]**, that a plan "uses the farmer's daylight unless a hand does it". As built: each plan move takes the ordinary move time (`data/jobTimes.ts`: 15 minutes and 1 minute for each 100 head, calves included) off the light of **the day it happens on**, never taking the light below zero and never stopping the move. A move made with 5 minutes of light left takes 5 minutes. A move made after last light takes none. The `plan-moved` event gives the time it started, the move time (`workMin`) and the light it took (`lightUsedMin`), and `DayEnd.lightLeftMin` is the light left after the plan's moves. A new day starts with all of its light. Four moves a day on a short day use what light there is. There is no hand yet (Stage 2), so no plan move is free of the day; when hands are built, a move a hand makes takes none. Setting, pausing, resuming and clearing a plan take none of the day: they are decisions. **Setting or resuming puts the mob on the stop at once and for nothing**, as the old game's `commitPlan` did; it is the one way to move a mob without the move time, and is for Claudia to rule on.
+
+### Looking at plans
+
+`plansView(farm)` gives, for each plan: its legs with the squares (the area each is in and whether it has water), the rule and the rounds, and, for each mob running it: the step, leg and stop it is on, rounds done, the round in this leg, moves, days since it was set, days on the stop, whether it is paused or waiting (and why), and what it will do next: `paused`; `waiting`; `finish` (the next move ends the plan); or `move` to an area, with the day it falls on for a `days` rule, or the feed now, the figure and the latest day for a `kg` rule. Plus the feed eaten and head-days. Facts only. A farm with no plan gives an empty list.
+
+### Events
+
+`plan-set`, `plan-paused`, `plan-resumed` and `plan-cleared` come from the actions. `plan-moved` (with the reason it moved, the rounds, the light it took and, for a plan that moves once a day or less, the classes expected to lose weight in the new area, and why, as the old game's "Heads up"), `plan-waiting`, `plan-staying` and `plan-finished` come from the daily tick. They go to the inbox and the period summary like any other event. None of them praises or blames.
+
+### Saves
+
+Format 6. `farm.plans`, `farm.nextPlanId` and each mob's `plan` are saved, hashed and loaded. An older save loads with no plans. Save, load and carry on equals running straight through, part-way through a plan, a pause and a wait (`plans.test.ts`). Nothing here reads a clock or draws a random number.
+
+### Proved against the old game
+
+`plans.mvp.test.ts` sets the same plan on the same mob in the old game and the engine, and compares every day, with no tolerance: every pasture array, every animal, where each mob is (the square), and the plan's stop, days on it, "still here" count, waiting, moves, rounds, feed eaten and head-days. It covers a rotation every 3 days for 120 days in two districts, the "grazed down to" rule (the day limit, the note, and moving each day), several moves a day (4, 2, and 2 with a dry stop in the way), a plan that runs out of rounds (stay, and repeat), a move by hand with a resume from a step, and the no-water case. In the no-water case the engine differs from the old game only in the round counts, which the test leaves out of the comparison and then asserts: the old game counted a round every day it was stuck, the engine none.
+
+### Not built
+
+- The plan report's weight gain (the old game added each animal's day's gain in the cattle step, which is not changed). The report has the days, moves, rounds, feed eaten and head-days.
+- The old game's confirmation before a plan moves stock onto a planting that is not ready to graze (`confirmGraze`, asked on a manual move). A plan move reports nothing about crops in the new area.
+- The old game's save-time water check dialog: `plan-set` carries `dryAreas` for a screen to ask.
+- Workers doing the planned moves, and the plan card and "Run today's plan" (screens, and Stage 2).

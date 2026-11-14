@@ -228,6 +228,9 @@ describe('looking is free', () => {
       clockView: (f) => engine.clockView(f),
       jobsToday: (f) => engine.jobsToday(f),
       thingsToDo: (f) => engine.thingsToDo(f),
+      // Grazing plans: the plans, and the stops a mob's plan gives it today.
+      plansView: (f) => engine.plansView(f),
+      stopsToday: (f) => engine.stopsToday(f, f.mobs[0]!),
       // The numbers the map is drawn from. Looking at the map is free.
       farmView: (f, env) => engine.farmView(f, env),
     };

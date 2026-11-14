@@ -14,7 +14,7 @@ import type { SpeciesId } from '../data/species';
 import type { RefusalReason } from '../farm/layout';
 import type { EdgeRef } from '../farm/topology';
 import type { FarmEvent } from '../sim/events';
-import type { FarmState } from '../sim/state';
+import type { FarmState, PlanRule } from '../sim/state';
 
 /** The fences a player can build. */
 export type FenceKind = 'permanent' | 'electric' | 'tape';
@@ -58,6 +58,21 @@ export type Action =
       to: MoveTarget;
     }
   | { type: 'setSupplement'; mob: number; supp: Supplement }
+  // ---- Grazing plans (milestone 1.5c). They are decisions: they take none of the day.
+  /**
+   * Make a plan, change one, or pick one, and put a mob on it at a step.
+   * `plan` is a whole plan (with an `id` to change that template), or
+   * `{ template }` to use one already made. `step` counts the stops from
+   * the first stop of the first leg (0 if left out). The mob is put in the
+   * area of that stop at once.
+   */
+  | { type: 'setPlan'; mob: number; plan: PlanSpec | { template: number }; step?: number }
+  /** Stop a plan moving a mob, keeping its place on the template. */
+  | { type: 'pausePlan'; mob: number }
+  /** Start a plan again at a step (where it was, if left out). The mob is put in the area of that stop at once. */
+  | { type: 'resumePlan'; mob: number; step?: number }
+  /** Take a mob off its plan. The template stays. */
+  | { type: 'clearPlan'; mob: number }
   /** Wean every calf of 90 days or more. With no `to`, the weaners go where the daily tick would send them. */
   | { type: 'wean'; mob: number; to?: MoveTarget }
   /** Mark every bull calf and unmarked young bull in the mob. */
@@ -94,6 +109,21 @@ export type Action =
   /** Harvest, the same way. */
   | { type: 'harvest'; field: number };
 
+/** One leg of a plan as the player asks for it. `rounds` is 0 (keep going) if left out. */
+export interface PlanLegSpec {
+  stops: number[];
+  rule: PlanRule;
+  rounds?: number;
+}
+
+/** A plan as the player asks for it. With an `id` it changes that template. */
+export interface PlanSpec {
+  id?: number;
+  name?: string;
+  legs: PlanLegSpec[];
+  after: 'repeat' | 'stay';
+}
+
 export type ActionType = Action['type'];
 
 export type ActionRefusalReason =
@@ -112,6 +142,14 @@ export type ActionRefusalReason =
   | 'not-a-sale-day'
   /** Nothing is booked onto a sale, so there is nothing to cancel. */
   | 'nothing-booked'
+  /** There is no such plan. */
+  | 'no-such-plan'
+  /** The mob has no plan. */
+  | 'no-plan'
+  /** The plan is already paused. */
+  | 'already-paused'
+  /** Another mob is in the area the plan wants to put the mob in. */
+  | 'area-occupied'
   | 'nothing-to-move'
   | 'already-there'
   | 'no-calves-to-wean'

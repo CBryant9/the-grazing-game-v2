@@ -37,6 +37,70 @@ export type MobWhere =
       since?: number;
     };
 
+/**
+ * When a plan moves a mob on from a stop (docs/MODEL.md, section 10). The
+ * old game's two rules, with its options.
+ *
+ * `days`: move after `every` days on the stop. Under 1 it is several moves
+ * a day: 0.25 is four a day (the old game's lowest), and the day's stops
+ * are grazed in turn.
+ *
+ * `kg`: move when the area is grazed down to `kg` kg DM/ha, after at least
+ * a day on it, or after `maxDays` days if that is more than 0.
+ */
+export type PlanRule =
+  { mode: 'days'; every: number } | { mode: 'kg'; kg: number; maxDays: number };
+
+/** One leg of a plan: the squares to graze, in order, the rule for moving on, and how many rounds to do. */
+export interface PlanLeg {
+  /** One square in each grazing area to visit, in order. The mob is put on that square. */
+  stops: number[];
+  rule: PlanRule;
+  /** Rounds of this leg before the next leg. 0 keeps going round this leg for ever. */
+  rounds: number;
+}
+
+/**
+ * A grazing plan as a template (PRD 5.15): the paddocks in order, the rule
+ * for moving on and the rounds, in one or more legs. Any number of mobs
+ * can run it, each from its own step.
+ */
+export interface PlanTemplate {
+  id: number;
+  name: string;
+  legs: PlanLeg[];
+  /** When the last leg is done: start again, or stay where the mob is. */
+  after: 'repeat' | 'stay';
+}
+
+/** Why a plan can not move a mob today. */
+export type PlanWaitReason = 'no-water' | 'occupied';
+
+/** A mob running a template: where it is on it, and the counts so far. */
+export interface PlanRun {
+  /** The template's id. */
+  template: number;
+  /** The leg, and the stop in it, the mob is on. */
+  leg: number;
+  idx: number;
+  /** Rounds of this leg done so far. */
+  round: number;
+  /** The farm day the stop's count of days starts from. The old game's `moved`. */
+  moved: number;
+  /** The days on the stop at the last "staying" note (kg rule). The old game's `noted`. */
+  noted: number;
+  /** A move that could not be made: the square the plan wants next, and why not. Null when none. */
+  waiting: { target: number; why: PlanWaitReason } | null;
+  /** True after a manual move, or when the player pauses it. A paused plan moves nothing. */
+  paused: boolean;
+  /** The report: the farm day it was set, moves made, full rounds made, feed eaten (kg DM) and head-days. */
+  start: number;
+  moves: number;
+  rounds: number;
+  eatenKg: number;
+  headDays: number;
+}
+
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
 export interface FarmMob extends CattleMob {
   /** Unique on the farm. Never reused. */
@@ -45,6 +109,8 @@ export interface FarmMob extends CattleMob {
   where: MobWhere;
   /** The farm day the mob last pushed through tape, or null. */
   lastBreak: number | null;
+  /** The grazing plan the mob is running. Left out when it has none. */
+  plan?: PlanRun;
 }
 
 /**
@@ -330,6 +396,10 @@ export interface FarmState {
   arrivals: Arrival[];
   /** Stock booked onto a sale day. Empty when none is booked. */
   saleBookings: SaleBooking[];
+  /** Grazing plan templates (milestone 1.5c). Empty when none has been made. */
+  plans: PlanTemplate[];
+  /** The id the next plan template gets. */
+  nextPlanId: number;
 
   seasons: SeasonSpec;
   market: MarketState;

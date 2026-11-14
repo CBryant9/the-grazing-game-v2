@@ -601,6 +601,32 @@ The PRD gives the figures. Where it does not say how a figure is applied, the si
 16. **Buying, sowing and harvest take none of the day** and can be done after last light.
 17. **Skips:** a week is 7 days, a month 30 (the MVP's) and a year 365.
 
+## Grazing plans (milestone 1.5c)
+
+The figures are in `packages/engine/src/data/plans.ts` (`PLAN_FIGURES`). Each is marked: **old game** is the old game's own figure or default (`reference/mvp/grazing-game.html`), **builder** is the builder's choice, for Claudia to check. None is a looked-up real-world figure. How they are used is MODEL.md, section 10.
+
+| Figure | Value | Source | Where it comes from |
+|---|---|---|---|
+| Most moves a day | 4 (a rule of 0.25 days) | old game | The plan dialog went "down to 4 moves a day" (REQUIREMENTS, "Grazing plans"). `perDayOf` is `round(1 ÷ every)` for a rule under a day |
+| Default days between moves for a new leg | 3 days | old game | `newPlanFor`: `every: 3` |
+| Default "grazed down to" figure for a new leg | 1,500 kg DM/ha | old game | `newPlanFor`: `kg: 1500` |
+| Default rounds for a new leg | 1 | old game | `newPlanFor`: `rounds: 1` |
+| Lowest "grazed down to" figure | 300 kg DM/ha | old game | `commitPlan` clamps the figure up to 300. The engine refuses a lower one, with the reason, instead of changing it |
+| "Still here" note | every 7 days on a stop (kg rule) | old game | `stay >= 7 && stay - noted >= 7` |
+| A move says a class will lose weight | more than 0.05 kg a head a day | old game | `planStep`: `gain < -.05` |
+| Highest "grazed down to" figure | 5,000 kg DM/ha | builder | The old game had no upper limit. This stops a figure that can mean nothing |
+| Longest wait between moves | 60 days | builder | The same |
+| Longest day limit | 365 days | builder | The same |
+| Most rounds in a leg | 99 | builder | The same. 0 means keep going |
+| Most legs in a plan | 8 | builder | The same |
+| Most stops in a leg | 30 | builder | The same |
+| Most plans kept on a farm | 20 | builder | The same |
+| Light a plan move takes | The ordinary move time: 15 min and 1 min per 100 head | builder | PRD 5.15 says, [Proposed], "it uses the farmer's daylight". Built as the move time off the light of the day it happens on, never below zero. A hand (Stage 2) will do it for nothing. **Question for Claudia** |
+| Setting, pausing, resuming and clearing a plan | None of the day | builder | They are decisions, not work. Setting or resuming puts the mob on the stop for nothing, as the old game did |
+| Another mob in the next area | The plan waits | builder | One mob to a paddock. The old game joined the mobs |
+
+`every` is also kept to 0.25 or more, and a rule under a day needs at least two stops. The old game quietly made a one-stop leg "every 1 day". The engine refuses it with the reason.
+
 ## Supplements (`FEED`)
 
 | Feed | Cost | What it does |

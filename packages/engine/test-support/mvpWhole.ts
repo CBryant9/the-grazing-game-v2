@@ -44,6 +44,38 @@ import {
   type MvpLogLine,
 } from './mvpFarm';
 
+/** One leg of the MVP's grazing plan. */
+export interface MvpLeg {
+  stops: number[];
+  mode: 'days' | 'kg';
+  every: number;
+  kg: number;
+  maxDays: number;
+  rounds: number;
+}
+
+/** The MVP's grazing plan on a mob (`commitPlan` makes one, `planStep` moves it). */
+export interface MvpPlan {
+  legs: MvpLeg[];
+  after: 'repeat' | 'stay';
+  leg: number;
+  idx: number;
+  round: number;
+  moved: number;
+  noted: number;
+  /** The stop the plan last said it was waiting for (no water), or -1. */
+  dryNote?: number;
+  rep: {
+    start: number;
+    moves: number;
+    rounds: number;
+    eaten: number;
+    gain: number;
+    headDays: number;
+    paddocks: Record<string, number>;
+  };
+}
+
 export interface MvpWholeMob {
   id: number;
   name: string;
@@ -51,7 +83,7 @@ export interface MvpWholeMob {
   loc: 'pad' | 'lot';
   anchor: number;
   supp: string;
-  plan: null;
+  plan: MvpPlan | null;
   dry: number;
   st: MvpSt | null;
   wReg: number;
@@ -137,6 +169,9 @@ export interface MvpWhole extends Omit<MvpFarm, 'S' | 'U'> {
   readonly DIFF: Record<string, { cash: number; od: number; broke: number }>;
   readonly MCLS: Record<string, [string, number]>;
   stepDay(): void;
+  normPlan(p: MvpPlan | null): MvpPlan | null;
+  perDayOf(L: MvpLeg): number;
+  planStep(m: MvpWholeMob, p: MvpPlan, why: string): void;
   mktBase(day: number): number;
   cpk(a: object): number;
   value(a: object): number;
@@ -195,7 +230,7 @@ const WHOLE_HOOK = `
   stepDay=wrap('tick',stepDay);
   Object.defineProperties(globalThis.__mvp,Object.getOwnPropertyDescriptors({
     PHASE:P,MAKING:MK,HERD:HD,MKT,COST,PER_M,SELL_COMM,HEAD_FEE,DIFF,MCLS,
-    stepDay,mktBase,cpk,value,netSale,estBuy,netWorth,scoreYear,liveYear,newYear,spend,
+    stepDay,normPlan,perDayOf,planStep,mktBase,cpk,value,netSale,estBuy,netWorth,scoreYear,liveYear,newYear,spend,
     startHerd,buyCattle,sellGroup,sellAnimals,sellClass,moveMob,toLot,movePicked,weanMob,autoWeanDest,
     mergeShared,newMob,placeAnchor,diffMoney,ccAEfor,cashBase,segCost,overheads,markCalves,harvestField,breakouts
   }));
@@ -421,6 +456,12 @@ const SCORE_KEYS = [
 ] as const;
 
 export interface CompareOptions {
+  /**
+   * Leave out the plan's round counts (`round`, `leg` and the report's rounds).
+   * The MVP counts a round every day a plan is stuck at a stop with no water;
+   * the rebuild counts rounds only when the mob moves (BUILD_PLAN 2.4).
+   */
+  skipPlanRounds?: boolean;
   /** Leave these year totals out (where the rebuild charges differently on purpose). */
   skipYear?: readonly (typeof YEAR_KEYS)[number][];
   /** Leave out the tag number counter (the MVP shares it with plantings and portable troughs). */
@@ -506,6 +547,25 @@ export function farmDifferences(farm: FarmState, mvp: MvpWhole, o: CompareOption
     if (e.join && m.join) {
       for (const k of ['start', 'conc', 'last', 'elig'] as const) {
         same(`${who} join.${k}`, e.join[k], m.join[k]);
+      }
+    }
+    // A plan: the engine's paused plan is the MVP's broken one (null).
+    const ep = e.plan && !e.plan.paused ? e.plan : null;
+    same(`${who} plan running`, !!ep, !!m.plan);
+    if (ep && m.plan) {
+      const p = m.plan;
+      same(`${who} plan idx`, ep.idx, p.idx);
+      same(`${who} plan moved`, ep.moved, p.moved);
+      same(`${who} plan noted`, ep.noted, p.noted ?? 0);
+      same(`${who} plan waiting`, ep.waiting?.target ?? -1, p.dryNote ?? -1);
+      same(`${who} plan moves`, ep.moves, p.rep.moves);
+      same(`${who} plan eaten`, ep.eatenKg, p.rep.eaten);
+      same(`${who} plan head-days`, ep.headDays, p.rep.headDays);
+      same(`${who} plan start`, ep.start, p.rep.start);
+      if (!o.skipPlanRounds) {
+        same(`${who} plan leg`, ep.leg, p.leg);
+        same(`${who} plan round`, ep.round, p.round);
+        same(`${who} plan rounds`, ep.rounds, p.rep.rounds);
       }
     }
     same(`${who} has figures`, !!e.st, !!m.st);

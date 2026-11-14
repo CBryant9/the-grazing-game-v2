@@ -482,6 +482,11 @@ export type {
   LoggedAction,
   MarketState,
   MobWhere,
+  PlanLeg,
+  PlanRule,
+  PlanRun,
+  PlanTemplate,
+  PlanWaitReason,
   PlayStream,
   PriceDay,
   RealYearsSpec,
@@ -497,6 +502,7 @@ export type {
   FarmEvent,
   FarmStarted,
   MobPlaceNote,
+  PlanReport,
   StartHerd,
   TickEvent,
 } from './sim/events';
@@ -518,7 +524,10 @@ export {
 } from './sim/derived';
 export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
-export { stopsToday } from './sim/plans';
+export { perDay, plansView, positionOf, stepOf, stepsIn, stopsToday } from './sim/plans';
+export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
+export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
+export type { PlanFigure, PlanFigureSource } from './data/plans';
 export {
   BREAKOUT_CHANCE,
   BREAKOUT_COOLDOWN_DAYS,
@@ -563,6 +572,8 @@ export type {
   ActionType,
   FenceKind,
   MoveTarget,
+  PlanLegSpec,
+  PlanSpec,
 } from './actions/types';
 
 export { farmHash, fromBase64, loadFarm, saveFarm, toBase64 } from './save/save';

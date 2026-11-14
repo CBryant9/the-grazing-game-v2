@@ -7,7 +7,7 @@
  * state facts and figures only, never a judgement.
  */
 
-import type { CattleNote } from '../cattle/notes';
+import type { CattleNote, GainForecast } from '../cattle/notes';
 import type { DeathCause } from '../cattle/simMob';
 import type { CropRisk, GrazeDamageEvent } from '../crops/fields';
 import type { CropEvent } from '../crops/tick';
@@ -19,13 +19,26 @@ import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
 import type { ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
-import type { GameOverReason, MobWhere, YearRecord } from './state';
+import type { GameOverReason, MobWhere, PlanWaitReason, YearRecord } from './state';
 
 /** Where a mob is, with the grazing area's name when it is on pasture. */
 export interface MobPlaceNote {
   where: MobWhere;
   /** "Paddock 3", or "Paddocks 1 + 2" where open gates join them. Null off pasture. */
   area: string | null;
+}
+
+/** What a plan has done so far: facts only. */
+export interface PlanReport {
+  /** Days since the plan was set. */
+  days: number;
+  moves: number;
+  /** Full rounds made. */
+  rounds: number;
+  /** Feed the mob ate in the paddock while on the plan, kg DM. */
+  eatenKg: number;
+  /** Head-days on the plan: each day, the head in the mob (calves not counted). */
+  headDays: number;
 }
 
 /** Events from the daily tick. */
@@ -72,6 +85,83 @@ export type TickEvent =
       into: number;
       intoName: string;
       area: string | null;
+    }
+  /**
+   * A grazing plan moved a mob on (docs/MODEL.md, section 10). `leg` and
+   * `stop` are where the mob is now, and `step` counts the stops from the
+   * first stop of the first leg. `because` is the rule that moved it: `days`
+   * (the days on the stop were up), `kg` (grazed down to the plan's figure,
+   * `massKgHa` is what was left) or `max-days` (the day limit, with
+   * `massKgHa` still there).
+   */
+  | {
+      type: 'plan-moved';
+      mob: number;
+      mobName: string;
+      template: number;
+      templateName: string;
+      from: string | null;
+      to: string;
+      cell: number;
+      leg: number;
+      stop: number;
+      step: number;
+      because: 'days' | 'kg' | 'max-days';
+      massKgHa: number | null;
+      /** How many moves the rule makes in a day: 1, or more for a rule under a day. */
+      movesADay: number;
+      head: number;
+      /** This move finished a round of its leg, started a leg, or went back to the start of the plan. */
+      roundDone: boolean;
+      legStarted: number | null;
+      restarted: boolean;
+      /** Full rounds and moves so far on this plan. */
+      rounds: number;
+      moves: number;
+      /**
+       * The ordinary move time, and how much of that day's light it took
+       * (less than the move time when little light was left, never more
+       * than was left). Times are minutes after midnight on the district
+       * town's clock. Builder's rule, for Claudia (docs/DATA.md).
+       */
+      time: { startsAt: number; endsAt: number; workMin: number; lightUsedMin: number };
+      /** For a plan that moves once a day or less: the classes expected to lose weight in the new area, and why. */
+      losing: GainForecast[];
+    }
+  /**
+   * A plan could not move a mob. Said once for each stop the plan is
+   * waiting for. `why`: `no-water` (the area has no water) or `occupied`
+   * (another mob is in it). The mob stays where it is and the plan tries
+   * again each day.
+   */
+  | {
+      type: 'plan-waiting';
+      mob: number;
+      mobName: string;
+      template: number;
+      why: PlanWaitReason;
+      /** The area the plan wants the mob in. */
+      area: string;
+      cell: number;
+      step: number;
+    }
+  /** A mob on a "grazed down to" plan is still in its area. Said once a week. */
+  | {
+      type: 'plan-staying';
+      mob: number;
+      mobName: string;
+      area: string | null;
+      days: number;
+      massKgHa: number;
+      moveAtKg: number;
+    }
+  /** A plan finished its rounds. The mob stays where it is. */
+  | {
+      type: 'plan-finished';
+      mob: number;
+      mobName: string;
+      area: string | null;
+      report: PlanReport;
     }
   /** A year closed. */
   | { type: 'year-end'; year: YearRecord }
@@ -157,6 +247,50 @@ export type ActionEvent =
       parts: { mob: number; mobName: string; area: string; head: number }[];
     }
   | { type: 'supplement-set'; mob: number; mobName: string; supp: Supplement }
+  /**
+   * A mob was put on a plan at a step. `dryAreas` are the areas in the plan
+   * that have no water now. `changed` is true when an existing template was
+   * changed rather than made.
+   */
+  | {
+      type: 'plan-set';
+      mob: number;
+      mobName: string;
+      template: number;
+      templateName: string;
+      changed: boolean;
+      step: number;
+      steps: number;
+      area: string | null;
+      dryAreas: string[];
+    }
+  /** A plan was paused, because the player asked or because they moved the mob by hand. */
+  | {
+      type: 'plan-paused';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      because: 'asked' | 'manual-move';
+    }
+  /** A paused plan was started again at a step. */
+  | {
+      type: 'plan-resumed';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      area: string | null;
+    }
+  /** A mob was taken off its plan. The template stays. */
+  | {
+      type: 'plan-cleared';
+      mob: number;
+      mobName: string;
+      template: number;
+      because: 'asked' | 'to-lot';
+      report: PlanReport;
+    }
   | { type: 'calves-marked'; mob: number; mobName: string; count: number; cost: number }
   /** A change to fences, gates or water. `detail` holds the lengths and counts. */
   | {

@@ -246,6 +246,8 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     nextMobId: 1,
     arrivals: [],
     saleBookings: [],
+    plans: [],
+    nextPlanId: 1,
     seasons: real ? real.spec : { kind: 'random' },
     market,
     priceHistory: [],

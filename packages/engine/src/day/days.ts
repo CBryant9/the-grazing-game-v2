@@ -109,7 +109,19 @@ export type SkipStop =
   | { type: 'harvest-ready'; fieldId: number; sp: SpeciesId; estimate: FieldYield }
   /** A year closed. `year` counts from 1. */
   | { type: 'year-end'; year: number }
-  | { type: 'game-over'; reason: GameOverReason };
+  | { type: 'game-over'; reason: GameOverReason }
+  /**
+   * A grazing plan could not move a mob because the next area has no water.
+   * The old game stopped its clock for this, once for each stop the plan was
+   * waiting for. `step` counts the stops from the first stop of the first leg.
+   */
+  | {
+      type: 'plan-waiting';
+      mob: number;
+      mobName: string;
+      area: string;
+      step: number;
+    };
 
 /** What "Next day" returns. */
 export interface DayEnd {
@@ -119,7 +131,7 @@ export interface DayEnd {
   day: DayResult;
   /** What happened at first light on the new day: cattle landing in the yards, booked stock sold. */
   dawn: FarmEvent[];
-  /** Minutes of light left unused when the day ended. */
+  /** Minutes of light left unused when the day ended, after any moves a grazing plan made. */
   lightLeftMin: number;
   /** Everything that would stop a skip, had this day been part of one. */
   stops: SkipStop[];
@@ -344,7 +356,8 @@ export function waterCheck(farm: FarmState): SkipStop[] {
 /**
  * What in a day's events stops a skip. These are the MVP's stops: a mob's
  * first day without water, a portable trough run dry, a crop ready to
- * harvest, the end of a year, and game over.
+ * harvest, the end of a year, and game over; and, once plans are built, a
+ * plan that can not move a mob because the next area has no water.
  */
 export function stopsIn(day: DayResult): SkipStop[] {
   const stops: SkipStop[] = [];
@@ -371,6 +384,14 @@ export function stopsIn(day: DayResult): SkipStop[] {
         sp: e.event.sp,
         estimate: e.event.estimate,
       });
+    } else if (e.type === 'plan-waiting' && e.why === 'no-water') {
+      stops.push({
+        type: 'plan-waiting',
+        mob: e.mob,
+        mobName: e.mobName,
+        area: e.area,
+        step: e.step,
+      });
     } else if (e.type === 'year-end') stops.push({ type: 'year-end', year: e.year.n });
     else if (e.type === 'game-over') stops.push({ type: 'game-over', reason: e.reason });
   }
@@ -390,8 +411,11 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
   realSourcesOf(farm, env);
   const before = snapshot(farm);
   const next = workingCopy(farm);
-  const lightLeftMin = lightLeft(farm);
   const day = stepDay(next, env);
+  // Plan moves made during the tick took their move time off this day's light.
+  let planUsed = 0;
+  for (const e of day.events) if (e.type === 'plan-moved') planUsed += e.time.lightUsedMin;
+  const lightLeftMin = Math.max(0, lightLeft(farm) - planUsed);
   // First light on the new day: cattle land, booked stock sells. Before the player can act.
   const atDawn = dawn(next);
   return {

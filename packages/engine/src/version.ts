@@ -19,8 +19,13 @@
  * is booked onto the next sale. No grass, cattle, crop or price formula
  * changed: a farm driven without the clock (calibration) runs exactly as
  * it did on 0.7.0.
+ *
+ * 0.9.0 (milestone 1.5c): grazing plans as templates, run from a step, and
+ * the plan moves in the daily tick, with the move time taken off the day's
+ * light. A farm with no plan runs exactly as it did on 0.8.0. No grass,
+ * cattle, crop or price formula changed.
  */
-export const ENGINE_VERSION = '0.8.0';
+export const ENGINE_VERSION = '0.9.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -43,5 +48,9 @@ export const ENGINE_VERSION = '0.8.0';
  * (cattle bought and on their way to the yards) and `saleBookings` (stock
  * booked onto a sale day), and a mob in the yards may say the day it came.
  * An older save loads with none of them.
+ *
+ * 6: grazing plans (milestone 1.5c). A farm has `plans` (templates) and
+ * `nextPlanId`, and a mob may have a `plan` (where it is on a template). An
+ * older save loads with no plans.
  */
-export const SAVE_FORMAT_VERSION = 5;
+export const SAVE_FORMAT_VERSION = 6;

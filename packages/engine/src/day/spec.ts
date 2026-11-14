@@ -238,6 +238,13 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
         part('head', (head / 100) * T.moveMobMinPer100Head.value),
       ]);
     }
+    case 'setPlan':
+    case 'pausePlan':
+    case 'resumePlan':
+    case 'clearPlan':
+      // Plans are decisions. Setting, pausing, resuming and clearing one take none of the day.
+      // (The moves a plan makes by itself take move time off the day they happen on: sim/plans.ts.)
+      return { kind: 'free' };
     case 'setSupplement':
       // Switching a supplement on or off is a decision at a daily price. It takes none of the
       // daylight (Claudia, 14 Nov 2026).
