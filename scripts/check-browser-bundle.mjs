@@ -15,8 +15,13 @@
 // browser is meant to hold ("Next day") is looked for in the JavaScript, so a
 // scan that found no files can not pass.
 //
+// It also reads the built service worker (serwist/sw.js.body, in the same
+// folder) and every file in its precache list, since all of those are sent
+// to the browser too. If the service worker file is missing after a build,
+// that fails.
+//
 // For its own test (scripts/check-browser-bundle.test.ts) the folders can be
-// given: --static <dir> --app <dir>.
+// given: --static <dir> --app <dir> --public <dir>.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -31,6 +36,8 @@ const arg = (name, fallback) => {
 };
 const STATIC = arg('--static', join(ROOT, 'apps/web/.next/static'));
 const APP = arg('--app', join(ROOT, 'apps/web/.next/server/app'));
+const PUBLIC = arg('--public', join(ROOT, 'apps/web/public'));
+const SW = join(APP, 'serwist', 'sw.js.body');
 
 /**
  * Text that exists only in the engine, chosen to survive minifying:
@@ -110,9 +117,42 @@ if (!pages.length) {
   process.exit(1);
 }
 
+// The built service worker and everything in its precache list.
+if (!existsSync(SW)) {
+  console.error(
+    `The service worker was not found at ${relative(ROOT, SW)}. Build the site first, and check the /serwist route still builds it.`,
+  );
+  process.exit(1);
+}
+const swText = readFileSync(SW, 'utf8');
+const precacheUrls = [...swText.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]);
+if (!precacheUrls.length) {
+  console.error(`No precache list was found in ${relative(ROOT, SW)}, so it can not be trusted.`);
+  process.exit(1);
+}
+const swFiles = new Set([SW]);
+const missing = [];
+for (const url of precacheUrls) {
+  const path = url.split('?')[0];
+  let file;
+  if (path === '/') file = join(APP, 'index.html');
+  else if (path === '/play') file = join(APP, 'play.html');
+  else if (path.startsWith('/_next/static/'))
+    file = join(STATIC, path.slice('/_next/static/'.length));
+  else file = join(PUBLIC, path);
+  if (existsSync(file) && statSync(file).isFile()) swFiles.add(file);
+  else missing.push(url);
+}
+if (missing.length) {
+  console.error(
+    `These files are in the service worker's list but were not found: ${missing.join(', ')}.`,
+  );
+  process.exit(1);
+}
+
 const found = [];
 let sawBrowserText = false;
-for (const f of [...scripts, ...pages]) {
+for (const f of new Set([...scripts, ...pages, ...swFiles])) {
   const text = readFileSync(f, 'utf8');
   if (scripts.includes(f) && text.includes(BROWSER_HAS)) sawBrowserText = true;
   for (const term of ENGINE_ONLY) {
@@ -133,5 +173,5 @@ if (found.length) {
   process.exit(1);
 }
 console.log(
-  `Browser bundle clean: ${scripts.length} script files and ${pages.length} /play page files searched for ${ENGINE_ONLY.length} engine-only terms, none found.`,
+  `Browser bundle clean: ${scripts.length} script files, ${pages.length} /play page files and the service worker with ${swFiles.size - 1} files in its list searched for ${ENGINE_ONLY.length} engine-only terms, none found.`,
 );

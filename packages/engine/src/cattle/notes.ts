@@ -43,7 +43,11 @@ export type CattleNote =
   /** Ten days of weight loss. Diet ME and CP, and the classes forecast to lose. */
   | { type: 'losingWeight'; me: number; cp: number; classes: GainForecast[] }
   /** A cow or heifer under CS 1.6 lost her pregnancy. */
-  | { type: 'slipped'; kind: 'cow' | 'heifer' }
+  /**
+   * A female lost her calf. `days` is how far in calf she was, so the screens
+   * say so only for a female that was PTIC on the record (`PTIC_DAYS` or more).
+   */
+  | { type: 'slipped'; kind: 'cow' | 'heifer'; days: number }
   /** A calf was lost at birth. `first` is true for a first calf. */
   | { type: 'calfLostAtBirth'; first: boolean }
   /** The first calf of a new calving. */
@@ -53,7 +57,14 @@ export type CattleNote =
   /** Unmarked young bulls in the mob are now fertile. */
   | { type: 'youngBullsFertile' }
   /** A bull is with females: a joining has started. */
-  | { type: 'joiningStarted'; adultBulls: number; ready: number; femalesPerBull: number }
+  | {
+      type: 'joiningStarted';
+      adultBulls: number;
+      ready: number;
+      femalesPerBull: number;
+      /** Joining-age females not PTIC on the record: the count the screens show (`ready` is the model's). */
+      readyOnRecord: number;
+    }
   /** Three or six weeks into a joining. */
   | {
       type: 'joiningProgress';
@@ -83,6 +94,11 @@ export type CattleNote =
       tooSoon: number;
     }
   /** Females ready to get in calf with no bull in the mob. */
-  | { type: 'noBull'; ready: number }
+  | {
+      type: 'noBull';
+      ready: number;
+      /** Joining-age females not PTIC on the record: the count the screens show. */
+      readyOnRecord: number;
+    }
   /** Average condition score is under 1.9. */
   | { type: 'lowCondition'; cs: number };

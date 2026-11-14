@@ -5,6 +5,7 @@ import type {
   DayResponse,
   FarmResponse,
   PreviewResponse,
+  RecordResponse,
   SetupChoices,
   SetupOptions,
   SkipRequestLength,
@@ -12,9 +13,18 @@ import type {
 } from './types';
 
 /** An error with a plain message the player can read. Never a stack or a code. */
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    /** The HTTP status, when the server answered. */
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
-const OFFLINE = 'The game could not be reached. Check your connection and try again.';
+/** What the player is told when a request never reached the server. The offline view looks for exactly this. */
+export const UNREACHABLE = 'The game could not be reached. Check your connection and try again.';
 const GENERIC = 'Something went wrong. Try again in a moment.';
 
 async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -28,7 +38,7 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(OFFLINE);
+    throw new ApiError(UNREACHABLE);
   }
   let data: unknown = null;
   try {
@@ -43,7 +53,7 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
       typeof (data as { error?: unknown }).error === 'string'
         ? (data as { error: string }).error
         : GENERIC;
-    throw new ApiError(message);
+    throw new ApiError(message, res.status);
   }
   if (data === null) throw new ApiError(GENERIC);
   return data as T;
@@ -57,6 +67,8 @@ export const api = {
   preview: (req: ActionRequest) => request<PreviewResponse>('preview', 'POST', req),
   act: (req: ActRequest) => request<ActResponse>('act', 'POST', req),
   day: (version: string) => request<DayResponse | StaleResponse>('day', 'POST', { version }),
+  record: (before?: number) =>
+    request<RecordResponse>(`record${before === undefined ? '' : `?before=${before}`}`, 'GET'),
   inboxRead: (upTo: number) => request<FarmResponse>('inbox', 'POST', { upTo }),
   skip: (length: SkipRequestLength, anyway: boolean, version: string) =>
     request<DayResponse | StaleResponse>('skip', 'POST', { length, anyway, version }),

@@ -50,7 +50,7 @@ import { lightOn } from './clock';
 import { dateOn, plantingsNow, surveyOf, type SourceEnv } from './derived';
 import type { FarmState } from './state';
 import { mobSummaries, paddockSummaries } from './summary';
-import { knownClassOf, knownInCalfSet } from './told';
+import { recordClassOf } from './told';
 
 /** Green leaf looks old by this age, days (docs/VISUALS.md, green leaf colour). */
 export const VIEW_OLD_LEAF_DAYS = 80;
@@ -309,8 +309,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
 
   // ---- Mobs
   const mobSums = mobSummaries(farm);
-  // The classes as the player knows them: PTIC only when a preg test or the saleyard said so.
-  const known = knownInCalfSet(farm);
+  // The classes on the record: PTIC only from PTIC_DAYS in calf (sim/told.ts).
   const mobs: FarmViewMob[] = farm.mobs.map((m, k) => {
     const sum = mobSums[k]!;
     const tally = new Map<ViewCattleKind, FarmViewCattle>();
@@ -326,7 +325,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     const anchor = m.where.kind === 'paddock' ? m.where.anchor : -1;
     const counts: Record<string, number> = {};
     for (const a of m.animals) {
-      const c = knownClassOf(a, known);
+      const c = recordClassOf(a);
       counts[c] = (counts[c] ?? 0) + 1;
     }
     const classes: Record<string, number> = {};

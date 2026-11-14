@@ -21,7 +21,7 @@
     "calves": 265,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 43909
+    "bytes": 43930
   },
   {
     "name": "nsw-small-running",
@@ -129,7 +129,7 @@
     "calves": 34,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 42602
+    "bytes": 42603
   },
   {
     "name": "nsw-tape-cells",

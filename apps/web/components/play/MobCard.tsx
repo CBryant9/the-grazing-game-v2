@@ -393,7 +393,7 @@ export function MobCard({
           />
           <Fact label="Diet energy" value={mob.me === null ? '-' : `ME ${num(mob.me, 1)} MJ/kg`} />
           <Fact label="Diet protein" value={mob.cp === null ? '-' : `CP ${num(mob.cp, 1)}%`} />
-          <Fact label="Known in calf (PTIC)" value={`${num(mob.ptic)} head`} />
+          <Fact label="PTIC" value={`${num(mob.ptic)} head`} />
           <Fact
             label="On the sale"
             value={mob.booked > 0 ? `${num(mob.booked)} head booked` : 'None booked'}

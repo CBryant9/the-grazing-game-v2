@@ -37,7 +37,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] Bulls join with cows. Condition score drives the chance each cow gets back in calf, on a realistic cycle and timeline, with some random dry cows.
 - [ ] Bull calves stay entire until marked. You are prompted to mark them. Unmarked young bulls get cows in calf ("you wouldn't have any dry cows").
 - [ ] With no bull: "Your cows are ready to get back in calf. You need a bull."
-- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect").
+- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect"). *(Reversed 14 Nov 2026: no preg test; a cow shows as PTIC on the record by herself from 50 days in calf. See "pregnancy on the record".)*
 
 ## Water and fencing
 
@@ -93,7 +93,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 ## Controls and screens
 
-- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen.
+- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen. *(Built in 1.7e: the Help button in the top bar and a Help part in More, ten topics and the terms. Review fix after 1.8: on a phone it opens in the same bottom sheet as the paddock, so the map stays above it; on a phone on its side it is the whole-screen sheet, as the paddock is; on a PC it is the side panel.)*
 - [ ] The Paddocks tab shows the quick list first (with water ✓/✗), and details and sorting on demand.
 - [ ] Tools snap back to Look after each build.
 - [ ] Clicking the map opens the paddock, never a cow ("I don't want to be able to click on the cows at this point").
@@ -300,9 +300,29 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
 - [ ] **The default fence is the permanent one.** "A normal fence is the one that they would go for. They have to specifically choose electrical." *(Built in milestone 1.7f: the fence tool starts on permanent fence.)*
 - [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)* *(Built in milestone 1.7f: no tool changes the zoom by itself; pinch and wheel zoom work in every tool.)*
 - [ ] **Red means one thing.** Her words: red "means doesn't fit today when building, so use other colours for other stuff". On the map and the cards, red on a line or a square is used only for the part of a line that does not fit today. A knocked-down fence is amber with its "!" marker. New tape is white and dashed, never red. The no-water salmon stays for words and markers, not as a red line. *(Built in milestone 1.7f. Reverses the red knocked-down fence, the red new tape and the red remove mark in VISUALS.)*
+  - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
 - [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
+
+## 14 Nov 2026: build it all, with a list of calls at the end
+
+Her words (as typed): "ok yeah hook in- I would like them all done and would prefer a list of clals at the ends that yu explain and i could say if i wnated something diffferent - let sjust focu son getting this done, maybe you should open some chats unde ryou to get it done faster pleas"
+
+- [ ] Every stage is built without stopping for decisions. Each call is logged with its reason. Claudia gets one explained list at the end, and can change any of them.
+
+## 14 Nov 2026: pregnancy on the record, no preg test
+
+Her words: "I think we're probably not going to pretest the mobs or need that animal husbandry, but we obviously do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the kind of general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry, I guess. I guess what they're considered is dry until they are progested. That's fine. What you pay in the calf sale premium is only for cows known to be... You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows. That's correct." (dictated; 'pretest' and 'progested' mean preg test and preg tested)
+
+- [ ] **No preg test job.** Not on the screens, the to-do list, the banner or the help.
+- [ ] **A cow or heifer is PTIC on the record by herself once she is a set number of days in calf** (the engine's `PTIC_DAYS`, 50: the day the price starts paying the in-calf premium; DATA "When a cow shows as PTIC"). Before that she is a cow or heifer (dry with no calf at foot), whether or not she is really in calf.
+- [ ] **PTIC price only for cows on the record as PTIC.** All others sell as cows.
+- [ ] **The mob lists show head PTIC and how far along**, in whole months ("31 PTIC, 2 to 4 months in calf"), the months for PTIC cows only. Nothing calls a cow "empty".
+- [ ] **Every class and group the player sees or picks from uses the one rule**: selling, booking a sale, moving part of a mob, the map, the herd list.
+- *(Reverses: earlier on 14 Nov 2026 the player was told only what a joining report or preg test had said, with the joining reports, the preg test and "known in calf" on the mob card. Built in engine 0.10.0 and 0.11.0; replaced by engine 0.12.0.)*
 
 ### For the game screens milestone
 
-- [ ] An information panel explains how the day works.
-- [ ] Onboarding and a tour show how things work, with help available at any time.
+- [ ] An information panel explains how the day works. *(Built in 1.7e: the first help topic, "How the day works".)*
+- [ ] Onboarding and a tour show how things work, with help available at any time. *(Built in 1.7e: the guided first day, with Skip this step, Skip the tour and Show the tour again, and the Help button always in the top bar. Tour progress is kept in the browser, not yet per player.)*
+- [ ] A short guided first day: open a paddock, move cattle, build a short fence and watch the daylight bar, open the market, end the day. It can be skipped and replayed from More. *(Built in 1.7e.)*
+- [ ] Empty states with one clear next step. *(Built in 1.7e for Herd, Plans, Paddocks, the inbox and Sell. The no farms, no posts and no followers states come with accounts and the community.)*

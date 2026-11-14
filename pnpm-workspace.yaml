@@ -1,3 +1,10 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Install scripts we do not run. esbuild and @swc/core (used only to build the
+# service worker) get their native programs from their own platform packages,
+# so their install scripts are not needed.
+allowBuilds:
+  esbuild: false
+  '@swc/core': false

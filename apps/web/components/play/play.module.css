@@ -66,6 +66,8 @@
 }
 .topextra {
   grid-area: theme;
+  display: flex;
+  gap: 6px;
 }
 .topdl {
   grid-area: dl;
@@ -287,12 +289,13 @@
 
 /* PC and tablet: the website header, then the game header in one row, a side panel and the map. */
 .screen[data-layout='pc'] .top {
-  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto;
-  grid-template-areas: 'name dl cash times';
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto auto;
+  grid-template-areas: 'name dl cash times theme';
   padding: 6px var(--gutter);
   gap: 6px 22px;
 }
-.screen[data-layout='pc'] .topextra {
+/* On a PC the theme switch is in the site header; Help stays here. */
+.screen[data-layout='pc'] .themeslot {
   display: none;
 }
 .screen[data-layout='pc'] .times {
@@ -1163,6 +1166,7 @@
   display: grid;
   gap: 2px;
   width: 100%;
+  min-width: 0;
   min-height: 56px;
   padding: 8px 12px;
   text-align: left;
@@ -1181,6 +1185,8 @@
   font-size: 0.75rem;
   color: var(--muted);
   line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1708,4 +1714,95 @@
     display: inline-flex;
     align-items: center;
   }
+}
+
+/* ---- Year score, Scores and Diary ------------------------------------------ */
+
+.yearscore {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.yearscore b {
+  font-family: var(--font-px);
+  font-size: 1.5rem;
+}
+.parts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.part {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.partname {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.parttrack {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--track);
+  overflow: hidden;
+}
+.partbar {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--accent);
+}
+.part[data-negative='true'] .partbar {
+  background: var(--knob);
+  opacity: 0.6;
+}
+.part[data-negative='true'] .partpts {
+  color: var(--muted);
+}
+.partpts {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.yeardetails {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+}
+.yearsummary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.yeardetails[open] > .yearsummary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.yeardetails > :last-child {
+  margin-bottom: 12px;
+}
+.diaryhead {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  margin: 0;
+}
+.diarylines {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
 }

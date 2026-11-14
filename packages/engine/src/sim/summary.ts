@@ -27,15 +27,8 @@ import {
   type SourceEnv,
 } from './derived';
 import type { FarmEvent } from './events';
-import type {
-  FarmState,
-  JoiningReport,
-  MobWhere,
-  PregTestReport,
-  YearRecord,
-  YearTotals,
-} from './state';
-import { knownClassOf, knownInCalfSet } from './told';
+import type { FarmState, MobWhere, YearRecord, YearTotals } from './state';
+import { onRecordPtic, recordClassOf } from './told';
 
 export interface MobSummary {
   id: number;
@@ -64,10 +57,10 @@ export interface MobSummary {
   /** The mob's figures from its last day: weight, CS, gain, diet ME and CP, intake. Null before its first day. */
   day: MobDay | null;
   /**
-   * What the mob would put in the bank if sold today, dollars. NOT FOR THE
-   * PLAYER'S SCREENS as it stands: it carries the pregnancy premium from a
-   * female's 50th day in calf, before any preg test (docs/MODEL.md, section
-   * 3, "What the player is told").
+   * What the mob would put in the bank if sold today, dollars. It carries
+   * the pregnancy premium from a female's 50th day in calf, the day she goes
+   * on the record as PTIC (`PTIC_DAYS`), so it agrees with the record
+   * (docs/MODEL.md, section 3, "The herd record").
    */
   saleValue: number;
   /** Head in the mob (calves at foot included) that are booked onto a sale, so a screen can mark them. */
@@ -119,55 +112,54 @@ export function mobSummaries(farm: FarmState): MobSummary[] {
   });
 }
 
-/** One mob's breeding, as the player has been told it. */
+/** One mob's breeding on the record. */
 export interface MobBreedingReport {
   mob: number;
   name: string;
-  /** The latest three-weekly joining report, with the farm day it was made, or null. */
-  joining: JoiningReport | null;
-  /** The latest preg test result, with the farm day it was made, or null. */
-  pregTest: PregTestReport | null;
-  /**
-   * Head the player knows are in calf: bought PTIC, or in calf at a preg
-   * test since, until they calve (or slip the calf, which is reported).
-   */
-  knownInCalf: { cows: number; heifers: number };
-  /**
-   * Head in each class as the player knows it: the herd list, except that a
-   * female counts as PTIC only when she is known to be in calf. Like the
-   * herd list it follows weight, age and calves at foot.
-   */
+  /** The joining under way: the farm day the bulls went in. Null with none. */
+  joining: { start: number } | null;
+  /** Females on the record as PTIC: `PTIC_DAYS` or more in calf. */
+  ptic: { cows: number; heifers: number };
+  /** How far along the PTIC females are, whole months in calf, least and most. Null with none. */
+  months: { least: number; most: number } | null;
+  /** Head in each class on the record (`recordClassOf`). */
   classes: Partial<Record<CattleClassId, number>>;
 }
 
+/** Days in a month of pregnancy, for "months in calf" on the record. */
+const MONTH_DAYS = 30;
+
 /**
- * What each mob's joining has told the player, in the farm's order: the
- * latest joining report and preg test, and the head known in calf. The only
- * read of pregnancy for the player's screens. On a day with no report or
- * test, the reports and the known head change only by calving, a slipped
- * calf (reported), death, sale or a move of stock. How long a joining runs
- * is `JOINING_DAYS`, and the reports come every `JOINING_REPORT_DAYS`.
+ * Each mob's breeding on the record, in the farm's order: the joining under
+ * way, the head PTIC (`PTIC_DAYS` or more in calf, by the one rule in
+ * `sim/told.ts`) and how far along they are in whole months, and the class
+ * table. The only read of pregnancy for the player's screens. A female less
+ * than `PTIC_DAYS` in calf shows exactly as one not in calf.
  */
 export function breedingReports(farm: FarmState): MobBreedingReport[] {
-  const known = knownInCalfSet(farm);
   return farm.mobs.map((m) => {
     let cows = 0;
     let heifers = 0;
+    let least = Infinity;
+    let most = -Infinity;
     const classes: Partial<Record<CattleClassId, number>> = {};
     for (const a of m.animals) {
-      if (a.preg >= 0 && known.has(a.id)) {
+      if (onRecordPtic(a)) {
         if (a.kind === 'cow') cows++;
-        else if (a.kind === 'heifer') heifers++;
+        else heifers++;
+        const months = Math.floor(a.preg / MONTH_DAYS);
+        least = Math.min(least, months);
+        most = Math.max(most, months);
       }
-      const c = knownClassOf(a, known);
+      const c = recordClassOf(a);
       classes[c] = (classes[c] ?? 0) + 1;
     }
     return {
       mob: m.id,
       name: m.name,
-      joining: m.reports?.joining ? { ...m.reports.joining } : null,
-      pregTest: m.reports?.pregTest ? { ...m.reports.pregTest } : null,
-      knownInCalf: { cows, heifers },
+      joining: m.join ? { start: m.join.start } : null,
+      ptic: { cows, heifers },
+      months: cows + heifers > 0 ? { least, most } : null,
       classes,
     };
   });

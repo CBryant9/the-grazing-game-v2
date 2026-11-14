@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GainForecast, GainReason } from '@gg/engine';
-import { breedingLines, mobWhy, moveNotes, reasonWord } from './mobwords';
+import { breedingLines, mobWhy, moveNotes, pticWords, reasonWord } from './mobwords';
 import { doneWord } from './words';
 
 const BANNED = /\bshould\b|\bmust\b|overgraz|\bbad\b|\bgood\b|—|–/i;
@@ -103,35 +103,29 @@ describe('why a mob is losing weight or short', () => {
 });
 
 describe('other words on the mob card and the job cards', () => {
-  it('states the joining, the latest report and preg test with their dates, and nothing live', () => {
-    const d = (date: number, month = 9) => ({ year: 2026, month, date });
+  it('states the joining dates and the head PTIC on the record, with how far along', () => {
+    const d = (date: number, month = 8) => ({ year: 2026, month, date });
     expect(
       breedingLines({
-        joining: { start: d(1), end: d(3, 11), days: 63, reportDays: 21, ended: false },
-        report: { date: d(22), weeks: 3, conceived: 41, inCalf: 41, females: 120 },
-        pregTest: null,
-        knownCows: 0,
-        knownHeifers: 0,
+        joining: { start: d(1), end: d(3, 10), days: 63, ended: false },
+        ptic: pticWords({ cows: 31, heifers: 0 }, { least: 2, most: 4 }),
       }),
     ).toEqual([
-      'Joining: 1 Oct 2026 to 3 Dec 2026 (9 weeks). A report comes every 3 weeks.',
-      'Joining report, 3 weeks in (22 Oct 2026): 41 of 120 females in calf, 41 in the 3 weeks before it.',
+      'Joining: bulls in from 1 Sep 2026 to 3 Nov 2026 (9 weeks).',
+      '31 PTIC, 2 to 4 months in calf.',
     ]);
+    expect(pticWords({ cows: 28, heifers: 3 }, { least: 3, most: 3 })).toBe(
+      '31 PTIC (28 cows, 3 heifers), 3 months in calf.',
+    );
+    expect(pticWords({ cows: 1, heifers: 0 }, { least: 1, most: 1 })).toBe(
+      '1 PTIC, 1 month in calf.',
+    );
+    expect(pticWords({ cows: 0, heifers: 0 }, null)).toBeNull();
+    expect(breedingLines({ joining: null, ptic: null })).toEqual([]);
+    // Nothing is said about cows that are not PTIC: no "empty", no "not in calf".
     expect(
-      breedingLines({
-        joining: null,
-        report: null,
-        pregTest: { date: d(10, 0), inCalf: 98, females: 120, rate: 0.8167, dry: 20, tooSoon: 2 },
-        knownCows: 90,
-        knownHeifers: 8,
-      }),
-    ).toEqual([
-      'Preg test (10 Jan 2026): 98 of 120 females in calf (82%). 20 not in calf. 2 females calved too recently to tell.',
-      'Known in calf now: 90 cows and 8 heifers.',
-    ]);
-    expect(
-      breedingLines({ joining: null, report: null, pregTest: null, knownCows: 0, knownHeifers: 0 }),
-    ).toEqual([]);
+      JSON.stringify(breedingLines({ joining: null, ptic: '2 PTIC, 2 months in calf.' })),
+    ).not.toMatch(/empty|not in calf/);
   });
 
   it('notes a paddock with no water and a mob already there', () => {

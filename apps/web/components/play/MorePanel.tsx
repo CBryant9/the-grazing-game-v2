@@ -1,17 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { InstallEntry } from '@/components/shell/InstallEntry';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { shortDate } from '@/lib/game/format';
+import { num, shortDate } from '@/lib/game/format';
 import { kindName, setupFacts, unreadSeqs, unreadWord } from '@/lib/game/more';
 import { useGame } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
+import { DiaryPanel } from './DiaryPanel';
+import { EmptyState } from './EmptyState';
+import { HelpSection } from './HelpPanel';
+import { Icon } from './Icon';
+import { ScoresPanel } from './ScoresPanel';
 import styles from './play.module.css';
 
 /** The farm's messages, newest first. A message that was new when the inbox opened keeps its New mark until the player leaves. */
 function Inbox({ snapshot }: { snapshot: Snapshot }) {
   const markRead = useGame((s) => s.markInboxRead);
+  const setTab = useGame((s) => s.setTab);
   const [fresh] = useState(() => unreadSeqs(snapshot.inbox));
   useEffect(() => {
     void markRead();
@@ -23,7 +30,9 @@ function Inbox({ snapshot }: { snapshot: Snapshot }) {
         Inbox
       </h3>
       {messages.length === 0 ? (
-        <p className="muted">No messages yet.</p>
+        <EmptyState action="Back to the farm" onAction={() => setTab('farm')}>
+          No messages yet. News about your cattle, sales, crops and water collects here.
+        </EmptyState>
       ) : (
         <ul className={styles.inbox}>
           {messages.map((m) => (
@@ -98,15 +107,75 @@ function Farm({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
-/** The More tab: the inbox, the farm, the theme and the way back to the home page. */
+/** The rows that open the Scores and Diary panels. */
+function Rows({ snapshot }: { snapshot: Snapshot }) {
+  const open = useGame((s) => s.openMore);
+  return (
+    <ul className={styles.rows}>
+      <li>
+        <button type="button" className={styles.row} onClick={() => open('scores')}>
+          <span className={styles.rowtop}>
+            <b>Scores</b>
+            <span aria-hidden="true">›</span>
+          </span>
+          <span className={styles.rowsub}>Year score {num(snapshot.score.total)}</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" className={styles.row} onClick={() => open('diary')}>
+          <span className={styles.rowtop}>
+            <b>Diary</b>
+            <span aria-hidden="true">›</span>
+          </span>
+          <span className={styles.rowsub}>Day by day</span>
+        </button>
+      </li>
+    </ul>
+  );
+}
+
+/** A panel opened from the More tab: a way back, a title, and the panel. */
+function SubPage({ title, children }: { title: string; children: ReactNode }) {
+  const open = useGame((s) => s.openMore);
+  return (
+    <section className={styles.listpanel} aria-label={title}>
+      <div>
+        <button type="button" className="btn sm ghost" onClick={() => open('menu')}>
+          <Icon name="back" size={16} /> Back to More
+        </button>
+      </div>
+      <h2 className={`px ${styles.soontitle}`}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/** The More tab: Scores, Diary, the inbox, the farm, the theme and the way back to the home page. */
 export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
+  const page = useGame((s) => s.morePage);
+  if (page === 'scores') {
+    return (
+      <SubPage title="Scores">
+        <ScoresPanel />
+      </SubPage>
+    );
+  }
+  if (page === 'diary') {
+    return (
+      <SubPage title="Diary">
+        <DiaryPanel />
+      </SubPage>
+    );
+  }
   return (
     <section className={styles.listpanel} aria-label="More">
       <h2 className={`px ${styles.soontitle}`}>More</h2>
+      <Rows snapshot={snapshot} />
       <p className="muted" aria-live="polite">
         {unreadWord(snapshot.inboxUnread) || 'No unread messages.'}
       </p>
       <Inbox snapshot={snapshot} />
+      <HelpSection />
       <Farm snapshot={snapshot} />
       <section aria-labelledby="look-title" className={styles.stack}>
         <h3 id="look-title" className={`px ${styles.minihead}`}>
@@ -118,6 +187,7 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
             Back to the home page
           </Link>
         </div>
+        <InstallEntry />
       </section>
     </section>
   );

@@ -771,3 +771,12 @@ How the arable land is laid out: it grows outwards from one square (or from the 
 - An unharvested crop becomes stubble 60 days after maturity, with the grain lost. Ripe grain sheds 0.2% a day from the day after maturity, then 3% a day from 31 days after maturity. *(Corrected in milestone 1.2b: the 0.2% a day was missing.)*
 - Stubble from an unharvested crop or a finished annual forage: dead = max(800, dead + green) kg DM/ha. A finished annual becomes stubble 30 days after its life is up. Off arable land a finished planting goes back to native pasture instead.
 - Self-sown annual ryegrass comes back at 12% of a full stand (the species' `regen` figure), on the 15th of the first month of its sowing window.
+
+## When a cow shows as PTIC (14 Nov 2026)
+
+| Figure | Value | Source |
+|---|---|---|
+| `PTIC_DAYS`, days in calf before a cow or heifer shows as PTIC on the record | **50** | The engine's own day: `PREG_PREMIUM.fromDays` in `market/prices.ts`, the day the sale price starts paying the in-calf premium (from the old game). Kept so the record and the price agree (Claudia: "You only get PTIC price if that cow is confirmed to be pregnant"). |
+| When pregnancy can be reliably found by rectal palpation | about **6 weeks** (42 days) of pregnancy; testing is usually done 8 to 10 weeks after the end of mating | Agriculture Victoria, "Pregnancy testing of beef cattle", https://agriculture.vic.gov.au/livestock-and-animals/beef/breeding/pregnancy-testing-of-beef-cattle (read 14 Nov 2026 through a search result: "pregnancies can be reliably detected as early as 6 weeks"; the page refused a direct fetch). No NSW DPI or Qld DAF page on the timing was found. |
+
+**For Claudia:** the sourced figure (about 42 days) is earlier than the engine's 50 days. The engine keeps 50 so that a cow shows as PTIC on the same day her price includes the in-calf premium, and no money changes against the old game. Moving both to 42 would change sale values against the old game.

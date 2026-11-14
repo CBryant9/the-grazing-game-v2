@@ -12,7 +12,6 @@ import type { Animal, AnimalKind, Sex } from '../cattle/types';
 import { GRID_N } from '../grid';
 import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
-import { reportsFromInbox } from '../sim/told';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 
 // ---------------------------------------------------------------------------
@@ -245,7 +244,7 @@ export function saveFarm(farm: FarmState): SavedFarm {
  * was added after the first saves were made, with the value it had before
  * it existed.
  */
-function upgrade(f: Record<string, unknown>, format: number): void {
+function upgrade(f: Record<string, unknown>): void {
   const farm = f as unknown as Partial<FarmState> & Record<string, unknown>;
   farm.inbox ??= [];
   farm.inboxSeq ??= farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0) + 1;
@@ -262,11 +261,10 @@ function upgrade(f: Record<string, unknown>, format: number): void {
   farm.plans ??= [];
   farm.nextPlanId ??= farm.plans.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   farm.ledger = { ...emptyLedger(), ...(farm.ledger ?? {}) };
-  // What the player has been told about breeding (format 7). Which females a preg test
-  // found in calf was not kept before, so none are known. Each mob's latest joining
-  // report and preg test are read back from the inbox.
-  farm.knownInCalf ??= new Int32Array(0);
-  if (format < 7 && farm.mobs && farm.inbox) reportsFromInbox(farm as FarmState);
+  // Format 8: the herd record is worked out from the cattle (PTIC from PTIC_DAYS in calf),
+  // so what format 7 kept of preg tests and reports is dropped.
+  delete (farm as { knownInCalf?: unknown }).knownInCalf;
+  for (const m of farm.mobs ?? []) delete (m as { reports?: unknown }).reports;
   for (const m of farm.mobs ?? []) {
     m.lastBreak ??= null;
     m.join ??= null;
@@ -314,7 +312,7 @@ export function loadFarm(saved: SavedFarm): FarmState {
     throw new Error('This farm was saved by a newer version of the game.');
   }
   const raw = unpack(saved) as Record<string, unknown>;
-  upgrade(raw, format);
+  upgrade(raw);
   const farm = raw as unknown as FarmState;
   farm.saveFormat = SAVE_FORMAT_VERSION;
   farm.engineVersion = ENGINE_VERSION;

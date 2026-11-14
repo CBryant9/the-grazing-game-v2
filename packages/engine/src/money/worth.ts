@@ -77,8 +77,8 @@ export function arrivalsWorth(farm: Pick<FarmState, 'arrivals'>): number {
  * Net worth: cash, plus 80% of what has been spent on infrastructure still
  * in place, plus the cattle at net sale value, plus what was paid for
  * cattle on their way to the yards. The cattle's value carries the
- * pregnancy premium from a female's 50th day in calf, tested or not
- * (docs/MODEL.md, section 3, "What the player is told").
+ * pregnancy premium from a female's 50th day in calf, the day she goes on
+ * the record as PTIC (docs/MODEL.md, section 3, "The herd record").
  */
 export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): number {
   let v = farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm);

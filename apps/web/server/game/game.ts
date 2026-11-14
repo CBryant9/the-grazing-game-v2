@@ -5,7 +5,6 @@ import {
   CLASS_LABELS,
   EDGE,
   GRID_N,
-  GROUPS,
   MARKET_CLASSES,
   MAX_BUY,
   SALE_CLASSES,
@@ -27,11 +26,13 @@ import {
   type CreateFarmOptions,
   type EdgeRef,
   type FarmEvent,
+  dateOn,
   type FarmState,
   type GroupId,
   type JobCard,
   type SourceEnv,
   type Supplement,
+  type TickEvent,
 } from '@gg/engine';
 import { loadRealData } from '@gg/engine/server';
 import { FARM_GRID_H, FARM_GRID_W } from '@gg/shared';
@@ -41,6 +42,7 @@ import type {
   DayResponse,
   JobCardWire,
   PreviewResponse,
+  RecordResponse,
   SetupChoices,
   SimpleAction,
   SkipRequestLength,
@@ -56,11 +58,12 @@ import {
   refundNote,
 } from './buildwords';
 import { cropLines, parseSow } from './crops';
-import { buyLines, cancelLines, sellLines } from './marketwords';
+import { buyLines, cancelLines, saleClassLabel, sellLines } from './marketwords';
 import { suppPerDay } from './mobs';
-import { moveNotes } from './mobwords';
+import { GROUP_NAME, lostWaterNote, moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
-import { buildSnapshot, buildSummary } from './snapshot';
+import { diaryPage, fileLines, periodFilings, type Filing } from './diary';
+import { buildSnapshot, buildSummary, dateParts } from './snapshot';
 import {
   BrokenFarmError,
   DONE_KEPT,
@@ -72,6 +75,7 @@ import {
   type StoredFarm,
 } from './store';
 import { dateText, doneWord, todoKey } from './words';
+import { pastYears, soFarView, yearView } from './years';
 import { join } from 'node:path';
 
 /** A refusal the route turns into a plain message with this status. Never carries a stack. */
@@ -103,6 +107,8 @@ const PRUNE_EVERY_MS = 6 * 3600_000;
 
 /** What the player reads when the farm they were looking at has changed. */
 export const STALE_MESSAGE = 'The farm has changed since this was shown. Here is the latest.';
+/** What the player reads when they ask for a day or a skip on a farm that is over. */
+export const OVER_MESSAGE = 'The game is over on this farm. Start a new farm to play again.';
 /** What the player reads when their farm can not be opened. */
 export const BROKEN_MESSAGE =
   'Your farm could not be opened. Try again, or start a new farm. The old farm is kept aside.';
@@ -320,6 +326,43 @@ export function moveNotesFor(farm: FarmState, action: Action): string[] {
   return moveNotes(area.name, areaWatered(survey.points, areaId), others);
 }
 
+/** Jobs that take water away from where it was: a hub or a trough taken out or moved. */
+const WATER_JOBS = new Set<Action['type']>([
+  'removeHub',
+  'moveHub',
+  'removeSquareHub',
+  'moveSquareHub',
+  'removeTrough',
+  'moveTrough',
+  'removePortable',
+  'movePortable',
+]);
+
+/**
+ * Mobs that have water now and would have none after a water job, found by
+ * a trial run of the job on a copy. A fact on the card; the job is not
+ * blocked.
+ */
+export function waterLossNotesFor(farm: FarmState, action: Action, env: SourceEnv): string[] {
+  if (!WATER_JOBS.has(action.type)) return [];
+  const trial = applyAction(farm, action, env);
+  if (!trial.ok) return [];
+  const before = surveyOf(farm);
+  const after = surveyOf(trial.farm);
+  const notes: string[] = [];
+  for (const m of farm.mobs) {
+    if (m.where.kind !== 'paddock') continue;
+    const was = areaIdOf(before, m);
+    if (was < 0 || !areaWatered(before.points, was)) continue;
+    const t = trial.farm.mobs.find((x) => x.id === m.id);
+    if (!t || t.where.kind !== 'paddock') continue;
+    const now = areaIdOf(after, t);
+    if (now < 0 || areaWatered(after.points, now)) continue;
+    notes.push(lostWaterNote(m.name, after.topology.areas[now]?.name ?? null));
+  }
+  return notes;
+}
+
 /** What a job card carries beyond the engine's own: notes, a daily price, and the ready-made lines of a market, plan or crop job. */
 interface Extras {
   notes: string[];
@@ -458,12 +501,14 @@ export class GameServer {
     held: Held,
     farm: FarmState,
     done?: DoneRequest,
+    filings: readonly Filing[] = [],
   ): Promise<Held> {
     const stored: StoredFarm = {
       ...held.stored,
       saved: saveFarm(farm),
       version: newVersion(),
       done: done ? [...held.stored.done, done].slice(-DONE_KEPT) : held.stored.done,
+      diary: filings.length ? fileLines(held.stored.diary, filings) : held.stored.diary,
     };
     await this.store.put(farmId, stored);
     const next = { stored, farm };
@@ -553,6 +598,7 @@ export class GameServer {
         saved: saveFarm(farm),
         version: newVersion(),
         done: [],
+        diary: [],
       };
       await this.store.put(id, stored);
       const held = { stored, farm };
@@ -617,16 +663,17 @@ export class GameServer {
         summary: [],
       };
     }
+    const water = waterLossNotesFor(farm, action, envFor(stored.setup));
     if (action.type === 'removePortable') {
       const back = portableRefund(farm, action.port);
       return {
-        notes: back === null ? [] : [refundNote(back)],
+        notes: [...(back === null ? [] : [refundNote(back)]), ...water],
         perDay: null,
         summary: [],
       };
     }
     return {
-      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)],
+      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action), ...water],
       perDay: null,
       summary: [],
     };
@@ -653,7 +700,7 @@ export class GameServer {
         return buyLines({
           qty: action.qty,
           one: c.one,
-          label: c.label,
+          label: saleClassLabel(action.cls) ?? c.label,
           total: Math.round(card.cost),
           cashBefore: Math.round(farm.cash),
           units: 'calf' in c,
@@ -665,7 +712,7 @@ export class GameServer {
         const what =
           action.type === 'sellClass'
             ? MARKET_CLASSES[action.cls].toLowerCase()
-            : `${GROUPS[action.group].name.toLowerCase()} from ${farm.mobs.find((m) => m.id === action.mob)?.name ?? 'the mob'}`;
+            : `${(GROUP_NAME[action.group as keyof typeof GROUP_NAME] ?? 'cattle').toLowerCase()} from ${farm.mobs.find((m) => m.id === action.mob)?.name ?? 'the mob'}`;
         if (sold?.type === 'cattle-sold') {
           return sellLines({
             head: sold.head,
@@ -802,6 +849,15 @@ export class GameServer {
         held,
         result.farm,
         meta.requestId ? { id: meta.requestId, ok: true, message, card } : undefined,
+        message
+          ? [
+              {
+                day: result.farm.day,
+                date: dateParts(dateOn(result.farm, result.farm.day)),
+                lines: [message],
+              },
+            ]
+          : [],
       );
       return { ok: true, message, card, snapshot: this.snapshotOf(next) };
     });
@@ -824,6 +880,38 @@ export class GameServer {
     });
   }
 
+  /** The last year that closed among these events, and how many closed. */
+  private yearsClosed(
+    held: Held,
+    ticks: readonly { type: string }[],
+  ): { yearEnd: DayResponse['yearEnd']; yearsClosed: number } {
+    const closed = ticks.filter(
+      (e): e is Extract<TickEvent, { type: 'year-end' }> => e.type === 'year-end',
+    );
+    const last = closed[closed.length - 1];
+    return {
+      yearEnd: last ? yearView(held.farm, held.stored.setup, last.year) : null,
+      yearsClosed: closed.length,
+    };
+  }
+
+  /**
+   * The Scores and Diary panels: the year so far, the finished years, and a
+   * page of the diary. `before` asks for diary days older than that day.
+   */
+  async record(sessionId: string, before?: number): Promise<RecordResponse> {
+    const id = farmIdFor(sessionId);
+    return this.locked(id, async () => {
+      const held = await this.need(id);
+      const { stored, farm } = held;
+      return {
+        soFar: soFarView(farm, stored.setup),
+        years: pastYears(farm, stored.setup),
+        ...diaryPage(stored.diary, before),
+      };
+    });
+  }
+
   /** Next day: the daily tick runs and the new day starts at first light. */
   async endDay(sessionId: string): Promise<DayResponse>;
   async endDay(sessionId: string, version: string): Promise<DayResponse | StaleResponse>;
@@ -831,13 +919,23 @@ export class GameServer {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
+      if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
       if (version !== undefined && version !== held.stored.version) return this.stale(held);
+      const seq0 = held.farm.inboxSeq;
       const end = endDay(held.farm, envFor(held.stored.setup));
-      const next = await this.save(id, held, end.farm);
+      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events);
+      const next = await this.save(
+        id,
+        held,
+        end.farm,
+        undefined,
+        periodFilings(end.farm, seq0, summary, [end.day]),
+      );
       return {
         ok: true,
         snapshot: this.snapshotOf(next),
-        summary: buildSummary('day', end.summary, end.stops, 1, end.day.events),
+        summary,
+        ...this.yearsClosed(next, end.day.events),
       };
     });
   }
@@ -859,19 +957,27 @@ export class GameServer {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
+      if (held.farm.over) throw new GameError(409, OVER_MESSAGE);
       if (version !== undefined && version !== held.stored.version) return this.stale(held);
+      const seq0 = held.farm.inboxSeq;
       const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
-      const next = result.daysRun > 0 ? await this.save(id, held, result.farm) : held;
+      const ticks = result.days.flatMap((d) => d.events);
+      const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks);
+      const next =
+        result.daysRun > 0
+          ? await this.save(
+              id,
+              held,
+              result.farm,
+              undefined,
+              periodFilings(result.farm, seq0, summary, result.days),
+            )
+          : held;
       return {
         ok: true,
         snapshot: this.snapshotOf(next),
-        summary: buildSummary(
-          'skip',
-          result.summary,
-          result.stops,
-          result.asked,
-          result.days.flatMap((d) => d.events),
-        ),
+        summary,
+        ...this.yearsClosed(next, ticks),
       };
     });
   }

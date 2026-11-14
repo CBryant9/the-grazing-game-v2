@@ -10,6 +10,7 @@
  */
 
 import { MARKING } from '../data/cattle';
+import { PREG_PREMIUM } from '../market/prices';
 import { lerp } from '../num';
 import type { Rng } from '../rng';
 import { makeAnimal } from './animal';
@@ -275,6 +276,9 @@ export function breedingNotes(
   const fem = joiningFemales(m);
   const preg = fem.filter((a) => a.preg >= 0).length;
   const ready = fem.filter((a) => a.preg < 0 && !a.barren && cycling(a));
+  // For the screens: joining-age females not PTIC on the record (PTIC from the
+  // premium day, sim/told.ts). The notes are still raised by `ready` above.
+  const readyOnRecord = fem.filter((a) => a.preg < PREG_PREMIUM.fromDays).length;
   // Bull calves due for marking.
   const toMark = m.animals.filter(
     (a) => a.sex === 'M' && a.kind === 'calf' && a.age >= MARK_NOTE_MIN_AGE,
@@ -296,6 +300,7 @@ export function breedingNotes(
         type: 'joiningStarted',
         adultBulls,
         ready: ready.length,
+        readyOnRecord,
         femalesPerBull: Math.round(
           fem.length / Math.max(1, adultBulls + YOUNG_BULL_SHARE * youngBulls),
         ),
@@ -330,6 +335,6 @@ export function breedingNotes(
   // No bull: cows ready to go back in calf.
   if (!bullF && !lot && ready.length >= 3 && (m.openNote ?? -999) < day - 60) {
     m.openNote = day;
-    notes.push({ type: 'noBull', ready: ready.length });
+    notes.push({ type: 'noBull', ready: ready.length, readyOnRecord });
   }
 }

@@ -32,7 +32,7 @@
  *     not by where cattle were drawn.
  */
 
-import { classOf, groupKey, makeSaleBatch, marketClass } from '../cattle/animal';
+import { makeSaleBatch, marketClass } from '../cattle/animal';
 import { markCalves, weanMob, WEAN_MIN_AGE } from '../cattle/breeding';
 import { animalLookup, type Animal } from '../cattle/types';
 import { cropRisks, fieldById, harvestField, sow } from '../crops/fields';
@@ -113,7 +113,7 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
-import { toldBought } from '../sim/told';
+import { recordClassOf, recordGroupOf } from '../sim/told';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
@@ -328,8 +328,6 @@ function buyCattle(j: Job, a: Extract<Action, { type: 'buyCattle' }>): Out {
   const total = price + units * HEAD_FEE + (unitFreight ? units * unitFreight : 0);
   const no = j.bankSays(total, 'cattle');
   if (no) return no;
-  // Cows sold as PTIC (pregnancy-tested in calf): the player knows they are in calf.
-  toldBought(farm, list);
   if (clocked) {
     // Paid for now, in the yards at first light tomorrow. Not on any ground until then.
     const arriveDay = farm.day + 1;
@@ -577,8 +575,9 @@ function sellGroup(j: Job, a: Extract<Action, { type: 'sellGroup' }>): Out {
   const plan = salePlan(j);
   if ('ok' in plan) return plan;
   const taken = plan.kind === 'book' ? bookedIds(j.farm) : new Set<number>();
+  // The group on the record: PTIC only from PTIC_DAYS in calf (sim/told.ts).
   const pool = m.animals.filter(
-    (x) => x.kind !== 'calf' && groupKey(x) === a.group && !taken.has(x.id),
+    (x) => x.kind !== 'calf' && recordGroupOf(x) === a.group && !taken.has(x.id),
   );
   if (a.group === 'steer' || a.group === 'heifer' || a.group === 'heiferP') pool.sort(byWeight);
   else pool.sort(byCondThenAge);
@@ -657,6 +656,7 @@ function moveCattle(j: Job, a: Extract<Action, { type: 'moveCattle' }>): Out {
   if ('ok' in where) return where;
   const s = j.survey;
   const picked: Animal[] = [];
+  // Classes on the record, the rows the player picked from (sim/told.ts).
   for (const p of a.picks) {
     if (!p || typeof p !== 'object') {
       return refuse('bad-request', 'Pick a class and how many to move.');
@@ -667,7 +667,7 @@ function moveCattle(j: Job, a: Extract<Action, { type: 'moveCattle' }>): Out {
       return refuse('bad-request', 'Pick a class and how many to move.');
     }
     if (alreadyAt(s, m, where)) return refuse('already-there', `${m.name} is already there.`);
-    const g = m.animals.filter((x) => x.kind !== 'calf' && classOf(x) === p.cls);
+    const g = m.animals.filter((x) => x.kind !== 'calf' && recordClassOf(x) === p.cls);
     if (!g.length) continue;
     if (g[0]!.kind === 'cow' || g[0]!.kind === 'bull') g.sort((x, y) => x.cond - y.cond);
     else g.sort(byWeight);

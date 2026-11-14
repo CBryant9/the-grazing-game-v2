@@ -1,0 +1,140 @@
+/*
+ * Help, the guided first day and the empty states. Colours are the design
+ * tokens in globals.css, so both themes work. Every control is at least the
+ * touch size (--tap) from the shared .btn and the rules below.
+ */
+
+/* ---- The help screen ------------------------------------------------------ */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.topics {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.topic {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.topic > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 6px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.topic > summary::-webkit-details-marker {
+  display: none;
+}
+.topic > summary::after {
+  content: '+';
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.topic[open] > summary::after {
+  content: '\2212';
+}
+.topic[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+.topictitle {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+.topicbody {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.terms {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.terms div {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.terms dt {
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.terms dd {
+  margin: 0;
+}
+.tourbox {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+/* ---- The coach strip ------------------------------------------------------ */
+
+.strip:focus {
+  outline: none;
+}
+.strip {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px var(--gutter);
+  background: var(--panel2);
+  border-bottom: 1px solid var(--line);
+  border-left: 4px solid var(--accent-line);
+}
+.stext {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.sstep {
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: var(--accent-text);
+}
+.sbody {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.sbtns {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- Empty states --------------------------------------------------------- */
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  background: var(--panel2);
+  border: 1px dashed var(--ghost);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.empty p {
+  margin: 0;
+}

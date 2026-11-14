@@ -2,17 +2,15 @@ import 'server-only';
 import {
   CLASS_LABELS,
   DISTRICTS,
-  GROUPS,
   JOINING_DAYS,
-  JOINING_REPORT_DAYS,
   SUPPLEMENTS,
   areaIdOf,
   areaWatered,
   breedingReports,
   dateOn,
-  groupKey,
   husbandryNow,
-  knownClassOf,
+  recordClassOf,
+  recordGroupOf,
   mobSummaries,
   plantingsNow,
   predictGains,
@@ -42,7 +40,7 @@ import type {
   SuppId,
   SuppOptionWire,
 } from '../../lib/game/types';
-import { SUPP_LABEL, REASON, breedingLines, mobWhy } from './mobwords';
+import { GROUP_NAME, SUPP_LABEL, REASON, breedingLines, mobWhy, pticWords } from './mobwords';
 
 const round = (n: number, places = 0): number => {
   const k = 10 ** places;
@@ -77,13 +75,13 @@ function areaOf(survey: Survey, areaId: number): GrazingArea {
 }
 
 /**
- * The class rows on the mob card, as the player knows them: a female counts
- * as PTIC only when a preg test or the saleyard said so (CLAUDE.md rule 14).
+ * The class rows on the mob card, on the record: a female counts as PTIC
+ * only from PTIC_DAYS in calf (the engine's one rule, CLAUDE.md rule 14).
  */
-function classRows(animals: readonly Animal[], known: ReadonlySet<number>): MobClassWire[] {
+function classRows(animals: readonly Animal[]): MobClassWire[] {
   const by = new Map<CattleClassId, Animal[]>();
   for (const a of animals) {
-    const c = knownClassOf(a, known);
+    const c = recordClassOf(a);
     const list = by.get(c);
     if (list) list.push(a);
     else by.set(c, [a]);
@@ -98,10 +96,6 @@ function classRows(animals: readonly Animal[], known: ReadonlySet<number>): MobC
   }));
 }
 
-/** The sale group a beast is in, as the player knows it: PTIC only when known. */
-const knownGroup = (a: Animal, known: ReadonlySet<number>): string =>
-  a.preg >= 0 && !known.has(a.id) ? groupKey({ ...a, preg: -1 }) : groupKey(a);
-
 const dateParts = (d: { year: number; month: number; date: number }): DateParts => ({
   year: d.year,
   month: d.month,
@@ -113,7 +107,6 @@ interface MobReads {
   survey: Survey;
   land: GrazingLand;
   market: MarketView;
-  known: ReadonlySet<number>;
   reports: Map<number, MobBreedingReport>;
   husbandry: Map<number, MobHusbandry>;
   supp: Map<number, SupplementCost>;
@@ -122,7 +115,7 @@ interface MobReads {
 /**
  * Every mob as the mob card needs it: the engine's own figures, the reasons
  * it gives for a mob not gaining, what each husbandry button can do, and the
- * breeding as the player has been told it. Plain numbers and ready-made
+ * breeding on the record (PTIC from PTIC_DAYS in calf). Plain numbers and ready-made
  * words only.
  */
 export function buildMobs(farm: FarmState, env: SourceEnv, market: MarketView): MobWire[] {
@@ -131,7 +124,6 @@ export function buildMobs(farm: FarmState, env: SourceEnv, market: MarketView): 
     survey,
     land: landOf(farm, survey, env),
     market,
-    known: new Set(farm.knownInCalf),
     reports: new Map(breedingReports(farm).map((r) => [r.mob, r])),
     husbandry: new Map(husbandryNow(farm, env).map((h) => [h.mob, h])),
     supp: new Map(supplementCosts(farm, env).map((c) => [c.mob, c])),
@@ -159,7 +151,8 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
   // The engine's own reasons, for a mob that is not gaining or is short of feed.
   let forecasts: GainForecast[] = [];
   if (area && m.st && (m.st.adg < 0.05 || m.st.f < 0.9)) {
-    forecasts = predictGains(m, r.land, area).filter((g) => g.why.length > 0);
+    // Grouped by the record, so the lines never move on the day a cow conceives.
+    forecasts = predictGains(m, r.land, area, recordClassOf).filter((g) => g.why.length > 0);
   }
   const why = mobWhy({
     name: s.name,
@@ -192,9 +185,9 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
   for (const b of r.market.booked) for (const id of b.animalIds) bookedIds.add(id);
   const sellGroups: SellGroupWire[] = SELL_GROUPS.map((id) => ({
     id,
-    name: GROUPS[id].name,
+    name: GROUP_NAME[id],
     head: m.animals.filter(
-      (a) => a.kind !== 'calf' && knownGroup(a, r.known) === id && !bookedIds.has(a.id),
+      (a) => a.kind !== 'calf' && recordGroupOf(a) === id && !bookedIds.has(a.id),
     ).length,
   })).filter((g) => g.head > 0);
 
@@ -229,27 +222,20 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
     cp: s.day ? round(s.day.cp, 1) : null,
     intakeKg: s.day ? round(s.day.intake, 1) : null,
     intakePct: s.day && s.day.wt > 0 ? round((s.day.intake / s.day.wt) * 100, 1) : null,
-    classes: classRows(m.animals, r.known),
+    classes: classRows(m.animals),
     why,
-    ptic: report ? report.knownInCalf.cows + report.knownInCalf.heifers : 0,
+    ptic: report ? report.ptic.cows + report.ptic.heifers : 0,
+    pticText: report ? pticWords(report.ptic, report.months) : null,
     breeding: breedingLines({
       joining: join
         ? {
             start: dateParts(dateOn(farm, join.start)),
             end: dateParts(dateOn(farm, join.start + JOINING_DAYS)),
             days: JOINING_DAYS,
-            reportDays: JOINING_REPORT_DAYS,
             ended: farm.day >= join.start + JOINING_DAYS,
           }
         : null,
-      report: report?.joining
-        ? { ...report.joining, date: dateParts(dateOn(farm, report.joining.day)) }
-        : null,
-      pregTest: report?.pregTest
-        ? { ...report.pregTest, date: dateParts(dateOn(farm, report.pregTest.day)) }
-        : null,
-      knownCows: report?.knownInCalf.cows ?? 0,
-      knownHeifers: report?.knownInCalf.heifers ?? 0,
+      ptic: report ? pticWords(report.ptic, report.months) : null,
     }),
     supp: m.supp as SuppId,
     suppOptions,

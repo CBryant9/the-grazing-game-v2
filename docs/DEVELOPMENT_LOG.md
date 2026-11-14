@@ -994,15 +994,162 @@ What was looked at in a real browser (the pane's browser on `next dev`, a runnin
 
 Not done:
 
-- Moving a mob or selling a group by the known classes can ask for more "not in calf" cows than the engine's live classes hold (the engine picks by live pregnancy). The engine then moves or sells fewer, or refuses. A fix needs an engine change.
+- Moving a mob or selling a group by the known classes could ask for more "not in calf" cows than the engine's live classes held. Settled in the second pass below (the herd record, engine 0.12.0).
 - Lighthouse was not run.
 
 Questions for Claudia:
 
-1. **Selling and moving by what is known.** The mob card now shows cows as PTIC only when a preg test said so, but the engine still picks "PTIC cows" and "cows not in calf" by live pregnancy. Should the engine pick by what the player knows?
-2. **The no-water colour.** No water on the water layer and in the move tool is now purple, not red. Right, or another colour?
-3. **The Short label chip** is a red-orange (`#ec6a48`). It is a word chip, not a line, so it was left. Change it too?
+(Questions 1 to 3 were settled in the second pass below.)
 4. **Stale farms.** A farm not played for 90 days is removed (the session cookie lasts 90 days). Right?
+
+### 14 Nov 2026: milestone 1.7f, second pass (review, and Claudia's change of direction)
+
+Same branch. Engine 0.12.0, save format 8.
+
+- **Pregnancy on the record, no preg test** (Claudia, 14 Nov 2026; REQUIREMENTS "pregnancy on the record"). Replaces the "told" design from earlier the same day (engine 0.10.0 and 0.11.0: `knownInCalf`, a mob's `reports`, joining reports and the preg test on the mob card), which is gone; save format 8 drops it from an older save. A cow or heifer is PTIC on the record by herself from `PTIC_DAYS` (50) in calf, the day the price pays the in-calf premium (`PREG_PREMIUM.fromDays`), so the record and the price agree and no money changes. One rule in `sim/told.ts` (`onRecordPtic`, `recordClassOf`, `recordGroupOf`) used by the mob card, the herd list ("31 PTIC, 2 to 4 months in calf."), the map's classes, `sellGroup` (sale and booking) and `moveCattle`. Groups renamed "Heifers" and "Cows" (no "empty", no "not in calf"). The inbox leaves out the joining progress and preg test notes; the cattle step still makes them, because the old game comparison checks them, so they stay in the engine unshown. Bought PTIC cattle come 100 to 210 days in calf, so they are PTIC from arrival (tested). Tests: a cow 10 days in calf shows exactly as an empty cow in every read and screen; selling "Cows" and moving a class by count take exactly the head asked for; the PTIC group and class with nothing on the record take none; PTIC price only from `PTIC_DAYS`; saves. Checked for selection by pregnancy: `sellGroup`, `moveCattle` (now the record); `sellClass` (market class), `sellAnimals`, booking by tag and `cancelSale` (tags), `markCalves`, `wean`, plan moves, `moveMob`, joins, the yards split and auto-weaning (no pregnancy). DATA "When a cow shows as PTIC": Agriculture Victoria gives reliable palpation from about 6 weeks of pregnancy (42 days); the engine keeps 50 (see the question below).
+- **A water job that leaves stock dry says so.** Taking out or moving a hub of either kind, a trough or a portable trough: a trial run finds each mob that has water now and would have none, and the card says "After this, Mob 1 has no water in Paddock 2. Cattle die on the fourth day without water." The job is not blocked.
+- **The key lists** cover the preview, act (stale, refused and repeated answers included), day and skip replies as well as the snapshot, and fail when a listed key is never sent. New fixtures: a booked sale, cattle on the way, a game over, a fence down to fix, a plan by days.
+- **Start-up warning** in production when `GG_TRUSTED_IP_HEADER` is unset (`instrumentation.ts`, `.env.example`).
+- **The session cookie is renewed** with a fresh Max-Age on every route that loads the farm. Tested.
+- **The husbandry reasons** are asserted exactly against `husbandryNow`.
+- **Colour, narrowed** (Claudia: red "is like an error, or a can't go any further, within the picture"). The rule is for the map picture only. The site's colours stay as designed, red included (the panels, the Short chip, the chart, the main button). On the map the no-water label text is now purple in both themes, like the pickable no-water outline. REQUIREMENTS and VISUALS updated.
+
+How it was tested: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` (2,273 tests, calibration and every old game comparison unchanged), `pnpm test:speed`, `pnpm build`, `pnpm check:browser-bundle`; the map fixtures were made again (the mob classes follow the record).
+
+Questions for Claudia:
+
+1. **When a cow shows as PTIC.** The engine uses 50 days in calf, the day the price pays the in-calf premium. Agriculture Victoria says pregnancy can be reliably found by palpation from about 6 weeks (42 days). Keep 50, or move both the record and the price to 42 (that changes sale values against the old game)?
+2. **Late pregnancy shows.** Cows more than 190 days in calf add 10% to AE and give a "late pregnancy" reason on the mob card. A grazier can usually see it by then. Leave it?
+3. **Fence materials.** Fence built over by another kind is lost, and materials on hand count for nothing in net worth. Right?
+4. **The main button is red.** Keep it?
+5. **No water is purple on the map** (labels, markers, the pickable outline) but keeps the site colour in the panels. Right?
+6. **Unused farms are removed after 90 days.** Right?
+
+### 14 Nov 2026: milestone 1.7f, third pass (a review of the second)
+
+Same branch. Engine 0.12.1 (notes carry more; no formula changed), save format 8.
+
+- **The inbox no longer gives away early pregnancy.** The `slipped` note carries the days in calf; the inbox says "A PTIC cow in Mob 1 lost her pregnancy." only from `PTIC_DAYS`, and nothing before. Tested at 10, 49 and 50 days.
+- **Ready-to-join counts follow the record.** The joining and no-bull notes carry `readyOnRecord` (joining-age females not PTIC on the record), which the inbox shows. The notes are still raised by the model's own count, so a note can stay silent when every female is in calf but under 50 days: a small give-away, accepted.
+- **The mob card's "why" lines** group cattle by `recordClassOf` (`predictGains` takes a grouping; the old game comparison still uses the live class and passes unchanged).
+- **No "empty" on screen:** the buy list, the buy card and the inbox say "Dry cows" from a server-side name list (the engine's label stays for its tables). The booking card adds "A cow that is PTIC on the record by then is paid as PTIC." (it shows no figure at booking; the price is set on the sale day).
+- Stale comments and docs brought up to date (summary, animal, prices, worth, the farm view, MODEL, REQUIREMENTS), Claudia's quote word for word, LESSONS E1 rewritten and E2 added, the told test checks the bought cattle where they land.
+- **The long layout comparison** ("40 farms vs MVP") ran past its 240 s limit when every test file ran beside it on a busy machine (about 70 s alone). Its own limit is now 10 minutes; it checks the same farms and jobs. No worker cap was added.
+- The herd list line wraps inside its row on a narrow screen.
+
+Calls made by the coordinator, for Claudia to confirm:
+
+1. The move tool's map key describes the map, so its no-water line stays purple like the map. Everything else in the panels keeps the site colour.
+2. The profit marker (not built) must not use red on the map when it is built (VISUALS).
+3. A cow booked for sale in "Cows" who reaches 50 days in calf by sale day is paid the PTIC premium, more than a figure worked out at booking. The sale pays by the record on the day.
+
+### 14 Nov 2026: m1.7g Scores and Diary
+
+Second pass (an Opus review): weight lost is worded "Cattle lost 4,200 kg of live weight." when the year's gain is negative. The pasture facts give both totals in tonnes ("1,000 t DM of pasture grew. The cattle ate 1,300 t DM."), never a percentage, and say "They ate feed carried over from before the year as well." when more was eaten than grew (the score still uses its own uncapped figure). With no monthly readings, "Ground cover is X% today." The diary files a skip's lines from the run's own day by day events, so a year-long skip keeps every day (only first light events come from the inbox). The game over card labels the year under way as a part year with its days, and has "Look around" (a strip "The game is over on this farm." with Show the result and Start a new farm; Scores, Diary, the map and the lists stay readable). A refused day or skip (409) from an old tab loads the farm again instead of offering a retry. The year card's button says Close when the game ended in the same skip. The summary's feed figure is feed only; grain income is its own line ("Grain sold").
+
+Branch `m1.7g-scores-diary`, from `m1.7f-review-fixes`. No engine rule or number changed.
+
+What was built:
+
+- **Year view** (`apps/web/server/game/years.ts`): a year as `{ n, title, total, parts, facts, money }`, worked out and rounded on the server. The five parts are Profit, Weight gain, Pasture use, Ground cover and Deaths, in whole points. The facts are plain sentences from the year's figures. The money rows are cattle sales, cattle bought, supplements, grain, crops, infrastructure, running costs and interest, with zero rows left out.
+- **Wire:** snapshot version 1 to 2. The snapshot gains `score: { year, total }` (the year so far). Day and skip replies gain `yearEnd` (the last year that closed, or null) and `yearsClosed`. `over` is now `{ text, days, years, total, worth }`.
+- **`GET /api/game/record`:** `{ soFar, years, diary, earlier }`, with `?before=<day>` for older diary days, 30 days a page. Same session, cookie renewal and limits as the farm route. A bad `before` is refused with a 400.
+- **The diary** (`diary.ts`), kept in the farm file beside the engine save. Stored format 2 to 3. A format 2 file loads with an empty diary. The last 400 days are kept, 12 lines a day, then "and N more". Lines come from a job's result line, a day or skip's inbox messages (filed under the day each carries), and the money lines of the day or skip (filed under the last day that ran).
+- **Screens:** the year end card ("Year 3 done", the Year score, a bar for each part, the facts, "Start year 4"), the Scores panel and the Diary panel (both from More), and the game over card. Next day and the skips are refused by the server once the game is over (409 with a plain message), as well as being switched off on screen. The old strip at the foot of the map is gone.
+- The browser fetches the record only when Scores or Diary is opened, and again after a day or skip while one is open.
+
+How it was tested: new tests for the diary lists (the 400 day cap, the 12 line limit, paging), a skip of 30 days filing under the right days, a format 2 farm loading with an empty diary, the year end for a year skip (random and real years), the game over refusals, the record route (paging, bad input, limits, cookie), the client store (year card beside the summary, fetching, paging, failure), and the key lists for every new field. Then `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm test:speed`, `pnpm build` and `pnpm check:browser-bundle`.
+
+Calls for Claudia (what, why, how to change it):
+
+1. **The headline is "Year score".** It is the engine's existing year score and its five parts. The PRD's "Grazier Score" (5.8) has no agreed weights, so it is not shown. It comes with the leaderboards in Stage 4. To change: rename the label in `YearScore` in `YearBlocks.tsx` and the line in `MorePanel.tsx`.
+2. **No video or ad on the year end card.** Ads are Stage 5.
+3. **The Diary is a list of days, newest first, with "Show earlier days".** The drag timeline and "view the farm on a past day" need a stored snapshot for every day, which waits for the database in Stage 3.
+4. **The Diary keeps the last 400 days for each farm.** To change: `DIARY_DAYS` in `diary.ts`.
+5. **The snapshot version went from 1 to 2, not the map's farm view version (4).** The map's view did not change, only the snapshot and the day and skip replies. `FARM_VIEW_VERSION` is unchanged.
+6. **The day number in the Diary counts from Day 1.** The farm's own day count starts at 0 on the first day, so the diary shows that day as Day 1. The paging value `before` is the farm's own day.
+7. **A real-years farm titles a year "Year 3 · 1997".** The real year is the one the game year began in (September). A random-seasons farm says "Year 3".
+8. **The diary leaves out births and deaths from the day's summary.** The inbox messages already say each one, by mob and cause, so saying them again would double the lines. The summary adds only the money lines. A long skip files each message under the day it happened. The inbox keeps 120 messages, so on a skip of a whole year only the last 120 are filed.
+9. **A job's own inbox messages are not filed.** The job's result line is filed instead, once.
+10. **The game over card counts the year under way** as a last year, so the total adds every score the farm earned. The part year's score is its score as if it closed that day.
+11. **The part scores are rounded one by one,** so the five numbers can differ from the total by a point.
+12. **The money rows on a year are signed:** money in is shown with a plus, money out with a minus. Interest keeps the engine's sign (paid is negative).
+13. **Once the game is over the game over card covers the screen** with two ways on: look around the finished farm (a strip with Show the result and Start a new farm), or a new farm, behind the same "this farm will be gone" confirm as the More tab.
+14. **The year score shows each part's points beside its facts, as the mockup does, so a player could work the weights back (for example dollars per profit point).** Kept for now. To be revisited when the Grazier Score and leaderboards are set in Stage 4.
+### 14 Nov 2026: milestone 1.7e, help, the guided first day and empty states
+
+What Claudia asked for (REQUIREMENTS, "Controls and screens" and "For the game screens milestone"; PRD 21a, "First-time experience"): help hidden behind a help button, in an info section that can be reopened, never covering the map on a small screen; an information panel that explains how the day works; onboarding and a tour with help available at any time; a short guided first day (open a paddock, move cattle, build a short fence and watch the daylight bar move, open the market, end the day) that can be skipped and replayed from More; empty states with one clear next step.
+
+What was built:
+
+1. **Help.** A Help button with its word in the top bar (on every layout) and a Help part in the More tab. It opens a help screen: a full-screen panel on a phone (like the other tabs, with its own Close help button and Escape), and the side panel on a PC. It is never a layer over the map: on a phone it takes the place of the map's panel the way Herd and Market do. Ten topics, each a heading that opens on a tap (How the day works is open first): the day, moving cattle, building (and what red means), water, buying and selling, husbandry (the banner and the one button, no preg testing, PTIC by itself), grazing plans, lick and feed, crops, reading a paddock; and What the terms mean (AE, DSE, CS, PTIC, ME, CP, kg DM/ha). The words are in `components/play/helptopics.ts`. Each line was checked against the game on this branch (the components, `words.ts`, `mobwords.ts`, `buildwords.ts`, `marketwords.ts`). It says what the player sees and can do, never how a number is worked out, and quotes no real-world figure. A test keeps the topic list, the terms and the plain writing (no em dashes, no judging words) from drifting.
+2. **The guided first day.** A coach strip of two lines and two buttons (Skip this step, Skip the tour) sits in the page flow between the top bar and the map, so it never covers the map (it takes 49 px on a phone on its side and on a PC, 112 px on a phone held upright, where the map is still 60% of the screen). Each step finishes when the player does it, read from the game's state: a paddock opened, a move that is done, a fence built (the fence tool's job done), the Market tab opened, and the farm's day gone past the day the tour began (Next day or a skip). A step done early counts. A farm with no cattle has no move step ("Step 1 of 4"). When every step is done or skipped the strip says so with Close the tour. Where it is up to is kept in `localStorage` under `gg-tour` (in try/catch: the page works without it, and the tour then lasts for the visit). A new farm starts a new tour; throwing a farm away clears it; a farm with no saved tour that has not seen a day gets one; an older farm gets none. Show the tour again (in More and at the top of the help screen) begins it again from the day the farm is on. The step logic is pure (`lib/game/tour.ts`, 26 tests); `lib/game/helpstore.ts` is a small separate store that watches the game's store.
+3. **Empty states.** `EmptyState` is one plain line and one button with a text label. Herd with no cattle gives when the next sale is and Go to the Market. Plans with no plan: with cattle, Make a plan; with none, the sale line and Go to the Market. Paddocks with none: Build a fence. The inbox with no messages: Back to the farm. The Market's Sell with nothing free to sell: See what is for sale (the Buy view).
+
+Calls made where the spec was open (also in the stage report): the tour's strip sits above the map rather than over it; a step done early counts; the move step is dropped on a farm with no cattle right now (so cattle bought later bring it back); Help is a full-screen panel on a phone like the other tabs; the help topics are collapsed lists with the first open; the tour ends with a closing line the player dismisses; an existing farm with a day or more behind it gets no tour until replayed.
+
+How it was tested: unit tests for the tour logic and the help words; `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` and `pnpm check:browser-bundle`. In a real browser (the pane, `next dev`, a Central Queensland farm, then a farm from scratch): the whole tour played start to finish at 390 by 844, with the strip's step changing as each thing was done and the daylight bar moving after a fence was built; skip a step, skip the tour, replay from the help screen, and a reload with the tour kept off; Help and More at 390 by 844 in light and dark, at 844 by 390 and at 1280 by 800; no sideways scroll at any of them; the buttons measured 44 px or more on touch. On a scratch farm the tour had four steps and the empty Herd, Plans and Sell lists showed their line and button.
+
+Not done or not looked at: the Paddocks and inbox empty states are in the code and the tests cannot reach them on screen (a farm always has a paddock and a first message); the help text says "A cow goes on the record as PTIC by herself", which is the newer ruling and needs the engine change from the other session to be true on screen; the mob card still has code for a preg test line that the engine no longer needs to send. In the landscape layout the closed Build button is drawn as a tall white bar in the middle of the map (not changed here and not looked into; a bug for whoever owns the build bar). Lighthouse was not run.
+
+### 14 Nov 2026: milestone 1.8, Stage 1 wrap (install, offline, errors, speed budgets, cost)
+
+Branch `claude/m1-8-stage1-wrap-eafda9`. Part of 1.8 only: the Stage 1 report and Claudia's real-phone play are not in this entry. New packages: `@serwist/turbopack`, `serwist` and `esbuild` (to build the service worker). No outside service, no art from outside the repo.
+
+**Install to the home screen.**
+
+- The manifest (`app/manifest.ts`) lists the SVG and three PNG icons. The icons are made by `scripts/make-icons.mjs` (`pnpm icons`): the pixel glyph already in `icon.svg`, lime on the frame colour from `globals.css`, with a small PNG writer in the script. `icon-maskable-512.png` keeps the glyph inside the safe circle that a launcher mask leaves. `apple-icon.png` is for iPhone.
+- The service worker is `app/sw.ts`. Next.js 16 builds with Turbopack, which `@serwist/next` does not support, so `app/serwist/[path]/route.ts` (`@serwist/turbopack`) builds it when the site is built and serves it at `/serwist/sw.js`. It keeps the build's scripts, styles, fonts and the public files (58 files, 1.6 MB) and the pages `/` and `/play`. `/api` is never stored (a network-only rule). No source map is published for it.
+- It is started from `/play` only, 8 seconds after the page has loaded, so the 1.6 MB it saves never competes with the farm's first load. It is not started on `next dev`.
+- The More tab has an Install entry (`components/shell/InstallEntry.tsx`, one line in `MorePanel.tsx`). It shows only when the browser has offered install (an Install button) or on an iPhone or iPad in a browser (the two steps: tap Share, tap Add to Home Screen). Nothing shows once installed. No pop-up.
+
+**Looking at the farm offline.**
+
+- `lib/game/offline.ts` keeps the last snapshot in `localStorage` (about 50 KB for a 1,000 ha farm), checked for shape and format on the way back. Every storage call is wrapped. If the snapshot does not fit, the old copy is dropped so a stale farm is never shown.
+- `lib/game/offlineWatch.ts` (started by `components/shell/PlayOffline.tsx`) keeps the copy fresh (after each snapshot, 0.4 s later, and when the page is hidden), shows it when `/play` can not reach the game, and holds every action off. The play components already switch Next day, skips and every job button off while the store's `busy` count is above zero, so being offline holds that count up by one. Looking (the map, paddocks, mobs, tabs) keeps working. One plain line shows above the play screen: "You are offline. This is the farm as you last saw it." A check every 15 seconds, and one when the browser says it is online, brings the live farm back and releases the buttons. If the farm was thrown away elsewhere, the normal screens take over.
+- `lib/game/store.ts` was not changed. `lib/game/api.ts` exports the "could not be reached" message as `UNREACHABLE`, so the watch can tell it from a server error.
+- Not available offline: setup, jobs, the market, the inbox being marked read. They need the connection.
+
+**Error screens.** `app/error.tsx`, `app/global-error.tsx` (brings its own html and a plain link home), `app/not-found.tsx`, and `PlayBoundary` around the play screen (Try again clears what was open and starts from the farm tab; Home page). Plain words, no stack, no code; the error goes to the console until Sentry in Stage 3. `/dev/crash?where=page|client|play` shows them (404 on a live build, like the other `/dev` pages).
+
+**Speed budgets in CI** (PRD 14.10). `pnpm test:speed` was already in CI (15 ms limit for the shared machine; 5 ms is held on the build PC). Added: `pnpm check:js-budget` (`scripts/check-js-budget.mjs`, with a test): the compressed size of the scripts each page asks for in its own HTML, `/` under 150 KB (the PRD target is 100 KB: React and the Next.js client are about 120 KB, so it is held at today's 141 KB and says so) and `/play` under 250 KB (184 KB). Lighthouse (`lighthouserc.json`, one set of assertions for each page): performance 0.95 median, Accessibility, Best Practices and SEO 1, LCP 2.0 s, CLS 0.05; TBT 200 ms as a warning (local runs swing between 60 and 630 ms with other work on the PC). On `/play` the LCP is a warning too (below). Nothing existing was loosened.
+
+**Lighthouse, run here** (mobile, `next start`, three runs each, the PC was shared with other work):
+
+| Page | Performance (median) | Accessibility | Best Practices | SEO | LCP | CLS |
+|---|---|---|---|---|---|---|
+| `/` | 0.95 (runs 0.84, 0.99, 0.95; an earlier set 0.98, 1.00, 0.99) | 1 | 1 | 1 | 0.9 s | 0 |
+| `/play` | 0.89 (runs 0.89, 0.91, 0.88) | 1 | 1 | 1 | 3.3 s | 0 |
+
+`/play` does not reach the 0.95 target, and did not before this change: the same build without it scored 0.87. The largest paint is the setup form's first heading ("Where is your farm?"), which waits for the page's scripts, then the farm request, then the setup request, one after the other. Fixing that means changing what the play page draws first (`PlayApp`, `SetupFlow`) and is not in this piece. The first paint is at 0.9 s.
+
+**Cost measurement** (`pnpm build`, then `pnpm measure:cost`; the script starts the built server on its own port with its own empty farm folder). Farm of 3,000 ha (Northern Tablelands NSW, large), 959 head at the start, Windows laptop, Node 24, with other work running, round trip on this machine:
+
+| What the player does | Runs | Median | Worst | Answer |
+|---|---|---|---|---|
+| Start the farm | 1 | 979 ms | | 52 KB |
+| Open the farm | 5 | 29 ms | 38 ms | 52 KB |
+| Next day | 10 | 86 ms | 182 ms | 53 KB |
+| +1 week skip | 1 | 175 ms | | 54 KB |
+| +1 year skip | 3 | 1,673 ms | 1,831 ms | 63 KB |
+
+A year skip ran 359 days on average: 4.7 ms a simulated day, in line with the engine's own 2 to 3 ms a day. A Next day is 86 ms, so most of it is the request, the save and the snapshot, not the simulation.
+
+The stored farm is one JSON file: 191 KB when started (67 KB compressed), 339 KB after about a year and a half of play (146 KB compressed). It grows as history is kept. BUILD_PLAN 5.2 says a farm at rest is "a few tens of KB": the stored file is several times that, and the snapshot sent to the browser is 52 KB. Worth looking at before Stage 3 sets storage limits.
+
+**How it was tested.** `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` 2,283 tests in 120 files, 16 of them new; one earlier full run had two files fail while the PC was busy with other work and they passed on the next run, so those two were not looked into, `pnpm build` and `pnpm check:browser-bundle` pass. Tests: the offline storage (round trip, bad data, no storage, no room), iPhone detection, the JavaScript budget check (pass, over, polyfills, missing file). In the pane's browser on a production build: at 390 by 844 (light) and 844 by 390 (dark), with the server stopped and the page reloaded, the farm opened from the service worker's copy with the line above it, Next day and the three skips disabled, the map drawn, and no sideways scroll. Reconnecting (the page's game requests blocked, then let through) took the line away and enabled the buttons; the server itself was not restarted under an open page. The 404 and the page error (390 by 844, light), and the play screen's error (both sizes, both themes) showed two buttons with no sideways scroll; the last-resort error showed its words and buttons (its width was not measured). The Install entry was hidden, appeared when a `beforeinstallprompt` event was sent, and asked the browser to install when tapped. `/api` was not in any cache.
+
+Not done or not checked: a real phone (install, the iPhone steps, offline in airplane mode, the Android install bar), the iPhone status bar in an installed app, and going offline while a request is in flight.
+
+**Calls for Claudia** (from the review of this branch).
+
+- The home page JavaScript is held at 142 KB (the check's limit is now 142 KB, so it can only go down) against the PRD 14.10 target of 100 KB. React and the Next.js client are about 120 KB (LESSONS, 1.8 W4 and R1). It reaches 100 KB when the website pages are built in Stage 5, or the target moves.
+- `/play` Lighthouse performance was measured at 0.89 (runs 0.89, 0.91, 0.88) against the 0.95 the CI asks for. The CI rule is not loosened, so CI fails on this until the page is made lighter. The cause is the setup form heading waiting on the scripts, then two requests one after the other (LESSONS, 1.8 W5). The fix is in `PlayApp` and `SetupFlow`.
+- The service worker starts 8 seconds after `/play` has loaded, so its 1.6 MB of saved files never competes with the farm's first load. Say if a player should get offline sooner.
+- The stored farm file is 191 KB when started and 339 KB after about a year and a half of play. BUILD_PLAN 5.2 says "a few tens of KB". Worth a decision before Stage 3 sets storage limits.
+- Help opens in the same bottom sheet as the paddock on a phone, so the map stays visible above it (REQUIREMENTS: help never covers the map on a small screen). On a phone on its side it is the whole-screen sheet, as the paddock is. This replaces the full-screen panel described in the 1.7e entry.
+- The last-farm copy (offline viewing) and the tour progress are kept per browser, not per player, until accounts arrive in Stage 3. A second player on the same browser sees the first player's last farm copy and tour progress.
+- The service worker now keeps only `/` and `/play`. Every other page (admin, sign-in callbacks, account pages) and everything under `/api` goes to the network and is never stored.
 
 ### 14 Nov 2026: milestone 5.4, the public website
 

@@ -40,7 +40,6 @@ import {
   type RealYearsSpec,
   type YearTotals,
 } from './state';
-import { toldBought } from './told';
 
 export type FarmSizeName = 'small' | 'medium' | 'large';
 const SIZE_INDEX: Record<FarmSizeName, 0 | 1 | 2> = { small: 0, medium: 1, large: 2 };
@@ -110,8 +109,6 @@ export function startHerd(farm: FarmState, rng: Rng): StartHerd | null {
       a.cost = a.paid;
       m.animals.push(a);
     }
-    // The cows that come as PTIC (pregnancy-tested in calf) are known to be in calf.
-    toldBought(farm, list);
   };
   const ptic = Math.round(cows * 0.55);
   const withCalf = Math.round(cows * 0.25);
@@ -251,7 +248,6 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     saleBookings: [],
     plans: [],
     nextPlanId: 1,
-    knownInCalf: new Int32Array(0),
     seasons: real ? real.spec : { kind: 'random' },
     market,
     priceHistory: [],

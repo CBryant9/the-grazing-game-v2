@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * on and a one-use id, so a job is never done on a farm that changed since,
  * and never done twice.
  */
-export const POST = route({ name: 'act', write: true }, async ({ req, sessionId }) => {
+export const POST = route({ name: 'act', write: true, renew: true }, async ({ req, sessionId }) => {
   if (!sessionId) throw new GameError(404, 'There is no farm yet. Set one up first.');
   const body = await readJson(req);
   return gameServer().act(sessionId, parseActionRequest(body), {

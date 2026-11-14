@@ -1,67 +1,72 @@
+import { createFarm, onRecordPtic, recordClassOf, stepDay, type FarmState } from '@gg/engine';
 import { describe, expect, it } from 'vitest';
-import type { MobWire, SetupChoices, Snapshot } from '../../lib/game/types';
-import { GameServer } from './game';
-import { MemoryFarmStore } from './store';
+import type { SetupChoices } from '../../lib/game/types';
+import { buildSnapshot } from './snapshot';
 
 /*
- * The player is told only what was reported (CLAUDE.md rule 14). During a
- * joining the mob card must not count cows in calf day by day: the known
- * figures move only on a day a joining report or a preg test is made (or
- * fall, when a known cow calves, dies or is sold).
+ * The mob card and the herd list show the herd record (Claudia, 14 Nov
+ * 2026): a female is PTIC from the engine's PTIC_DAYS in calf, and before
+ * that shows exactly as one not in calf. No preg test is reported.
  */
 
-const A = 'a'.repeat(32);
-const choices: SetupChoices = {
+const setup: SetupChoices = {
   district: 'cw',
   size: 'small',
   enterprise: 'grazing',
   years: 'random',
   startType: 'running',
   difficulty: 'easy',
-  name: 'Told',
+  name: 'Record',
 };
+const snap = (farm: FarmState) => buildSnapshot(farm, { name: 'R', setup, version: 'v1' }, {});
 
-const PTIC = new Set(['pticHeifer', 'pticCow', 'pticCowWithCalf']);
-const pticRows = (m: MobWire): number =>
-  m.classes.filter((c) => PTIC.has(c.id)).reduce((n, c) => n + c.head, 0);
-const reportLines = (m: MobWire): string =>
-  m.breeding.filter((l) => /^(Joining report|Preg test)/.test(l)).join('|');
+function farmAt(days: number): FarmState {
+  const farm = createFarm({
+    seed: 5,
+    district: 'cw',
+    size: 'small',
+    start: { year: 2026, month: 8 },
+    startType: 'running',
+    difficulty: 'easy',
+  });
+  for (let d = 0; d < days; d++) stepDay(farm);
+  return farm;
+}
 
-describe('what the mob card says about breeding', () => {
-  it('during a joining nothing counts up on a day with no report', async () => {
-    const game = new GameServer({ store: new MemoryFarmStore(), seed: () => 5 });
-    let snap: Snapshot = await game.create(A, choices);
-    // Find a joining under way.
-    for (let i = 0; i < 60 && !snap.mobs.some((m) => m.breeding[0]?.startsWith('Joining:')); i++) {
-      snap = (await game.skip(A, 'week')).snapshot;
-    }
-    const joining = snap.mobs.find((m) => m.breeding[0]?.startsWith('Joining:'));
-    expect(joining, 'a joining under way').toBeDefined();
-    const id = joining!.id;
-    // The length is the engine's JOINING_DAYS, never a hard-coded week count.
-    expect(joining!.breeding[0]).toMatch(/\(9 weeks\)/);
-    expect(joining!.breeding.join(' ')).not.toMatch(/week \d+ of 9/);
-
-    let prev = snap.mobs.find((m) => m.id === id)!;
-    let reports = 0;
-    let quietDays = 0;
-    for (let d = 0; d < 80; d++) {
-      snap = (await game.endDay(A)).snapshot;
-      const now = snap.mobs.find((m) => m.id === id);
-      if (!now) break;
-      if (reportLines(now) !== reportLines(prev)) {
-        reports++;
-      } else {
-        quietDays++;
-        // No report today: what is known in calf can only stay or fall.
-        expect(now.ptic, `day ${snap.day}`).toBeLessThanOrEqual(prev.ptic);
-        expect(pticRows(now), `day ${snap.day}`).toBeLessThanOrEqual(pticRows(prev));
+describe('the mob card shows the record', () => {
+  it('head PTIC, how far along, and the class rows follow the one rule', () => {
+    const farm = farmAt(90);
+    const s = snap(farm);
+    for (const m of s.mobs) {
+      const mob = farm.mobs.find((x) => x.id === m.id)!;
+      const ptic = mob.animals.filter(onRecordPtic).length;
+      expect(m.ptic).toBe(ptic);
+      if (ptic > 0) {
+        expect(m.pticText).toMatch(/^\d+ PTIC.*, \d+( to \d+)? months? in calf\.$/);
+        expect(m.breeding).toContain(m.pticText);
+      } else expect(m.pticText).toBeNull();
+      for (const row of m.classes) {
+        expect(row.head).toBe(mob.animals.filter((a) => recordClassOf(a) === row.id).length);
       }
-      prev = now;
     }
-    expect(reports).toBeGreaterThan(0);
-    expect(quietDays).toBeGreaterThan(30);
-    // The reports carry their dates.
-    expect(prev.breeding.join(' ')).toMatch(/\(\d{1,2} [A-Z][a-z]{2} \d{4}\)/);
-  }, 180_000);
+  });
+
+  it('a cow 10 days in calf and an empty cow show the same on every screen', () => {
+    const farm = farmAt(10);
+    const m = farm.mobs.find((x) => x.animals.some((a) => a.kind === 'cow' && !a.calf))!;
+    const cow = m.animals.find((a) => a.kind === 'cow' && !a.calf)!;
+    cow.preg = -1;
+    const empty = snap(farm);
+    cow.preg = 10;
+    const tenDays = snap(farm);
+    expect(tenDays.mobs).toEqual(empty.mobs);
+    expect(tenDays.view.mobs).toEqual(empty.view.mobs);
+  });
+
+  it('no preg test or count of cows in calf reaches the inbox, and no cow is called empty', () => {
+    const farm = farmAt(200);
+    const s = snap(farm);
+    const text = JSON.stringify({ inbox: s.inbox, mobs: s.mobs, market: s.market });
+    expect(text).not.toMatch(/preg test|in calf now|got in calf|empty/i);
+  });
 });

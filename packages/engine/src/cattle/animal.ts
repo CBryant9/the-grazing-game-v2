@@ -94,8 +94,8 @@ export function makeSaleBatch(ids: AnimalIds, rng: Rng, key: SaleClassId, qty: n
 /**
  * The class an animal is listed under in the herd list and the stock book.
  * NOT FOR THE PLAYER'S SCREENS on its own: it says PTIC from the day a
- * female conceives. Screens use `knownClassOf` (sim/told.ts) or
- * `breedingReports`, which say PTIC only once the player has been told.
+ * female conceives. Screens use `recordClassOf` (sim/told.ts) or
+ * `breedingReports`, which say PTIC only from `PTIC_DAYS` in calf.
  */
 export function classOf(a: Animal): CattleClassId {
   switch (a.kind) {

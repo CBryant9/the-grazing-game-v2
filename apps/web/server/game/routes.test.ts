@@ -26,9 +26,11 @@ let day: { POST: Handler };
 let skip: { POST: Handler };
 let setup: { GET: Handler };
 let inbox: { POST: Handler };
+let record: { GET: Handler };
 
 beforeAll(async () => {
   inbox = await import('@/app/api/game/inbox/route');
+  record = await import('@/app/api/game/record/route');
   farm = await import('@/app/api/game/farm/route');
   preview = await import('@/app/api/game/preview/route');
   act = await import('@/app/api/game/act/route');
@@ -508,5 +510,77 @@ describe('allow', () => {
     expect(allow('k', 2, 1000, 10)).toBe(true);
     expect(allow('k', 2, 1000, 20)).toBe(false);
     expect(allow('k', 2, 1000, 1500)).toBe(true);
+  });
+});
+
+describe('the session cookie is renewed', () => {
+  it('a request that loads the farm sends the same session again with a fresh Max-Age', async () => {
+    const cookie = await started();
+    const session = cookie.split('=')[1]!;
+    const got = await farm.GET(new Request(`${HOST}/api/game/farm`, { headers: { cookie } }));
+    const set = got.headers.get('set-cookie')!;
+    expect(set).toMatch(new RegExp(`^gg_session=${session};`));
+    expect(set).toMatch(/Max-Age=7776000/);
+    expect(set).toMatch(/HttpOnly/);
+    const version = (await got.json()).snapshot.farmVersion;
+    const d = await day.POST(post('day', { version }, cookie));
+    expect(d.headers.get('set-cookie')).toMatch(new RegExp(`^gg_session=${session};`));
+    // A refusal sends nothing new, and a visitor with no session gets no cookie.
+    const bad = await day.POST(post('day', {}, cookie));
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get('set-cookie')).toBeNull();
+  });
+});
+
+describe('the record route', () => {
+  const get = (query: string, cookie?: string) =>
+    record.GET(
+      new Request(`${HOST}/api/game/record${query}`, { headers: cookie ? { cookie } : {} }),
+    );
+
+  it('gives the year so far, the finished years and a page of the diary', async () => {
+    const cookie = await started();
+    const version = (await getFarm(cookie)).snapshot!.farmVersion;
+    const sk = await skip.POST(post('skip', { length: 'year', anyway: false, version }, cookie));
+    expect(sk.status).toBe(200);
+    const body = await sk.json();
+    expect(body.yearsClosed).toBe(1);
+    expect(body.yearEnd.n).toBe(1);
+    const res = await get('', cookie);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('set-cookie')).toMatch(/Max-Age=7776000/);
+    const rec = await res.json();
+    expect(Object.keys(rec).sort()).toEqual(['diary', 'earlier', 'soFar', 'years']);
+    expect(rec.years.map((y: { n: number }) => y.n)).toEqual([1]);
+    expect(rec.soFar.n).toBe(2);
+    expect(rec.diary).toHaveLength(30);
+    expect(rec.earlier).toBe(rec.diary[29].day);
+    const older = await (await get(`?before=${rec.earlier}`, cookie)).json();
+    expect(older.diary[0].day).toBeLessThan(rec.earlier);
+  });
+
+  it('refuses a visitor with no farm, and a bad page', async () => {
+    expect((await get('')).status).toBe(404);
+    const cookie = await started();
+    for (const bad of [
+      '?before=abc',
+      '?before=-1',
+      '?before=1.5',
+      '?before=',
+      '?before=1&before=2',
+    ]) {
+      const res = await get(bad, cookie);
+      expect(res.status).toBe(400);
+      expect(Object.keys(await res.json())).toEqual(['error']);
+    }
+    expect((await get('?before=0', cookie)).status).toBe(200);
+  });
+
+  it('is limited like the other routes', async () => {
+    const cookie = await started();
+    let last = 200;
+    for (let i = 0; i < 101; i++) last = (await get('', cookie)).status;
+    expect(last).toBe(429);
   });
 });

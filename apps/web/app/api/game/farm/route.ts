@@ -6,11 +6,14 @@ import type { FarmResponse } from '@/lib/game/types';
 export const dynamic = 'force-dynamic';
 
 /** The session's farm as a snapshot, null when it has none, or a plain message when it can't be opened. */
-export const GET = route({ name: 'farm' }, async ({ sessionId }): Promise<FarmResponse> => {
-  if (!sessionId) return { snapshot: null };
-  const snap = await gameServer().snapshot(sessionId, true);
-  return snap === 'broken' ? { snapshot: null, broken: BROKEN_MESSAGE } : { snapshot: snap };
-});
+export const GET = route(
+  { name: 'farm', renew: true },
+  async ({ sessionId }): Promise<FarmResponse> => {
+    if (!sessionId) return { snapshot: null };
+    const snap = await gameServer().snapshot(sessionId, true);
+    return snap === 'broken' ? { snapshot: null, broken: BROKEN_MESSAGE } : { snapshot: snap };
+  },
+);
 
 /** Create the session's farm from the setup choices. */
 export const POST = route(

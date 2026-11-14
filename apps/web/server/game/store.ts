@@ -3,13 +3,15 @@ import { mkdir, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'n
 import { join } from 'node:path';
 import type { SavedFarm } from '@gg/engine';
 import type { JobCardWire, SetupChoices } from '../../lib/game/types';
+import { DIARY_DAYS, type StoredDiaryDay } from './diary';
 
 /**
  * The version of what is kept for a farm. 1 had no `format` (milestone
- * 1.6). 2 added `format`, `version` and `done` (milestone 1.7f). An older
- * farm is brought up to date when it is read (`upgradeStored`).
+ * 1.6). 2 added `format`, `version` and `done` (milestone 1.7f). 3 added the
+ * `diary` (milestone 1.7g). An older farm is brought up to date when it is
+ * read (`upgradeStored`), with an empty diary.
  */
-export const STORED_FORMAT = 2;
+export const STORED_FORMAT = 3;
 
 /** Act requests the server remembers for each farm, so a repeat gets the same answer. */
 export const DONE_KEPT = 12;
@@ -39,6 +41,8 @@ export interface StoredFarm {
   done: DoneRequest[];
   /** The newest inbox message the player has seen. Left out until the inbox is first opened. */
   inboxRead?: number;
+  /** The days lived, oldest first, at most `DIARY_DAYS` of them. */
+  diary: StoredDiaryDay[];
 }
 
 /** A stored farm that could not be read: bad JSON, or not a farm at all. */
@@ -67,6 +71,8 @@ export function upgradeStored(raw: unknown, version: () => string): StoredFarm {
     version: typeof raw.version === 'string' && raw.version ? raw.version : version(),
     done: Array.isArray(raw.done) ? (raw.done as DoneRequest[]).slice(-DONE_KEPT) : [],
     ...(typeof raw.inboxRead === 'number' ? { inboxRead: raw.inboxRead } : {}),
+    // A farm from before the diary has none. It is not broken: the diary starts now.
+    diary: Array.isArray(raw.diary) ? (raw.diary as StoredDiaryDay[]).slice(-DIARY_DAYS) : [],
   };
 }
 

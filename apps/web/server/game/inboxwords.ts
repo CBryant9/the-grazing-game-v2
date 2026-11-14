@@ -1,7 +1,7 @@
 import 'server-only';
-import { SALE_CLASSES, SPECIES, type CattleNote, type FarmEvent } from '@gg/engine';
+import { SPECIES, type CattleNote, type FarmEvent, PTIC_DAYS } from '@gg/engine';
 import type { InboxKind } from '../../lib/game/types';
-import { longDate } from './marketwords';
+import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText } from './planwords';
 import { causeWord, gameOverWord } from './words';
@@ -45,7 +45,10 @@ export function noteWord(mobName: string, area: string | null, n: CattleNote): s
       ].join(' ');
     }
     case 'slipped':
-      return `A ${n.kind} in ${mobName} lost her pregnancy. She was under CS 1.6.`;
+      // Only a female that was PTIC on the record: before PTIC_DAYS nothing said she was in calf.
+      return n.days >= PTIC_DAYS
+        ? `A PTIC ${n.kind} in ${mobName} lost her pregnancy. She was under CS 1.6.`
+        : null;
     case 'calfLostAtBirth':
       return `A calf was lost at birth in ${mobName}${n.first ? ', a first calf' : ''}.`;
     case 'calvingStarted':
@@ -55,20 +58,14 @@ export function noteWord(mobName: string, area: string | null, n: CattleNote): s
     case 'youngBullsFertile':
       return `The unmarked young bulls in ${mobName} are now fertile.`;
     case 'joiningStarted':
-      return `Joining has started in ${mobName}: ${plural(n.adultBulls, 'bull')} with ${plural(n.ready, 'female')} ready to join.`;
+      return `Joining has started in ${mobName}: ${plural(n.adultBulls, 'bull')} with ${plural(n.readyOnRecord, 'female')} of joining age not PTIC.`;
+    // No preg test and no count of cows in calf (Claudia, 14 Nov 2026): the record shows a
+    // female as PTIC from the engine's PTIC_DAYS in calf, on the mob card and the herd list.
     case 'joiningProgress':
-      return `${mobName}, joining week ${n.weeks}: ${n.conceived} got in calf in the last 3 weeks. ${n.inCalf} of ${plural(n.females, 'female')} are in calf now.`;
-    case 'pregTest': {
-      const rest = [
-        n.dry > 0 ? `${plural(n.dry, 'female')} not in calf.` : '',
-        n.tooSoon > 0 ? `${plural(n.tooSoon, 'female')} calved too recently to tell.` : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      return `${mobName} preg test: ${n.inCalf} of ${plural(n.females, 'female')} in calf (${pct(n.rate)}). At CS ${n.cs.toFixed(1)} about ${pct(n.expected)} would be expected.${rest ? ` ${rest}` : ''}`;
-    }
+    case 'pregTest':
+      return null;
     case 'noBull':
-      return `${mobName} has ${plural(n.ready, 'female')} ready to join and no bull.`;
+      return `${mobName} has ${plural(n.readyOnRecord, 'female')} of joining age not PTIC, and no bull.`;
     case 'lowCondition':
       return `${mobName} has an average condition of CS ${n.cs.toFixed(1)}.`;
   }
@@ -137,7 +134,7 @@ export function inboxMessage(e: FarmEvent): Message | null {
     case 'harvested':
       return msg('crop', `Harvested ${t1(e.t)} t of ${name(e.sp)}, worth ${money(e.value)}.`);
     case 'cattle-on-the-way': {
-      const what = SALE_CLASSES[e.cls]?.label.toLowerCase() ?? 'cattle';
+      const what = saleClassLabel(e.cls)?.toLowerCase() ?? 'cattle';
       return msg(
         'sale',
         `Bought ${e.qty.toLocaleString('en-AU')} ${what} for ${money(e.total)}, freight included. They arrive in the stock yards at first light on ${longDate(e.arriveDate)}.`,

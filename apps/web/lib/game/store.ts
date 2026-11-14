@@ -24,10 +24,12 @@ import { choiceJob, moveHubJob, moveJob, tapOutcome, type TapInfo } from './taps
 import type {
   ActionRequest,
   ActResponse,
+  DiaryDay,
   EdgeWire,
   FenceKindId,
   JobCardWire,
   PreviewResponse,
+  RecordResponse,
   SetupChoices,
   SimpleAction,
   SkipRequestLength,
@@ -35,9 +37,33 @@ import type {
   Snapshot,
   StaleResponse,
   SummaryWire,
+  YearView,
 } from './types';
 
 export type Tab = 'farm' | 'market' | 'herd' | 'paddocks' | 'plans' | 'more';
+
+/** What the More tab shows: its menu, or one of its panels. */
+export type MorePage = 'menu' | 'scores' | 'diary';
+
+/** The year that has just closed, shown on a card until the player closes it. */
+export interface YearEndState {
+  view: YearView;
+  /** How many years closed in the day or skip. */
+  closed: number;
+}
+
+/** What the Scores and Diary panels show, fetched when one is opened. */
+export interface RecordState {
+  status: 'loading' | 'ready' | 'failed';
+  data: RecordResponse | null;
+  /** The diary days fetched so far, newest first. Older pages are added to the end. */
+  diary: DiaryDay[];
+  /** The `before` for older days, or null when there are none. */
+  earlier: number | null;
+  /** True while older days are being fetched. */
+  paging: boolean;
+  message?: string;
+}
 
 /** One thing to do, from asking about it to its result. The result stays on the row it came from. */
 export interface JobState {
@@ -129,6 +155,12 @@ interface GameState {
   /** The mob card that is open. It is never opened by tapping a cow on the map. */
   mobId: number | null;
   summary: SummaryWire | null;
+  /** The year that closed in the last day or skip. Shown before its summary. */
+  yearEnd: YearEndState | null;
+  /** True when the player chose to look around a finished farm: the game over card is hidden. */
+  overHidden: boolean;
+  morePage: MorePage;
+  record: RecordState | null;
   jobs: Record<string, JobState>;
   /** Husbandry jobs on the mob card, by slot ("12:mark"), the same flow as the things to do. */
   acts: Record<string, JobState>;
@@ -203,6 +235,15 @@ interface GameState {
   /** The card for opening or shutting a gate, from the paddock sheet. */
   openGate: (edge: EdgeWire) => Promise<void>;
   setTab: (tab: Tab) => void;
+  /** Open one of the More tab's panels, or its menu. Scores and Diary fetch their data. */
+  openMore: (page: MorePage) => void;
+  /** Fetch the Scores and Diary data again. */
+  loadRecord: () => Promise<void>;
+  /** Fetch the next page of older diary days. */
+  loadEarlier: () => Promise<void>;
+  dismissYearEnd: () => void;
+  /** Hide the game over card to look around the finished farm, or show it again. */
+  setOverHidden: (hidden: boolean) => void;
   /** The player opened the inbox: tell the server how far they have read. */
   markInboxRead: () => Promise<void>;
   dismissSummary: () => void;
@@ -212,6 +253,7 @@ interface GameState {
 const messageOf = (e: unknown): string =>
   e instanceof ApiError ? e.message : 'Something went wrong. Try again in a moment.';
 
+let recordTickets = 0;
 let tickets = 0;
 /** A number for each preview asked, so only the answer to the newest is used. */
 const nextTicket = (): number => ++tickets;
@@ -223,6 +265,12 @@ export const useGame = create<GameState>()((set, get) => {
     try {
       return await work();
     } catch (e) {
+      // The farm was refused as it stands (the game is over, seen from an old tab): there is nothing to
+      // retry. Load the farm again, so the game over card or the broken farm screen shows.
+      if (e instanceof ApiError && e.status === 409) {
+        void get().load();
+        return undefined;
+      }
       set({ notice: { message: messageOf(e), retry } });
       return undefined;
     } finally {
@@ -256,6 +304,16 @@ export const useGame = create<GameState>()((set, get) => {
 
   /** The version the screen shows, to send with Next day and skips. */
   const versionNow = (): string => get().snapshot?.farmVersion ?? '';
+
+  /** The year end card for a day or skip reply, or null when no year closed. */
+  const yearEndOf = (r: { yearEnd: YearView | null; yearsClosed: number }): YearEndState | null =>
+    r.yearEnd ? { view: r.yearEnd, closed: r.yearsClosed } : null;
+
+  /** After a day or skip: fetch the Scores or Diary again if one is open. */
+  const refreshRecord = (): void => {
+    const { tab, morePage } = get();
+    if (tab === 'more' && morePage !== 'menu') void get().loadRecord();
+  };
 
   /**
    * Send the job a card was made for: its request, the version it was made
@@ -443,6 +501,10 @@ export const useGame = create<GameState>()((set, get) => {
     paddockId: null,
     mobId: null,
     summary: null,
+    yearEnd: null,
+    overHidden: false,
+    morePage: 'menu',
+    record: null,
     jobs: {},
     acts: {},
     move: null,
@@ -476,6 +538,10 @@ export const useGame = create<GameState>()((set, get) => {
         sow: null,
         build: null,
         summary: null,
+        yearEnd: null,
+        overHidden: false,
+        morePage: 'menu',
+        record: null,
       });
     },
 
@@ -494,6 +560,10 @@ export const useGame = create<GameState>()((set, get) => {
             sow: null,
             build: null,
             summary: null,
+            yearEnd: null,
+            overHidden: false,
+            morePage: 'menu',
+            record: null,
             paddockId: null,
             mobId: null,
             tab: 'farm',
@@ -517,6 +587,7 @@ export const useGame = create<GameState>()((set, get) => {
           set({
             ...adopt(snapshot),
             summary,
+            yearEnd: yearEndOf(r),
             jobs: {},
             acts: {},
             move: null,
@@ -524,6 +595,7 @@ export const useGame = create<GameState>()((set, get) => {
             sow: null,
             build: null,
           });
+          refreshRecord();
         },
       );
     },
@@ -544,6 +616,7 @@ export const useGame = create<GameState>()((set, get) => {
           set({
             ...adopt(snapshot),
             summary,
+            yearEnd: yearEndOf(r),
             jobs: ran ? {} : get().jobs,
             acts: ran ? {} : get().acts,
             move: ran ? null : get().move,
@@ -551,6 +624,7 @@ export const useGame = create<GameState>()((set, get) => {
             sow: ran ? null : get().sow,
             build: ran ? null : get().build,
           });
+          if (ran) refreshRecord();
         },
       );
     },
@@ -1066,7 +1140,72 @@ export const useGame = create<GameState>()((set, get) => {
       if (out.kind === 'job') await previewPicked(out.job);
     },
 
-    setTab: (tab) => set({ tab }),
+    setTab: (tab) => set({ tab, morePage: 'menu' }),
+
+    openMore(page) {
+      set({ morePage: page });
+      if (page !== 'menu') void get().loadRecord();
+    },
+
+    async loadRecord() {
+      const ticket = ++recordTickets;
+      set((s) => ({
+        record: s.record?.data
+          ? { ...s.record, status: 'ready' }
+          : { status: 'loading', data: null, diary: [], earlier: null, paging: false },
+      }));
+      try {
+        const data = await api.record();
+        if (ticket !== recordTickets) return;
+        set({
+          record: {
+            status: 'ready',
+            data,
+            diary: data.diary,
+            earlier: data.earlier,
+            paging: false,
+          },
+        });
+      } catch (e) {
+        if (ticket !== recordTickets) return;
+        set((s) => ({
+          record: {
+            status: 'failed',
+            data: s.record?.data ?? null,
+            diary: s.record?.diary ?? [],
+            earlier: s.record?.earlier ?? null,
+            paging: false,
+            message: messageOf(e),
+          },
+        }));
+      }
+    },
+
+    async loadEarlier() {
+      const r = get().record;
+      if (!r || r.earlier === null || r.paging) return;
+      const ticket = recordTickets;
+      set({ record: { ...r, paging: true } });
+      try {
+        const data = await api.record(r.earlier);
+        if (ticket !== recordTickets) return;
+        const now = get().record ?? r;
+        set({
+          record: {
+            ...now,
+            diary: [...now.diary, ...data.diary],
+            earlier: data.earlier,
+            paging: false,
+          },
+        });
+      } catch (e) {
+        if (ticket !== recordTickets) return;
+        set({ record: { ...(get().record ?? r), paging: false, message: messageOf(e) } });
+      }
+    },
+
+    dismissYearEnd: () => set({ yearEnd: null }),
+    setOverHidden: (hidden) => set({ overHidden: hidden }),
 
     async markInboxRead() {
       const snap = get().snapshot;

@@ -59,12 +59,22 @@ export function gainWhy(a: Animal, diet: Diet, supp: Supplement): GainReason[] {
  * The expected gain for each class in a mob if it grazed this area today,
  * calves left out. Does not change the pasture.
  */
-export function predictGains(m: CattleMob, land: GrazingLand, area: GrazingArea): GainForecast[] {
+export function predictGains(
+  m: CattleMob,
+  land: GrazingLand,
+  area: GrazingArea,
+  /**
+   * How to group the cattle. The live class by default (tests, the old
+   * game); the screens pass `recordClassOf`, so the lines never move on the
+   * day a cow conceives.
+   */
+  classify: (a: Animal) => CattleClassId = classOf,
+): GainForecast[] {
   const diet = dietOf(land, area).diet;
   const groups = new Map<CattleClassId, Animal[]>();
   for (const a of m.animals) {
     if (a.kind === 'calf') continue;
-    const cls = classOf(a);
+    const cls = classify(a);
     const list = groups.get(cls);
     if (list) list.push(a);
     else groups.set(cls, [a]);
