@@ -325,15 +325,22 @@ export const LAMBING_TIMES = {
 export const ORPHAN = { weanDays: 56, daily: 0.02 } as const;
 
 /**
- * Default joining start, by district (call C27): a month before peak
- * growth, joining 150 days before lambing. Western Victoria and the Central
- * West join on 1 April and lamb in September; the Northern Tablelands joins
- * on 15 May and lambs in October. Month is 0 for January.
+ * Default joining start, by district, so lambing starts 147 days later at
+ * the district's usual time (call C27, sourced 15 Nov 2026):
+ * - Central West (wheat-sheep zone): June lambing is typical (NSW DPIRD,
+ *   "Sheep | Merino" climate vulnerability page, no date: "June lambing ...
+ *   typical of production in the wheat-sheep zone"), so joining starts on
+ *   5 January and lambing on 1 June;
+ * - Northern Tablelands (high rainfall zone): September lambing is typical
+ *   (same page), so joining starts on 7 April and lambing on 1 September;
+ * - Western Victoria: Hamilton lambed in August and September (EverGraze,
+ *   S54), so joining starts on 1 April and lambing on 26 August.
+ * Month is 0 for January.
  */
 export const JOIN_START: Partial<Record<DistrictId, { month: number; date: number }>> = {
   wv: { month: 3, date: 1 },
-  cw: { month: 3, date: 1 },
-  nsw: { month: 4, date: 15 },
+  cw: { month: 0, date: 5 },
+  nsw: { month: 3, date: 7 },
 };
 
 // ---------------------------------------------------------------------------
@@ -494,6 +501,50 @@ export const SHEEP_WATER_L = {
  * 2026; docs/DATA.md). For the screens: it is not how long a sheep lives.
  */
 export const WATER_WELFARE_HOURS = 48;
+
+// ---------------------------------------------------------------------------
+// Supplements (milestone 2.4, engine half)
+// ---------------------------------------------------------------------------
+
+/** What a sheep mob is fed on top of the pasture. */
+export type SheepFeed = 'none' | 'lick' | 'grain' | 'hay';
+export const SHEEP_FEEDS: readonly SheepFeed[] = ['none', 'lick', 'grain', 'hay'];
+
+/**
+ * Grain and hay are fed to fill the gap between what the pasture gives and
+ * what the sheep needs (Agriculture Victoria, "Drought Feeding and
+ * Management of Sheep", ch. 4, read 15 Nov 2026: a ration is worked out
+ * from the sheep's energy needs), never more than the full ration with no
+ * paddock feed in that guide's table 4.5 (kg a head a day, for a 45 kg
+ * sheep; 10% more for each 5 kg over, the same guide):
+ * - wheat: dry 3.8 kg a week (0.54 a day), last 4 to 6 weeks of pregnancy
+ *   5.2 (0.74), with lambs at foot 7.5 (1.07); 12 MJ ME a kg (same guide);
+ * - good hay alone: dry 5.4 kg a week (0.77 a day), late pregnancy 8 to 10
+ *   (1.29 a day, the middle), with lambs at foot 10 to 14 (1.71); ME 8.5
+ *   MJ a kg, worked out from the guide's 46 MJ a week for 5.4 kg (my
+ *   arithmetic).
+ * Grain protein 11% and the prices are STAND-INS: no dated feed price was
+ * read (only search summaries); grain is charged at the game's pellet price
+ * and hay at its hay price (FEED_COST, the MVP's figures).
+ * The lick is the cattle lick's rule (intake × 1.25 when diet CP is under
+ * 7%, × 1.08 at 7 to 9%, no protein penalty; MODEL section 3) at the cattle
+ * cost a head a day ÷ 8.4 (one DSE's share of an AE). STAND-IN: no sheep
+ * lick intake or price was read.
+ */
+export const SHEEP_RATION = {
+  grain: { me: 12, cp: 11, kgDay: { dry: 3.8 / 7, latePreg: 5.2 / 7, lactating: 7.5 / 7 } },
+  hay: { me: 46 / 5.4, cp: 9, kgDay: { dry: 5.4 / 7, latePreg: 9 / 7, lactating: 12 / 7 } },
+  /** The table's sheep weight, kg, and 10% more for each 5 kg over it. */
+  refKg: 45,
+  perFiveKg: 0.1,
+  /**
+   * Young sheep are fed for growth too: 50 g a head a day, the least a
+   * weaner should grow to 12 months old (MMFS ch. 10.4, S17).
+   */
+  youngGrowthKg: 0.05,
+  /** Late pregnancy for the ration: the last 6 weeks, from this day. */
+  latePregDay: 147 - 42,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Sheep put on a farm (start flocks, and `addSheepMob` until the market)

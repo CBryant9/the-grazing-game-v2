@@ -179,6 +179,7 @@ export function createSheepMob(
     lastShort: -99,
     lastThin: -99,
     lossDays: 0,
+    feed: 'none',
   };
 }
 
@@ -375,6 +376,10 @@ export function sheepDay(
       ids: farm.animalIds,
       rng,
     });
+    if (res.feedCost > 0) {
+      farm.cash -= res.feedCost;
+      farm.year.feed += res.feedCost;
+    }
     const area = areaNameOf(survey, m);
     for (const note of res.notes)
       events.push({ type: 'sheep', mob: m.id, mobName: m.name, area, note });

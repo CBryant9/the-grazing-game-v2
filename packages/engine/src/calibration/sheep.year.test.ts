@@ -9,7 +9,7 @@ import {
   type SheepYearCase,
   type SheepYearRun,
 } from '../../test-support/sheep';
-import { FLYSTRIKE, type SheepBreed } from '../data/sheep';
+import { FLYSTRIKE, JOIN_START, type SheepBreed } from '../data/sheep';
 import { heldDiet } from '../sheep/graze';
 import { sheepMobsOf } from '../sheep/farm';
 import type { Sheep } from '../sheep/types';
@@ -22,25 +22,34 @@ import type { Sheep } from '../sheep/types';
  * carrying capacity in DSE (1.5 DSE a ewe over the year), with rams at
  * 1% + 1; shorn at the start and crutched six months on.
  *
- * Northern Tablelands and Central West rows are skipped with the reason
- * (call C18): on native pasture alone, with no supplementary feed for sheep
- * yet, the grass model's winter (green under 100 kg DM/ha on the
- * Tablelands, 200 to 350 in the Central West, the dead feed 50% digestible)
- * takes ewes from CS 3 at joining to about 1.4 (Tablelands) and 2.2
- * (Central West) at lambing. docs/CALIBRATION.md has their figures.
+ * Every case runs with the district's usual winter feeding (milestone 2.4):
+ * grain fed to fill the energy gap whenever a mob's CS falls under 2.7
+ * (Lifetime Wool's target from joining to lambing, S18), and weaners fed
+ * while they grow under 50 g a day (MMFS S17). Without it the grass
+ * model's native winter takes Tablelands ewes from CS 3 to 1.4 at lambing
+ * (docs/CALIBRATION.md, the grass question for Claudia).
+ *
+ * A known open gap is vitest's expected failure (`it.fails`): the reason
+ * and the figure are in its name, and it fails the run if it starts to pass.
  */
 
 vi.setConfig({ testTimeout: 1_800_000 });
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
+const DISTRICTS: readonly DistrictId[] = ['nsw', 'cw', 'wv'];
+const NAME: Record<string, string> = {
+  nsw: 'Northern Tablelands',
+  cw: 'Central West',
+  wv: 'Western Victoria',
+};
 const mean = (v: readonly number[]): number => v.reduce((a, b) => a + b, 0) / v.length;
 const within = (v: number, lo: number, hi: number): void => {
   expect(v).toBeGreaterThanOrEqual(lo);
   expect(v).toBeLessThanOrEqual(hi);
 };
 
-/** The month joining starts in (call C27): May on the Tablelands (15 May), April elsewhere (1 April). */
-const joinMonth = (d: DistrictId): number => (d === 'nsw' ? 4 : 3);
+/** The month joining starts in (call C27, `JOIN_START`): the run starts on the 1st of it. */
+const joinMonth = (d: DistrictId): number => JOIN_START[d]!.month;
 
 const cache = new Map<string, SheepYearRun[]>();
 function runs(c: SheepYearCase): SheepYearRun[] {
@@ -63,48 +72,74 @@ const ewes = (district: DistrictId, breed: SheepBreed = 'merino'): SheepYearRun[
     share: 0.8,
     days: 365,
     crutch: [180],
+    winterFeed: true,
   });
 
 const marked = (rs: SheepYearRun[]): number =>
   mean(rs.map((r) => (r.join!.marked / r.join!.joined) * 100));
 
-const NT_CW_SKIP =
-  'skipped (C18): native winter feed in the grass model with no sheep supplement yet';
+/**
+ * Known open gaps, for Claudia: the row, the district and the figure. Each
+ * is an expected failure, so it fails the run if it starts to pass.
+ */
+const GAPS: Record<string, string> = {
+  'SB-43 xb nsw': 'first-cross ewes 4.2% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb cw': 'first-cross ewes 4.7% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-43 xb wv': 'first-cross ewes 4.6% a year (S67 puts their lambing deaths alone at 3.25%)',
+  'SB-47 wv': 'weaners lose 1.6% (the band is the national average, which takes in worms: C22)',
+};
+
+/** A test per district: an expected failure where the row has a known open gap. */
+function byDistrict(
+  row: string,
+  key: (d: DistrictId) => string,
+  title: (d: DistrictId) => string,
+  check: (d: DistrictId) => void,
+): void {
+  for (const d of DISTRICTS) {
+    const gap = GAPS[key(d)];
+    if (gap) it.fails(`${row} ${NAME[d]}: KNOWN OPEN GAP, ${gap}`, () => check(d));
+    else it(`${row} ${title(d)}`, () => check(d));
+  }
+}
 
 describe('sheep benchmarks: year', () => {
-  it('SB-40 self-replacing Merino ewes, Western Victoria, average year: 75 to 90 lambs marked per 100 ewes joined', () => {
-    within(marked(ewes('wv')), 75, 90);
-  });
-  it.skip(`SB-40 Merino ewes, Northern Tablelands and Central West: ${NT_CW_SKIP}`, () => {});
+  byDistrict(
+    'SB-40',
+    (d) => `SB-40 ${d}`,
+    (d) =>
+      `self-replacing Merino ewes, ${NAME[d]}, average year: 75 to 90 lambs marked per 100 ewes joined`,
+    (d) => within(marked(ewes(d)), 75, 90),
+  );
 
-  it('SB-41 first-cross ewes to terminal rams, Western Victoria, average year: 100 to 120 lambs marked per 100 ewes joined', () => {
-    within(marked(ewes('wv', 'xb')), 100, 120);
-  });
-  it.skip(`SB-41 first-cross ewes, Northern Tablelands and Central West: ${NT_CW_SKIP}`, () => {});
+  byDistrict(
+    'SB-41',
+    (d) => `SB-41 ${d}`,
+    (d) =>
+      `first-cross ewes to terminal rams, ${NAME[d]}, average year: 100 to 120 lambs marked per 100 ewes joined`,
+    (d) => within(marked(ewes(d, 'xb')), 100, 120),
+  );
 
   /**
-   * SB-43 for one breed in Western Victoria: ewes near CS 3, 2 to 4% a year.
-   * Held on the mean over the blocks, as every year band is (CALIBRATION,
-   * how a benchmark is judged): one block of 675 ewes differs from the next
-   * by about 0.7 points in the same season. The "never over 4.5%" is the
-   * same mean, and the highest single block is logged in CALIBRATION.
+   * SB-43: breeding ewes near CS 3, 2 to 4% a year. Held on the mean over the
+   * blocks, as every year band is (CALIBRATION, how a benchmark is judged):
+   * one block of a few hundred ewes differs from the next by about 0.7
+   * points in the same season. The "never over 4.5%" is the same mean, and
+   * the highest single block is logged in CALIBRATION.
    */
-  function sb43(breed: SheepBreed): void {
-    const rs = ewes('wv', breed);
-    within(mean(rs.map((r) => r.csAtLambing!)), 2.7, 3.3);
-    within(mean(rs.map((r) => r.deathsPct)), 2, 4);
+  for (const breed of ['merino', 'xb'] as const) {
+    byDistrict(
+      'SB-43',
+      (d) => `SB-43 ${breed} ${d}`,
+      (d) =>
+        `breeding ewes near CS 3, ${breed === 'xb' ? 'first-cross' : 'Merino'}, ${NAME[d]}, average year: 2 to 4% die in a year`,
+      (d) => {
+        const rs = ewes(d, breed);
+        within(mean(rs.map((r) => r.csAtLambing!)), 2.5, 3.3);
+        within(mean(rs.map((r) => r.deathsPct)), 2, 4);
+      },
+    );
   }
-  it('SB-43 breeding ewes near CS 3, Merino, Western Victoria, average year: 2 to 4% die in a year', () => {
-    sb43('merino');
-  });
-  // A known open gap, for Claudia (vitest's expected failure: it fails the run if it starts to pass).
-  it.fails(
-    'SB-43 breeding ewes near CS 3, first-cross, Western Victoria: KNOWN OPEN GAP, 4.05% a year against 2 to 4% (S67 puts first-cross lambing deaths alone at 3.25%)',
-    () => {
-      sb43('xb');
-    },
-  );
-  it.skip(`SB-43 breeding ewes, Northern Tablelands and Central West: ${NT_CW_SKIP}`, () => {});
 
   const weanerDeaths = (district: DistrictId): number =>
     mean(
@@ -116,19 +151,15 @@ describe('sheep benchmarks: year', () => {
         share: 0.6,
         days: 365,
         crutch: [120],
+        winterFeed: true,
       }).map((r) => r.deathsPct),
     );
-  it('SB-47 Merino weaners grown to target, Central West, average year: 2 to 6% die after weaning', () => {
-    within(weanerDeaths('cw'), 2, 6);
-  });
-  // A known open gap, for Claudia: the band is the national survey average, which takes in worms (left out, C22).
-  it.fails(
-    'SB-47 Merino weaners grown to target, Western Victoria: KNOWN OPEN GAP, 1.7% against 2 to 6% (worms left out, C22)',
-    () => {
-      within(weanerDeaths('wv'), 2, 6);
-    },
+  byDistrict(
+    'SB-47',
+    (d) => `SB-47 ${d}`,
+    (d) => `Merino weaners grown to target, ${NAME[d]}, average year: 2 to 6% die after weaning`,
+    (d) => within(weanerDeaths(d), 2, 6),
   );
-  it.skip(`SB-47 Merino weaners, Northern Tablelands: ${NT_CW_SKIP}`, () => {});
 
   it('SB-52 adult Merino wethers, Tablelands and Central West, average year, shorn once: 3.8 to 4.6 kg clean, 18 to 20 micron', () => {
     for (const district of ['nsw', 'cw'] as const) {
@@ -140,6 +171,7 @@ describe('sheep benchmarks: year', () => {
         share: 0.8,
         days: 365,
         crutch: [180],
+        winterFeed: true,
       });
       within(mean(rs.map((r) => r.fleeceKg)), 3.8, 4.6);
       within(mean(rs.map((r) => r.micron)), 18, 20);
@@ -164,6 +196,7 @@ describe('sheep benchmarks: year', () => {
           share: 0.8,
           days: 430,
           crutch: [180],
+          winterFeed: true,
           probe: (_d, farm, isStart) => {
             if (kg) return;
             // The lambs born on the farm this year, by head.

@@ -39,6 +39,13 @@ import type { Sheep, SheepJoining, SheepMob, SheepRngs, SheepSex } from '../src/
 // A year on a district block (the benchmark rows of kind "Year")
 // ---------------------------------------------------------------------------
 
+/** Winter feeding starts under this CS and stops at the second (Lifetime Wool S18: CS 2.7+ joining to lambing). */
+export const FEED_FROM_CS = 2.7;
+export const FEED_TO_CS = 2.9;
+/** Weaner mobs are fed while they grow under 50 g a day (MMFS S17), until they reach 70. */
+export const WEANER_FEED_FROM = 0.05;
+export const WEANER_FEED_TO = 0.07;
+
 /** The block the sheep year runs use: the cattle steer block, 260 ha with one water. */
 export const SHEEP_BLOCK_HA = 260;
 
@@ -60,6 +67,13 @@ export interface SheepYearCase {
   /** Farm days to shear and crutch on. Shorn on day 0 if left out. */
   shear?: number[];
   crutch?: number[];
+  /**
+   * Winter feeding (milestone 2.4): grain fed to fill the energy gap
+   * (`SHEEP_RATION`) whenever a mob's average CS falls under 2.7, until it is
+   * back to 2.9. CS 2.7 and over from joining to lambing is Lifetime Wool's
+   * target (S18; Agriculture Victoria S7).
+   */
+  winterFeed?: boolean;
   /** Called with each day's result. */
   onDay?: (res: DayResult) => void;
   /** Called after each day, to read figures part way. */
@@ -164,6 +178,19 @@ export function sheepYearRun(
       if (csAtLambing === null && mob.join && mob.join.lambingStart >= 0) {
         const ewes = mob.sheep.filter((s) => s.sex === 'F' && isStart(s, d));
         csAtLambing = ewes.reduce((t, s) => t + s.cond * s.n, 0) / headOf(ewes);
+      }
+    }
+    if (c.winterFeed) {
+      for (const sm of sheepMobsOf(farm)) {
+        const w = sm.sheep.filter((x) => x.weaned);
+        const h = headOf(w);
+        const cs = h ? w.reduce((t, x) => t + x.cond * x.n, 0) / h : 3;
+        // Weaners are fed to keep growing 50 g a day (S17); the rest to hold CS 2.7.
+        const young = h > 0 && w.every((x) => x.age < 365);
+        const adg = h ? w.reduce((t, x) => t + x.adg * x.n, 0) / h : 0;
+        if (young) sm.feed = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
+        else if (cs < FEED_FROM_CS) sm.feed = 'grain';
+        else if (cs >= FEED_TO_CS) sm.feed = 'none';
       }
     }
     const res = stepDay(farm, env);

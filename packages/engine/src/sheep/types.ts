@@ -11,7 +11,7 @@
  * plays exactly as it did before sheep existed.
  */
 
-import type { SheepBreed } from '../data/sheep';
+import type { SheepBreed, SheepFeed } from '../data/sheep';
 import type { Rng, RngState } from '../rng';
 import type { MobWhere } from '../sim/state';
 
@@ -181,6 +181,8 @@ export interface SheepMob {
   lastThin: number;
   /** Days in a row losing more than 20 g a head a day. */
   lossDays: number;
+  /** What the mob is fed on top of the pasture (`setSheepFeed`). */
+  feed: SheepFeed;
 }
 
 /** A farm's sheep. Left off the farm until the first sheep come, so a cattle farm is unchanged. */

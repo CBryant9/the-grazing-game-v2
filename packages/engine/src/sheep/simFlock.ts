@@ -31,11 +31,13 @@ import {
   MILK,
   NO_WATER,
   ORPHAN,
+  SHEEP_RATION,
   THIN_DEATHS,
   WEANER_DEATHS,
   WOOL,
   YOUNG_FRAME_DAYS,
 } from '../data/sheep';
+import { FEED_COST, LICK } from '../data/feed';
 import { clamp } from '../num';
 import { meFromDmd } from '../pasture/quality';
 import type { Rng } from '../rng';
@@ -110,6 +112,8 @@ export interface FlockDayResult {
   births: Sheep[];
   notes: SheepNote[];
   plantingGrazes: PlantingGraze[];
+  /** Dollars of grain, hay or lick fed today. Take it off cash. */
+  feedCost: number;
 }
 
 /** Live lambs at foot, by the record of their dams. */
@@ -214,7 +218,10 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     lpe[k] = l;
     let w = s.wt * appetiteShare(s, l) * qf * diet.avail;
     // Too little protein and the rumen slows (the cattle rule, no lick for sheep yet).
-    if (diet.cp < 7) w *= 1 - (7 - diet.cp) * 0.05;
+    if (m.feed === 'lick') {
+      // The cattle lick's rule: more dry feed eaten when protein is short, and no protein penalty.
+      w *= diet.cp < 7 ? LICK.liftUnder7 : diet.cp < 9 ? LICK.liftUnder9 : 1;
+    } else if (diet.cp < 7) w *= 1 - (7 - diet.cp) * 0.05;
     wants[k] = w;
     demand += w * s.n;
     if (s.weaned) dseNow += dseOf(s, l) * s.n;
@@ -240,6 +247,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
   const lambing = join !== null && join.lambingStart >= 0 && join.marked < 0;
 
   const added: Sheep[] = [];
+  let feedCost = 0;
   let sumWt = 0;
   let sumCs = 0;
   let sumAdg = 0;
@@ -255,6 +263,36 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     if (s.dead || s.n <= 0) continue;
     const past = wants[k]! * f;
     let mei = past * me;
+    // Grain or hay fills the gap between the pasture and what the sheep needs, up to the
+    // full ration (SHEEP_RATION). Lambs at foot are not hand fed.
+    let fed = 0;
+    if (s.weaned && (m.feed === 'grain' || m.feed === 'hay')) {
+      const R = SHEEP_RATION[m.feed];
+      const full =
+        maintMJ(s, walk) +
+        pregnancyMJ(s.preg, s.litter) +
+        milkPotentialMJ(s, lpe[k]!) +
+        (s.age < 365 ? SHEEP_RATION.youngGrowthKg * gainMJPerKg(s) : 0);
+      const gap = full - mei;
+      if (gap > 0) {
+        const stage =
+          s.lact >= 0 && lpe[k]! > 0
+            ? R.kgDay.lactating
+            : s.preg >= SHEEP_RATION.latePregDay
+              ? R.kgDay.latePreg
+              : R.kgDay.dry;
+        const cap =
+          stage *
+          (1 + SHEEP_RATION.perFiveKg * Math.max(0, (s.wt - SHEEP_RATION.refKg) / 5));
+        fed = Math.min(cap, gap / R.me);
+        mei += fed * R.me;
+        feedCost += fed * s.n * (m.feed === 'grain' ? FEED_COST.pelletKg : FEED_COST.hayKg);
+      }
+    }
+    if (m.feed === 'lick' && s.weaned) {
+      feedCost +=
+        ((FEED_COST.lick * (diet.cp < 9 ? 1 : LICK.greenFeedShare)) / DSE_PER_AE) * s.n;
+    }
     let milkIn = 0;
     const l = lpe[k]!;
     let req = maintMJ(s, walk) + pregnancyMJ(s.preg, s.litter);
@@ -287,7 +325,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     s.age++;
 
     // Wool.
-    growWool(s, woolGrowthG(s, past + milkIn * WOOL.milkKgPerMj, gain, milking));
+    growWool(s, woolGrowthG(s, past + fed + milkIn * WOOL.milkKgPerMj, gain, milking));
 
     // Breeding.
     if (s.sex === 'F' && s.weaned) {
@@ -513,7 +551,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     m.lastThin = day;
     notes.push({ type: 'lowCondition', cs: st.cs });
   }
-  return { st, deaths, births, notes, plantingGrazes };
+  return { st, deaths, births, notes, plantingGrazes, feedCost };
 }
 
 /** Start the year's joining: count the ewes and rams, and share each ewe record out by cycle day. */
