@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { NOT_SET_UP, authRoute } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
 import { SESSION_COOKIE, readJson } from '@/server/game/http';
@@ -18,9 +19,9 @@ export const POST = authRoute(
     const body = (await readJson(ctx.req, 512)) as { everywhere?: unknown } | null;
     try {
       await ctx.deps.provider.signOut(ctx.jar, body?.everywhere === true ? 'global' : 'local');
-    } catch {
+    } catch (e) {
       // Signing out of this device must always work, even if the auth server can not be reached.
-      console.error('sign_out_failed');
+      logFailure({ route: 'auth-signout', reason: 'sign_out_failed' }, e);
       if (body?.everywhere === true) {
         throw new GameError(
           503,

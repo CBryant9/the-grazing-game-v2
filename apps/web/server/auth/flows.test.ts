@@ -426,14 +426,14 @@ describe('finish sign-up', () => {
 
   it('refuses a banned address, whichever spelling reaches the same inbox, with a plain line', async () => {
     await db.query('insert into public.ban_records (email_hash, banned_until) values ($1, null)', [
-      banHash('Banned.Person@Gmail.com', PEPPER),
+      banHash('Test.Banned.Example@Gmail.com', PEPPER),
     ]);
-    const { out, b } = await signUp('bannedperson@googlemail.com', 'not_banned_name');
+    const { out, b } = await signUp('test.banned.example@googlemail.com', 'not_banned_name');
     expect(out).toMatchObject({ ok: false, reason: 'banned' });
     expect(await db.query('select 1 from public.profiles')).toMatchObject({ rows: [] });
     expect((await b.me()).needsSignUp).toBe(true);
     // A different address is a different sign-in.
-    expect((await signUp('someone.else@gmail.com', 'fine_name')).out.ok).toBe(true);
+    expect((await signUp('test.other.example@gmail.com', 'fine_name')).out.ok).toBe(true);
   });
 
   it('says Sign-ups are not open yet when the switch is off, in me and in finish', async () => {

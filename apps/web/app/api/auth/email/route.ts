@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { normaliseEmail } from '@/server/auth/email';
 import { NOT_SET_UP, authRoute } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
@@ -34,9 +35,9 @@ export const POST = authRoute({ name: 'email', max: 10, write: true }, async (ct
   try {
     // Send to the address as typed, not the normalised one: the player's own spelling gets the mail.
     await ctx.deps.provider.sendLink(ctx.jar, (body!.email as string).trim(), redirectTo);
-  } catch {
-    // Never the provider's message: it can carry the address.
-    console.error('send_link_failed');
+  } catch (e) {
+    // Never the provider's message: it can carry the address. Class and code only.
+    logFailure({ route: 'auth-email', reason: 'send_link_failed' }, e);
   }
   return { ok: true, message: SENT };
 });

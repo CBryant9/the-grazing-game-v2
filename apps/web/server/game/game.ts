@@ -1,3 +1,4 @@
+import { logFailure } from './../logging';
 import 'server-only';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import {
@@ -649,7 +650,7 @@ export class GameServer {
         const wait = this.retryMs[attempt];
         if (wait === undefined) {
           this.cache.delete(farmId);
-          console.error('save_failed');
+          logFailure({ route: 'game-save', reason: 'save_failed' }, e);
           throw new GameError(503, SAVE_FAILED_MESSAGE, 'save_failed');
         }
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));

@@ -1,3 +1,4 @@
+import { logFailure } from '../logging';
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { GameError } from '../game/game';
@@ -83,12 +84,15 @@ export function authRoute(
       }
       const jar = jarFor(req);
       const setCookies: string[] = [];
+      const deps = authDeps();
       const out = await handler({
         req,
-        deps: authDeps(),
+        deps,
         jar,
         setCookies,
-        origin: siteOrigin(req),
+        // Only worked out when accounts are on: with them off it is not needed, and in
+        // production it needs GG_SITE_URL, which an off copy does not have.
+        origin: deps ? siteOrigin(req) : '',
         who,
       });
       for (const c of jar.out) {
@@ -104,7 +108,7 @@ export function authRoute(
       return res;
     } catch (e) {
       if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
-      console.error('account_route_failed');
+      logFailure({ route: `auth-${options.name}`, reason: 'account_route_failed' }, e);
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
     }
   };

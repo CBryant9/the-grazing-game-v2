@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { NOT_SET_UP, authRoute } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
 import { readJson } from '@/server/game/http';
@@ -16,8 +17,8 @@ export const POST = authRoute({ name: 'google', max: 10, write: true }, async (c
   const redirectTo = `${ctx.origin}/auth/callback?next=${encodeURIComponent(safeNext(body?.next))}`;
   try {
     return { url: await ctx.deps.provider.googleUrl(ctx.jar, redirectTo) };
-  } catch {
-    console.error('google_start_failed');
+  } catch (e) {
+    logFailure({ route: 'auth-google', reason: 'google_start_failed' }, e);
     throw new GameError(
       503,
       'Google sign-in is not working right now. Try the emailed link instead.',

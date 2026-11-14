@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { USERNAME, convertGuest, finishSignUp, parseDob } from '@/server/auth/accounts';
 import { authRoute, requireUser } from '@/server/auth/route';
 import { SESSION_COOKIE, readJson, sessionFrom } from '@/server/game/http';
@@ -53,8 +54,8 @@ export const POST = authRoute(
     if (guest) {
       try {
         ({ moved, noRoom } = await convertGuest(deps, guest, user.id));
-      } catch {
-        console.error('guest_move_failed');
+      } catch (e) {
+        logFailure({ route: 'auth-finish', reason: 'guest_move_failed' }, e);
       }
       if (moved > 0) ctx.setCookies.push(clearCookieText(ctx.req, SESSION_COOKIE));
     }

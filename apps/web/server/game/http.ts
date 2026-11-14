@@ -1,3 +1,4 @@
+import { logFailure } from '../logging';
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { jarFor, type CookieJar, type CookieToSet } from '../auth/provider';
@@ -263,7 +264,7 @@ export function route(
     } catch (e) {
       if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
       // The detail stays in the server log. The player gets a plain line.
-      console.error('game_route_failed');
+      logFailure({ route: `game-${options.name}`, reason: 'game_route_failed' }, e);
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
     }
   };

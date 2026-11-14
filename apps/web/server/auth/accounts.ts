@@ -1,3 +1,4 @@
+import { logFailure } from '../logging';
 import 'server-only';
 import { FEATURE_SWITCHES, type FeatureSwitchKey } from '@gg/shared';
 import { sessionHash } from '../db/dbstore';
@@ -158,7 +159,7 @@ export async function finishSignUp(
     if (err.code === '23505') return { result: 'username_taken' };
     if (err.code === '23514') return { result: 'bad_username' };
     if (err.code === '22023') return { result: 'bad_date_of_birth' };
-    console.error('sign_up_failed', err.code ?? '');
+    logFailure({ route: 'auth-finish', reason: 'sign_up_failed' }, e);
     return { result: 'unavailable' };
   }
 }

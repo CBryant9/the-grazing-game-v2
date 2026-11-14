@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { accountOf, deleteAccount } from '@/server/auth/accounts';
 import { authRoute, requireUser } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
@@ -33,8 +34,8 @@ export const POST = authRoute(
     }
     try {
       await deleteAccount(deps, user);
-    } catch {
-      console.error('delete_account_failed');
+    } catch (e) {
+      logFailure({ route: 'account-delete', reason: 'delete_account_failed' }, e);
       throw new GameError(
         503,
         'Your account could not be deleted just now, and nothing was deleted. Try again in a moment.',

@@ -1,3 +1,4 @@
+import { logFailure } from '@/server/logging';
 import { accountOf } from '@/server/auth/accounts';
 import { NOT_SET_UP, authRoute, redirect } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
@@ -23,8 +24,8 @@ export const GET = authRoute({ name: 'callback', max: 30 }, async (ctx) => {
   let user = null;
   try {
     user = await ctx.deps.provider.exchange(ctx.jar, code);
-  } catch {
-    console.error('code_exchange_failed');
+  } catch (e) {
+    logFailure({ route: 'auth-callback', reason: 'code_exchange_failed' }, e);
   }
   if (!user || user.anonymous) return redirect(ctx, '/sign-in?problem=link');
   const account = await accountOf(ctx.deps, user);
