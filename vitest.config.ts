@@ -15,5 +15,9 @@ export default defineConfig({
     include: ['packages/*/src/**/*.test.ts', 'apps/*/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/.next/**'],
     environment: 'node',
+    // The engine's long tests (29 years of days, year-long herds) take a few
+    // seconds each alone and longer with a hundred files running beside them.
+    // The default 5 seconds made them fail at random under load.
+    testTimeout: 30_000,
   },
 });
