@@ -1,5 +1,5 @@
 import type { DistrictId } from '@gg/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { dateAt } from '../calendar';
 import { DISTRICTS } from '../data/districts';
 import { districtPotential } from '../pasture/potential';
@@ -17,6 +17,10 @@ import {
   type WeatherSeasons,
 } from './weatherSeasons';
 import { daySerial, tableIndex } from './weatherTable';
+
+// These tests walk every day of 29 years. With the whole suite running beside
+// them the default 5 seconds is not always enough, so the file gets a longer limit.
+vi.setConfig({ testTimeout: 60_000 });
 
 const IDS: DistrictId[] = ['cq', 'nsw', 'cw', 'wv'];
 const range = (from: number, to: number): number[] =>
