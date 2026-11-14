@@ -1087,6 +1087,17 @@ Branch `m2.1-hands-and-contractors`, from `m1.7f-review-fixes` (34fecf2). Engine
 
 **Not done.** The screens (another agent). Sheep (2.3, 2.4). Real-year wages: every farm pays 2026 rates, as with its other costs.
 
+### 15 Nov 2026: m2.5 Calf growth (investigation, stopped for Claudia)
+
+Home-bred calves weigh 77 to 101 kg at weaning (about 225 days old) in every district, and about 90 kg at 200 days. The sources say about 160 to 175 kg at 180 to 200 days. No model change was made. The change that matches the sources breaks the Northern Tablelands herd deaths benchmark, so the work stopped there rather than loosen a band (CALIBRATION.md, the m2.5 entry; figures and sources in DATA.md, "Calf growth to weaning").
+
+**Calls for Claudia**
+
+- **The cause has two parts.** The model charges a calf the same energy for each kg of gain as a steer (about twice the measured figure for a 60 kg calf), and the milk rule halves a cow's milk on ordinary dry-ish feed (ME about 7.5), where Brahman cows are measured giving about 6 kg a day. After 100 days the calves gain almost nothing.
+- **Fixing both** gives about 150 to 160 kg at 200 days, and lifts Tablelands herd deaths from 2.6% to 4.4% (band 1.5 to 3.6%). Those herds calve in summer and milk into winter.
+- **To decide:** whether the herds benchmark should calve at each district's usual time; whether milk on poor feed should fall by a fixed share or only as the cow loses condition; and whether the calf cost of gain alone (sourced, about +20 kg at 200 days, no other benchmark touched) should go in now.
+- No benchmark test was added: a test that fails would stop `pnpm test`. The bands are ready to write once the rule is chosen: Central Qld (nearest source, north Queensland) about 0.6 to 0.95 kg a day to weaning and 140 to 225 kg at 200 days; the southern districts (nearest source, Grafton) 0.6 to 1.1 kg a day and 150 to 260 kg at 200 days.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

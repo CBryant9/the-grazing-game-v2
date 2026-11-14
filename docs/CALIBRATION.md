@@ -1129,6 +1129,50 @@ No grass, cattle, crop, season or price formula changed, and the daily tick (`st
 - **Real-year calibration:** the herd and steer files (`calibration/realYearHerds.{cq,nsw,cw,wv}.test.ts`, `calibration/realYearSteers.{cqLick,cqNoLick,nsw,cw,wv}.test.ts`) were run on this branch: 9 files, 55 tests, all pass, with no band changed.
 - The whole suite (`pnpm test`) passes, with no `*.mvp.test.ts` file or calibration band changed.
 
+### 15 Nov 2026, m2.5 calf growth: investigation only, no model change (engine 0.13.0)
+
+**Stopped before changing the model, for Claudia.** Home-bred calves grow far too slowly before weaning. The change that matches the sources moves the Northern Tablelands herd deaths benchmark out of its band, and no change that keeps every benchmark inside its band reaches the sourced weights. The figures behind both are below. The sources are in DATA.md, "Calf growth to weaning".
+
+**What the model gives now.** Home-bred calves only (bought calves at foot left out), weighed on the day they reach each age. Running farm left alone for a year from 1 September; "average year" is the medium farm on seed 1 with every day at the district curve; "found case" is a small Central Qld farm on easy, real years in order from 1997 (a below average season, 0.81), seed 1.
+
+| Run | 100 days | 150 days | 200 days | Weaned (days old) | Weaned, kg (lowest to highest) |
+|---|---|---|---|---|---|
+| Found case, Central Qld 1997 | 77 | 82 | 85 | 100 to 281 (mean 222) | 77 (51 to 86) |
+| Central Qld, average year | 82 | 88 | 90 | 125 to 281 (227) | 81 (70 to 95) |
+| Northern Tablelands, average year | 89 | 95 | 96 | 135 to 281 (225) | 83 (71 to 96) |
+| Central West NSW, average year | 76 | 86 | 90 | 173 to 281 (227) | 83 (80 to 86) |
+| Western Victoria, average year | 72 | 88 | 98 | 173 to 281 (222) | 101 (95 to 104) |
+
+Against the sources: about 0.75 to 0.79 kg a day and 161 to 173 kg at 180 days for Brahman-cross calves in the north (Fordyce et al. 1993), and 0.7 kg a day and 171 kg at 200 days for British calves on the poorest pasture in MLA's table (ME 9.0). The model's calves gain about 0.46 kg a day to 100 days and then almost nothing: 0.08 kg a day from 100 to 200 days.
+
+**Why the MVP recorded 148 to 249 kg (v11).** No script for that check survives (`reference/mvp/calibrate.js` has no weaning test). An established herd starts with cow and calf units whose calves are set at 36 kg + 0.8 kg a day of age (`BOUGHT_CALF`), so calves of 60 to 140 days start at 84 to 148 kg. Weaned at about 9 months, those give weights of that size. Most likely the v11 figure came from those bought calves, not from calves the model grew. The model has never been tested on a calf it grew itself.
+
+**The cause, from the energy each calf gets, by age (Central Qld, average year).**
+
+- **0 to 100 days:** milk 16 to 19 MJ a day, little pasture. The gain is held down by the cost of gain: the model charges 20 + 0.045 x LW MJ for each kg, the same for a calf as for a steer. For a 60 kg calf that is about twice what Sekine and Asahida (1990) measured for calves (510 to 520 kJ per kg LW^0.75 for ruminant calves under 100 kg, 413 on milk). For a 300 kg steer the two agree.
+- **100 to 200 days:** milk falls from 16 to about 6 MJ, and the calf's own pasture (1 to 2 kg DM at ME 7.1 to 7.5) does not make up the rest, so the calf sits near maintenance. Most of the fall is the milk rule's feed term, `clamp((ME - 6) / 3, 0.45, 1)`: on the herd's ME of 7.2 to 7.6 it halves the milk. Brahman cows on tropical pasture averaged 6.2 kg of milk a day over 216 days (Neidhardt et al. 1979); the model's cow gives about half that on the same kind of feed. The lactation curve (full to day 60, then a straight line to nothing at day 280) adds to it.
+- **Not the cause:** calf maintenance (the model's 0.45 x LW^0.75 x (1 + walk) is 0.47 to 0.53 MJ, against 480 to 500 kJ measured) and the calf's appetite (3% of LW, the same as a weaner, which is held by the steer benchmarks). Calving time is the start herd's (PTIC cows 100 to 210 days in calf on 1 September calve from late November to early March in every district), which is right for Central Qld and not for the southern districts.
+
+**What each change gave** (home-bred calves at 200 days, kg; then the established herd benchmarks in `calibration/herds.test.ts`, 24 tests). Each was switched on in a scratch copy only and taken out again.
+
+| Change | Found case | Central Qld | Tablelands | Central West | Western Vic | Herd benchmarks |
+|---|---|---|---|---|---|---|
+| None (as now) | 85 | 90 | 96 | 90 | 98 | all pass |
+| A. Calf cost of gain 0.52 x LW^0.75 MJ a kg, never above the steer figure (Sekine and Asahida) | 103 | 111 | 115 | 110 | 121 | not run (calves only, cows unchanged) |
+| A at 0.413 (the milk figure) | 109 | 118 | 122 | 118 | 130 | not run |
+| B. No feed term on milk (the cow pays for her milk and loses condition instead) | 132 | 130 | 127 | 126 | 134 | **Tablelands deaths 4.4% (band 1.5 to 3.6), one herd 6.6% (limit 6)** |
+| A and B | 158 | 156 | 151 | 151 | 160 | **the same two Tablelands failures** |
+| A, and the lactation line reaching nothing at day 460 not 280 (no source) | 116 | 124 | 127 | 126 | 141 | all pass |
+| Milk worth 1.6 / 2.0 times forage ME to the calf (no source) | weaned 121 / 146 | weaned 129 / 153 | | | | not run |
+
+A and B together is the only change with a source for each part, and it puts calves at about 0.6 kg a day to 200 days, the bottom of the sourced range. It breaks the Tablelands herd deaths benchmark: those herds calve in summer and milk into a frosty winter, and a cow that keeps milking loses condition. The change that keeps every benchmark passing (A with a longer lactation) has no source for its second half and still gives only 0.4 to 0.5 kg a day.
+
+**Questions for Claudia** (the work is waiting on these):
+
+1. Is the Tablelands start herd (calving late November to early March, milking into winter) a fair test of deaths, or should the herds benchmark herds calve at the district's usual time? With spring calving the milk change may not raise deaths.
+2. Should milk on poor feed fall by a fixed share (the MVP's rule) or only as the cow loses condition? The sourced Brahman milk figure says the MVP's cut is too deep on tropical pasture.
+3. May the calf cost of gain (A) go in on its own now? It is sourced and touches calves only, but it lifts weights by only about 20 kg at 200 days.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

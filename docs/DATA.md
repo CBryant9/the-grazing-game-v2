@@ -830,3 +830,35 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 ### The farm's standing with workers
 
 All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.
+
+## Calf growth to weaning (m2.5, 15 Nov 2026, sourced, not yet used by the model)
+
+Looked up for the calf growth benchmark. None of these figures is in the engine yet: the model change they point to is waiting on Claudia (CALIBRATION.md, the m2.5 entry). "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
+
+**Growth to weaning and weaning weight**
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Brahman-Shorthorn crosses (half and three-quarter), Swan's Lagoon near Ayr, dry tropics of north Queensland. Calving from late October, weaning on set dates in April, June or August. **Nearest sourced figure for Central Queensland**: no Central Queensland source was read | Birth to weaning about 0.75 to 0.79 kg a day; weight adjusted to 180 days about 161 to 173 kg; birth weight about 26 to 28 kg. Year-to-year differences in growth up to 25%, higher when the wet season started earlier. Calves of mature cows 4 to 10 kg heavier at weaning | Fordyce et al., Aust. J. Exp. Agric. 1993, 33:119-27 (Qld DPI), read: https://era.dpi.qld.gov.au/id/eprint/13231/1/ . The scan's table columns are jumbled, so the kg a day and 180-day weights are approximate |
+| Northern Australia, weaning practice | About 100 kg (about three months old) is the usual lowest weaning weight; under 100 kg is a drought wean. Calves of 3 months and over, well fed, can be 150 kg or more by the end of their first wet season | FutureBeef (Qld DAF), "Weaning: a critical component of herd management", https://futurebeef.com.au/resources/weaning/ , no date shown, read |
+| Northern Australia, weaners (calving season not stated) | Mean weaning age and weight 192 to 203 days and 187 to 199 kg across three herds | MLA final report B.NBP.0390, table 5, read: https://www.mla.com.au/contentassets/4a9fb5eb39034ef6be6eb5653c75af8f/b.nbp.0390_final_report.pdf |
+| British breeds, projections from NSW Agriculture's crossbreeding work at Grafton (high, medium and low pre-weaning pasture). **Nearest sourced figure for the Northern Tablelands, Central West and Western Victoria**: no Armidale, Dubbo or Hamilton source was read | 0.7 kg a day on pasture of ME 9.0: 31 kg at birth, 101 kg at 100 days, 171 kg at 200 days, 206 kg at 250 days. 0.9 kg a day at ME 10.5: 214 kg at 200 days. 1.1 kg a day at ME 12.0: 256 kg at 200 days | MLA More Beef from Pastures, tool 5.05 "Weaning age and projected liveweights", https://mbfp.mla.com.au/weaner-throughput/tool-55-weaning-age-and-projected-liveweights/ (page copyright 2024), read |
+| Wagyu x Hereford steers born August to November at Grafton, weaned in April at 200 days, on deliberately slow and rapid pre-weaning nutrition | 0.63 kg a day (slow) and 0.98 kg a day (rapid) from birth to weaning | Cafe et al., Aust. J. Exp. Agric. 2006, 46:951-5, read (the weaning weights of about 157 and 236 kg were search only) |
+| Western District of Victoria and Limestone Coast, 11 beef businesses | Calves weaned early in a very dry 2024 at four to five months averaged 150 kg. True early weaning is at least three months and 130 kg; in many southern systems calves are weaned at nine months or older | MLA final report L.PDS.1908, "Post weaning management strategies for beef herds", 30 June 2025, read |
+| NSW, general | Calves "ideally" grow 0.7 to 0.8 kg a day before weaning | NSW DPI, "Weaning beef calves", search only (the page refused a fetch) |
+
+**The energy cost of a calf's growth**
+
+| Figure | Value | Source |
+|---|---|---|
+| ME for maintenance, young calves | about 480 (milk-fed) and 500 (ruminant) kJ per kg LW^0.75 a day | Sekine and Asahida, "Energy metabolism of calf", JARQ 1990, 24:141-148 (Holstein calves, Hokkaido University), read: https://www.jircas.go.jp/sites/default/files/publication/jarq/24-2-141-148_0.pdf |
+| ME for 1 kg of daily gain | 413 kJ per kg LW^0.75 (calves on milk replacer gaining about 0.5 kg a day); 510 to 520 (ruminant calves under 100 kg); 520, 575 and 483 for calves of 55-99, 100-149 and 150-195 kg | Same paper |
+| The game's figure for comparison | ME per kg of gain = 20 + 0.045 x LW (MJ), the same for every animal. At 60 kg that is about 1,050 kJ per kg LW^0.75, at 100 kg 775, at 150 kg 620, at 300 kg 465 | MODEL.md, section 3 |
+
+**Beef cow milk**
+
+| Figure | Value | Source |
+|---|---|---|
+| Brahman cows on tropical pasture, Venezuela (no Australian source was read) | 6.2 kg a day on average over a 216-day lactation (1,340 kg), peaking in the second month | Neidhardt et al., J. Anim. Sci. 1979, 48:1-6, abstract read: https://academic.oup.com/jas/article-abstract/48/1/1/4697779 |
+
+Not found: the Australian feeding standards' efficiencies for milk-fed calves (SCA 1990, CSIRO 2007) could not be read online, and no Australian lactation curve for Brahman-cross or British cows was read.
