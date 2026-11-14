@@ -17,23 +17,23 @@ export const COST_PER_M = {
   electric: 3.6,
   tape: 0.9,
   pipe: 4.8,
-  /**
-   * Sheep-proof netting fence, a metre. STAND-IN, Claudia's to set (call
-   * C26): above the cattle fence's $7, as PRD 5.12 says it costs more. The
-   * sources read do not give the two side by side (docs/SHEEP_BENCHMARKS.md,
-   * section 10: WA DPIRD's netting fence materials $4,186 a km in 2026;
-   * about $4,850 a km built in Queensland in 2012).
-   */
-  netting: 10,
 } as const;
-export type PerMetreItem = keyof typeof COST_PER_M;
+/**
+ * Sheep-proof netting fence, dollars a metre. STAND-IN, Claudia's to set
+ * (call C26): above the cattle fence's $7, as PRD 5.12 says it costs more.
+ * The sources read do not give the two side by side (docs/SHEEP_BENCHMARKS.md,
+ * section 10). Kept apart from `COST_PER_M`, which is the MVP's table.
+ */
+export const NETTING_PER_M = 10;
+
+export type PerMetreItem = keyof typeof COST_PER_M | 'netting';
 
 /**
  * What one segment of fence or pipe costs on a farm: the price a metre
  * times the side of a square, rounded to a whole dollar as the MVP did.
  */
 export const segmentCost = (item: PerMetreItem, sideM: number): number =>
-  Math.round(COST_PER_M[item] * sideM);
+  Math.round((item === 'netting' ? NETTING_PER_M : COST_PER_M[item]) * sideM);
 
 /** One-off prices, dollars. */
 export const COSTS = {

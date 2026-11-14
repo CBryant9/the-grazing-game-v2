@@ -6,7 +6,7 @@ import { SHEEP_RATION } from '../data/sheep';
 import { SHEARING_RATE, woolPriceCKg } from '../data/sheepMarket';
 import { DSE_PER_AE, MVP_DSE_PER_AE } from '../data/stocking';
 import { GRID_W } from '../grid';
-import { COST_PER_M, segmentCost } from '../money/costs';
+import { COST_PER_M, NETTING_PER_M, segmentCost } from '../money/costs';
 import { netWorth, scoreYear } from '../money/worth';
 import { loadFarm, saveFarm } from '../save/save';
 import { createFarm } from '../sim/create';
@@ -226,7 +226,7 @@ describe('netting fence', () => {
       );
       expect(nettingEdges(done.farm).length).toBe(10);
     }
-    expect(COST_PER_M.netting).toBeGreaterThan(COST_PER_M.permanent);
+    expect(NETTING_PER_M).toBeGreaterThan(COST_PER_M.permanent);
     const kinds = fenceKindsRead();
     expect(kinds.find((k) => k.kind === 'netting')!.holdsSheep).toBe(true);
     expect(kinds.filter((k) => k.holdsSheep).length).toBe(1);

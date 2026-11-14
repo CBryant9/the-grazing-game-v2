@@ -14,7 +14,7 @@ import {
   type SheepIndicatorId,
 } from '../data/sheepMarket';
 import { EDGE, type EdgeRef } from '../farm/topology';
-import { COST_PER_M } from '../money/costs';
+import { COST_PER_M, NETTING_PER_M } from '../money/costs';
 import { SHEEP_BUY_CLASSES, sheepBuyPrice, type SheepBuyClassId } from './market';
 import { surveyOf, areaNameOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
@@ -271,7 +271,7 @@ export interface FenceKindRead {
 export function fenceKindsRead(): FenceKindRead[] {
   return (['permanent', 'electric', 'tape', 'netting'] as const).map((kind) => ({
     kind,
-    perM: COST_PER_M[kind],
+    perM: kind === 'netting' ? NETTING_PER_M : COST_PER_M[kind],
     holdsCattle: true,
     holdsSheep: fenceHoldsSheep(kind),
   }));
