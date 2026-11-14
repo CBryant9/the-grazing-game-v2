@@ -9,6 +9,8 @@
  * The rules are the MVP's (buildFence, removeFence, placeGate, toggleGate,
  * fixFence, layPipe, placeTrough, moveTrough, placeHub, placeFenceHub,
  * placePort, refillPort). The mouse, snapping and drawing code is not here.
+ * Moving and removing water hubs, and fence materials kept, are the
+ * rebuild's (Claudia, 14 Nov 2026).
  */
 
 import type { FarmScale } from '../data/farms';
@@ -693,6 +695,156 @@ export function placeFenceHub(layout: FarmLayout, vertex: number): Outcome<Fence
 
 export interface HubRemoved {
   vertex: number;
+}
+
+export interface HubMoved {
+  from: number;
+  to: number;
+  /** The squares that can now drink at it. */
+  cells: number[];
+  /** The paddocks it now waters, by id. */
+  paddocks: number[];
+}
+
+/**
+ * Move a fence-line or corner hub to another grid corner. The new corner
+ * needs a fence or gate, and water reaching one of the squares it touches,
+ * as the water stands before the move (the check `moveTrough` makes).
+ * What drew water through the old corner is left as it is: a trough or hub
+ * that was placed keeps watering its squares, as when a trough is moved.
+ */
+export function moveHub(layout: FarmLayout, from: number, to: number): Outcome<HubMoved> {
+  if (!vertexOnFarm(from) || !vertexOnFarm(to)) {
+    return refuse('off-the-farm', 'That corner is off the farm.');
+  }
+  const at = layout.water.hubs.indexOf(from);
+  if (at < 0) return refuse('no-hub-there', 'There is no water hub there to move.');
+  if (layout.water.hubs.includes(to)) {
+    return refuse('hub-already-there', 'There is already a water hub there.');
+  }
+  if (!vertexOnFence(layout.fences, to)) {
+    return refuse('hub-needs-fence', 'This kind of water hub goes on a fence line or corner.');
+  }
+  const cells = hubCells(to);
+  const reach = pipeReach(layout.water);
+  if (!cells.some((c) => reach[c])) {
+    return refuse(
+      'hub-needs-water',
+      'A water hub can only move where one of the squares it touches is the bore or pipe joined to the bore.',
+    );
+  }
+  const water = cloneWater(layout.water);
+  water.hubs[at] = to;
+  const topology = buildTopology(layout.fences, layout.scale.haPerSquare);
+  const paddocks = [...new Set(cells.map((c) => topology.paddockOf[c]!))];
+  return { ok: true, layout: { ...layout, water }, from, to, cells, paddocks };
+}
+
+/** The four sides of a square, as edges: top, bottom, left, right. */
+function sidesOf(cell: number): EdgeRef[] {
+  const x = cell % GRID_W;
+  const y = (cell / GRID_W) | 0;
+  return [hEdge(y, x), hEdge(y + 1, x), vEdge(y, x), vEdge(y, x + 1)];
+}
+
+/**
+ * True if the square holds a water hub: a fixed trough with a gate on every
+ * side that is not the boundary. This is what `placeSquareHub` builds, and
+ * what it already calls "built".
+ */
+export function isSquareHub(layout: Pick<FarmLayout, 'fences' | 'water'>, cell: number): boolean {
+  if (!cellOnFarm(cell) || !layout.water.troughs.includes(cell)) return false;
+  return sidesOf(cell).every((e) => {
+    const c = getEdge(layout.fences, e);
+    return c === EDGE.boundary || c === EDGE.gateShut || c === EDGE.gateOpen;
+  });
+}
+
+/** The squares that hold a water hub, in the order their troughs were put in. */
+export function squareHubs(layout: Pick<FarmLayout, 'fences' | 'water'>): number[] {
+  return layout.water.troughs.filter((c) => isSquareHub(layout, c));
+}
+
+export interface SquareHubRemoved {
+  cell: number;
+  /** Gates left standing round the square. They stay as they were, open or shut. */
+  gates: number;
+}
+
+/**
+ * Take out a water hub on a square: its trough comes out. The gates stay as
+ * they are, so the paddocks round it keep their fences and nothing about the
+ * grazing changes (a builder's rule). A gate can be taken out on its own.
+ */
+export function removeSquareHub(layout: FarmLayout, cell: number): Outcome<SquareHubRemoved> {
+  if (!cellOnFarm(cell)) return refuse('off-the-farm', 'That square is off the farm.');
+  if (!isSquareHub(layout, cell)) return refuse('no-hub-there', 'There is no water hub there.');
+  const water = cloneWater(layout.water);
+  water.troughs = water.troughs.filter((x) => x !== cell);
+  const gates = sidesOf(cell).filter((e) => {
+    const c = getEdge(layout.fences, e);
+    return c === EDGE.gateShut || c === EDGE.gateOpen;
+  }).length;
+  return { ok: true, layout: { ...layout, water }, cell, gates };
+}
+
+export interface SquareHubMoved extends FenceEffect {
+  from: number;
+  to: number;
+  /** Gates hung at the new square, all open. The gates at the old square stay. */
+  gates: number;
+  /** Fence the new gates took the place of, by kind. */
+  replaced: EdgeTally;
+}
+
+/**
+ * Move a water hub on a square to another square: the trough moves, and the
+ * new square gets an open gate on every side that is not the boundary or a
+ * gate, as when a hub is built. The new square must have no trough, and
+ * water must reach it as the water stands before the move (the check
+ * `moveTrough` makes). The gates at the old square stay as they are.
+ */
+export function moveSquareHub(
+  layout: FarmLayout,
+  from: number,
+  to: number,
+): Outcome<SquareHubMoved> {
+  if (!cellOnFarm(from) || !cellOnFarm(to)) {
+    return refuse('off-the-farm', 'That square is off the farm.');
+  }
+  if (!isSquareHub(layout, from)) {
+    return refuse('no-hub-there', 'There is no water hub there to move.');
+  }
+  if (layout.water.troughs.includes(to)) {
+    return refuse('trough-already-there', 'There is already a trough there.');
+  }
+  if (!canTrough(layout.water, to)) {
+    return refuse(
+      'hub-needs-water',
+      'A water hub can only move onto the bore or onto pipe joined to the bore.',
+    );
+  }
+  const water = cloneWater(layout.water);
+  water.troughs[water.troughs.indexOf(from)] = to;
+  const fences = cloneFences(layout.fences);
+  const replaced = emptyTally();
+  let gates = 0;
+  for (const e of sidesOf(to)) {
+    const c = getEdge(fences, e);
+    if (c === EDGE.boundary || c === EDGE.gateShut || c === EDGE.gateOpen) continue;
+    count(replaced, c);
+    setEdge(fences, e, EDGE.gateOpen);
+    gates++;
+  }
+  return {
+    ok: true,
+    layout: { ...layout, water, fences },
+    from,
+    to,
+    gates,
+    replaced,
+    ...fenceEffect(layout, fences),
+  };
 }
 
 /** Take out a fence-line or corner hub. */

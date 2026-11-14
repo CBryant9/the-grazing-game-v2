@@ -38,6 +38,7 @@ import {
 import { fieldProgress } from '../crops/fields';
 import { DISTRICTS } from '../data/districts';
 import { SPECIES } from '../data/species';
+import { squareHubs } from '../farm/layout';
 import { EDGE, labelSquare } from '../farm/topology';
 import { NO_WATER_DISTANCE, PORTABLE_CAPACITY_L, pipeReach } from '../farm/water';
 import { GRID_N } from '../grid';
@@ -359,7 +360,14 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     squares: sq,
     fences: viewFences,
     gates,
-    water: { bore: water.bore, pipe, pipeDry, troughs, hubs: water.hubs.slice() },
+    water: {
+      bore: water.bore,
+      pipe,
+      pipeDry,
+      troughs,
+      hubs: water.hubs.slice(),
+      squareHubs: squareHubs(layout),
+    },
     // The model has no trees. The MVP's 16 trees were decoration only.
     trees: [],
     buildings,

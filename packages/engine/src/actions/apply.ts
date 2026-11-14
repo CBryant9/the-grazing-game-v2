@@ -24,6 +24,10 @@
  *     bought, and comes off net worth when that thing is removed;
  *   - sowing, removing troughs, hubs and portable troughs, and changing a
  *     supplement are actions here, not screen code;
+ *
+ * and the rebuild's own rules from Claudia (14 Nov 2026): fence taken down
+ * keeps its materials and fence built from them is half price, and both
+ * kinds of water hub can be removed and moved;
  *   - a fence that divides a mob's area shares the mob out by a seeded rule,
  *     not by where cattle were drawn.
  */
@@ -46,7 +50,9 @@ import {
   buildFence,
   fixFence,
   layPipe,
+  moveHub,
   movePortable,
+  moveSquareHub,
   moveTrough,
   placeFenceHub,
   placeGate,
@@ -58,6 +64,7 @@ import {
   removeGate,
   removeHub,
   removePortable,
+  removeSquareHub,
   removeTrough,
   setGate,
   tapeRun,
@@ -1374,6 +1381,70 @@ function doRemoveHub(j: Job, a: Extract<Action, { type: 'removeHub' }>): Out {
   return null;
 }
 
+function doMoveHub(j: Job, a: Extract<Action, { type: 'moveHub' }>): Out {
+  const { farm } = j;
+  const out = moveHub(farm.layout, a.from, a.to);
+  if (!out.ok) return out;
+  // Builder's figure: moving a hub costs what moving a trough costs.
+  const no = j.bankSays(COSTS.moveTrough, 'moving a water hub');
+  if (no) return no;
+  farm.year.running += COSTS.moveTrough;
+  // What was spent on the hub goes with it.
+  const paid = farm.ledger.hubs[a.from];
+  delete farm.ledger.hubs[a.from];
+  if (paid) farm.ledger.hubs[a.to] = paid;
+  waterJob(j, 'moveHub', out.layout, COSTS.moveTrough, {
+    from: a.from,
+    to: a.to,
+    paddocksWatered: out.paddocks.length,
+  });
+  return null;
+}
+
+function doRemoveSquareHub(j: Job, a: Extract<Action, { type: 'removeSquareHub' }>): Out {
+  const out = removeSquareHub(j.farm.layout, a.cell);
+  if (!out.ok) return out;
+  // No refund, as for a trough. What was spent on the trough comes off net worth. The gates stay.
+  delete j.farm.ledger.troughs[a.cell];
+  waterJob(j, 'removeSquareHub', out.layout, 0, { cell: a.cell, gatesLeft: out.gates });
+  return null;
+}
+
+function doMoveSquareHub(j: Job, a: Extract<Action, { type: 'moveSquareHub' }>): Out {
+  const { farm } = j;
+  const before = j.survey;
+  const was = farm.layout.fences;
+  const out = moveSquareHub(farm.layout, a.from, a.to);
+  if (!out.ok) return out;
+  // Moving the trough costs what moving a trough costs. Each new gate is a new gate.
+  const cost = COSTS.moveTrough + out.gates * COSTS.gate;
+  const no = j.bankSays(cost, 'moving a water hub');
+  if (no) return no;
+  const paid = farm.ledger.troughs[a.from];
+  delete farm.ledger.troughs[a.from];
+  if (paid) farm.ledger.troughs[a.to] = paid;
+  for (const e of sidesOfCell(a.to)) {
+    if (getEdge(was, e) !== getEdge(out.layout.fences, e)) {
+      farm.ledger.edges[edgeKey(e)] = COSTS.gate;
+    }
+  }
+  farm.year.running += COSTS.moveTrough;
+  farm.year.infra += out.gates * COSTS.gate;
+  fenceJob(j, 'moveSquareHub', before, out, cost, {
+    from: a.from,
+    to: a.to,
+    gates: out.gates,
+  });
+  return null;
+}
+
+/** The four sides of a square: top, bottom, left, right. */
+function sidesOfCell(cell: number): EdgeRef[] {
+  const x = cell % GRID_W;
+  const y = (cell / GRID_W) | 0;
+  return [hEdge(y, x), hEdge(y + 1, x), vEdge(y, x), vEdge(y, x + 1)];
+}
+
 function doPlaceSquareHub(j: Job, a: Extract<Action, { type: 'placeSquareHub' }>): Out {
   const { farm } = j;
   const before = j.survey;
@@ -1385,10 +1456,7 @@ function doPlaceSquareHub(j: Job, a: Extract<Action, { type: 'placeSquareHub' }>
   if (no) return no;
   if (out.troughAdded) farm.ledger.troughs[a.cell] = COSTS.trough;
   // Each side that became a gate. The fence it took the place of is gone.
-  const x = a.cell % GRID_W;
-  const y = (a.cell / GRID_W) | 0;
-  const sides: EdgeRef[] = [hEdge(y, x), hEdge(y + 1, x), vEdge(y, x), vEdge(y, x + 1)];
-  for (const e of sides) {
+  for (const e of sidesOfCell(a.cell)) {
     if (getEdge(was, e) !== getEdge(out.layout.fences, e)) {
       farm.ledger.edges[edgeKey(e)] = COSTS.gate;
     }
@@ -1569,8 +1637,14 @@ function run(j: Job, a: Action): Out {
       return doPlaceFenceHub(j, a);
     case 'removeHub':
       return doRemoveHub(j, a);
+    case 'moveHub':
+      return doMoveHub(j, a);
     case 'placeSquareHub':
       return doPlaceSquareHub(j, a);
+    case 'removeSquareHub':
+      return doRemoveSquareHub(j, a);
+    case 'moveSquareHub':
+      return doMoveSquareHub(j, a);
     case 'placePortable':
       return doPlacePortable(j, a);
     case 'movePortable':

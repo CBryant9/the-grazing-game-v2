@@ -14,7 +14,7 @@ import {
 } from '../../test-support/workingDay';
 import type { Action, ActionType } from '../actions/types';
 import { EDGE, getEdge } from '../farm/topology';
-import { GRID_N } from '../grid';
+import { GRID_N, GRID_W } from '../grid';
 import { LAND } from '../pasture/state';
 import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
@@ -448,6 +448,9 @@ describe('the job card and the job agree, for every kind of action', () => {
     };
     const planned = work(b.farm, setPlan).farm;
     const paused = work(planned, { type: 'pausePlan', mob: b.steers }).farm;
+    // A water hub on a square, to take out or move.
+    const squareHub = setUp(b.farm, { type: 'placeSquareHub', cell: b.pipedCell });
+    const pipedRow = (b.pipedCell / GRID_W) | 0;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
       buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
       cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
@@ -523,7 +526,18 @@ describe('the job card and the job agree, for every kind of action', () => {
         },
       ],
       removeHub: [{ farm: b.farm, action: { type: 'removeHub', vertex: b.hub } }],
+      // Along the pipe row to the corner on the electric line: one of its squares is piped.
+      moveHub: [{ farm: b.farm, action: { type: 'moveHub', from: b.hub, to: b.hub - 6 } }],
       placeSquareHub: [{ farm: b.farm, action: { type: 'placeSquareHub', cell: b.pipedCell } }],
+      removeSquareHub: [
+        { farm: squareHub, action: { type: 'removeSquareHub', cell: b.pipedCell } },
+      ],
+      moveSquareHub: [
+        {
+          farm: squareHub,
+          action: { type: 'moveSquareHub', from: b.pipedCell, to: cell(8, pipedRow) },
+        },
+      ],
       placePortable: [{ farm: b.farm, action: { type: 'placePortable', cell: b.openCell } }],
       movePortable: [
         { farm: b.farm, action: { type: 'movePortable', port: b.port, cell: b.openCell } },
@@ -533,8 +547,8 @@ describe('the job card and the job agree, for every kind of action', () => {
       sow: [{ farm: june, action: { type: 'sow', species: 'barley', cells: fallow } }],
       harvest: [{ farm: ready.farm, action: { type: 'harvest', field: ready.field } }],
     };
-    // 34 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(34);
+    // 37 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(37);
 
     const outcomes = new Set<string>();
     let refusals = 0;

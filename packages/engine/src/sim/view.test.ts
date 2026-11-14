@@ -86,7 +86,7 @@ const ALLOWED: Record<string, readonly string[]> = {
   ],
   'view.fences': ['h', 'v'],
   'view.gates[]': ['line', 'index', 'open', 'kind'],
-  'view.water': ['bore', 'pipe', 'pipeDry', 'troughs', 'hubs'],
+  'view.water': ['bore', 'pipe', 'pipeDry', 'troughs', 'hubs', 'squareHubs'],
   'view.water.troughs[]': ['kind', 'cell', 'id', 'levelPct'],
   'view.buildings[]': ['kind', 'cell'],
   'view.paddocks[]': [
@@ -562,6 +562,43 @@ describe('the farm view says what the model says', () => {
     const far = cellAt(bx + dir * 8, by);
     const metres = 5 * farm.layout.scale.sideM;
     expect(view.squares.waterDist[far]).toBe(Math.round(metres / 100));
+  });
+
+  it('both kinds of water hub, so the map can draw and tap them, and they follow a move', () => {
+    let farm = openFarm('nsw');
+    const bore = farm.layout.water.bore;
+    const bx = bore % 40;
+    const by = Math.floor(bore / 40);
+    const dir = bx < 20 ? 1 : -1;
+    const run = [1, 2, 3, 4].map((k) => cellAt(bx + dir * k, by));
+    farm = act(farm, { type: 'layPipe', cells: run });
+    farm = act(farm, { type: 'placeSquareHub', cell: run[1]! });
+    // A fence down the far side of the last piped square, and a hub on its corner.
+    const fx = bx + dir * 4 + (dir > 0 ? 1 : 0);
+    farm = act(farm, {
+      type: 'buildFence',
+      edges: [vEdge(by - 1, fx), vEdge(by, fx), vEdge(by + 1, fx)],
+      fence: 'permanent',
+    });
+    const corner = by * 41 + fx;
+    farm = act(farm, { type: 'placeFenceHub', vertex: corner });
+    let view = farmView(farm);
+    expect(view.water.squareHubs).toEqual([run[1]]);
+    expect(view.water.hubs).toEqual([corner]);
+    // The hub's trough is a fixed trough too. The plain trough on the bore is not a hub.
+    const fixed = view.water.troughs.filter((t) => t.kind === 'fixed').map((t) => t.cell);
+    expect(fixed).toContain(run[1]);
+    expect(view.water.squareHubs).not.toContain(bore);
+    farm = act(farm, { type: 'moveSquareHub', from: run[1]!, to: run[3]! });
+    farm = act(farm, { type: 'moveHub', from: corner, to: corner + 41 });
+    view = farmView(farm);
+    expect(view.water.squareHubs).toEqual([run[3]]);
+    expect(view.water.hubs).toEqual([corner + 41]);
+    farm = act(farm, { type: 'removeSquareHub', cell: run[3]! });
+    farm = act(farm, { type: 'removeHub', vertex: corner + 41 });
+    view = farmView(farm);
+    expect(view.water.squareHubs).toEqual([]);
+    expect(view.water.hubs).toEqual([]);
   });
 
   it('a paddock with no water reads -1 for distance, and its area says it has none', () => {

@@ -95,9 +95,20 @@ export type Action =
   | { type: 'removeTrough'; cell: number }
   /** A water hub on a fence line or corner, by grid corner (see vertexId). */
   | { type: 'placeFenceHub'; vertex: number }
+  /** Take out a fence-line or corner hub. No refund. */
   | { type: 'removeHub'; vertex: number }
+  /** Move a fence-line or corner hub to another grid corner. It costs what moving a trough costs. */
+  | { type: 'moveHub'; from: number; to: number }
   /** A water hub on a square: a trough with an open gate on every side. */
   | { type: 'placeSquareHub'; cell: number }
+  /** Take out a water hub on a square: the trough comes out and the gates stay. No refund. */
+  | { type: 'removeSquareHub'; cell: number }
+  /**
+   * Move a water hub on a square to another square: the trough moves, at
+   * what moving a trough costs, and the new square gets its open gates. The
+   * old square keeps its gates.
+   */
+  | { type: 'moveSquareHub'; from: number; to: number }
   | { type: 'placePortable'; cell: number }
   | { type: 'movePortable'; port: number; cell: number }
   | { type: 'refillPortable'; port: number }
