@@ -138,6 +138,7 @@ export function cropLines(farm: FarmState, env: SourceEnv, action: Action): stri
       convHa: info.convHa,
       convCost: info.convHa * CONVERT_COST_PER_HA,
       skipped: new Set(action.cells).size - info.use.length,
+      crop: info.crop,
       cashBefore: farm.cash,
     });
   }

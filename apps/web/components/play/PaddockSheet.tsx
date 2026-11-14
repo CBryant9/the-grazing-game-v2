@@ -5,6 +5,7 @@ import type { PaddockWire, Snapshot } from '@/lib/game/types';
 import { num, plural } from '@/lib/game/format';
 import { gatesOfPaddock } from '@/lib/game/build';
 import { useGame } from '@/lib/game/store';
+import { CropSection } from './CropSection';
 import { Sheet } from './Sheet';
 import { Sward } from './Sward';
 import styles from './play.module.css';
@@ -88,6 +89,7 @@ export function PaddockSheet({
           ))}
         </ul>
       )}
+      <CropSection snapshot={snapshot} paddock={p} />
       {gates.length > 0 && (
         <>
           <h3 className={`px ${styles.minihead}`}>{gates.length > 1 ? 'Gates' : 'Gate'}</h3>

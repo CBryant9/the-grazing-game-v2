@@ -129,6 +129,8 @@ export interface SowLines {
   convCost: number;
   /** Squares asked for that can not take it. */
   skipped: number;
+  /** A forage or grain crop, which only goes on arable land. Pasture goes anywhere with no crop in the ground. */
+  crop: boolean;
   cashBefore: number;
 }
 
@@ -142,8 +144,11 @@ export function sowLines(s: SowLines): string[] {
     );
   }
   if (s.skipped > 0) {
+    const squares = s.skipped === 1 ? '1 square' : `${s.skipped} squares`;
     out.push(
-      `${s.skipped === 1 ? '1 square' : `${s.skipped} squares`} can not take it. It goes on arable land with no crop in the ground.`,
+      s.crop
+        ? `${squares} can not take it. A crop only goes on arable land with no crop in the ground.`
+        : `${squares} can not take it, because a crop is in the ground there.`,
     );
   }
   out.push('Sowing happens at once and takes none of the day.');
