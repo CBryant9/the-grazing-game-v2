@@ -114,6 +114,10 @@ export interface FlockDayResult {
   plantingGrazes: PlantingGraze[];
   /** Dollars of grain, hay or lick fed today. Take it off cash. */
   feedCost: number;
+  /** Pasture the mob ate today, kg DM (for the year's totals, as the cattle's). */
+  eatenKg: number;
+  /** Live weight the mob gained today, kg, birth weights of lambs born included (as the cattle's). */
+  gainKg: number;
 }
 
 /** Live lambs at foot, by the record of their dams. */
@@ -227,6 +231,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     if (s.weaned) dseNow += dseOf(s, l) * s.n;
   }
   let f = 1;
+  let eatenKg = 0;
   if (place.kind === 'held') f = place.f ?? 1;
   else if (demand > 0) {
     const got = sheepGrazeAlloc(
@@ -239,6 +244,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
       plantingGrazes,
     );
     f = got / demand;
+    eatenKg = got;
   }
 
   let rams = 0;
@@ -248,6 +254,7 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
 
   const added: Sheep[] = [];
   let feedCost = 0;
+  let gainKg = 0;
   let sumWt = 0;
   let sumCs = 0;
   let sumAdg = 0;
@@ -315,7 +322,9 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     let gain = bal > 0 ? bal / gainMJPerKg(s) : bal / LOSS_MJ;
     gain = clamp(gain, -LOSS_CAP, GAIN_CAP);
     if (m.dry > 0) gain = -s.wt * NO_WATER.lossShare;
+    const was = s.wt;
     s.wt = Math.max(1.5, s.wt + gain);
+    gainKg += (s.wt - was) * s.n;
     // Young growing sheep put most of a gain into frame, not condition.
     const young = s.age < YOUNG_FRAME_DAYS;
     s.cond = clamp(s.cond + (gain / kgPerCs(s)) * (gain > 0 && young ? 0.3 : 1), 1, 5);
@@ -549,7 +558,9 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
     m.lastThin = day;
     notes.push({ type: 'lowCondition', cs: st.cs });
   }
-  return { st, deaths, births, notes, plantingGrazes, feedCost };
+  let born = 0;
+  for (const b of births) born += b.wt * b.n;
+  return { st, deaths, births, notes, plantingGrazes, feedCost, eatenKg, gainKg: gainKg + born };
 }
 
 /** Start the year's joining: count the ewes and rams, and share each ewe record out by cycle day. */

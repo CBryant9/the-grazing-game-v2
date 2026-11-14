@@ -180,7 +180,7 @@ export const SCORE = {
 export function scoreYear(
   y: Pick<
     YearTotals,
-    'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'sheepDeaths' | 'covers'
+    'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'sheepDeaths' | 'sheepDeathAe' | 'covers'
   > & {
     worth1: number;
   },
@@ -201,8 +201,9 @@ export function scoreYear(
     (cover < S.coverLow ? (S.coverLow - cover) * S.coverShort : 0);
   const profitPts = profit / S.dollarsPerPoint;
   const gainPts = y.gain * S.gainPts;
-  // A sheep death counts as one DSE's share of a beast (call, 15 Nov 2026). 0 with no sheep.
-  const deathPts = -(y.deaths + (y.sheepDeaths ?? 0) / DSE_PER_AE) * S.death;
+  // A sheep death counts by the animal's size in AE (call, 15 Nov 2026): a newborn lamb about
+  // 0.03 of a beast, a ewe about 0.2. Cattle deaths count one each, as before. 0 with no sheep.
+  const deathPts = -(y.deaths + (y.sheepDeathAe ?? 0)) * S.death;
   return {
     profit,
     util,

@@ -461,6 +461,9 @@ export function sheepDay(
       ids: farm.animalIds,
       rng,
     });
+    // Pasture eaten and weight gained count in the year's totals as the cattle's do.
+    farm.year.eaten += res.eatenKg;
+    farm.year.gain += res.gainKg;
     if (res.feedCost > 0) {
       farm.cash -= res.feedCost;
       farm.year.feed += res.feedCost;
@@ -486,6 +489,8 @@ export function sheepDay(
       for (const d of res.deaths) {
         deaths.push(d);
         farm.year.sheepDeaths = (farm.year.sheepDeaths ?? 0) + d.count;
+        farm.year.sheepDeathAe =
+          (farm.year.sheepDeathAe ?? 0) + d.count * Math.pow(d.sheep.wt / 450, 0.75);
         by.set(d.cause, (by.get(d.cause) ?? 0) + d.count);
         out.deaths.push({ id: d.sheep.id, mob: m.id, cause: d.cause, count: d.count });
       }

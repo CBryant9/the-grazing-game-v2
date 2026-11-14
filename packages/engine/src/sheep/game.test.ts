@@ -8,7 +8,7 @@ import { DSE_PER_AE, MVP_DSE_PER_AE } from '../data/stocking';
 import { GRID_W } from '../grid';
 import { COST_PER_M, NETTING_PER_M, segmentCost } from '../money/costs';
 import { netWorth, scoreYear } from '../money/worth';
-import { loadFarm, saveFarm } from '../save/save';
+import { saveFarm } from '../save/save';
 import { createFarm } from '../sim/create';
 import { dateAt } from '../calendar';
 import { surveyOf } from '../sim/derived';
@@ -280,7 +280,7 @@ describe('the cattle, sheep or mix choice at setup', () => {
 });
 
 describe('sheep in the score and the saves', () => {
-  it('a sheep death counts as one DSE share of a beast in the year score', () => {
+  it('a sheep death counts by its size in AE in the year score', () => {
     const base = {
       worth0: 0,
       grown: 1000,
@@ -291,7 +291,7 @@ describe('sheep in the score and the saves', () => {
       worth1: 0,
     };
     const a = scoreYear({ ...base }, 80);
-    const b = scoreYear({ ...base, sheepDeaths: 84 }, 80);
+    const b = scoreYear({ ...base, sheepDeaths: 84, sheepDeathAe: 10 }, 80);
     const c = scoreYear({ ...base, deaths: 12 }, 80);
     expect(b.deathPts).toBeCloseTo(c.deathPts, 9);
     expect(a.deathPts).toBeGreaterThan(b.deathPts);

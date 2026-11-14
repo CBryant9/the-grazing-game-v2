@@ -168,6 +168,11 @@ export interface YearTotals {
   wool?: number;
   /** Sheep that died (lambs included). Left out until a farm first has sheep die. */
   sheepDeaths?: number;
+  /**
+   * The same deaths weighed by each animal's size, in AE ((kg ÷ 450)^0.75, the
+   * cattle AE rule): what the year score counts. Left out with `sheepDeaths`.
+   */
+  sheepDeathAe?: number;
   /** Dollars from grain. */
   grain: number;
   /** Dollars spent on sowing forages and crops, and on harvesting. */
