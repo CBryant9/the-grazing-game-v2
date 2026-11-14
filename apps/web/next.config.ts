@@ -17,7 +17,10 @@ const nextConfig: NextConfig = {
   // Never publish source maps: the code must not be readable (CLAUDE.md, rule 14).
   productionBrowserSourceMaps: false,
   // Workspace packages are plain TypeScript and are compiled with the app.
-  transpilePackages: ['@gg/shared', '@gg/render'],
+  transpilePackages: ['@gg/shared', '@gg/render', '@gg/engine'],
+  // The game routes read the real weather and price tables from the engine's
+  // data folder at run time. Make sure a hosted build ships them with the routes.
+  outputFileTracingIncludes: { '/api/game/**': ['../../packages/engine/data/raw/**'] },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

@@ -52,3 +52,6 @@ next-env.d.ts
 
 # written by next dev; the project does not use it
 apps/web/AGENTS.md
+
+# farms kept by the game server for now (apps/web/server/game/store.ts)
+.farms/
