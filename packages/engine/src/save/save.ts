@@ -276,6 +276,8 @@ function upgrade(f: Record<string, unknown>): void {
   }
   if (farm.layout) {
     farm.layout.tapeOnRoll ??= 0;
+    // Fence materials kept (format 7): a farm saved before had none on hand.
+    farm.layout.fenceOnHand ??= { permanent: 0, electric: 0 };
     farm.layout.water.hubs ??= [];
     farm.layout.water.ports ??= [];
     farm.layout.water.nextPortId ??=

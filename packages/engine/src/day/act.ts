@@ -104,7 +104,7 @@ function finish(
   light: Light,
   workMin: number,
   card: Pick<JobCard, 'outcome' | 'totalWorkMin' | 'parts' | 'cost'> &
-    Partial<Pick<JobCard, 'line' | 'notToday'>>,
+    Partial<Pick<JobCard, 'line' | 'notToday' | 'fenceMaterials' | 'materialsKept'>>,
 ): Worked {
   // Stock booked onto a sale, and cattle on their way: the card says so.
   const sale = did.find((e) => e.type === 'sale-booked');
@@ -236,6 +236,55 @@ function doWhole(
 // A line of fence, tape or pipe
 // ---------------------------------------------------------------------------
 
+/** The lengths and counts a fence or water job reported, or null. */
+function layoutDetail(
+  events: readonly FarmEvent[],
+): Record<string, number | boolean | string> | null {
+  const e = events.find((x) => x.type === 'layout-job');
+  return e?.type === 'layout-job' ? e.detail : null;
+}
+
+/**
+ * The fence materials a line uses or keeps, for the card. `whole` is what
+ * the whole line did, tried at once; `today` is what the part built today did.
+ */
+function materialsOf(
+  farm: FarmState,
+  action: Action,
+  whole: readonly FarmEvent[],
+  today: readonly FarmEvent[],
+): Partial<Pick<JobCard, 'fenceMaterials' | 'materialsKept'>> {
+  const w = layoutDetail(whole);
+  const t = layoutDetail(today);
+  if (!w || !t) return {};
+  const n = (v: number | boolean | string | undefined): number => Number(v ?? 0);
+  if (action.type === 'buildFence') {
+    if (action.fence === 'tape') return {};
+    return {
+      fenceMaterials: {
+        fence: action.fence,
+        onHandM: farm.layout.fenceOnHand[action.fence] * farm.layout.scale.sideM,
+        fromStockM: n(w.fromStockM),
+        saving: n(w.stockSaving),
+        fromStockTodayM: n(t.fromStockM),
+        savingToday: n(t.stockSaving),
+        onHandAfterM: n(t.onHandM),
+      },
+    };
+  }
+  if (action.type === 'removeFence' || action.type === 'rollUpTape') {
+    return {
+      materialsKept: {
+        permanentM: n(t.keptPermanentM),
+        electricM: n(t.keptElectricM),
+        permanentOnHandM: n(t.permanentOnHandM),
+        electricOnHandM: n(t.electricOnHandM),
+      },
+    };
+  }
+  return {};
+}
+
 function doLine(
   farm: FarmState,
   action: Action,
@@ -275,6 +324,7 @@ function doLine(
       parts,
       cost,
       line,
+      ...materialsOf(farm, action, trial.events, trial.events),
     });
   }
   // Build the pieces that fit, by the same rules as building them all. The
@@ -288,6 +338,7 @@ function doLine(
     cost,
     line,
     notToday: { reason: 'not-enough-daylight', message: NOT_TODAY },
+    ...materialsOf(farm, action, trial.events, some.events),
   });
 }
 

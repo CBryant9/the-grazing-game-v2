@@ -97,6 +97,29 @@ export function mobSummaries(farm: FarmState): MobSummary[] {
   });
 }
 
+/** Fence materials on hand, in metres, by kind. */
+export interface MaterialsOnHand {
+  /** Permanent fence taken down and kept to use again. */
+  permanentM: number;
+  /** Electric fence taken down and kept to use again. */
+  electricM: number;
+  /** Tape on the roll. */
+  tapeM: number;
+}
+
+/**
+ * The fence materials on hand. Permanent and electric fence taken down is
+ * kept, and fence of that kind is built from it first, at half price.
+ */
+export function materialsOnHand(farm: FarmState): MaterialsOnHand {
+  const { fenceOnHand, tapeOnRoll, scale } = farm.layout;
+  return {
+    permanentM: fenceOnHand.permanent * scale.sideM,
+    electricM: fenceOnHand.electric * scale.sideM,
+    tapeM: tapeOnRoll * scale.sideM,
+  };
+}
+
 /** A paddock's pasture and stock, with its name and water. */
 export interface PaddockView extends PaddockSummary {
   id: number;

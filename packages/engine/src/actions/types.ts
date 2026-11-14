@@ -284,6 +284,36 @@ export interface JobCard {
    * words. It is not remembered. The player draws it again another day.
    */
   notToday?: { reason: 'not-enough-daylight'; message: string };
+  /**
+   * Permanent or electric fence: the materials on hand it uses. They are
+   * used first, along the line in the order drawn, and a metre built from
+   * them is half price. For a line cut short, "today" is the part built
+   * today. Left out for other jobs.
+   */
+  fenceMaterials?: {
+    fence: 'permanent' | 'electric';
+    /** Metres of this kind on hand before the job. */
+    onHandM: number;
+    /** The whole line as drawn: metres built from materials on hand, and the dollars that saves. */
+    fromStockM: number;
+    saving: number;
+    /** The part built today. The same as the whole line when it all fits. */
+    fromStockTodayM: number;
+    savingToday: number;
+    /** Metres of this kind left on hand after today's part. */
+    onHandAfterM: number;
+  };
+  /**
+   * Taking fence down: the permanent and electric fence materials kept from
+   * the part done today, and what is on hand of each kind after it. Left out
+   * for other jobs.
+   */
+  materialsKept?: {
+    permanentM: number;
+    electricM: number;
+    permanentOnHandM: number;
+    electricOnHandM: number;
+  };
 }
 
 /** What `previewAction` returns: the job card, or why the job can't be done. Nothing changes. */

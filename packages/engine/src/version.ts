@@ -24,8 +24,16 @@
  * the plan moves in the daily tick, with the move time taken off the day's
  * light. A farm with no plan runs exactly as it did on 0.8.0. No grass,
  * cattle, crop or price formula changed.
+ *
+ * 0.10.0 (engine rules after the screens review, 14 Nov 2026): fence
+ * materials are kept when fence is taken down and reused at half price;
+ * both kinds of water hub can be removed and moved; the player is told
+ * only what a joining report or a preg test has told them; and reads the
+ * web server needs. No grass, cattle, crop, season or price formula
+ * changed. A farm that never takes a fence down and builds again runs
+ * exactly as it did on 0.9.0.
  */
-export const ENGINE_VERSION = '0.9.0';
+export const ENGINE_VERSION = '0.10.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -52,5 +60,9 @@ export const ENGINE_VERSION = '0.9.0';
  * 6: grazing plans (milestone 1.5c). A farm has `plans` (templates) and
  * `nextPlanId`, and a mob may have a `plan` (where it is on a template). An
  * older save loads with no plans.
+ *
+ * 7: engine rules after the screens review (14 Nov 2026). A farm's layout
+ * has `fenceOnHand` (permanent and electric fence materials kept, in
+ * segments). An older save loads with none on hand.
  */
-export const SAVE_FORMAT_VERSION = 6;
+export const SAVE_FORMAT_VERSION = 7;

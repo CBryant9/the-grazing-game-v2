@@ -51,7 +51,22 @@ export interface FarmLayout {
   water: Water;
   /** Rolled-up tape ready to use again, in segments. One segment is one side of a square. */
   tapeOnRoll: number;
+  /**
+   * Permanent and electric fence taken down and kept to use again, in
+   * segments, by kind (Claudia, 14 Nov 2026). Fence of that kind is built
+   * from these first, at half the price of new (REUSED_FENCE_SHARE).
+   */
+  fenceOnHand: FenceOnHand;
 }
+
+/** Fence materials kept from fence taken down, in segments, by kind. */
+export interface FenceOnHand {
+  permanent: number;
+  electric: number;
+}
+
+/** Nothing on hand: a new farm's fence materials. */
+export const noFenceOnHand = (): FenceOnHand => ({ permanent: 0, electric: 0 });
 
 export type RefusalReason =
   | 'off-the-farm'
@@ -255,6 +270,14 @@ export interface FenceBuilt extends FenceEffect {
   /** Tape only: segments of new tape that had to be bought. */
   tapeNew: number;
   tapeNewM: number;
+  /**
+   * Permanent and electric only: segments built from materials on hand, and
+   * those segments. Materials are used first, along the line in the order
+   * it was drawn.
+   */
+  fromStock: number;
+  fromStockM: number;
+  fromStockEdges: EdgeRef[];
   /** Old fence the new run went over, by kind. It is gone, tape included. */
   replaced: EdgeTally;
 }
@@ -262,7 +285,8 @@ export interface FenceBuilt extends FenceEffect {
 /**
  * Build a run of fence. Gates and the boundary in the run are left as they
  * are. Any other fence in the run becomes the new type. Tape comes off the
- * roll first.
+ * roll first. Permanent and electric fence use the materials of that kind on
+ * hand first, along the line in the order drawn.
  */
 export function buildFence(
   layout: FarmLayout,
@@ -275,6 +299,9 @@ export function buildFence(
   if (!edges.every(edgeOnFarm)) return refuse('off-the-farm', 'That line runs off the farm.');
   const fences = cloneFences(layout.fences);
   const replaced = emptyTally();
+  const kind = type === EDGE.permanent ? 'permanent' : type === EDGE.electric ? 'electric' : null;
+  let stock = kind ? layout.fenceOnHand[kind] : 0;
+  const fromStockEdges: EdgeRef[] = [];
   let n = 0;
   for (const e of edges) {
     const c = getEdge(fences, e);
@@ -282,6 +309,10 @@ export function buildFence(
     if (c !== type) {
       n++;
       count(replaced, c);
+      if (stock > 0) {
+        stock--;
+        fromStockEdges.push({ line: e.line, index: e.index });
+      }
     }
     setEdge(fences, e, type);
   }
@@ -289,9 +320,13 @@ export function buildFence(
   const side = layout.scale.sideM;
   const fromRoll = type === EDGE.tape ? Math.min(n, layout.tapeOnRoll) : 0;
   const bought = type === EDGE.tape ? n - fromRoll : 0;
+  const fromStock = fromStockEdges.length;
+  const fenceOnHand = kind
+    ? { ...layout.fenceOnHand, [kind]: layout.fenceOnHand[kind] - fromStock }
+    : layout.fenceOnHand;
   return {
     ok: true,
-    layout: { ...layout, fences, tapeOnRoll: layout.tapeOnRoll - fromRoll },
+    layout: { ...layout, fences, tapeOnRoll: layout.tapeOnRoll - fromRoll, fenceOnHand },
     type,
     segments: n,
     metres: n * side,
@@ -299,6 +334,9 @@ export function buildFence(
     tapeFromRollM: fromRoll * side,
     tapeNew: bought,
     tapeNewM: bought * side,
+    fromStock,
+    fromStockM: fromStock * side,
+    fromStockEdges,
     replaced,
     ...fenceEffect(layout, fences),
   };
@@ -313,19 +351,30 @@ export interface FenceRemoved extends FenceEffect {
   /** Tape rolled up and put back on the roll, in segments. Knocked-down tape counts. */
   tapeToRoll: number;
   tapeToRollM: number;
+  /**
+   * Permanent and electric fence materials kept to use again, in segments,
+   * by kind. Knocked-down electric fence counts. Gates are not kept.
+   */
+  kept: FenceOnHand;
 }
 
-/** Pull down every fence and gate along a run. The boundary stays. */
+/**
+ * Pull down every fence and gate along a run. The boundary stays. Tape goes
+ * back on the roll, and permanent and electric fence materials are kept.
+ */
 export function removeFence(layout: FarmLayout, edges: readonly EdgeRef[]): Outcome<FenceRemoved> {
   if (!edges.every(edgeOnFarm)) return refuse('off-the-farm', 'That line runs off the farm.');
   const fences = cloneFences(layout.fences);
   const removed = emptyTally();
+  const kept = noFenceOnHand();
   let n = 0;
   let tape = 0;
   for (const e of edges) {
     const c = getEdge(fences, e);
     if (c >= 1 && c <= 7) {
       if (c === EDGE.tape || c === EDGE.tapeDown) tape++;
+      if (c === EDGE.permanent) kept.permanent++;
+      if (c === EDGE.electric || c === EDGE.electricDown) kept.electric++;
       count(removed, c);
       setEdge(fences, e, EDGE.none);
       n++;
@@ -335,12 +384,21 @@ export function removeFence(layout: FarmLayout, edges: readonly EdgeRef[]): Outc
   const side = layout.scale.sideM;
   return {
     ok: true,
-    layout: { ...layout, fences, tapeOnRoll: layout.tapeOnRoll + tape },
+    layout: {
+      ...layout,
+      fences,
+      tapeOnRoll: layout.tapeOnRoll + tape,
+      fenceOnHand: {
+        permanent: layout.fenceOnHand.permanent + kept.permanent,
+        electric: layout.fenceOnHand.electric + kept.electric,
+      },
+    },
     removed,
     segments: n,
     metres: n * side,
     tapeToRoll: tape,
     tapeToRollM: tape * side,
+    kept,
     ...fenceEffect(layout, fences),
   };
 }

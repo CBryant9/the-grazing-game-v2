@@ -250,7 +250,13 @@ describe('fences, gates and water at the start, against the MVP', () => {
         mvp.startLayout(true);
         mvp.recompute();
         const laid = layRunning(rngStream(k, 'running'), bore, scale);
-        const layout: FarmLayout = { scale, fences: laid.fences, water: laid.water, tapeOnRoll: 0 };
+        const layout: FarmLayout = {
+          scale,
+          fences: laid.fences,
+          water: laid.water,
+          tapeOnRoll: 0,
+          fenceOnHand: { permanent: 0, electric: 0 },
+        };
         const where = `running farm ${k} (${id}, ${farmHa} ha)`;
         expectSameLayout(layout, mvp, where);
         expectSameSurvey(surveyLayout(layout), mvp, where);
@@ -297,7 +303,13 @@ describe('fences, gates and water at the start, against the MVP', () => {
       mvp.startScratch();
       mvp.recompute();
       const laid = layScratch(rngStream(k, 'scratch'), bore);
-      const layout: FarmLayout = { scale, fences: laid.fences, water: laid.water, tapeOnRoll: 0 };
+      const layout: FarmLayout = {
+        scale,
+        fences: laid.fences,
+        water: laid.water,
+        tapeOnRoll: 0,
+        fenceOnHand: { permanent: 0, electric: 0 },
+      };
       const where = `scratch farm ${k}`;
       expectSameLayout(layout, mvp, where);
       expectSameSurvey(surveyLayout(layout), mvp, where);
@@ -680,7 +692,13 @@ describe('a whole new farm, against the MVP', () => {
 
       expect(firstDifference(pasture.F, S.F), 'soil fertility').toBeNull();
       expect(bore).toBe(S.bore);
-      const layout: FarmLayout = { scale, fences: laid.fences, water: laid.water, tapeOnRoll: 0 };
+      const layout: FarmLayout = {
+        scale,
+        fences: laid.fences,
+        water: laid.water,
+        tapeOnRoll: 0,
+        fenceOnHand: { permanent: 0, electric: 0 },
+      };
       expectSameLayout(layout, mvp);
       expectSameCrops({ crops, pasture, ctx }, mvp);
       expect(land.squares * scale.haPerSquare).toBe(S.arableHa);

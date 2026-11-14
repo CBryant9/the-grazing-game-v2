@@ -212,6 +212,7 @@ describe('looking is free', () => {
       calibrationView: (f) => engine.calibrationView(f),
       farmTotals: (f, env) => engine.farmTotals(f, env),
       mobSummaries: (f) => engine.mobSummaries(f),
+      materialsOnHand: (f) => engine.materialsOnHand(f),
       paddockSummaries: (f, env) => engine.paddockSummaries(f, env),
       farmHash: (f) => engine.farmHash(f),
       saveFarm: (f) => engine.saveFarm(f),

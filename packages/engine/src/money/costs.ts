@@ -50,6 +50,20 @@ export const COSTS = {
 /** A portable trough sells back for this share of its price. */
 export const PORTABLE_RESALE_SHARE = 0.5;
 
+/** Dollars a portable trough gives back when it is taken off the farm (sold back). */
+export const portableResale = (): number => COSTS.portable * PORTABLE_RESALE_SHARE;
+
+/**
+ * A metre of permanent or electric fence built from materials on hand (kept
+ * from fence taken down) costs this share of a new metre. Claudia's figure,
+ * 14 Nov 2026: "half price is fine" (docs/DATA.md).
+ */
+export const REUSED_FENCE_SHARE = 0.5;
+
+/** What one segment of permanent or electric fence costs when it is built from materials on hand. */
+export const reusedSegmentCost = (item: 'permanent' | 'electric', sideM: number): number =>
+  segmentCost(item, sideM) * REUSED_FENCE_SHARE;
+
 /** Selling: the agent's commission, as a share of the sale value. */
 export const SELL_COMMISSION = 0.05;
 /** Freight and yard dues, dollars a head, on selling and on buying. */

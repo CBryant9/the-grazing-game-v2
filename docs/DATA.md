@@ -489,8 +489,8 @@ Names used for cattle on the farm (`label`): Weaner steer (under 280 kg), Yearli
 
 | Item | Cost |
 |---|---|
-| Permanent fence | $7/m |
-| Electric fence | $3.60/m, plus a $900 solar energiser once |
+| Permanent fence | $7/m new; $3.50/m from materials on hand |
+| Electric fence | $3.60/m new; $1.80/m from materials on hand; plus a $900 solar energiser once |
 | Temporary tape | $0.90/m new; $10 to roll up or roll out reused tape (shown as $45 a square on the default farm) |
 | Pipe | $4.80/m |
 | Trough | $1,500; moving one $300 |
@@ -527,6 +527,13 @@ Corrections from the code (milestone 1.2c):
 - Interest is worked each day on the balance after the day's feed bill and before the day's overheads and health.
 - **What counts as infrastructure in net worth (the rebuild's rule):** what was paid for fence, gates, pipe, troughs and hubs still in place; the tape the farm owns at the price of new tape; $555 of a portable trough's $600 (not its first fill of water); the $900 energiser; and half the establishment cost of a sown perennial pasture still in the ground. Net worth counts 80% of that. Improvements that came with the farm count for nothing. See MODEL.md, section 8.
 - Sowing a forage or grain crop, and harvest costs, go to the year's cropping costs. Sowing a perennial pasture goes to the year's infrastructure total in full.
+
+Fence materials kept and reused (14 Nov 2026):
+
+- **A metre of permanent or electric fence built from materials on hand costs half the price of a new metre.** `REUSED_FENCE_SHARE = 0.5` in `money/costs.ts`. **Decided: Claudia's figure**, 14 Nov 2026. Her words: "if they remove a fence, they can have so many discounted fence fees because they would already have some of the materials, but they still don't get the full amount", then "half price is fine". It is a game rule, not a looked-up real-world figure, so it has no outside source.
+- Taking down permanent or electric fence keeps its materials on hand, by the metre and by kind (knocked-down electric counts as electric). Gates are not kept. Tape is unchanged: it goes back on the roll.
+- Building fence of a kind uses the materials on hand of that kind first, along the line in the order drawn. The rest is charged at the full price. The half is of the rounded segment price, so a segment on the 260 ha default farm is $175 permanent and $90 electric from materials on hand.
+- **Builder's choices, for Claudia to check:** materials on hand count for nothing in net worth (the ledger records what was spent on what is standing, so a segment rebuilt at half price is in the ledger at half); fence built over by a new run of another kind, and fence a gate or a square hub takes the place of, is gone, not kept (as tape under a new fence already was); materials have no limit on how long they keep; the energiser rule is unchanged (it is bought with the first electric fence built, whether the wire is new or reused).
 
 ## Job times (milestone 1.5a, the working day)
 
@@ -587,7 +594,7 @@ The PRD gives the figures. Where it does not say how a figure is applied, the si
 2. **Whole segments only.** A line is built one map square's side at a time. A segment is built if all of it fits in the light left. On a big farm a segment is long (340 m on 12,000 ha), so a day of permanent fence there is one segment, not 500 m.
 3. **The bank must cover the whole line as drawn**, though only the part that fits is built and charged today.
 4. **A job that needs more than a whole day's light** can be done at first light, before anything else that day, and it uses the whole day. This is so no job is impossible. With the muster gone it matters only for a very big mob: weaning 2,000 head is 17 h 10 m.
-5. **Taking things out takes as long as putting them in:** pulling down fence (at the pace of its kind), taking out a gate (60 min), a trough or a water hub (180 min). `removalWork` and the removal cases in `day/spec.ts`.
+5. **Taking things out takes as long as putting them in:** pulling down fence (at the pace of its kind), taking out a gate (60 min), a trough or a water hub (180 min). `removalWork` and the removal cases in `day/spec.ts`. Fence built from materials on hand takes as long as new fence: only the price changes (14 Nov 2026).
 6. **Moving a fixed trough** takes as long as fitting one (180 min).
 7. **Water hubs.** On a fence line or corner: a trough (180 min). On a square: a trough if the square has none (180 min) and a swing gate for each side that gets one (60 min each).
 8. **Putting a knocked-down segment back up:** its length at the pace of its kind (electric or tape).

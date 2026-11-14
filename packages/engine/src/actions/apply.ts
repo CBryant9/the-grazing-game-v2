@@ -79,7 +79,8 @@ import {
   COW_CALF_FREIGHT,
   HEAD_FEE,
   PASTURE_ASSET_SHARE,
-  PORTABLE_RESALE_SHARE,
+  portableResale,
+  reusedSegmentCost,
   segmentCost,
 } from '../money/costs';
 import { spend } from '../money/worth';
@@ -1108,7 +1109,12 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   const was = farm.layout.fences;
   const out = buildFence(farm.layout, a.edges, type);
   if (!out.ok) return out;
-  const each = segmentCost(a.fence, farm.layout.scale.sideM);
+  const side = farm.layout.scale.sideM;
+  const each = segmentCost(a.fence, side);
+  // A segment built from materials on hand (kept from fence taken down) is half price.
+  const reused = a.fence === 'tape' ? each : reusedSegmentCost(a.fence, side);
+  const fromStock = new Set(out.fromStockEdges.map(edgeKey));
+  const fenceCost = (out.segments - out.fromStock) * each + out.fromStock * reused;
   let cost: number;
   let fee = 0;
   let energiser = false;
@@ -1117,7 +1123,7 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
     fee = out.tapeFromRoll > 0 ? COSTS.tapeRoll : 0;
     cost = out.tapeNew * each + fee;
   } else {
-    cost = out.segments * each;
+    cost = fenceCost;
     // The energiser is bought once, with the first electric fence.
     if (a.fence === 'electric' && !farm.energiser) {
       energiser = true;
@@ -1132,14 +1138,17 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   }
   for (const e of a.edges) {
     if (getEdge(was, e) === getEdge(out.layout.fences, e)) continue;
-    if (a.fence === 'tape') delete farm.ledger.edges[edgeKey(e)];
-    else farm.ledger.edges[edgeKey(e)] = each;
+    const key = edgeKey(e);
+    if (a.fence === 'tape') delete farm.ledger.edges[key];
+    // The ledger records what was spent on what is standing: half for a segment from materials on hand.
+    else farm.ledger.edges[key] = fromStock.has(key) ? reused : each;
   }
   if (a.fence === 'tape') {
     farm.year.infra += out.tapeNew * each;
     farm.year.running += fee;
-  } else farm.year.infra += out.segments * each;
+  } else farm.year.infra += fenceCost;
   farm.layout = out.layout;
+  const onHand = a.fence === 'tape' ? 0 : farm.layout.fenceOnHand[a.fence];
   j.events.push({
     type: 'layout-job',
     job: 'buildFence',
@@ -1150,6 +1159,10 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
       metres: out.metres,
       tapeFromRollM: out.tapeFromRollM,
       tapeNewM: out.tapeNewM,
+      // Permanent and electric: metres from materials on hand, what that saved, and what is left on hand.
+      fromStockM: out.fromStockM,
+      stockSaving: out.fromStock * (each - reused),
+      onHandM: onHand * side,
       energiserBought: energiser,
       paddocksBefore: out.paddocksBefore,
       paddocksAfter: out.paddocksAfter,
@@ -1175,6 +1188,7 @@ function doRemoveFence(j: Job, edges: readonly EdgeRef[], job: string): Out {
     if (getEdge(out.layout.fences, e) === EDGE.none) delete farm.ledger.edges[edgeKey(e)];
   }
   farm.layout = out.layout;
+  const side = farm.layout.scale.sideM;
   j.events.push({
     type: 'layout-job',
     job: j.part.label ?? job,
@@ -1183,7 +1197,12 @@ function doRemoveFence(j: Job, edges: readonly EdgeRef[], job: string): Out {
       segments: out.segments,
       metres: out.metres,
       tapeToRollM: out.tapeToRollM,
-      tapeOnRollM: farm.layout.tapeOnRoll * farm.layout.scale.sideM,
+      tapeOnRollM: farm.layout.tapeOnRoll * side,
+      // Fence materials kept to use again, and what is now on hand of each kind.
+      keptPermanentM: out.kept.permanent * side,
+      keptElectricM: out.kept.electric * side,
+      permanentOnHandM: farm.layout.fenceOnHand.permanent * side,
+      electricOnHandM: farm.layout.fenceOnHand.electric * side,
       paddocksBefore: out.paddocksBefore,
       paddocksAfter: out.paddocksAfter,
     },
@@ -1427,7 +1446,7 @@ function doRefillPortable(j: Job, a: Extract<Action, { type: 'refillPortable' }>
 function doRemovePortable(j: Job, a: Extract<Action, { type: 'removePortable' }>): Out {
   const out = removePortable(j.farm.layout, a.port);
   if (!out.ok) return out;
-  const back = COSTS.portable * PORTABLE_RESALE_SHARE;
+  const back = portableResale();
   j.farm.cash += back;
   delete j.farm.ledger.ports[a.port];
   waterJob(j, 'removePortable', out.layout, -back, { port: a.port });
