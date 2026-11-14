@@ -1,4 +1,4 @@
-import { createFarm, saveFarm } from '@gg/engine';
+import { createFarm, endDay, saveFarm, type YearScore, type YearTotals } from '@gg/engine';
 import { describe, expect, it } from 'vitest';
 import type { DateParts, SetupChoices } from '../../lib/game/types';
 import {
@@ -12,6 +12,8 @@ import {
 } from './diary';
 import { GameError, GameServer, farmIdFor } from './game';
 import { MemoryFarmStore, STORED_FORMAT, type StoredFarm } from './store';
+import { buildSummary } from './snapshot';
+import { yearFacts } from './years';
 
 const A = 'a'.repeat(32);
 const date = (n: number): DateParts => ({ year: 2026, month: 8, date: (n % 28) + 1 });
@@ -143,7 +145,7 @@ describe('what a day or skip adds to the diary', () => {
       summaryLines({
         daysRun: 0,
         cash: { before: 1, after: 2 },
-        money: { sales: 5, buys: 0, feed: 0, running: 0, interest: 0 },
+        money: { sales: 5, buys: 0, feed: 0, grain: 0, running: 0, interest: 0 },
       } as never),
     ).toEqual([]);
   });
@@ -250,7 +252,7 @@ describe('the year end and the end of the game', () => {
     await game.create(A, SETUP);
     const id = farmIdFor(A);
     const raw = (await store.get(id)) as unknown as StoredFarm;
-    const farm = createFarm({
+    let farm = createFarm({
       seed: 3,
       district: 'cw',
       size: 'small',
@@ -258,6 +260,7 @@ describe('the year end and the end of the game', () => {
       startType: 'running',
       difficulty: 'medium',
     });
+    for (let i = 0; i < 4; i++) farm = endDay(farm).farm;
     farm.over = { reason: 'bank', day: 42 };
     store.putRaw(id, JSON.stringify({ ...raw, saved: saveFarm(farm) }));
     const over = server(store);
@@ -265,7 +268,136 @@ describe('the year end and the end of the game', () => {
     expect(snap.over).toMatchObject({ days: 42, text: expect.stringMatching(/bank/) });
     expect(typeof snap.over!.worth).toBe('number');
     expect(snap.over!.total).toBe(snap.over!.years.reduce((a, y) => a + y.total, 0));
+    // The year under way is a part year, with its days.
+    expect(snap.over!.years.at(-1)).toMatchObject({ n: 1, partDays: 4 });
     await expect(over.endDay(A)).rejects.toMatchObject({ status: 409 });
     await expect(over.skip(A, 'week')).rejects.toMatchObject({ status: 409 });
   });
+});
+
+const year = (over: Partial<YearTotals> = {}, score: Partial<YearScore> = {}) =>
+  ({
+    start: 0,
+    grown: 1_000_000,
+    eaten: 400_000,
+    gain: 2000,
+    births: 1,
+    deaths: 0,
+    sales: 0,
+    buys: 0,
+    feed: 0,
+    grain: 0,
+    crops: 0,
+    infra: 0,
+    running: 0,
+    interest: 0,
+    worth0: 1000,
+    worth1: 2000,
+    covers: [70, 80],
+    ...over,
+    score: { util: 40, cover: 75, ...score } as YearScore,
+  }) as YearTotals & { worth1: number; score: YearScore };
+
+describe('the year facts', () => {
+  it('says gained or lost for live weight', () => {
+    expect(yearFacts(year({ gain: 4200 }))).toContain(
+      'Cattle gained 4,200 kg of live weight, birth weights included.',
+    );
+    const lost = yearFacts(year({ gain: -4200 }));
+    expect(lost).toContain('Cattle lost 4,200 kg of live weight, birth weights included.');
+    expect(lost.join(' ')).not.toMatch(/gained|-4,200/);
+  });
+
+  it('gives both pasture totals in tonnes, and says so when more was eaten than grew', () => {
+    const under = yearFacts(year({ grown: 1_000_000, eaten: 400_000 }));
+    expect(under).toContain('1,000 t DM of pasture grew. The cattle ate 400 t DM.');
+    expect(under.join(' ')).not.toMatch(/carried over|%  *of the feed/);
+    const over = yearFacts(year({ grown: 1_000_000, eaten: 1_300_000 }, { util: 130 }));
+    expect(over).toContain('1,000 t DM of pasture grew. The cattle ate 1,300 t DM.');
+    expect(over).toContain('They ate feed carried over from before the year as well.');
+    // No percentage over 100 is shown.
+    expect(over.join(' ')).not.toMatch(/130/);
+  });
+
+  it('says ground cover is today when there are no monthly readings yet', () => {
+    expect(yearFacts(year({ covers: [] }))).toContain('Ground cover is 75% today.');
+    expect(yearFacts(year())).toContain('Ground cover averaged 75%.');
+  });
+});
+
+describe('feed spend and grain income in a summary', () => {
+  it('keeps them apart', () => {
+    const s = {
+      fromDate: { year: 2026, month: 8, date: 1 },
+      toDate: { year: 2026, month: 8, date: 2 },
+      daysRun: 1,
+      cash: { before: 0, after: 0 },
+      head: { before: 0, after: 0 },
+      calves: { before: 0, after: 0 },
+      liveWeightKg: { before: 0, after: 0 },
+      massKgHa: { before: 0, after: 0 },
+      greenKgHa: { before: 0, after: 0 },
+      coverPct: { before: 0, after: 0 },
+      births: 0,
+      deaths: 0,
+      deathsByCause: {},
+      gainKg: 0,
+      money: {
+        sales: 0,
+        buys: 0,
+        feed: 100,
+        grain: 300,
+        crops: 0,
+        infra: 0,
+        running: 0,
+        interest: 0,
+      },
+      arrived: { head: 0, calves: 0 },
+      bookedSold: { head: 0, calvesAtFoot: 0, net: 0 },
+    };
+    const wire = buildSummary('day', s as never, [], 1);
+    expect(wire.money.feed).toBe(100);
+    expect(wire.money.grain).toBe(300);
+    expect(summaryLines(wire)).toEqual(['Feed: $100.', 'Grain sold: $300.']);
+  });
+});
+
+describe('a long skip in the diary', () => {
+  it('files lines from the first month as well as the last, and none twice', async () => {
+    const game = server();
+    const first = await game.create(A, SETUP);
+    const mob = first.mobs[0]!;
+    await game.act(A, {
+      action: {
+        type: 'setPlan',
+        mob: mob.id,
+        stops: first.paddocks.slice(0, 2).map((p) => p.cell),
+        trigger: { mode: 'days', every: 3 },
+        rounds: 0,
+        after: 'repeat',
+        step: 0,
+      },
+    });
+    let ran = 0;
+    for (let i = 0; i < 3 && ran < 300; i++) ran += (await game.skip(A, 'year')).summary.daysRun;
+    expect(ran).toBeGreaterThan(300);
+    const all = [];
+    let before: number | undefined;
+    for (let i = 0; i < 20; i++) {
+      const page = await game.record(A, before);
+      all.push(...page.diary);
+      if (page.earlier === null) break;
+      before = page.earlier;
+    }
+    const days = all.map((d) => d.day);
+    // Lines in the first 30 days of the run, and in the last 30.
+    expect(days.some((d) => d >= first.day && d < first.day + 30)).toBe(true);
+    expect(days.some((d) => d >= first.day + ran - 30)).toBe(true);
+    // Far more days than the 120 inbox messages could have held.
+    expect(all.length).toBeGreaterThan(120);
+    for (const d of all) {
+      const lines = d.lines.filter((l) => !/^and \d+ more$/.test(l));
+      expect(new Set(lines).size).toBe(lines.length);
+    }
+  }, 120_000);
 });

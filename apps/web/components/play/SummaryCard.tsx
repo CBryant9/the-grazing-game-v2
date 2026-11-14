@@ -140,6 +140,7 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
           {m.sales > 0 && <li>Sales: {money(m.sales)}.</li>}
           {m.buys > 0 && <li>Cattle bought: {money(m.buys)}.</li>}
           {m.feed > 0 && <li>Feed: {money(m.feed)}.</li>}
+          {m.grain > 0 && <li>Grain sold: {money(m.grain)}.</li>}
           {m.running > 0 && <li>Running costs: {money(m.running)}.</li>}
           {m.interest > 0 && <li>Interest: {money(m.interest)}.</li>}
           {summary.arrived.head > 0 && (

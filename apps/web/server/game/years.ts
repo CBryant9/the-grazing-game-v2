@@ -40,10 +40,26 @@ export function scoreParts(s: YearScore): ScorePartWire[] {
 /** Plain sentences from the year's figures. */
 export function yearFacts(y: Closed): string[] {
   const out = [`Net worth went from ${dollars(y.worth0)} to ${dollars(y.worth1)}.`];
-  out.push(`Cattle gained ${n0(y.gain)} kg of live weight, birth weights included.`);
+  out.push(
+    y.gain < 0
+      ? `Cattle lost ${n0(-y.gain)} kg of live weight, birth weights included.`
+      : `Cattle gained ${n0(y.gain)} kg of live weight, birth weights included.`,
+  );
   out.push(`${plural(y.births, 'birth')}. ${plural(y.deaths, 'death')}.`);
-  if (y.grown > 0) out.push(`${n0(y.score.util)}% of the feed grown was eaten.`);
-  out.push(`Ground cover averaged ${n0(y.score.cover)}%.`);
+  // Tonnes, with both totals. What was eaten can top what grew (feed carried over counts as eaten),
+  // so no percentage is shown. The score uses its own figure, uncapped.
+  if (y.grown > 0 || y.eaten > 0) {
+    out.push(
+      `${n0(y.grown / 1000)} t DM of pasture grew. The cattle ate ${n0(y.eaten / 1000)} t DM.`,
+    );
+    if (y.eaten > y.grown) out.push('They ate feed carried over from before the year as well.');
+  }
+  // With no monthly readings yet the figure is today's cover, not an average.
+  out.push(
+    y.covers.length === 0
+      ? `Ground cover is ${n0(y.score.cover)}% today.`
+      : `Ground cover averaged ${n0(y.score.cover)}%.`,
+  );
   return out;
 }
 
@@ -116,9 +132,19 @@ export function overWire(
   farm: FarmState,
   over: { reason: 'bank' | 'feed'; day: number },
 ): OverWire {
-  const years = farm.years.map((r) => ({ n: r.n, total: r.score.total }));
+  const years: OverWire['years'] = farm.years.map((r) => ({
+    n: r.n,
+    total: r.score.total,
+    partDays: null,
+  }));
   const live = liveYear(farm);
-  if (farm.day > live.start) years.push({ n: farm.years.length + 1, total: live.score.total });
+  if (farm.day > live.start) {
+    years.push({
+      n: farm.years.length + 1,
+      total: live.score.total,
+      partDays: farm.day - live.start,
+    });
+  }
   return {
     text: gameOverWord(over.reason),
     days: over.day,

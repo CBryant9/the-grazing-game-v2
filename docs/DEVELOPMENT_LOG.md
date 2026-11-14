@@ -1045,6 +1045,8 @@ Calls made by the coordinator, for Claudia to confirm:
 
 ### 14 Nov 2026: m1.7g Scores and Diary
 
+Second pass (an Opus review): weight lost is worded "Cattle lost 4,200 kg of live weight." when the year's gain is negative. The pasture facts give both totals in tonnes ("1,000 t DM of pasture grew. The cattle ate 1,300 t DM."), never a percentage, and say "They ate feed carried over from before the year as well." when more was eaten than grew (the score still uses its own uncapped figure). With no monthly readings, "Ground cover is X% today." The diary files a skip's lines from the run's own day by day events, so a year-long skip keeps every day (only first light events come from the inbox). The game over card labels the year under way as a part year with its days, and has "Look around" (a strip "The game is over on this farm." with Show the result and Start a new farm; Scores, Diary, the map and the lists stay readable). A refused day or skip (409) from an old tab loads the farm again instead of offering a retry. The year card's button says Close when the game ended in the same skip. The summary's feed figure is feed only; grain income is its own line ("Grain sold").
+
 Branch `m1.7g-scores-diary`, from `m1.7f-review-fixes`. No engine rule or number changed.
 
 What was built:
@@ -1072,7 +1074,8 @@ Calls for Claudia (what, why, how to change it):
 10. **The game over card counts the year under way** as a last year, so the total adds every score the farm earned. The part year's score is its score as if it closed that day.
 11. **The part scores are rounded one by one,** so the five numbers can differ from the total by a point.
 12. **The money rows on a year are signed:** money in is shown with a plus, money out with a minus. Interest keeps the engine's sign (paid is negative).
-13. **Once the game is over the game over card covers the screen** with one way on, a new farm, behind the same "this farm will be gone" confirm as the More tab.
+13. **Once the game is over the game over card covers the screen** with two ways on: look around the finished farm (a strip with Show the result and Start a new farm), or a new farm, behind the same "this farm will be gone" confirm as the More tab.
+14. **The year score shows each part's points beside its facts, as the mockup does, so a player could work the weights back (for example dollars per profit point).** Kept for now. To be revisited when the Grazier Score and leaderboards are set in Stage 4.
 
 ## Ideas raised but not built yet
 

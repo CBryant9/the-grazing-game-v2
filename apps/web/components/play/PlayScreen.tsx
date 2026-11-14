@@ -21,7 +21,7 @@ import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
 import { PlanFlow } from './PlanFlow';
 import { PlansPanel } from './PlansPanel';
-import { GameOverCard } from './GameOverCard';
+import { GameOverCard, OverStrip } from './GameOverCard';
 import { SummaryCard } from './SummaryCard';
 import { YearEndCard } from './YearEndCard';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
@@ -126,6 +126,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const moveTargetPicked = useGame((s) => s.moveTargetPicked);
   const summary = useGame((s) => s.summary);
   const yearEnd = useGame((s) => s.yearEnd);
+  const overHidden = useGame((s) => s.overHidden);
   const build = useGame((s) => s.build);
   const buildDrag = useGame((s) => s.buildDrag);
   const buildTap = useGame((s) => s.buildTap);
@@ -259,6 +260,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             onFenceTap={(e) => void startFix(e.edge)}
           />
           <NoticeBar />
+          {snapshot.over && overHidden && <OverStrip />}
           {!pc && tab === 'farm' && !sheetOpen && !build && <TodoBanner snapshot={snapshot} />}
           {sheetOpen && <Opened snapshot={snapshot} />}
           {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
@@ -274,7 +276,9 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
       </div>
       {yearEnd && <YearEndCard end={yearEnd} />}
       {summary && !yearEnd && <SummaryCard summary={summary} />}
-      {snapshot.over && !yearEnd && !summary && <GameOverCard over={snapshot.over} />}
+      {snapshot.over && !overHidden && !yearEnd && !summary && (
+        <GameOverCard over={snapshot.over} />
+      )}
     </div>
   );
 }

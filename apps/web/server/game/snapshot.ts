@@ -255,7 +255,8 @@ export function buildSummary(
     money: {
       sales: round(s.money.sales),
       buys: round(s.money.buys),
-      feed: round(s.money.feed + s.money.grain),
+      feed: round(s.money.feed),
+      grain: round(s.money.grain),
       running: round(s.money.running),
       interest: round(s.money.interest),
     },

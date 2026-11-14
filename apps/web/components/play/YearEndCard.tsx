@@ -14,6 +14,8 @@ import styles from './play.module.css';
  */
 export function YearEndCard({ end }: { end: YearEndState }) {
   const dismiss = useGame((s) => s.dismissYearEnd);
+  // The game ended in the same skip that closed the year: there is no next year to start.
+  const over = useGame((s) => s.snapshot?.over != null);
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -61,7 +63,7 @@ export function YearEndCard({ end }: { end: YearEndState }) {
         <YearScore view={end.view} />
         <div className={styles.sumbtns}>
           <button ref={closeRef} type="button" className="btn coral" onClick={dismiss}>
-            Start year {end.view.n + 1}
+            {over ? 'Close' : `Start year ${end.view.n + 1}`}
           </button>
         </div>
       </div>

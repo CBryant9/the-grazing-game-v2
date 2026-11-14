@@ -1,5 +1,5 @@
 import 'server-only';
-import { dateOn, type FarmState } from '@gg/engine';
+import { dateOn, type FarmEvent, type FarmState } from '@gg/engine';
 import type { DateParts, DiaryDay, SummaryWire } from '../../lib/game/types';
 import { inboxMessage } from './inboxwords';
 
@@ -101,20 +101,33 @@ export function summaryLines(s: SummaryWire): string[] {
   if (m.sales > 0) out.push(`Sales: ${money(m.sales)}${over}.`);
   if (m.buys > 0) out.push(`Cattle bought: ${money(m.buys)}${over}.`);
   if (m.feed > 0) out.push(`Feed: ${money(m.feed)}${over}.`);
+  if (m.grain > 0) out.push(`Grain sold: ${money(m.grain)}${over}.`);
   if (m.running > 0) out.push(`Running costs: ${money(m.running)}${over}.`);
   if (m.interest > 0) out.push(`Interest earned: ${money(m.interest)}${over}.`);
   if (m.interest < 0) out.push(`Interest paid: ${money(m.interest)}${over}.`);
   return out;
 }
 
+/** A day the engine ran, with what its tick reported. */
+export interface RunDay {
+  day: number;
+  events: readonly FarmEvent[];
+}
+
 /**
- * What a day or skip files in the diary. The inbox messages made since
- * `seq0` go under the day each one carries, so a long skip files its lines
- * under the right days. Messages made by the player's own jobs are older
- * than `seq0`: the job's result line was filed when it was done. The money
- * lines go under the last day that ran.
+ * What a day or skip files in the diary. Each day's own events (from the
+ * run itself, not the inbox, which keeps only 120 messages) go under that
+ * day. The events of first light carry no day, so those still come from the
+ * inbox made since `seq0`: cattle landing and booked stock selling. Messages
+ * made by the player's own jobs are older than `seq0`: the job's result line
+ * was filed when it was done. The money lines go under the last day that ran.
  */
-export function periodFilings(farm: FarmState, seq0: number, summary: SummaryWire): Filing[] {
+export function periodFilings(
+  farm: FarmState,
+  seq0: number,
+  summary: SummaryWire,
+  days: readonly RunDay[],
+): Filing[] {
   const byDay = new Map<number, string[]>();
   const add = (day: number, lines: string[]): void => {
     if (lines.length === 0) return;
@@ -122,8 +135,15 @@ export function periodFilings(farm: FarmState, seq0: number, summary: SummaryWir
     if (there) there.push(...lines);
     else byDay.set(day, lines);
   };
+  for (const d of days) {
+    for (const e of d.events) {
+      const words = inboxMessage(e);
+      if (words) add(d.day, [words.text]);
+    }
+  }
   for (const m of farm.inbox) {
     if (m.seq < seq0) continue;
+    if (m.event.type !== 'cattle-arrived' && m.event.type !== 'cattle-sold') continue;
     const words = inboxMessage(m.event);
     if (words) add(m.day, [words.text]);
   }

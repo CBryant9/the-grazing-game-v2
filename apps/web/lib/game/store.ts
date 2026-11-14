@@ -157,6 +157,8 @@ interface GameState {
   summary: SummaryWire | null;
   /** The year that closed in the last day or skip. Shown before its summary. */
   yearEnd: YearEndState | null;
+  /** True when the player chose to look around a finished farm: the game over card is hidden. */
+  overHidden: boolean;
   morePage: MorePage;
   record: RecordState | null;
   jobs: Record<string, JobState>;
@@ -240,6 +242,8 @@ interface GameState {
   /** Fetch the next page of older diary days. */
   loadEarlier: () => Promise<void>;
   dismissYearEnd: () => void;
+  /** Hide the game over card to look around the finished farm, or show it again. */
+  setOverHidden: (hidden: boolean) => void;
   /** The player opened the inbox: tell the server how far they have read. */
   markInboxRead: () => Promise<void>;
   dismissSummary: () => void;
@@ -261,6 +265,12 @@ export const useGame = create<GameState>()((set, get) => {
     try {
       return await work();
     } catch (e) {
+      // The farm was refused as it stands (the game is over, seen from an old tab): there is nothing to
+      // retry. Load the farm again, so the game over card or the broken farm screen shows.
+      if (e instanceof ApiError && e.status === 409) {
+        void get().load();
+        return undefined;
+      }
       set({ notice: { message: messageOf(e), retry } });
       return undefined;
     } finally {
@@ -492,6 +502,7 @@ export const useGame = create<GameState>()((set, get) => {
     mobId: null,
     summary: null,
     yearEnd: null,
+    overHidden: false,
     morePage: 'menu',
     record: null,
     jobs: {},
@@ -528,6 +539,7 @@ export const useGame = create<GameState>()((set, get) => {
         build: null,
         summary: null,
         yearEnd: null,
+        overHidden: false,
         morePage: 'menu',
         record: null,
       });
@@ -549,6 +561,7 @@ export const useGame = create<GameState>()((set, get) => {
             build: null,
             summary: null,
             yearEnd: null,
+            overHidden: false,
             morePage: 'menu',
             record: null,
             paddockId: null,
@@ -1192,6 +1205,7 @@ export const useGame = create<GameState>()((set, get) => {
     },
 
     dismissYearEnd: () => set({ yearEnd: null }),
+    setOverHidden: (hidden) => set({ overHidden: hidden }),
 
     async markInboxRead() {
       const snap = get().snapshot;

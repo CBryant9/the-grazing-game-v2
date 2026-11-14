@@ -929,7 +929,7 @@ export class GameServer {
         held,
         end.farm,
         undefined,
-        periodFilings(end.farm, seq0, summary),
+        periodFilings(end.farm, seq0, summary, [end.day]),
       );
       return {
         ok: true,
@@ -970,7 +970,7 @@ export class GameServer {
               held,
               result.farm,
               undefined,
-              periodFilings(result.farm, seq0, summary),
+              periodFilings(result.farm, seq0, summary, result.days),
             )
           : held;
       return {

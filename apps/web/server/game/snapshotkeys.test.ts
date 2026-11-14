@@ -147,7 +147,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'mobs[].sellGroups[]': ['head', 'id', 'name'],
   'mobs[].suppOptions[]': ['id', 'label', 'perDay'],
   over: ['days', 'text', 'total', 'worth', 'years'],
-  'over.years[]': ['n', 'total'],
+  'over.years[]': ['n', 'partDays', 'total'],
   'paddocks[]': [
     'ae',
     'aePerHa',
@@ -269,7 +269,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'day.summary.head': ['after', 'before'],
   'day.summary.liveWeightKg': ['after', 'before'],
   'day.summary.massKgHa': ['after', 'before'],
-  'day.summary.money': ['buys', 'feed', 'interest', 'running', 'sales'],
+  'day.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
   'day.summary.to': ['date', 'month', 'year'],
   preview: ['card', 'message', 'ok', 'reason', 'version'],
   'preview.card': [
@@ -338,7 +338,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'skip.summary.head': ['after', 'before'],
   'skip.summary.liveWeightKg': ['after', 'before'],
   'skip.summary.massKgHa': ['after', 'before'],
-  'skip.summary.money': ['buys', 'feed', 'interest', 'running', 'sales'],
+  'skip.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
   'skip.summary.to': ['date', 'month', 'year'],
 };
 

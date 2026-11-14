@@ -14,7 +14,14 @@ const api = vi.hoisted(() => ({
   record: vi.fn(),
 }));
 vi.mock('./api', () => {
-  class ApiError extends Error {}
+  class ApiError extends Error {
+    constructor(
+      message: string,
+      readonly status?: number,
+    ) {
+      super(message);
+    }
+  }
   return { api, ApiError };
 });
 
@@ -579,5 +586,30 @@ describe('the year end card and the record panels', () => {
     api.record.mockResolvedValueOnce(rec());
     await useGame.getState().loadRecord();
     expect(useGame.getState().record?.status).toBe('ready');
+  });
+});
+
+describe('a farm that is over', () => {
+  it('a refused day (409) loads the farm again instead of offering a retry', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap() });
+    api.day.mockRejectedValueOnce(new ApiError('The game is over on this farm.', 409));
+    api.farm.mockResolvedValueOnce({
+      snapshot: snap({ over: { text: 'Over.', days: 5, years: [], total: 0, worth: 0 } }),
+    });
+    await useGame.getState().nextDay();
+    const s = useGame.getState();
+    expect(s.notice).toBeNull();
+    expect(api.farm).toHaveBeenCalledTimes(1);
+    expect(s.snapshot?.over?.text).toBe('Over.');
+    expect(s.phase).toBe('ready');
+  });
+
+  it('looking around hides the card and a new farm brings it back to normal', async () => {
+    useGame.setState({ phase: 'ready', snapshot: snap() });
+    useGame.getState().setOverHidden(true);
+    expect(useGame.getState().overHidden).toBe(true);
+    api.remove.mockResolvedValueOnce({ snapshot: null });
+    await useGame.getState().restart();
+    expect(useGame.getState().overHidden).toBe(false);
   });
 });

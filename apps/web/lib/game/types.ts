@@ -467,7 +467,8 @@ export interface OverWire {
   /** Days the farm ran. */
   days: number;
   /** Each year's score, the year under way last. */
-  years: { n: number; total: number }[];
+  /** `partDays` is set for the year under way, which is counted as if it closed on the last day. */
+  years: { n: number; total: number; partDays: number | null }[];
   /** The scores added up. */
   total: number;
   /** Net worth at the end, dollars. */
@@ -593,7 +594,16 @@ export interface SummaryWire {
   deaths: number;
   deathsByCause: Record<string, number>;
   gainKg: number;
-  money: { sales: number; buys: number; feed: number; running: number; interest: number };
+  money: {
+    sales: number;
+    buys: number;
+    /** Supplements and the feedlot only. */
+    feed: number;
+    /** Dollars from grain. */
+    grain: number;
+    running: number;
+    interest: number;
+  };
   arrived: { head: number; calves: number };
   bookedSold: { head: number; net: number };
   /** Where a grazing plan moved a mob, one line for each mob. */
