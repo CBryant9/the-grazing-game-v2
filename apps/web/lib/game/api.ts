@@ -14,7 +14,8 @@ import type {
 /** An error with a plain message the player can read. Never a stack or a code. */
 export class ApiError extends Error {}
 
-const OFFLINE = 'The game could not be reached. Check your connection and try again.';
+/** What the player is told when a request never reached the server. The offline view looks for exactly this. */
+export const UNREACHABLE = 'The game could not be reached. Check your connection and try again.';
 const GENERIC = 'Something went wrong. Try again in a moment.';
 
 async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -28,7 +29,7 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(OFFLINE);
+    throw new ApiError(UNREACHABLE);
   }
   let data: unknown = null;
   try {

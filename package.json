@@ -20,6 +20,9 @@
     "data:silo": "node scripts/data/pull-silo.mjs",
     "data:cpi": "node scripts/data/pull-cpi.mjs",
     "check:browser-bundle": "node scripts/check-browser-bundle.mjs",
+    "check:js-budget": "node scripts/check-js-budget.mjs",
+    "measure:cost": "node scripts/measure-cost.mjs",
+    "icons": "node scripts/make-icons.mjs",
     "dev:map-fixtures": "node scripts/dev/make-map-fixtures.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },

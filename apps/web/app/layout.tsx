@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Anton, JetBrains_Mono, Silkscreen } from 'next/font/google';
 import { SITE } from '@gg/shared';
+import { themeScript } from '@/lib/themeScript';
 import './globals.css';
 
 // Fonts are downloaded at build time and served from our own site (PRD 14.10).
@@ -39,7 +40,15 @@ export const metadata: Metadata = {
     url: '/',
   },
   twitter: { card: 'summary_large_image', title: SITE.name, description: SITE.description },
-  icons: { icon: '/icon.svg' },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  // Added to the iPhone home screen, it opens as an app with the game's name.
+  appleWebApp: { capable: true, title: 'Grazing Game', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
@@ -50,10 +59,6 @@ export const viewport: Viewport = {
     { media: '(prefers-color-scheme: light)', color: '#fffaf0' },
   ],
 };
-
-// Applies a remembered light or dark choice before the first paint, so the
-// page never flashes the wrong theme. With no choice, the device setting wins.
-const themeScript = `try{var t=localStorage.getItem('gg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
