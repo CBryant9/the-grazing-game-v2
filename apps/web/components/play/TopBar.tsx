@@ -4,6 +4,7 @@ import type { Snapshot } from '@/lib/game/types';
 import { clockText, dateText, lightNote, money, num } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { DailyTime, ModeTag } from './DailyBits';
 import { HelpButton } from './HelpPanel';
 import styles from './play.module.css';
 
@@ -63,11 +64,13 @@ export function TimeButtons() {
 export function TopBar({ snapshot }: { snapshot: Snapshot }) {
   const busy = useGame((s) => s.busy > 0);
   const { farm, date, season, totals, clock } = snapshot;
+  const daily = snapshot.daily ?? null;
   return (
     <header className={styles.top} aria-busy={busy}>
       <div className={styles.topname}>
         <h1 className={`px ${styles.fname}`}>{farm.name}</h1>
         <p className={styles.sub}>
+          <ModeTag daily={daily} />
           {dateText(date)}
           <span aria-hidden="true"> · </span>
           <span className={styles.season}>{season}</span>
@@ -82,7 +85,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
         <DaylightBar clock={clock} />
       </div>
       <div className={styles.toptimes}>
-        <TimeButtons />
+        {daily ? <DailyTime daily={daily} /> : <TimeButtons />}
       </div>
       <div className={styles.topextra}>
         <HelpButton />

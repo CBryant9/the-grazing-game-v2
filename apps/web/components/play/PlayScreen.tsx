@@ -12,6 +12,7 @@ import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
 import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
+import { DailyOverlay } from './DailyBits';
 import { FarmMap } from './FarmMap';
 import { HelpPanel } from './HelpPanel';
 import { HerdList, PaddockList } from './Lists';
@@ -280,6 +281,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             onFenceTap={(e) => void startFix(e.edge)}
           />
           <NoticeBar />
+          <DailyOverlay snapshot={snapshot} />
           {snapshot.over && overHidden && <OverStrip />}
           {!pc && tab === 'farm' && !sheetOpen && !build && !helpOpen && (
             <TodoBanner snapshot={snapshot} />

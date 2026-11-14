@@ -1,5 +1,5 @@
 import { authDeps } from '@/server/auth/deps';
-import { fastLimits } from '@/server/auth/accounts';
+import { farmLimits, fastLimits, featureSwitches } from '@/server/auth/accounts';
 import { BROKEN_MESSAGE, GameError, gameServer } from '@/server/game/game';
 import { readJson, route } from '@/server/game/http';
 import { FARM_COOKIE } from '@/server/player';
@@ -15,7 +15,11 @@ async function listFor(userId: string, currentId: string | null): Promise<FarmsR
   const deps = authDeps();
   const farms = await gameServer().farms({ kind: 'user', id: userId }, currentId);
   const { limit, going } = deps ? await fastLimits(deps, userId) : { limit: 0, going: 0 };
-  return { farms, limit, going, signedIn: true };
+  // With Daily Farm switched off its slots are not offered.
+  const dailyOn = deps ? (await featureSwitches(deps.sql)).daily_farm : false;
+  const daily =
+    deps && dailyOn ? await farmLimits(deps, userId, 'daily') : { limit: 0, going: 0 };
+  return { farms, limit, going, dailyLimit: daily.limit, dailyGoing: daily.going, signedIn: true };
 }
 
 const owns = async (userId: string, id: string): Promise<boolean> =>
@@ -23,7 +27,9 @@ const owns = async (userId: string, id: string): Promise<boolean> =>
 
 /** The account's farms for the picker. A guest has one farm and no picker. */
 export const GET = route({ name: 'farms' }, async ({ player }): Promise<FarmsResponse> => {
-  if (!player.user) return { farms: [], limit: 1, going: 0, signedIn: false };
+  if (!player.user) {
+    return { farms: [], limit: 1, going: 0, dailyLimit: 0, dailyGoing: 0, signedIn: false };
+  }
   return listFor(player.user.id, player.farmId);
 });
 

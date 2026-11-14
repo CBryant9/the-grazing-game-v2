@@ -220,19 +220,26 @@ export async function deleteAccount(deps: AuthDeps, user: AuthUser): Promise<voi
   await deps.provider.deleteUser(user.id);
 }
 
-/** Fast Farms the account may have, and how many are going. */
-export async function fastLimits(
+/** Farms of a mode the account may have, and how many are going. */
+export async function farmLimits(
   deps: AuthDeps,
   userId: string,
+  mode: 'fast' | 'daily',
 ): Promise<{ limit: number; going: number }> {
   const r = await deps.sql.query<{ lim: number; going: number }>(
-    `select public.farm_limit($1, null, 'fast') as lim,
+    `select public.farm_limit($1, null, $2) as lim,
             (select count(*)::int from public.farms f
-              where f.owner_id = $1 and f.mode = 'fast' and f.status = 'active') as going`,
-    [userId],
+              where f.owner_id = $1 and f.mode = $2 and f.status = 'active') as going`,
+    [userId, mode],
   );
   return { limit: r.rows[0]?.lim ?? 0, going: r.rows[0]?.going ?? 0 };
 }
+
+/** Fast Farms the account may have, and how many are going. */
+export const fastLimits = (
+  deps: AuthDeps,
+  userId: string,
+): Promise<{ limit: number; going: number }> => farmLimits(deps, userId, 'fast');
 
 // ---- Feature switches: from the database when it is on, the shared defaults otherwise.
 

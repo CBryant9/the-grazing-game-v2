@@ -1,3 +1,4 @@
+import { farmLimits, featureSwitches } from '@/server/auth/accounts';
 import { authDeps } from '@/server/auth/deps';
 import { BROKEN_MESSAGE, GameError, gameServer } from '@/server/game/game';
 import { readJson, route } from '@/server/game/http';
@@ -16,9 +17,14 @@ export const GET = route(
   { name: 'farm', renew: true },
   async ({ sessionId, player }): Promise<FarmResponse> => {
     if (player.mustPick && player.user) {
+      const deps = authDeps();
+      const fast = deps ? await farmLimits(deps, player.user.id, 'fast') : { limit: 0 };
+      const dailyOn = deps ? (await featureSwitches(deps.sql)).daily_farm : false;
+      const daily = deps && dailyOn ? await farmLimits(deps, player.user.id, 'daily') : { limit: 0 };
       return {
         snapshot: null,
         pick: await gameServer().farms({ kind: 'user', id: player.user.id }, null),
+        limits: { fast: fast.limit, daily: daily.limit },
       };
     }
     if (!sessionId) return { snapshot: null };

@@ -96,6 +96,8 @@ export function setupOptions(): SetupOptions {
       text: DIFFICULTY_TEXT[id],
     })),
     nameMax: NAME_MAX,
+    // The route fills this in for the player who asked (server/daily/offer.ts).
+    daily: { state: 'coming', text: 'Daily Farm is coming. Fast Farm is ready to play now.', limit: 0, going: 0 },
   };
 }
 

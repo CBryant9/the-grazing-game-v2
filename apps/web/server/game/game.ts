@@ -1021,6 +1021,12 @@ export class GameServer {
       const daily = cur.stored.daily!;
       const farmDate = isoOf(dateOn(cur.farm));
       const today = localDate(this.now(), daily.timezone);
+      // What the farm is looked at and worked on with: the data up to the last night it ran.
+      if (this.daily) {
+        dailyEnvs.set(cur.stored.setup, {
+          data: await this.daily.data.bundleThrough(addDays(farmDate, -1), farmDate),
+        });
+      }
       if (cur.farm.over || daysBetween(farmDate, today) <= 0) {
         cur.waiting = null;
         return cur;
@@ -1029,10 +1035,6 @@ export class GameServer {
         cur.waiting = WAITING_TEXT;
         return cur;
       }
-      // What the farm is looked at and worked on with: the data up to the last night it ran.
-      dailyEnvs.set(cur.stored.setup, {
-        data: await this.daily.data.bundleThrough(addDays(farmDate, -1), farmDate),
-      });
       if (!(await this.daily.enabled())) {
         cur.waiting = PAUSED_TEXT;
         return cur;
@@ -1045,7 +1047,15 @@ export class GameServer {
         cur.waiting = WAITING_TEXT;
         return cur;
       }
-      cur = await this.rollOne(farmId, cur, farmDate);
+      try {
+        cur = await this.rollOne(farmId, cur, farmDate);
+      } catch (e) {
+        // Another tab or server ran this night first. Take its farm and carry on from there.
+        if (!(e instanceof SaveConflictError)) throw e;
+        const fresh = await this.loadRaw(farmId);
+        if (!fresh || !fresh.stored.daily) return cur;
+        cur = fresh;
+      }
     }
   }
 
@@ -1081,6 +1091,10 @@ export class GameServer {
       away,
       rolledFrom: [...daily.rolledFrom, held.stored.version].slice(-ROLLED_KEPT),
     };
+    // The farm is now on the next day: it is looked at with the data up to the night just run.
+    dailyEnvs.set(held.stored.setup, {
+      data: await this.daily!.data.bundleThrough(farmDate, addDays(farmDate, 1)),
+    });
     return this.save(
       farmId,
       held,

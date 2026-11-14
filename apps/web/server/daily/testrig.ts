@@ -159,5 +159,31 @@ export function serveThrough(r: Rig, through: string): void {
   for (let d = addDays(from, 1); d <= through; d = addDays(d, 1)) r.serveDay(d);
 }
 
+/** Keep days of data straight in the database, as a fetch would, so no feed is needed. */
+const BASE_PRICE: Record<string, number> = {
+  'restocker-yearling-steer': 600,
+  'restocker-yearling-heifer': 540,
+  'feeder-steer': 580,
+  'feeder-heifer': 520,
+  'heavy-steer': 520,
+  'processor-cow': 340,
+};
+
+/** With `allPrices`, every series has a row every day, so a farm can run for months. Otherwise one series moves and the rest are held. */
+export async function keepThrough(r: Rig, through: string, allPrices = false): Promise<void> {
+  const from = DISTRICT_IDS.map(bakedThrough).sort()[0]!;
+  for (let d = addDays(from, 1); d <= through; d = addDays(d, 1)) {
+    for (const district of DISTRICT_IDS) {
+      const prices = seriesFor(district).flatMap((series) =>
+        allPrices || series.indicator === 'restocker-yearling-steer'
+          ? [{ series, row: { value: BASE_PRICE[series.indicator]! + Number(d.slice(8, 10)), head: 4000 } }]
+          : [],
+      );
+      await r.sql.transaction((tx) => r.data.keepDay(tx, district, d, weatherFor(d), prices));
+    }
+  }
+  r.data.forget();
+}
+
 /** The farm keys for the account, in order made. */
 export const OWNER = { kind: 'user' as const, id: USER };

@@ -788,15 +788,17 @@ export interface FarmResponse {
   broken?: string;
   /** Set when the player is signed in and has more than one farm: the picker is shown first. */
   pick?: FarmListItem[];
+  /** The farms of each mode the account may have, sent with the picker. */
+  limits?: { fast: number; daily: number };
 }
 
-/** One farm in the picker (milestone 3.2). The id is the one the browser sends back to open or delete it. */
 /** The two ways to play (PRD section 3). Daily Farm runs in real time, Fast Farm at the player's pace. */
 export type FarmMode = 'daily' | 'fast';
 
 /** Where a Daily Farm's work for today stands. A fact, never a nudge. */
 export type DailyWork = 'not-started' | 'started' | 'done';
 
+/** One farm in the picker (milestone 3.2). The id is the one the browser sends back to open or delete it. */
 export interface FarmListItem {
   id: string;
   name: string;
@@ -820,6 +822,9 @@ export interface FarmsResponse {
   /** Fast Farms the account may have at once, and how many are going. */
   limit: number;
   going: number;
+  /** The same for Daily Farms. */
+  dailyLimit: number;
+  dailyGoing: number;
   signedIn: boolean;
 }
 
@@ -854,6 +859,20 @@ export interface SetupOptions {
   starts: { id: SetupStart; label: string; text: string }[];
   difficulties: { id: SetupDifficulty; label: string; text: string }[];
   nameMax: number;
+  /** Whether a Daily Farm can be started, and if not, why in plain words (milestone 3.3). */
+  daily: DailyOffer;
+}
+
+/**
+ * Daily Farm at setup. `open`: it can be started. `coming`: it is switched off or has no database
+ * behind it, so setup shows the plain "coming" state. `guest`: it needs an account. `full`: the
+ * account has all the Daily Farms it can have.
+ */
+export interface DailyOffer {
+  state: 'open' | 'coming' | 'guest' | 'full';
+  text: string;
+  limit: number;
+  going: number;
 }
 
 export interface SetupChoices {
