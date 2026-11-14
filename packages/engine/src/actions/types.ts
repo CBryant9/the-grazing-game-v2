@@ -192,7 +192,9 @@ export type ActionRefusalReason =
   /** There is no such hand on the farm. */
   | 'no-such-hand'
   /** There is no such contract fencing under way. */
-  | 'no-such-run';
+  | 'no-such-run'
+  /** Sheep graze the area cattle were to go to (one mob to an area, one species to a paddock). */
+  | 'sheep-there';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {

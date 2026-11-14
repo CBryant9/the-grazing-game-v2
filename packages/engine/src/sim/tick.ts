@@ -58,6 +58,8 @@ import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { runPlans, stopsToday } from './plans';
+import { mergeSheepShared, sheepDay, sheepMobsOf, sheepWaterLitres } from '../sheep/farm';
+import type { SheepDeathCause } from '../sheep/notes';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -103,6 +105,10 @@ export interface DayResult {
   deaths: { id: number; kind: AnimalKind; mob: number; cause: DeathCause }[];
   /** Every calf born today. */
   births: { id: number; mob: number }[];
+  /** Every sheep that died today. Left out on a farm with no sheep. */
+  sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause }[];
+  /** Every lamb born today. Left out on a farm with no sheep. */
+  lambs?: { id: number; mob: number }[];
 }
 
 /** Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its area and the day's stops. */
@@ -319,6 +325,14 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   // 5. Deaths are settled.
   settleDeaths(farm.mobs, deaths, byId, farm.year);
 
+  // 4b and 5b. The sheep's day, on the same pasture, and their deaths settled.
+  // A farm that has never had sheep skips this and is unchanged.
+  if (farm.sheep) {
+    const sd = sheepDay(farm, survey, land, date, events);
+    result.sheepDeaths = sd.deaths;
+    result.lambs = sd.births;
+  }
+
   // 6. Water use, breakouts and mobs joining.
   if (farm.layout.water.ports.length) {
     const areaOf = survey.topology.areaOf;
@@ -327,6 +341,11 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       for (const mb of farm.mobs) {
         if (mb.where.kind !== 'paddock' || areaOf[mb.where.anchor] !== areaId) continue;
         for (const a of mb.animals) litres += waterNeedPerHead(a.wt, date.month);
+      }
+      for (const sm of sheepMobsOf(farm)) {
+        if (sm.where.kind === 'paddock' && areaOf[sm.where.anchor] === areaId) {
+          litres += sheepWaterLitres(sm, date.month);
+        }
       }
       return litres;
     };
@@ -342,6 +361,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     if (drained.changed) {
       survey = surveyOf(farm);
       mergeShared(farm, survey, events);
+      mergeSheepShared(farm, survey, events);
     } else keepSurvey(farm.layout, survey);
   }
 
@@ -380,6 +400,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   }
   if (brokeOut) survey = surveyOf(farm);
   mergeShared(farm, survey, events);
+  mergeSheepShared(farm, survey, events);
 
   // 7. Running costs and interest.
   let head = 0;
@@ -432,6 +453,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   }
   let onPasture = 0;
   for (const m of farm.mobs) if (m.where.kind === 'paddock') onPasture += m.animals.length;
+  for (const m of sheepMobsOf(farm)) if (m.where.kind === 'paddock') onPasture += m.sheep.length;
   if (onPasture && !farm.over) {
     const { G, D } = farm.pasture;
     let av = 0;

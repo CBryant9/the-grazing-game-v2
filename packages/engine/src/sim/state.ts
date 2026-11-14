@@ -24,6 +24,7 @@ import type { YearOrder } from '../season/realYears';
 import type { Action } from '../actions/types';
 import type { FarmEvent } from './events';
 import type { LabourState } from '../labour/types';
+import type { SheepState } from '../sheep/types';
 
 /** Where a mob is. */
 export type MobWhere =
@@ -75,7 +76,10 @@ export interface PlanTemplate {
 }
 
 /** Why a plan can not move a mob today. */
-export type PlanWaitReason = 'no-water';
+export type PlanWaitReason =
+  | 'no-water'
+  /** Sheep graze the next stop: cattle never go in with sheep. */
+  | 'sheep-there';
 
 /** A mob running a template: where it is on it, and the counts so far. */
 export interface PlanRun {
@@ -436,6 +440,13 @@ export interface FarmState {
    * then saves and plays exactly as it did before hands existed.
    */
   labour?: LabourState;
+
+  /**
+   * Sheep (milestone 2.3): the farm's sheep mobs and their random streams.
+   * Left out on a farm that has never had sheep, which then saves and plays
+   * exactly as it did before sheep existed.
+   */
+  sheep?: SheepState;
 }
 
 /** The MVP's price chart kept 31 days. */

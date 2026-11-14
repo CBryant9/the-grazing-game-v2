@@ -58,8 +58,16 @@
  * cattle, crop, season or price formula changed. A farm with no hands and
  * no contract fencing plays exactly as it did on 0.12.1 (a test holds its
  * digest).
+ *
+ * 0.14.0 (milestone 2.3): the sheep model. Sheep mobs beside the cattle
+ * mobs, on the same grass model: energy and intake by class, growth,
+ * condition, joining on a 17-day cycle, lambing, lamb survival, marking and
+ * weaning counts, wool and micron, deaths (lambing, weaners, thin sheep, no
+ * water, flystrike) and water by class (docs/MODEL.md, the sheep section).
+ * No grass, cattle, crop, season or price formula changed. A farm with no
+ * sheep plays exactly as it did on 0.13.0 (a test holds its digest).
  */
-export const ENGINE_VERSION = '0.13.0';
+export const ENGINE_VERSION = '0.14.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -104,5 +112,10 @@ export const ENGINE_VERSION = '0.13.0';
  * day, contract fencing under way and the injury stream). It is left out on
  * a farm that has never hired or ordered contract fencing, so an older save
  * loads with no hands and no contract fencing, and is otherwise unchanged.
+ *
+ * 10: sheep (milestone 2.3). A farm may have `sheep` (its sheep mobs and
+ * their random streams); a mob's sheep are saved in columns. It is left out
+ * on a farm that has never had sheep, so an older save loads with no sheep
+ * and is otherwise unchanged.
  */
-export const SAVE_FORMAT_VERSION = 9;
+export const SAVE_FORMAT_VERSION = 10;

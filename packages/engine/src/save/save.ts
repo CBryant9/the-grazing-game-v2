@@ -9,6 +9,7 @@
  */
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
+import type { Sheep, SheepSex } from '../sheep/types';
 import { GRID_N } from '../grid';
 import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
@@ -194,9 +195,115 @@ function unpackAnimals(p: PackedAnimals): Animal[] {
 const isAnimalList = (key: string, v: unknown): v is Animal[] =>
   key === 'animals' && Array.isArray(v);
 
+/** A sheep mob's sheep, in columns (format 10), like the cattle. */
+interface PackedSheep {
+  $: 'sheep';
+  n: number;
+  /** One letter a sheep: F, M or W. */
+  sex: string;
+  /** One letter a sheep: m Merino, x crossbred. */
+  breed: string;
+  /** One digit a sheep: 1 weaned, 2 died today, 4 has had a day. */
+  flags: string;
+  ints: string;
+  nums: string;
+}
+
+const SHEEP_INTS = [
+  'id',
+  'age',
+  'dam',
+  'preg',
+  'litter',
+  'lact',
+  'reared',
+  'parity',
+  'oes',
+  'wage',
+  'woolDays',
+  'flyCover',
+  'struck',
+  'doomed',
+] as const satisfies readonly (keyof Sheep)[];
+const SHEEP_NUMS = [
+  'srw',
+  'wt',
+  'cond',
+  'csJoin',
+  'csScan',
+  'milk',
+  'adg',
+  'wwt',
+  'fleece',
+  'micronKg',
+  'lambRisk',
+  'paid',
+  'cost',
+] as const satisfies readonly (keyof Sheep)[];
+
+const isSheepList = (key: string, v: unknown): v is Sheep[] => key === 'sheep' && Array.isArray(v);
+
+function packSheep(list: readonly Sheep[]): PackedSheep {
+  const n = list.length;
+  const NI = SHEEP_INTS.length;
+  const NN = SHEEP_NUMS.length + 1;
+  const ints = new Int32Array(n * NI);
+  const nums = new Float64Array(n * NN);
+  let sex = '';
+  let breed = '';
+  let flags = '';
+  for (let i = 0; i < n; i++) {
+    const s = list[i]!;
+    sex += s.sex;
+    breed += s.breed === 'merino' ? 'm' : 'x';
+    flags += ((s.weaned ? 1 : 0) | (s.dead ? 2 : 0) | (s.di !== undefined ? 4 : 0)).toString(16);
+    for (let k = 0; k < NI; k++) {
+      const v = s[SHEEP_INTS[k]!];
+      if (!Number.isInteger(v) || v < -2147483648 || v > 2147483647) {
+        throw new Error(`saveFarm: sheep ${s.id} has a figure that should be a whole number`);
+      }
+      ints[i * NI + k] = v;
+    }
+    for (let k = 0; k < NN - 1; k++) nums[i * NN + k] = s[SHEEP_NUMS[k]!];
+    nums[i * NN + NN - 1] = s.di ?? 0;
+  }
+  return {
+    $: 'sheep',
+    n,
+    sex,
+    breed,
+    flags,
+    ints: toBase64(new Uint8Array(ints.buffer)),
+    nums: toBase64(new Uint8Array(nums.buffer)),
+  };
+}
+
+function unpackSheep(p: PackedSheep): Sheep[] {
+  const ints = new Int32Array(ownBuffer(fromBase64(p.ints)));
+  const nums = new Float64Array(ownBuffer(fromBase64(p.nums)));
+  const NI = SHEEP_INTS.length;
+  const NN = SHEEP_NUMS.length + 1;
+  const out: Sheep[] = [];
+  for (let i = 0; i < p.n; i++) {
+    const f = parseInt(p.flags[i]!, 16);
+    const s = {
+      sex: p.sex[i] as SheepSex,
+      breed: p.breed[i] === 'm' ? 'merino' : 'xb',
+      weaned: !!(f & 1),
+      dead: !!(f & 2),
+      di: f & 4 ? nums[i * NN + NN - 1]! : undefined,
+    } as Record<string, unknown>;
+    for (let k = 0; k < NI; k++) s[SHEEP_INTS[k]!] = ints[i * NI + k]!;
+    for (let k = 0; k < NN - 1; k++) s[SHEEP_NUMS[k]!] = nums[i * NN + k]!;
+    out.push(s as unknown as Sheep);
+  }
+  return out;
+}
+
 function pack(v: unknown, key = ''): unknown {
   if (ArrayBuffer.isView(v)) return packArray(v as Numbers);
   if (isAnimalList(key, v)) return packAnimals(v);
+  if (isSheepList(key, v)) return packSheep(v);
   if (Array.isArray(v)) return v.map((x) => pack(x));
   if (v !== null && typeof v === 'object') {
     const out: Record<string, unknown> = {};
@@ -217,6 +324,7 @@ function unpack(v: unknown): unknown {
   if (v !== null && typeof v === 'object') {
     const tag = (v as { $?: unknown }).$;
     if (tag === 'animals') return unpackAnimals(v as PackedAnimals);
+    if (tag === 'sheep') return unpackSheep(v as PackedSheep);
     if (typeof tag === 'string') return unpackArray(v as PackedArray);
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(v)) out[k] = unpack((v as Record<string, unknown>)[k]);
@@ -302,6 +410,9 @@ function upgrade(f: Record<string, unknown>): void {
   // Farm hands and contract fencing (format 9): a farm saved before had none. `labour` is
   // left out until the first hire or order, so there is nothing to fill in.
   if (farm.labour === null) delete farm.labour;
+  // Sheep (format 10): a farm saved before had none. `sheep` is left out until the first
+  // sheep come, so there is nothing to fill in.
+  if (farm.sheep === null) delete farm.sheep;
 }
 
 /**

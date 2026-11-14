@@ -19,6 +19,7 @@ import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
 import type { ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
+import type { SheepDeathCause, SheepNote } from '../sheep/notes';
 import type { GameOverReason, MobWhere, PlanWaitReason, YearRecord } from './state';
 
 /** Where a mob is, with the grazing area's name when it is on pasture. */
@@ -78,6 +79,24 @@ export type TickEvent =
       reason: 'hungry' | 'thirsty';
       edge: EdgeRef;
       area: string;
+    }
+  /** A note from a sheep mob's day: no water, short of feed, joining, scanning, lambing, marking, flystrike. */
+  | { type: 'sheep'; mob: number; mobName: string; area: string | null; note: SheepNote }
+  /** Lambs born today in one sheep mob. */
+  | { type: 'lambs-born'; mob: number; mobName: string; count: number }
+  /** Sheep that died today in one sheep mob of one cause. */
+  | { type: 'sheep-deaths'; mob: number; mobName: string; cause: SheepDeathCause; count: number }
+  /**
+   * A sheep mob's lambs were weaned. `into` is the new mob they went to, or
+   * null when there was no other empty area with water and they stayed.
+   */
+  | {
+      type: 'sheep-weaned';
+      mob: number;
+      mobName: string;
+      count: number;
+      avgKg: number;
+      into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
     }
   /** Two mobs that share a grazing area, the feedlot or the yards now run as one. */
   | {

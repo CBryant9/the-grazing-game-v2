@@ -113,6 +113,7 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
+import { sheepAreas } from '../sheep/farm';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
@@ -219,7 +220,15 @@ class Job {
     if (to === 'lot') return { kind: 'lot' };
     if (!to || !isCell(to.cell)) return refuse('bad-request', 'That square is off the farm.');
     const s = this.survey;
-    return { kind: 'paddock', anchor: placeAnchor(s, s.topology.areaOf[to.cell]!) };
+    const areaId = s.topology.areaOf[to.cell]!;
+    // One mob to an area: cattle never go in with sheep.
+    if (this.farm.sheep && sheepAreas(this.farm, s).has(areaId)) {
+      return refuse(
+        'sheep-there',
+        'Sheep are grazing there. Cattle and sheep run in separate paddocks.',
+      );
+    }
+    return { kind: 'paddock', anchor: placeAnchor(s, areaId) };
   }
 
   /** Say where cattle ended up, and warn about no water and about crops there. */

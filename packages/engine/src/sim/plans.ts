@@ -26,6 +26,7 @@ import { PLAN_FIGURES } from '../data/plans';
 import type { Survey } from '../farm/layout';
 import { areaIdOf, grazingArea, surveyOf } from './derived';
 import { mergeShared } from './mobs';
+import { sheepAreas } from '../sheep/farm';
 import type { TickEvent, PlanReport } from './events';
 import type {
   FarmMob,
@@ -198,16 +199,19 @@ function planStep(
   const areaId = survey.topology.areaOf[target]!;
   const area = grazingArea(survey, areaId);
   const step = stepOf(tpl, leg, ni);
-  if (!area.hasWater) {
+  // Cattle never go in with sheep. A farm with no sheep never waits for this.
+  const sheepThere = farm.sheep ? sheepAreas(farm, survey).has(areaId) : false;
+  if (!area.hasWater || sheepThere) {
+    const why = sheepThere ? 'sheep-there' : 'no-water';
     // Said once for each stop, as the old game said it once for each stop.
     if (run.waiting?.target !== target) {
-      run.waiting = { target, why: 'no-water' };
+      run.waiting = { target, why };
       events.push({
         type: 'plan-waiting',
         mob: m.id,
         mobName: m.name,
         template: tpl.id,
-        why: 'no-water',
+        why,
         area: survey.topology.areas[areaId]!.name,
         cell: target,
         step,

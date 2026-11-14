@@ -672,3 +672,44 @@ export type {
 } from './labour/reads';
 export type { ContractRun, Hand, HandKind, HandSkills, LabourState, Person } from './labour/types';
 export type { ContractStopWhy, HandDuty, HandLeftWhy, LabourEvent } from './sim/events';
+
+// Milestone 2.3: the sheep model (docs/MODEL.md, the sheep section). A
+// farm's sheep live in `farm.sheep`, left out on a farm that has never had
+// sheep. The market, the setup choice, the shearing job and the wool sale
+// come in milestone 2.4: these are the helpers and reads they use. Screens
+// show the numbers and classes the reads give (each field says what may be
+// shown), never a chance, a formula or a table (rule 14).
+export { SHEEP_DISTRICTS, sheepDistrict, WATER_WELFARE_HOURS } from './data/sheep';
+export type { SheepBreed } from './data/sheep';
+export {
+  addSheepMob,
+  ensureSheepState,
+  joinOnFor,
+  occupiedAreas,
+  sheepAreas,
+  sheepMobsOf,
+  sheepWaterLitres,
+} from './sheep/farm';
+export type { AddSheepResult, AddSheepSpec, SheepGroupSpec } from './sheep/farm';
+export { aeFromDse, dseOf, sheepClassOf } from './sheep/energy';
+export { crutchMob, fleeceMicron, greasyKg, shearMob } from './sheep/wool';
+export type { ShearResult } from './sheep/wool';
+export {
+  carcaseKg,
+  dressingShare,
+  fleeceOf,
+  sheepJoiningRecord,
+  sheepMobsRead,
+  stockingRead,
+} from './sheep/reads';
+export type { SheepClassRow, SheepJoiningRecord, SheepMobRead, StockingRead } from './sheep/reads';
+export type { SheepDeathCause, SheepNote } from './sheep/notes';
+export type {
+  Sheep,
+  SheepClass,
+  SheepJoining,
+  SheepMob,
+  SheepMobDay,
+  SheepSex,
+  SheepState,
+} from './sheep/types';
