@@ -300,21 +300,5 @@ describe('sheep in the score and the saves', () => {
     expect(DSE_PER_AE).toBe(8.4);
     expect(MVP_DSE_PER_AE).toBe(8);
   });
-  it('a format 10 sheep mob loads with no feed and its district shearing days', () => {
-    const farm = farmWithSheep();
-    const saved = saveFarm(farm) as Record<string, unknown>;
-    saved.saveFormat = 10;
-    const sheep = saved.sheep as { mobs: Record<string, unknown>[] };
-    for (const m of sheep.mobs) {
-      delete m.feed;
-      delete m.shearOn;
-      delete m.crutchOn;
-      delete m.lastBreak;
-    }
-    const loaded = loadFarm(saved as never);
-    const m = sheepMobsOf(loaded)[0]!;
-    expect(m.feed).toBe('none');
-    expect(m.shearOn).toEqual(sheepJobDates(m.joinOn).shearOn);
-    expect(m.lastBreak).toBeNull();
-  });
+  // Old saves load by format number: oldSaves.test.ts, with saves made by the old code.
 });

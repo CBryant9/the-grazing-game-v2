@@ -244,6 +244,9 @@ const SHEEP_NUMS = [
   'cost',
 ] as const satisfies readonly (keyof Sheep)[];
 
+/** The sheep columns of a format 10 save (the first pass, before head counts). */
+const SHEEP_INTS_FORMAT_10 = SHEEP_INTS.filter((k) => k !== 'n' && k !== 'doomed2');
+
 const isSheepList = (key: string, v: unknown): v is Sheep[] => key === 'sheep' && Array.isArray(v);
 
 function packSheep(list: readonly Sheep[]): PackedSheep {
@@ -281,14 +284,13 @@ function packSheep(list: readonly Sheep[]): PackedSheep {
   };
 }
 
-function unpackSheep(p: PackedSheep): Sheep[] {
+function unpackSheep(p: PackedSheep, format: number): Sheep[] {
   const ints = new Int32Array(ownBuffer(fromBase64(p.ints)));
   const nums = new Float64Array(ownBuffer(fromBase64(p.nums)));
-  // A format 10 save has no head count or second-day column: read it with its own columns.
-  const cols: readonly string[] =
-    p.n > 0 && ints.length / p.n !== SHEEP_INTS.length
-      ? SHEEP_INTS.filter((k) => k !== 'n' && k !== 'doomed2')
-      : SHEEP_INTS;
+  // A format 10 save (the first pass, a sheep each) has no head count or second-day column,
+  // and its `doomed` was the days a doomed lamb had left (or -1). Read by the save's format.
+  const old = format <= 10;
+  const cols: readonly string[] = old ? SHEEP_INTS_FORMAT_10 : SHEEP_INTS;
   const NI = cols.length;
   const NN = SHEEP_NUMS.length + 1;
   const out: Sheep[] = [];
@@ -303,6 +305,14 @@ function unpackSheep(p: PackedSheep): Sheep[] {
     } as Record<string, unknown>;
     for (let k = 0; k < NI; k++) s[cols[k]!] = ints[i * NI + k]!;
     for (let k = 0; k < NN - 1; k++) s[SHEEP_NUMS[k]!] = nums[i * NN + k]!;
+    if (old) {
+      // A sheep each, and a doomed lamb's days left turned into the day of life it dies on.
+      const left = s.doomed as number;
+      const dieAt = left >= 0 ? (s.age as number) + left + 1 : -1;
+      s.n = 1;
+      s.doomed = dieAt === 1 ? 1 : 0;
+      s.doomed2 = dieAt === 2 ? 1 : 0;
+    }
     out.push(s as unknown as Sheep);
   }
   return out;
@@ -327,15 +337,15 @@ function pack(v: unknown, key = ''): unknown {
   return v;
 }
 
-function unpack(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(unpack);
+function unpack(v: unknown, format: number): unknown {
+  if (Array.isArray(v)) return v.map((x) => unpack(x, format));
   if (v !== null && typeof v === 'object') {
     const tag = (v as { $?: unknown }).$;
     if (tag === 'animals') return unpackAnimals(v as PackedAnimals);
-    if (tag === 'sheep') return unpackSheep(v as PackedSheep);
+    if (tag === 'sheep') return unpackSheep(v as PackedSheep, format);
     if (typeof tag === 'string') return unpackArray(v as PackedArray);
     const out: Record<string, unknown> = {};
-    for (const k of Object.keys(v)) out[k] = unpack((v as Record<string, unknown>)[k]);
+    for (const k of Object.keys(v)) out[k] = unpack((v as Record<string, unknown>)[k], format);
     return out;
   }
   return v;
@@ -453,7 +463,7 @@ export function loadFarm(saved: SavedFarm): FarmState {
   if (format > SAVE_FORMAT_VERSION) {
     throw new Error('This farm was saved by a newer version of the game.');
   }
-  const raw = unpack(saved) as Record<string, unknown>;
+  const raw = unpack(saved, format) as Record<string, unknown>;
   upgrade(raw);
   const farm = raw as unknown as FarmState;
   farm.saveFormat = SAVE_FORMAT_VERSION;
