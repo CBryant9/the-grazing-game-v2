@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
+import { useLayout } from '@/lib/game/hooks';
+import { Sheet } from './Sheet';
 import { HELP_TERMS, HELP_TOPICS } from './helptopics';
 import helpStyles from './help.module.css';
 import styles from './play.module.css';
@@ -46,13 +48,25 @@ export function HelpSection() {
 }
 
 /**
- * The help screen. On a phone it is a full screen panel like the other tabs.
- * On a PC it fills the side panel. It is never a layer over the map. Each
- * topic is a heading that opens on a tap. Escape closes it.
+ * The help screen. On a phone (and a phone on its side) it opens in the same
+ * sheet the paddock uses, so the map stays visible above it on a phone held
+ * upright. On a PC it fills the side panel. Each topic is a heading that opens
+ * on a tap. It takes focus, Escape closes it, and focus goes back.
  */
 export function HelpPanel() {
   const close = useHelp((s) => s.closeHelp);
-  const replay = useHelp((s) => s.tourReplay);
+  const layout = useLayout();
+  if (layout !== 'pc') {
+    return (
+      <Sheet title="Help" onClose={close}>
+        <HelpContent />
+      </Sheet>
+    );
+  }
+  return <HelpSidePanel onClose={close} />;
+}
+
+function HelpSidePanel({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLElement>(null);
 
   // Take focus when it opens, and hand it back to what opened it.
@@ -71,15 +85,24 @@ export function HelpPanel() {
       className={styles.listpanel}
       aria-label="Help"
       onKeyDown={(e) => {
-        if (e.key === 'Escape') close();
+        if (e.key === 'Escape') onClose();
       }}
     >
       <header className={helpStyles.head}>
         <h2 className={`px ${styles.soontitle}`}>Help</h2>
-        <button type="button" className="btn" onClick={close}>
+        <button type="button" className="btn" onClick={onClose}>
           Close help
         </button>
       </header>
+      <HelpContent />
+    </section>
+  );
+}
+
+function HelpContent() {
+  const replay = useHelp((s) => s.tourReplay);
+  return (
+    <>
       <p className="muted">Short answers about how the game works. Tap a topic to open it.</p>
       <div className={helpStyles.tourbox}>
         <button type="button" className="btn sm ghost" onClick={replay}>
@@ -119,6 +142,6 @@ export function HelpPanel() {
           </details>
         </li>
       </ul>
-    </section>
+    </>
   );
 }

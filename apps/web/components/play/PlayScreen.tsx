@@ -179,7 +179,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   }, [build, buildEnd]);
 
   const pc = layout === 'pc';
-  // The help screen is a full screen panel on a phone, so what is under it is not drawn.
+  // Help opens in the same sheet on a phone, so the paddock sheet under it is not drawn.
   const sheetOpen =
     tab === 'farm' &&
     !pc &&

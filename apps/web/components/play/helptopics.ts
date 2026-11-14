@@ -48,7 +48,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Open the build tools (the Build button on a phone). The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
       'Fence: pick permanent, electric or tape, then drag along the paddock lines. Gate: tap a fence to put a gate in it, and tap a gate to open or shut it. Pipe: drag across squares, starting from the bore, a trough, a hub or pipe that is already there. Trough: tap a square that water reaches. Water hub: tap a fence corner or a square.',
       'Every job shows a card first, with its cost and the light it uses. You confirm, and the tool goes back to Look.',
-      'Red on the map means one thing: this part does not fit in today. A line that does not fit is not built. Only the part that fits is built, and the red part is drawn again another day.',
+      'Red on the map while you draw means one thing: this can not be done. The part of a line that does not fit in today shows red and is not built. Only the part that fits is built. Draw the rest again another day. A line the game can not build at all shows red too.',
     ],
   },
   {
@@ -86,7 +86,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     title: 'Grazing plans',
     lines: [
       'A grazing plan moves a mob round the paddocks by itself each day. Plans have their own tab.',
-      'Tap paddocks in the order the mob will visit them. Then pick the rule: move every few days, move a few times a day, or move when the feed is down to a level in kg DM/ha, with an optional most days.',
+      'Tap paddocks in the order the mob will visit them. Then pick the rule: move every few days, move a few times a day, or move when the feed is down to a level in kg DM/ha, with an optional limit in days. The limit moves the mob after that many days even if the feed has not dropped, and 0 means no limit.',
       'Pick the rounds: a number of rounds, or keep going. After the last round the mob starts again or stays put.',
       'Moving a mob by hand pauses its plan. A plan can be paused, resumed, changed or cleared. If a plan cannot move a mob, because the next paddock has no water, it says so and tries again the next day.',
     ],
@@ -133,7 +133,11 @@ export const HELP_TERMS: readonly HelpTerm[] = [
     means: 'Dry sheep equivalent. Another way to count stock together, with a dry sheep as one.',
   },
   { term: 'CS', means: 'Condition score, from 1 to 5. How lean or fat an animal is.' },
-  { term: 'PTIC', means: 'Preg tested in calf. A female the game has on the record as in calf.' },
+  {
+    term: 'PTIC',
+    means:
+      'On the record as in calf. A cow or heifer shows as PTIC by herself once she is far enough along.',
+  },
   { term: 'ME', means: 'Metabolisable energy, in MJ/kg. How much energy is in the feed.' },
   { term: 'CP', means: 'Crude protein, as a % of the feed. How much protein is in the feed.' },
   { term: 'kg DM/ha', means: 'Kilograms of dry matter on each hectare. The feed on offer.' },

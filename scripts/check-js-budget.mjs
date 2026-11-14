@@ -37,7 +37,7 @@ const PAGES = [
     path: '/',
     file: 'index.html',
     targetKb: 100,
-    limitKb: Number(arg('--limit-home', '150')),
+    limitKb: Number(arg('--limit-home', '142')),
   },
   {
     path: '/play',

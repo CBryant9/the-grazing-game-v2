@@ -85,6 +85,9 @@
 
 /* ---- The coach strip ------------------------------------------------------ */
 
+.strip:focus {
+  outline: none;
+}
 .strip {
   flex: none;
   display: flex;

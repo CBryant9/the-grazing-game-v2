@@ -136,6 +136,7 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
 export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
   const openPaddock = useGame((s) => s.openPaddock);
   const selectTool = useGame((s) => s.selectTool);
+  const setTab = useGame((s) => s.setTab);
   const [key, dir, pick] = useSort<PaddockSortKey>('name');
   const rows = sortPaddocks(snapshot.paddocks, snapshot.mobs, key, dir);
   return (
@@ -145,7 +146,13 @@ export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
         {plural(snapshot.paddocks.length, 'paddock')}, {num(snapshot.farm.setup.farmHa)} ha.
       </p>
       {rows.length === 0 ? (
-        <EmptyState action="Build a fence" onAction={() => selectTool('fence')}>
+        <EmptyState
+          action="Build a fence"
+          onAction={() => {
+            setTab('farm');
+            selectTool('fence');
+          }}
+        >
           This farm has no paddocks yet. A fence round some land makes one.
         </EmptyState>
       ) : (

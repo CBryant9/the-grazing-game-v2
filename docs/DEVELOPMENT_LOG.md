@@ -1108,6 +1108,16 @@ The stored farm is one JSON file: 191 KB when started (67 KB compressed), 339 KB
 
 Not done or not checked: a real phone (install, the iPhone steps, offline in airplane mode, the Android install bar), the iPhone status bar in an installed app, and going offline while a request is in flight.
 
+**Calls for Claudia** (from the review of this branch).
+
+- The home page JavaScript is held at 142 KB (the check's limit is now 142 KB, so it can only go down) against the PRD 14.10 target of 100 KB. React and the Next.js client are about 120 KB (LESSONS, 1.8 W4 and R1). It reaches 100 KB when the website pages are built in Stage 5, or the target moves.
+- `/play` Lighthouse performance was measured at 0.89 (runs 0.89, 0.91, 0.88) against the 0.95 the CI asks for. The CI rule is not loosened, so CI fails on this until the page is made lighter. The cause is the setup form heading waiting on the scripts, then two requests one after the other (LESSONS, 1.8 W5). The fix is in `PlayApp` and `SetupFlow`.
+- The service worker starts 8 seconds after `/play` has loaded, so its 1.6 MB of saved files never competes with the farm's first load. Say if a player should get offline sooner.
+- The stored farm file is 191 KB when started and 339 KB after about a year and a half of play. BUILD_PLAN 5.2 says "a few tens of KB". Worth a decision before Stage 3 sets storage limits.
+- Help opens in the same bottom sheet as the paddock on a phone, so the map stays visible above it (REQUIREMENTS: help never covers the map on a small screen). On a phone on its side it is the whole-screen sheet, as the paddock is. This replaces the full-screen panel described in the 1.7e entry.
+- The last-farm copy (offline viewing) and the tour progress are kept per browser, not per player, until accounts arrive in Stage 3. A second player on the same browser sees the first player's last farm copy and tour progress.
+- The service worker now keeps only `/` and `/play`. Every other page (admin, sign-in callbacks, account pages) and everything under `/api` goes to the network and is never stored.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

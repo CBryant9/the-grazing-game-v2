@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
 import { HELP_TERMS, HELP_TOPICS } from './helptopics';
 
 const all = [
   ...HELP_TOPICS.flatMap((t) => [t.title, ...t.lines]),
   ...HELP_TERMS.flatMap((t) => [t.term, t.means]),
 ];
+
+const tourWords = [...Object.values(TOUR_TEXT).flatMap((t) => [t.title, t.body]), TOUR_FINISHED];
+const everyWord = [...all, ...tourWords];
 
 describe('the help topics', () => {
   it('covers every topic the first-time experience asks for', () => {
@@ -53,6 +57,19 @@ describe('the help topics', () => {
     const husbandry = HELP_TOPICS.find((t) => t.id === 'husbandry')!.lines.join(' ');
     expect(husbandry).toContain('no preg testing');
     expect(husbandry).toContain('PTIC');
+  });
+
+  it('never judges or prescribes, in any topic or tour line, and has no dash asides', () => {
+    const banned = ['should', 'overgraz', 'well done', 'good job', 'poor management', 'you must'];
+    for (const s of everyWord) {
+      const lower = s.toLowerCase();
+      for (const w of banned) expect(lower, `"${w}" in: ${s}`).not.toContain(w);
+      for (const d of [' � ', ' � ', ' - ']) expect(s, `dash aside in: ${s}`).not.toContain(d);
+    }
+  });
+
+  it('does not mention a preg test as something to do', () => {
+    for (const s of everyWord) expect(s.toLowerCase()).not.toContain('preg tested');
   });
 
   it('describes a paddock label without judging it', () => {

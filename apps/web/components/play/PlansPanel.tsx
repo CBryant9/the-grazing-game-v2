@@ -164,6 +164,7 @@ function PlanCard({ plan }: { plan: PlanWire }) {
 export function PlansPanel({ snapshot }: { snapshot: Snapshot }) {
   const startPlan = useGame((s) => s.startPlan);
   const setTab = useGame((s) => s.setTab);
+  const selectTool = useGame((s) => s.selectTool);
   const free = mobsWithoutPlan(snapshot);
   return (
     <section className={styles.listpanel} aria-label="Plans">
@@ -185,10 +186,23 @@ export function PlansPanel({ snapshot }: { snapshot: Snapshot }) {
         </div>
       )}
       {snapshot.plans.length === 0 ? (
-        snapshot.mobs.length === 0 || snapshot.paddocks.length === 0 ? (
+        snapshot.mobs.length === 0 ? (
           <EmptyState action="Go to the Market" onAction={() => setTab('market')}>
-            No grazing plans yet. A plan needs a mob to move, and there are no cattle on the farm.{' '}
+            {snapshot.paddocks.length === 0
+              ? 'No grazing plans yet. A plan needs a mob to move and paddocks to move it through. There are no cattle and no paddocks on the farm.'
+              : 'No grazing plans yet. A plan needs a mob to move, and there are no cattle on the farm.'}{' '}
             {snapshot.market.saleLine}
+          </EmptyState>
+        ) : snapshot.paddocks.length === 0 ? (
+          <EmptyState
+            action="Build a fence"
+            onAction={() => {
+              setTab('farm');
+              selectTool('fence');
+            }}
+          >
+            No grazing plans yet. A plan moves a mob through paddocks, and this farm has no paddocks
+            yet. A fence round some land makes one.
           </EmptyState>
         ) : (
           <EmptyState action="Make a plan" onAction={() => startPlan({})}>

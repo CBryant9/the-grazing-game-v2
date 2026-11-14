@@ -3,13 +3,14 @@
 //
 // What it keeps, so the farm can be looked at offline and second visits are
 // quick: the page shell and the site's own scripts, styles, fonts and icons.
-// What it never keeps: anything under /api. The farm's numbers are read from
+// What it never keeps: any page other than / and /play, and anything under /api. The farm's numbers are read from
 // the server each time, and the last copy the player saw is kept by the page
 // itself (lib/game/offline.ts), not here. Nothing from the engine is in any
 // of this, and `pnpm check:browser-bundle` still looks at everything sent.
 
 import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from 'serwist';
 import type { PrecacheEntry, RuntimeCaching } from 'serwist';
+import { isCacheablePagePath } from '../lib/pwa/cacheablePage';
 
 declare const self: {
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
@@ -39,9 +40,12 @@ const runtimeCaching: RuntimeCaching[] = [
       plugins: [new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 })],
     }),
   },
-  // Pages: the network first, so a new version shows at once; the last copy when it can not be reached.
+  // Only the home page and the game page are kept. Every other page (admin,
+  // sign-in callbacks, account pages) goes to the network and is never stored.
+  // The network first, so a new version shows at once; the last copy when it can not be reached.
   {
-    matcher: ({ request, sameOrigin }) => sameOrigin && request.destination === 'document',
+    matcher: ({ request, sameOrigin, url }) =>
+      sameOrigin && request.destination === 'document' && isCacheablePagePath(url.pathname),
     handler: new NetworkFirst({
       cacheName: 'pages',
       networkTimeoutSeconds: 4,

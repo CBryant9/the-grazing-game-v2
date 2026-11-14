@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
 import { currentStep, stepLabel, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
 import styles from './help.module.css';
@@ -13,13 +14,25 @@ import styles from './help.module.css';
 export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
   const tour = useHelp((s) => s.tour);
   const skipStep = useHelp((s) => s.tourSkipStep);
-  const end = useHelp((s) => s.tourEnd);
+  const endTour = useHelp((s) => s.tourEnd);
+  const strip = useRef<HTMLElement>(null);
+  // The strip's buttons go away when the tour ends or the step changes, which
+  // would drop focus to the page body. Send it somewhere sensible instead:
+  // the map region when the tour ends, the strip itself when a step is skipped.
+  const end = (): void => {
+    endTour();
+    requestAnimationFrame(() => document.getElementById('main')?.focus());
+  };
+  const skip = (step: Parameters<typeof skipStep>[0]): void => {
+    skipStep(step);
+    requestAnimationFrame(() => strip.current?.focus());
+  };
   if (!tour || tour.status !== 'active') return null;
 
   const step = currentStep(tour, hasCattle);
   if (step === null) {
     return (
-      <section className={styles.strip} aria-label="First day tour">
+      <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">
         <div className={styles.stext} role="status">
           <p className={styles.sbody}>{TOUR_FINISHED}</p>
         </div>
@@ -34,7 +47,7 @@ export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
 
   const text = TOUR_TEXT[step];
   return (
-    <section className={styles.strip} aria-label="First day tour">
+    <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">
       <div className={styles.stext} role="status">
         <p className={styles.sstep}>
           {stepLabel(tour, hasCattle)}: {text.title}
@@ -42,7 +55,7 @@ export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
         <p className={styles.sbody}>{text.body}</p>
       </div>
       <div className={styles.sbtns}>
-        <button type="button" className="btn sm ghost" onClick={() => skipStep(step)}>
+        <button type="button" className="btn sm ghost" onClick={() => skip(step)}>
           Skip this step
         </button>
         <button type="button" className="btn sm ghost" onClick={end}>
