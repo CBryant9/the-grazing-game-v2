@@ -11,7 +11,7 @@ import { createFarm } from './create';
 import { grazingArea, landOf, plantingsNow, surveyOf } from './derived';
 import { portableRefund, supplementCosts } from './reads';
 import { cloneFarm, type FarmState } from './state';
-import { stepDay } from './tick';
+import { placeFor, stepDay } from './tick';
 import { farmView } from './view';
 
 /*
@@ -36,8 +36,10 @@ const herdFarm = (): FarmState =>
 function tickFeed(farm: FarmState): number {
   const f = cloneFarm(farm);
   const before = f.year.feed;
+  const years = f.years.length;
   stepDay(f);
-  return f.year.feed - before;
+  // On the day the year closes, the day's feed is in the year just filed.
+  return (f.years.length > years ? f.years.at(-1)!.feed : f.year.feed) - before;
 }
 
 /** A farm with every mob on one supplement. */
@@ -68,22 +70,34 @@ describe('what a supplement costs a mob a day', () => {
     }
   });
 
-  it('on many days through the year, lick included, as it moves with the feed', () => {
+  it('every day of a year, lick included: priced on the feed after the day’s growth', () => {
     let farm = allOn(herdFarm(), 'lick');
     let checked = 0;
-    for (let d = 0; d < 200; d++) {
+    let growthMattered = 0;
+    for (let d = 0; d < 365; d++) {
       const weaningToday = farm.mobs.some((m) =>
         m.animals.some((a) => a.kind === 'calf' && a.age >= 279),
       );
-      if (d % 9 === 0 && !weaningToday) {
-        expect(sumOf(farm, 'lick'), `day ${farm.day}`).toBeCloseTo(tickFeed(farm), 9);
+      if (!weaningToday) {
+        const charged = tickFeed(farm);
+        expect(sumOf(farm, 'lick'), `day ${farm.day}`).toBeCloseTo(charged, 9);
         checked++;
+        // Priced on the feed as it stood before the day's growth, lick would sometimes be wrong.
+        const s = surveyOf(farm);
+        const land = landOf(farm, s, plantingsNow(farm));
+        let before = 0;
+        for (const m of farm.mobs) {
+          const { diet } = dayDiet(placeFor(farm, s, m), land);
+          for (const a of m.animals) before += intakeOf(a, diet, 'lick', false).cost;
+        }
+        if (Math.abs(before - charged) > 1e-9) growthMattered++;
       }
       stepDay(farm);
       for (const m of farm.mobs) m.supp = 'lick';
       farm = cloneFarm(farm);
     }
-    expect(checked).toBeGreaterThan(15);
+    expect(checked).toBeGreaterThan(300);
+    expect(growthMattered).toBeGreaterThan(0);
   });
 
   it('in the feedlot every option is the ration’s price', () => {

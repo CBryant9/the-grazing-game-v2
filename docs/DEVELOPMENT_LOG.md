@@ -902,6 +902,33 @@ Questions for Claudia:
 3. **Gate sentence.** Opening a gate says "The mobs in them will join if both hold stock." Is that the wording she wants, given joining is automatic?
 4. **Remove.** Removing a fence gives nothing back and is free (the engine's rule). Is that intended, or should a permanent fence pay something back?
 
+### 14 Nov 2026: engine rules after the screens review
+
+Branch `m1.7x-engine-rules`, from `m1.7c-build-tools`. Engine and shared types only: nothing under `apps/` or `packages/render` changed. Engine 0.10.0, save format 7.
+
+Built:
+
+- **Fence materials are kept, and reused fence is half price** (Claudia: "half price is fine"). Taking down permanent or electric fence keeps its materials on hand, by the metre and by kind (`layout.fenceOnHand`; knocked-down electric counts as electric; gates are not kept; tape is unchanged). Building fence of a kind uses them first, along the line in the order drawn, at half the price of a new metre (`REUSED_FENCE_SHARE = 0.5`); the rest is full price. The ledger records each segment at what it cost. The build result and the job card say the metres from materials on hand and what that saves, for the whole line and for the part built today (`fenceMaterials`); the take-down result and card say what was kept and what is on hand (`materialsKept`). `materialsOnHand(farm)` gives the metres of each kind, tape on the roll included. Times are unchanged.
+- **Water hubs can be removed and moved.** `moveHub` (a fence-line or corner hub to another corner), `removeSquareHub` (the trough comes out, the gates stay) and `moveSquareHub` (the trough moves, the new square gets its open gates, the old square keeps its gates). A hub on a square is read from the layout (`isSquareHub`: a fixed trough with a gate on every side that is not the boundary), so nothing new is kept. Moving costs what moving a trough costs ($300) plus any new gates; times follow the trough. The farm view carries `water.squareHubs` beside `water.hubs`.
+- **The player is told only what a joining report or a preg test has told them.** `breedingReports(farm)`: each mob's latest joining report and preg test with their farm days, the head known in calf (bought PTIC, the running farm's starting PTIC cows included, or in calf at a preg test since, until they calve, slip, die or are sold), and the class table as the player knows it. The farm view's mob `classes` now count PTIC only when known. Kept as display state only (`farm.knownInCalf`, `mob.reports`). `JOINING_DAYS` (63) and `JOINING_REPORT_DAYS` (21) are exported for the screens. The live fields (`mobSummaries` classes and sale value, `classOf`, `label`, `groupKey`, `preg`) are marked "not for the player's screens".
+- **Reads for the web server**: `supplementCosts` (each supplement's daily price for each mob as today's tick charges it, plans that move more than once a day included), `husbandryNow` (calves to mark and wean, and whether each job can be done now with its reason), `portableRefund`. `areaWatered` was already exported. To share code rather than copy it, `simMob`'s diet choice became `dayDiet` and the tick's first three steps became `startOfDay`, with the arithmetic unchanged.
+
+How it was tested: `pnpm typecheck`, `pnpm lint`, `pnpm test` (2,142 tests, up from 2,089), `pnpm test:speed` (2.77 ms a day with 4,895 head, limit 5 ms) and `pnpm format:check` pass. New test files: `actions/fenceMaterials.test.ts`, `actions/hubs.test.ts`, `sim/told.test.ts`, `sim/reads.test.ts`, with additions to the job card test (every action, now 37), the farm view test, the saves tests and the "looking is free" test. The old game comparison has a new run that builds a fence, takes it down and builds again: it asserts the half price on the reused segments, then sets the old game's cash and year's infrastructure spending level, and every other figure stays equal day by day. No calibration or comparison figure was changed. A test runs a farm with what the player was told wiped every day and gets the same farm, so display state can't reach a formula. Break-it checks: 21 changes to the new rules and figures, one at a time (the half price, materials used and kept, the ledger, the card, the save upgrade, the hub checks and costs, the view, what a preg test tells, calving, the known classes, bought PTIC, the inbox read-back, the supplement price on the day's stops and after growth, the counts and the refund). Each made a test fail. The first run left one alive (pricing lick before the day's growth); a test over every day of a year now catches it.
+
+Not done:
+
+- **The farm view version is still 3.** `squareHubs` was added as an optional field and the meaning of a mob's `classes` changed, which calls for version 4. Bumping it fails the map fixture test in `apps/web/dev-fixtures` (the stored views are version 3), and this change was not to touch `apps/`. When the screens branch lands: bump `FARM_VIEW_VERSION` to 4, make `squareHubs` required if wanted, and run `pnpm dev:map-fixtures`.
+- The screens: the fence tool starting on permanent fence, the pipe tool not zooming, the hub move and remove tools, showing materials on hand, and moving the web server onto the new reads.
+
+Questions for Claudia:
+
+1. **Fence materials in net worth.** Materials on hand count for nothing, and a segment rebuilt from them is on the books at the half that was paid. Right, or should materials on hand count for something?
+2. **Fence built over.** Fence under a new run of another kind, or where a gate or a square hub goes, is gone, not kept. Should it be kept as materials too?
+3. **Removing a hub on a square** takes the trough out and leaves the gates. Should the gates come out too, or be shut?
+4. **Moving a hub** costs what moving a trough costs ($300). Right?
+5. **The pregnancy premium.** A cow's sale value rises by $320 at 400c (about $304 after commission) on her 50th day in calf, tested or not. It doesn't move the day she conceives, but on day 50 it moves her mob's sale value and the farm's net worth, so a player watching those can count cows reaching 50 days: up to 13 days before the preg test. Leave it, or apply the premium only to cows known to be PTIC? (Late pregnancy shows the same way in AE at 190 days, well after the test. Selling the "PTIC cows" group also picks by live pregnancy.)
+6. **A running farm's starting cows that come PTIC** are treated as known in calf, as if the previous owner's preg test came with them. Right?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
