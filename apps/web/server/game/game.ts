@@ -3,11 +3,13 @@ import { createHash, randomInt } from 'node:crypto';
 import {
   applyAction,
   CLASS_LABELS,
+  EDGE,
   GRID_N,
   SUPPLEMENTS,
   areaIdOf,
   createFarm,
   endDay,
+  getEdge,
   loadFarm,
   marketView,
   previewAction,
@@ -18,6 +20,7 @@ import {
   type Action,
   type CattleClassId,
   type CreateFarmOptions,
+  type EdgeRef,
   type FarmState,
   type GroupId,
   type JobCard,
@@ -25,6 +28,7 @@ import {
   type Supplement,
 } from '@gg/engine';
 import { loadRealData } from '@gg/engine/server';
+import { FARM_GRID_H, FARM_GRID_W } from '@gg/shared';
 import type {
   ActionRequest,
   ActResponse,
@@ -36,6 +40,8 @@ import type {
   SkipRequestLength,
   Snapshot,
 } from '../../lib/game/types';
+import { parseBuildAction } from './build';
+import { gateNotes, lineWords } from './buildwords';
 import { buildMobs } from './mobs';
 import { moveNotes } from './mobwords';
 import { buildSnapshot, buildSummary } from './snapshot';
@@ -174,8 +180,46 @@ export function parseAction(body: unknown, farm?: FarmState): Action | null {
       return port === null ? null : { type: 'refillPortable', port };
     }
     default:
-      return null;
+      return parseBuildAction(a);
   }
+}
+
+/** The squares on the two sides of a fence segment. -1 where the side is off the farm. */
+function sidesOf(e: EdgeRef): [number, number] {
+  if (e.line === 'h') {
+    const vy = Math.floor(e.index / FARM_GRID_W);
+    return [vy > 0 ? e.index - FARM_GRID_W : -1, vy < FARM_GRID_H ? e.index : -1];
+  }
+  const y = Math.floor(e.index / (FARM_GRID_W + 1));
+  const vx = e.index % (FARM_GRID_W + 1);
+  const row = y * FARM_GRID_W;
+  return [vx > 0 ? row + vx - 1 : -1, vx < FARM_GRID_W ? row + vx : -1];
+}
+
+/**
+ * What a gate does: which paddocks it joins, and that the mobs in them join
+ * if both hold stock. Read from the farm as it stands before the job.
+ */
+export function gateNotesFor(farm: FarmState, action: Action): string[] {
+  if (action.type !== 'placeGate' && action.type !== 'setGate') return [];
+  const [a, b] = sidesOf(action.edge);
+  if (a < 0 || b < 0) return [];
+  const survey = surveyOf(farm);
+  const topo = survey.topology;
+  const nameOf = (cell: number): string =>
+    topo.paddocks.find((p) => p.id === topo.paddockOf[cell])?.name ?? 'the paddock';
+  const holds = (cell: number): boolean =>
+    farm.mobs.some((m) => m.where.kind === 'paddock' && areaIdOf(survey, m) === topo.areaOf[cell]);
+  const was = getEdge(farm.layout.fences, action.edge);
+  const kind =
+    action.type === 'placeGate'
+      ? 'place'
+      : action.open
+        ? was === EDGE.gateOpen
+          ? 'none'
+          : 'open'
+        : 'shut';
+  return gateNotes(kind, nameOf(a), nameOf(b), holds(a) && holds(b));
 }
 
 /**
@@ -222,6 +266,19 @@ function cardWire(card: JobCard, extra: string[] = [], perDay: number | null = n
     notes.push('Marking covers every bull calf and young bull in the mob that is not marked yet.');
   }
   if (card.notToday) notes.push(card.notToday.message);
+  let line: JobCardWire['line'] = null;
+  if (card.line) {
+    const wire = (p: NonNullable<JobCard['line']>['fits']) => ({
+      edges: p.pieces.flatMap((x) =>
+        'edge' in x ? [{ line: x.edge.line, index: x.edge.index }] : [],
+      ),
+      cells: p.pieces.flatMap((x) => ('cell' in x ? [x.cell] : [])),
+      metres: Math.round(p.metres),
+    });
+    const fits = wire(card.line.fits);
+    const doesNotFit = wire(card.line.doesNotFit);
+    line = { fits, doesNotFit, words: lineWords(fits.metres, doesNotFit.metres) };
+  }
   return {
     action: card.action,
     outcome: card.outcome,
@@ -233,6 +290,7 @@ function cardWire(card: JobCard, extra: string[] = [], perDay: number | null = n
     costToday: Math.round(card.costToday),
     perDay,
     notes,
+    line,
   };
 }
 
@@ -375,7 +433,7 @@ export class GameServer {
       const option = mob?.suppOptions.find((o) => o.id === action.supp);
       return { notes: [], perDay: option ? option.perDay : null };
     }
-    return { notes: moveNotesFor(farm, action), perDay: null };
+    return { notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)], perDay: null };
   }
 
   /** The job card for an action: time, cost and light left. Nothing changes. */

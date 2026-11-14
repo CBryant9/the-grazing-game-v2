@@ -4,7 +4,8 @@ import { GameError, isSessionId } from './game';
 
 export const SESSION_COOKIE = 'gg_session';
 const SESSION_DAYS = 90;
-const BODY_LIMIT = 4096;
+/** A line of fence is up to 400 segments, each about 30 bytes, so a request can be long. */
+const BODY_LIMIT = 32 * 1024;
 
 const HEADERS = { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' };
 

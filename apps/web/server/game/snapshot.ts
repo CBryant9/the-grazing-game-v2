@@ -27,6 +27,7 @@ import {
   type Snapshot,
   type SummaryWire,
 } from '../../lib/game/types';
+import { buildWire } from './buildwords';
 import { buildMobs } from './mobs';
 import { causeWord, gameOverWord, inboxWord, stopWord, todoWire } from './words';
 
@@ -168,6 +169,7 @@ export function buildSnapshot(
     plans: plansView(farm) as unknown as Record<string, unknown>[],
     mobs,
     paddocks,
+    build: buildWire(),
     inbox,
     over: farm.over ? { text: gameOverWord(farm.over.reason) } : null,
   };

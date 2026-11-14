@@ -50,6 +50,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   costToday: 72,
   perDay: null,
   notes: [],
+  line: null,
   ...over,
 });
 

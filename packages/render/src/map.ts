@@ -166,6 +166,8 @@ export interface MapToolTapEvent extends MapPointerEvent {
   edge: ViewEdge | null;
   /** The VIEW_FENCE code on that segment. */
   edgeCode: number;
+  /** How far that segment is from the tap, in screen pixels. Infinity with none. */
+  edgeDistPx: number;
   /** The nearest grid corner within a touch, or null. */
   corner: Corner | null;
   /** True when a water hub stands on that corner. */
@@ -1678,6 +1680,7 @@ class PixiFarmMap implements FarmMap {
       ...base,
       edge: edge ? edge.edge : null,
       edgeCode: edge ? fenceCodeAt(view, edge.edge) : VIEW_FENCE.none,
+      edgeDistPx: edge ? edge.distPx : Infinity,
       corner: corner ? { vx: corner.vx, vy: corner.vy } : null,
       hub,
     };

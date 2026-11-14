@@ -17,7 +17,8 @@ function Row({
     button: string | null;
     urgent: boolean;
     mob?: number | null;
-    opens?: 'move' | null;
+    opens?: 'move' | 'fix' | null;
+    edge?: { line: 'h' | 'v'; index: number } | null;
   };
   job?: JobState;
 }) {
@@ -26,6 +27,7 @@ function Row({
   const dismissJob = useGame((s) => s.dismissJob);
   const openMob = useGame((s) => s.openMob);
   const startMove = useGame((s) => s.startMove);
+  const startFix = useGame((s) => s.startFix);
   const busy = useGame((s) => s.busy > 0);
   const phase = job?.phase;
   return (
@@ -40,7 +42,9 @@ function Row({
               onClick={() =>
                 item.opens === 'move' && item.mob != null
                   ? void startMove({ mobId: item.mob })
-                  : void startJob(item.key)
+                  : item.opens === 'fix' && item.edge
+                    ? void startFix(item.edge)
+                    : void startJob(item.key)
               }
             >
               {item.button}

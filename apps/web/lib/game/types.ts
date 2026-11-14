@@ -72,8 +72,10 @@ export interface TodoWire {
   urgent: boolean;
   /** The mob this is about, so the banner can open its card. Null when it is about something else. */
   mob: number | null;
-  /** 'move' when the button opens the move flow instead of doing a job at once (cattle in the yards). */
-  opens: 'move' | null;
+  /** 'move' when the button opens the move flow instead of doing a job at once (cattle in the yards). 'fix' when it opens the card for a fence that is down. */
+  opens: 'move' | 'fix' | null;
+  /** The fence segment this is about (a fence that is down), so the map can show it. */
+  edge: EdgeWire | null;
 }
 
 export type SuppId = 'none' | 'lick' | 'hay' | 'pellet';
@@ -198,6 +200,41 @@ export interface InboxWire {
   text: string;
 }
 
+/** One side of a square, as the map and the engine number it. */
+export interface EdgeWire {
+  line: 'h' | 'v';
+  index: number;
+}
+
+export type FenceKindId = 'permanent' | 'electric' | 'tape';
+export type BuildToolId = 'fence' | 'gate' | 'pipe' | 'trough' | 'portable' | 'hub' | 'remove';
+
+/** A fence the player can draw: what a metre costs and what it does. From the server. */
+export interface FenceOptionWire {
+  id: FenceKindId;
+  name: string;
+  /** Dollars a metre. */
+  perM: number;
+  /** "$7 a metre". */
+  price: string;
+  text: string;
+}
+
+export interface BuildToolWire {
+  id: BuildToolId;
+  name: string;
+  /** One short line of help, shown when the tool is picked. */
+  help: string;
+  /** What it costs, in words. */
+  price: string;
+}
+
+/** The tool bar: the tools and the fences, with their prices and help lines. */
+export interface BuildWire {
+  tools: BuildToolWire[];
+  fences: FenceOptionWire[];
+}
+
 export interface Snapshot {
   version: typeof SNAPSHOT_VERSION;
   farm: {
@@ -218,6 +255,8 @@ export interface Snapshot {
   plans: Record<string, unknown>[];
   mobs: MobWire[];
   paddocks: PaddockWire[];
+  /** The build tools, with prices and help lines. */
+  build: BuildWire;
   inbox: InboxWire[];
   over: { text: string } | null;
 }
@@ -237,6 +276,22 @@ export interface JobCardWire {
   perDay: number | null;
   /** Plain sentences about this job, for example that stock are booked onto a sale. */
   notes: string[];
+  /** For a line of fence, tape or pipe: the pieces that fit today and the pieces that do not. */
+  line: LineWire | null;
+}
+
+/** The pieces of a line job, in the order drawn. Fence and tape give segments, pipe gives squares. */
+export interface LinePiecesWire {
+  edges: EdgeWire[];
+  cells: number[];
+  metres: number;
+}
+
+export interface LineWire {
+  fits: LinePiecesWire;
+  doesNotFit: LinePiecesWire;
+  /** What the card says when part of it does not fit. Empty when all of it fits. */
+  words: string[];
 }
 
 export interface Refusal {
@@ -334,6 +389,23 @@ export type SimpleAction =
   | { type: 'wean'; mob: number }
   | { type: 'harvest'; field: number }
   | { type: 'refillPortable'; port: number }
+  | { type: 'buildFence'; edges: EdgeWire[]; fence: FenceKindId }
+  | { type: 'removeFence'; edges: EdgeWire[] }
+  | { type: 'rollUpTape'; edge: EdgeWire }
+  | { type: 'fixFence'; edge: EdgeWire }
+  | { type: 'placeGate'; edge: EdgeWire }
+  | { type: 'removeGate'; edge: EdgeWire }
+  | { type: 'setGate'; edge: EdgeWire; open: boolean }
+  | { type: 'layPipe'; cells: number[] }
+  | { type: 'placeTrough'; cell: number }
+  | { type: 'moveTrough'; from: number; to: number }
+  | { type: 'removeTrough'; cell: number }
+  | { type: 'placeFenceHub'; vertex: number }
+  | { type: 'placeSquareHub'; cell: number }
+  | { type: 'removeHub'; vertex: number }
+  | { type: 'placePortable'; cell: number }
+  | { type: 'movePortable'; port: number; cell: number }
+  | { type: 'removePortable'; port: number }
   | { type: 'pausePlan'; mob: number }
   | { type: 'clearPlan'; mob: number };
 

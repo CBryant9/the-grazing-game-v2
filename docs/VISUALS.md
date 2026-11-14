@@ -187,6 +187,18 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 - **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, red below.
 - **The stock yards** are drawn on their square (no homestead: REQUIREMENTS, 14 Nov 2026). The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.**
 
+### The build tools on the map (milestone 1.7c)
+
+All of this is drawn on two layers above everything else on the farm, so a draft or a hover redraws only those and never the grass or the cattle. Line widths are set in screen pixels and follow the zoom.
+
+- **Draft line:** the fence's own colour on a dark casing (permanent brown, electric yellow, tape white and dashed, pipe blue). Pipe draws a tint on each square and a line through their middles. **The part that does not fit today is red** (the red the map uses for a knocked-down fence), solid, on the same casing. The card beside it says the same in words, so colour is never the only signal. Red goes with the server's job card: the first pieces drawn that fit are the line's colour, the rest are red. If none fits, all of it is red.
+- **Snap dots:** at each end of a fence line, green and filled where it joins an existing fence, a gate or the boundary, a white ring on open ground. A dot also shows at the corner under the mouse in the Fence and Water hub tools.
+- **Hover (PC):** in a tool the thing under the pointer is highlighted: a fence segment or gate in white with a dark casing, a square outlined and tinted lightly, a corner as a dot.
+- **Remove:** what is about to go is marked in red with a white core. Tape marks the whole straight run that is rolled up.
+- **A knocked-down fence** is tapped in Look. It offers the card "Put this fence back up", marked on the map, and a tap anywhere else still opens the paddock.
+- **Panning in a tool:** a drag draws, so the map is moved with two fingers, the space bar held, or the middle mouse button. Wheel and pinch still zoom. In Look nothing changed: one finger pans, a tap opens the paddock.
+- **Builder's choices (not in the spec above):** the dashed white for draft tape, the 7 px dark casing, the 7 px dot, a trough or hub picked is marked with a white square or dot, and a tap in a tool reaches the nearest fence within 22 px (10 px counts as "right under the finger" in Remove, so a trough beside a fence can still be picked).
+
 ### Layers, light and weather
 
 - **Layers:** water reach, pasture quality, recently grazed, arable land, pipe and labels, with the colours and strengths above. The profit layer is listed but not drawn yet: the view carries no figures for each beast.
@@ -200,7 +212,7 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 For Claudia to know before she looks at it. Each is from the spec above.
 
 - Trees. The profit layer. The selected mob and picked animals. The farmer and the ute.
-- The fence tool on the map: the drag preview, snap dots, the hovered fence segment, and **clicking a knocked-down fence to put it back up**. A tap reports a square and a paddock only, not a fence line.
+- Keyboard drawing on the map. The build tools can be picked and confirmed by keyboard, but a fence or a pipe is drawn with a finger or the mouse.
 - The "drag to see more" hint on a phone held upright.
 - Animation: cattle walking and grazing, time-lapse, the hand-over between days.
 - Half-built fence lines and pegs (they come with the working day, milestone 1.5).

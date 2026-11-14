@@ -1189,3 +1189,171 @@
     animation: none;
   }
 }
+
+/* ---- Build tools: the tool bar and the card beside the line -------------- */
+
+.toolclosed {
+  display: flex;
+  justify-content: flex-start;
+}
+.toolclosed :global(.btn) {
+  min-height: var(--tap);
+  background: var(--hud);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.toolbar {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.75rem;
+}
+.toolrow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.tool {
+  flex: none;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.tool[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.fencechoice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.fencebtn {
+  min-height: var(--tap);
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  font-size: 0.75rem;
+}
+.fencebtn small {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.fencebtn[aria-pressed='true'] {
+  background: var(--sel);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.toolhelp {
+  display: grid;
+  gap: 2px;
+  line-height: 1.4;
+}
+.toolbar > :global(.btn) {
+  justify-self: start;
+  min-height: var(--tap);
+}
+
+.buildcard {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--hud);
+  border: 1px solid var(--coral);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.buildcard :global(.btn) {
+  min-height: var(--tap);
+}
+.buildfloat {
+  position: absolute;
+  z-index: 9;
+  width: min(300px, calc(100% - 16px));
+  left: 8px;
+  top: 8px;
+}
+.cardhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  color: var(--accent-text);
+}
+.cardlength {
+  font-size: 0.75rem;
+  color: var(--text);
+}
+.cardlate {
+  color: var(--bad);
+  font-weight: 700;
+}
+.cardreason {
+  color: var(--bad);
+}
+.gatelist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.gatelist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.gatelist :global(.btn) {
+  min-height: var(--tap);
+}
+
+/* The bottom stack on a phone: the card, then the tool bar. */
+.buildstack {
+  position: absolute;
+  z-index: 8;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+.buildstack > * {
+  pointer-events: auto;
+}
+/* A phone on its side: the stack is a column on the right, so the map stays wide. */
+.screen[data-layout='landscape'] .buildstack {
+  left: auto;
+  width: min(300px, 46%);
+  top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buildcard,
+  .toolbar {
+    transition: none;
+    animation: none;
+  }
+}

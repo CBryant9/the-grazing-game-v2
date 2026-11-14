@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
+import { buildAnchor, buildDraft, mapToolFor } from '@/lib/game/build';
 import { pickable } from '@/lib/game/lists';
 import { useLayout, useReducedMotion, useTheme } from '@/lib/game/hooks';
 import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
+import { BuildBar } from './BuildBar';
+import { BuildCard } from './BuildCard';
 import { FarmMap } from './FarmMap';
 import { HerdList, PaddockList } from './Lists';
 import { MobCard } from './MobCard';
@@ -93,6 +96,7 @@ function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
   if (open) return <Opened snapshot={snapshot} />;
   return (
     <div className={styles.sidebody}>
+      <BuildBar build={snapshot.build} docked />
       <h2 className={`px ${styles.minihead}`}>Things to do</h2>
       <TodoList snapshot={snapshot} />
       <h2 className={`px ${styles.minihead}`}>Paddocks</h2>
@@ -124,6 +128,12 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const openPaddock = useGame((s) => s.openPaddock);
   const moveTargetPicked = useGame((s) => s.moveTargetPicked);
   const summary = useGame((s) => s.summary);
+  const build = useGame((s) => s.build);
+  const buildDrag = useGame((s) => s.buildDrag);
+  const buildTap = useGame((s) => s.buildTap);
+  const buildEnd = useGame((s) => s.buildEnd);
+  const startFix = useGame((s) => s.startFix);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
   // Evening: nothing more can start today, so the farm is lit for dusk. It can still be looked at.
@@ -136,6 +146,16 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
     document.documentElement.classList.add('play-lock');
     return () => document.documentElement.classList.remove('play-lock');
   }, []);
+
+  // Escape goes back to Look from any tool, as long as no job is being done.
+  useEffect(() => {
+    if (!build || build.phase === 'applying') return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') buildEnd();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [build, buildEnd]);
 
   const pc = layout === 'pc';
   const sheetOpen =
@@ -156,6 +176,13 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         : null,
     [picking, move, snapshot.paddocks, snapshot.mobs, mover],
   );
+
+  // The build tools: what the map's pointer does, and the line about to be built.
+  const mapTool = mapToolFor(build);
+  const draft = useMemo(() => buildDraft(build, snapshot.view), [build, snapshot.view]);
+  const anchor = useMemo(() => buildAnchor(build), [build]);
+  // The tool bar and the card show on the farm tab, when no sheet is open.
+  const showBuild = tab === 'farm' && !sheetOpen;
 
   return (
     <div className={styles.screen} data-layout={layout} data-evening={clock.evening}>
@@ -187,11 +214,35 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             onTapPaddock={
               picking ? (id) => void moveTargetPicked(id) : move ? () => {} : openPaddock
             }
+            tool={mapTool}
+            draft={draft}
+            anchor={anchor}
+            anchorEl={cardRef}
+            floating={pc}
+            onDrag={(e) => buildDrag({ phase: e.phase, corner: e.corner, square: e.square })}
+            onToolTap={(e) =>
+              void buildTap({
+                square: e.square,
+                edge: e.edge,
+                edgeCode: e.edgeCode,
+                edgeDistPx: e.edgeDistPx,
+                corner: e.corner,
+                hub: e.hub,
+              })
+            }
+            onFenceTap={(e) => void startFix(e.edge)}
           />
           <NoticeBar />
           <GameOver />
-          {!pc && tab === 'farm' && !sheetOpen && <TodoBanner snapshot={snapshot} />}
+          {!pc && tab === 'farm' && !sheetOpen && !build && <TodoBanner snapshot={snapshot} />}
           {sheetOpen && <Opened snapshot={snapshot} />}
+          {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
+          {!pc && showBuild && (
+            <div className={styles.buildstack}>
+              <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
+              <BuildBar build={snapshot.build} docked={false} />
+            </div>
+          )}
           {!pc && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
         </main>
         {!pc && <Nav />}

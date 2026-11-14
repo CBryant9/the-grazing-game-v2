@@ -1,6 +1,7 @@
 import 'server-only';
 import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engine';
 import type { TodoWire } from '../../lib/game/types';
+import { layoutWord } from './buildwords';
 
 /**
  * The words for what the engine reports. Plain Australian English, short
@@ -36,7 +37,7 @@ export function todoKey(t: ThingToDo): string {
 export function todoWire(t: ThingToDo): TodoWire {
   const key = todoKey(t);
   const button = (label: string): string | null => (t.action ? label : null);
-  const base = { key, mob: null, opens: null } as const;
+  const base = { key, mob: null, opens: null, edge: null } as const;
   switch (t.type) {
     case 'calves-to-mark': {
       const bulls = t.youngBulls > 0 ? ` and ${plural(t.youngBulls, 'young bull')}` : '';
@@ -85,7 +86,10 @@ export function todoWire(t: ThingToDo): TodoWire {
       return {
         ...base,
         text: `A ${FENCE_WORD[t.fence]} fence is down.`,
+        // The button opens the same card as tapping the fence on the map.
         button: button('Put it back up'),
+        opens: 'fix',
+        edge: { line: t.edge.line, index: t.edge.index },
         urgent: false,
       };
     case 'trough-empty':
@@ -231,7 +235,7 @@ export function doneWord(events: readonly FarmEvent[]): string {
         parts.push('The mob is off its plan.');
         break;
       case 'layout-job':
-        parts.push('Done.');
+        parts.push(layoutWord(e) ?? 'Done.');
         break;
       default:
         break;

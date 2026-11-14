@@ -3,6 +3,7 @@
 import { PADDOCK_LABELS } from '@gg/shared';
 import type { PaddockWire, Snapshot } from '@/lib/game/types';
 import { num, plural } from '@/lib/game/format';
+import { gatesOfPaddock } from '@/lib/game/build';
 import { useGame } from '@/lib/game/store';
 import { Sheet } from './Sheet';
 import { Sward } from './Sward';
@@ -43,11 +44,13 @@ export function PaddockSheet({
   onClose: () => void;
 }) {
   const startMove = useGame((s) => s.startMove);
+  const openGate = useGame((s) => s.openGate);
   const openMob = useGame((s) => s.openMob);
   const p = snapshot.paddocks.find((x) => x.id === paddockId);
   const vp = snapshot.view.paddocks.find((x) => x.id === paddockId);
   if (!p || !vp) return null;
   const label = PADDOCK_LABELS[p.label];
+  const gates = gatesOfPaddock(snapshot.view, paddockId);
   const here = snapshot.mobs.filter((m) => p.mobs.includes(m.id));
   const others = snapshot.mobs.filter((m) => !p.mobs.includes(m.id));
   const moveReason =
@@ -84,6 +87,27 @@ export function PaddockSheet({
             </li>
           ))}
         </ul>
+      )}
+      {gates.length > 0 && (
+        <>
+          <h3 className={`px ${styles.minihead}`}>{gates.length > 1 ? 'Gates' : 'Gate'}</h3>
+          <ul className={styles.gatelist}>
+            {gates.map((g) => (
+              <li key={`${g.edge.line}${g.edge.index}`}>
+                <span>
+                  To {g.to}: <b>{g.open ? 'open' : 'shut'}</b>
+                </span>
+                <button
+                  type="button"
+                  className="btn sm ghost"
+                  onClick={() => void openGate(g.edge)}
+                >
+                  {g.open ? 'Shut it' : 'Open it'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <details className={styles.details}>
         <summary>Details</summary>
