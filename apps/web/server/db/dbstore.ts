@@ -76,6 +76,7 @@ interface SaveRow {
   inbox_read: number | null;
   missed_wages: number[];
   daily: unknown;
+  rev: number;
 }
 
 const json = (v: unknown): string => JSON.stringify(v);
@@ -108,7 +109,7 @@ export class DbFarmStore implements FarmStore {
     return this.guard(async () => {
       const r = await this.sql.query<SaveRow>(
         `select s.stored_format, f.name, s.save, s.setup, s.farm_version, s.done,
-                s.inbox_read, s.missed_wages, s.daily
+                s.inbox_read, s.missed_wages, s.daily, s.rev
            from public.farm_saves s join public.farms f on f.id = s.farm_id
           where s.farm_id = $1`,
         [id],
@@ -138,6 +139,7 @@ export class DbFarmStore implements FarmStore {
         ...(row.inbox_read !== null ? { inboxRead: row.inbox_read } : {}),
         ...(row.missed_wages.length ? { missedWages: row.missed_wages } : {}),
         ...(row.daily ? { daily: row.daily } : {}),
+        rev: row.rev,
         diary,
       };
     });
@@ -160,7 +162,7 @@ export class DbFarmStore implements FarmStore {
   async version(farmId: string): Promise<string | null> {
     return this.guard(async () => {
       const r = await this.sql.query<{ v: string }>(
-        'select farm_version as v from public.farm_saves where farm_id = $1',
+        `select farm_version || ':' || rev as v from public.farm_saves where farm_id = $1`,
         [toUuid(farmId)],
       );
       return r.rows[0]?.v ?? null;
@@ -172,14 +174,15 @@ export class DbFarmStore implements FarmStore {
     id: string,
     farm: StoredFarm,
     expect: string,
+    expectRev?: number,
   ): Promise<number> {
     const r = await tx.query(
       `update public.farm_saves
           set stored_format = $2, save_format = $3, engine_version = $4, save = $5::jsonb,
               setup = $6::jsonb, farm_version = $7, done = $8::jsonb, inbox_read = $9,
               missed_wages = array(select jsonb_array_elements_text($10::jsonb)::int),
-              daily = $12::jsonb
-        where farm_id = $1 and farm_version = $11`,
+              daily = $12::jsonb, rev = rev + 1
+        where farm_id = $1 and farm_version = $11 and ($13::int is null or rev = $13)`,
       [
         id,
         farm.format,
@@ -193,6 +196,7 @@ export class DbFarmStore implements FarmStore {
         json(farm.missedWages ?? []),
         expect,
         farm.daily ? json(farm.daily) : null,
+        expectRev ?? null,
       ],
     );
     return r.rowCount;
@@ -338,7 +342,7 @@ export class DbFarmStore implements FarmStore {
       this.sql.transaction(async (tx) => {
         // The version in the WHERE is what stops two tabs both winning: the
         // second one finds the version changed and changes nothing.
-        const changed = await this.writeSave(tx, id, farm, options.expect);
+        const changed = await this.writeSave(tx, id, farm, options.expect, options.expectRev);
         if (changed === 0) throw new SaveConflictError('The farm changed under this save.');
         // A Daily Farm's clock moves in the same transaction as its save. The database refuses a
         // day that is not over in the farm's time zone, so no save can make an extra day.
@@ -472,6 +476,20 @@ export class DbFarmStore implements FarmStore {
           current: false,
         };
       });
+    });
+  }
+
+  async hasRoom(owner: Owner, mode: 'fast' | 'daily'): Promise<boolean> {
+    if (owner.kind !== 'user') return true;
+    return this.guard(async () => {
+      const r = await this.sql.query<{ lim: number; going: number }>(
+        `select public.farm_limit($1, null, $2) as lim,
+                (select count(*)::int from public.farms f
+                  where f.owner_id = $1 and f.mode = $2 and f.status = 'active') as going`,
+        [owner.id, mode],
+      );
+      const row = r.rows[0];
+      return row !== undefined && row.going < row.lim;
     });
   }
 

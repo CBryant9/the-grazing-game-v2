@@ -5,7 +5,6 @@ import {
   worksOn,
   type DayEnd,
   type FarmState,
-  type PlanView,
   type SourceEnv,
 } from '@gg/engine';
 import type { PlanDueWire } from '../../lib/game/types';
@@ -54,27 +53,6 @@ export function nightOf(farm: FarmState, env: SourceEnv): { end: DayEnd; plansHe
   }
 }
 
-/** The step a plan goes to next, counted from the first stop of the first leg, worked out as the engine's own reading does. */
-function nextStep(view: PlanView, leg: number, stop: number, roundInLeg: number): number | null {
-  const here = view.legs[leg];
-  if (!here) return null;
-  let ni = stop + 1;
-  let nl = leg;
-  if (ni >= here.stops.length) {
-    ni = 0;
-    if (here.rounds > 0 && roundInLeg + 1 >= here.rounds) {
-      nl++;
-      if (nl >= view.legs.length) {
-        if (view.after === 'repeat') nl = 0;
-        else return null;
-      }
-    }
-  }
-  let step = ni;
-  for (let l = 0; l < nl; l++) step += view.legs[l]!.stops.length;
-  return step;
-}
-
 /**
  * The plan moves due today that no hand will make, for the plan card (PRD 5.15). Empty when a
  * hand works today (they move the mob tonight, from their own hours) or when no plan is due.
@@ -86,22 +64,34 @@ export function plansDue(farm: FarmState): PlanDueWire[] {
   for (const view of plansView(farm)) {
     for (const m of view.mobs) {
       const n = m.next;
-      if (m.paused || !m.onPasture || n.kind !== 'move') continue;
+      if (m.paused || !m.onPasture) continue;
+      if (n.kind === 'finish') {
+        // The move that closes the plan: due when the stay on this stop is up, so the card can end the plan.
+        const rule = view.legs[m.leg]?.rule;
+        if (rule?.mode === 'days' && m.daysOnStop >= rule.every) {
+          out.push({
+            mob: m.mob,
+            mobName: m.mobName,
+            from: m.area,
+            to: m.area ?? 'where it is',
+            text: `Your grazing plan said today it is finished. ${m.mobName} would stay${m.area ? ` in ${m.area}` : ' where it is'}.`,
+          });
+        }
+        continue;
+      }
+      if (n.kind !== 'move') continue;
       const due =
         n.rule === 'days'
           ? n.onDay !== null && n.onDay <= farm.day
           : (n.massKgHa !== null && n.kg !== null && n.massKgHa <= n.kg) ||
             (n.latestDay !== null && n.latestDay <= farm.day);
       if (!due) continue;
-      const step = nextStep(view, m.leg, m.stop, m.roundInLeg);
-      if (step === null) continue;
       const from = m.area ? ` from ${m.area}` : '';
       out.push({
         mob: m.mob,
         mobName: m.mobName,
         from: m.area,
         to: n.area,
-        step,
         text: `Your grazing plan said today you would move ${m.mobName}${from} to ${n.area}.`,
       });
     }

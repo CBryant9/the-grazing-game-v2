@@ -84,6 +84,7 @@ export interface Rig {
   feedRows: {
     weather: Record<string, WeatherRow>;
     prices: Record<string, { value: number; head: number }>;
+    yardings: Record<string, { type: 'Prime' | 'Store'; head: number }>;
   };
   /** A new game server on the same database and clock, as another server or tab would be. */
   another(): GameServer;
@@ -131,7 +132,7 @@ export async function rig(start: { date: string; time: string; zone?: string }):
       now: () => clock.now,
       daily: runtime,
     });
-  const feedRows: Rig['feedRows'] = { weather: {}, prices: {} };
+  const feedRows: Rig['feedRows'] = { weather: {}, prices: {}, yardings: {} };
   const serveDay = (date: string): void => {
     for (const d of DISTRICT_IDS) {
       feedRows.weather[`${d} ${date}`] = weatherFor(date);
@@ -179,7 +180,6 @@ export function serveThrough(r: Rig, through: string): void {
   for (let d = addDays(from, 1); d <= through; d = addDays(d, 1)) r.serveDay(d);
 }
 
-/** Keep days of data straight in the database, as a fetch would, so no feed is needed. */
 const BASE_PRICE: Record<string, number> = {
   'restocker-yearling-steer': 600,
   'restocker-yearling-heifer': 540,
@@ -189,7 +189,10 @@ const BASE_PRICE: Record<string, number> = {
   'processor-cow': 340,
 };
 
-/** With `allPrices`, every series has a row every day, so a farm can run for months. Otherwise one series moves and the rest are held. */
+/**
+ * Keep days of data straight in the database, as a fetch would, so no feed is needed. The days are
+ * real dates: a game day runs on the real day the lag points at, so a real day kept here is used
+ * DAILY_DATA_LAG_DAYS later. With `allPrices`, every series has a row every day, so a farm can run for months. Otherwise one series moves and the rest are held. */
 export async function keepThrough(r: Rig, through: string, allPrices = false): Promise<void> {
   const from = DISTRICT_IDS.map(bakedThrough).sort()[0]!;
   for (let d = addDays(from, 1); d <= through; d = addDays(d, 1)) {
@@ -204,7 +207,10 @@ export async function keepThrough(r: Rig, through: string, allPrices = false): P
             ]
           : [],
       );
-      await r.sql.transaction((tx) => r.data.keepDay(tx, district, d, weatherFor(d), prices));
+      await r.sql.transaction(async (tx) => {
+        await r.data.keepWeather(tx, district, [{ date: d, row: weatherFor(d) }]);
+        for (const p of prices) await r.data.keepPrices(tx, p.series, [{ date: d, row: p.row }]);
+      });
     }
   }
   r.data.forget();

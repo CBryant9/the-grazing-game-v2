@@ -107,6 +107,8 @@ describe('a Daily Farm over seven real days with two missed', () => {
     const away = snap.daily!.catchUp!;
     // Nights of the 13th, 14th and 15th passed. The player opened only on the 13th, so the 14th and 15th were missed.
     expect(away.days.map((d) => d.date.date)).toEqual([14, 15]);
+    // The number of days away is the true number, and the lines shown are at most the last 60.
+    expect(away.daysAway).toBe(2);
     for (const d of away.days)
       for (const line of d.lines) expect(line).not.toMatch(/should|must|overgraz|—/i);
     expect(snap.date.date).toBe(16);

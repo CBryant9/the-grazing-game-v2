@@ -71,6 +71,13 @@ export type Action =
   | { type: 'pausePlan'; mob: number }
   /** Start a plan again at a step (where it was, if left out). The mob is put in the area of that stop at once. */
   | { type: 'resumePlan'; mob: number; step?: number }
+  /**
+   * Make the plan's next move now, by hand (milestone 3.3: a Daily Farm's plan card, when no hand
+   * is there to make it). It is the move the daily tick would make, with the plan's rounds and
+   * stops counted as that move counts them, so a plan of 2 rounds still ends after 2 rounds.
+   * Unlike `resumePlan` it does not start the round again. It takes the ordinary move time.
+   */
+  | { type: 'planMove'; mob: number }
   /** Take a mob off its plan. The template stays. */
   | { type: 'clearPlan'; mob: number }
   /** Wean every calf of 90 days or more. With no `to`, the weaners go where the daily tick would send them. */
@@ -177,6 +184,8 @@ export type ActionRefusalReason =
   | 'no-plan'
   /** The plan is already paused. */
   | 'already-paused'
+  | 'not-on-pasture'
+  | 'plan-waiting'
   | 'nothing-to-move'
   | 'already-there'
   | 'no-calves-to-wean'

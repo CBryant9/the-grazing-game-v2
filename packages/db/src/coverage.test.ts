@@ -157,6 +157,7 @@ const SERVER_FUNCTIONS = [
   'daily_claim_due',
   'daily_days_owed',
   'daily_finish',
+  'daily_rollover_ping',
   'farm_limit',
   'prune_housekeeping',
   'rollup_ad_events',
@@ -369,13 +370,17 @@ describe('functions', () => {
 });
 
 describe('the reference data matches packages/shared', () => {
-  it('feature switches: every key, at the shared launch defaults (PRD 11.7)', async () => {
+  it('feature switches: every key, at the shared launch defaults (PRD 11.7, except Daily Farm, which is off until Claudia turns it on; the PRD table says On)', async () => {
     const got = await rows<{ key: string; enabled: boolean }>(
       db,
       `select key, enabled from public.feature_switches order by key`,
     );
     const asObject = Object.fromEntries(got.map((r) => [r.key, r.enabled]));
     expect(asObject).toEqual({ ...FEATURE_SWITCHES });
+    // One answer in every place: the seed (the reference-data migration says true, and migration
+    // 20261115000400 sets it off), packages/shared, and here.
+    expect(asObject.daily_farm).toBe(false);
+    expect(FEATURE_SWITCHES.daily_farm).toBe(false);
   });
 
   it('ad slots: every slot, all off', async () => {
@@ -405,9 +410,25 @@ describe('the reference data matches packages/shared', () => {
     expect(r!.n).toBe(0);
   });
 
-  it('schedules the nightly jobs', async () => {
-    const jobs = await rows<{ jobname: string }>(db, `select jobname from cron.job order by 1`);
-    expect(jobs.map((j) => j.jobname)).toEqual(['gg-housekeeping', 'gg-rollup-ad-events']);
+  it('schedules the nightly jobs and the Daily Farm rollover', async () => {
+    const jobs = await rows<{ jobname: string; schedule: string }>(
+      db,
+      `select jobname, schedule from cron.job order by 1`,
+    );
+    expect(jobs.map((j) => j.jobname)).toEqual([
+      'gg-daily-rollover',
+      'gg-housekeeping',
+      'gg-rollup-ad-events',
+    ]);
+    expect(jobs[0]!.schedule).toBe('*/15 * * * *');
+  });
+
+  it('the rollover job does nothing, and does not fail, where pg_net or Vault is not there', async () => {
+    const [r] = await rows<{ v: string | null }>(
+      db,
+      `select public.daily_rollover_ping()::text as v`,
+    );
+    expect(r!.v).toBeNull();
   });
 });
 

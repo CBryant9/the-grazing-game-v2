@@ -60,13 +60,14 @@ export function DailyTime({ daily }: { daily: DailyWire }) {
   const done = useGame((s) => s.dailyDone);
   const left = useMinutesLeft(daily);
   useCatchingUp(left <= 0 || daily.waiting !== null);
+  // Every state says its true reason: the server's own words when it is paused or unavailable.
   const text = daily.waiting
-    ? 'Waiting for yesterday’s weather and prices'
+    ? daily.waiting
     : left > 1
       ? `Today ends at midnight, in ${durationText(left)}`
       : left > 0
         ? 'Today ends at midnight, in under a minute'
-        : 'Today has ended. The farm moves to the next day as soon as the weather is in.';
+        : 'Today has ended. The next day opens within a few minutes.';
   return (
     <div className={styles.time} role="group" aria-label="The day">
       <p className={styles.ends}>{text}</p>
@@ -101,9 +102,10 @@ function CatchUp({ daily }: { daily: DailyWire }) {
         <h2 id="catchup-title" className={`px ${play.sumtitle}`}>
           While you were away
         </h2>
-        {c.days.length > 0 && (
+        {c.daysAway > 0 && (
           <p className={play.sumwhen}>
-            The farm ran on for {plural(c.days.length, 'day')} you did not open it.
+            The farm ran on for {plural(c.daysAway, 'day')} you did not open it.
+            {c.daysAway > c.days.length && ` The summary shows the last ${c.days.length}.`}
           </p>
         )}
         {c.days.map((d) => (
@@ -155,11 +157,7 @@ function useRunPlan(): (moves: PlanDueWire[]) => Promise<void> {
   return async (moves) => {
     for (const m of moves) {
       const slot = `plan-due-${m.mob}`;
-      await startAct(slot, `Move ${m.mobName} to ${m.to}`, {
-        type: 'resumePlan',
-        mob: m.mob,
-        step: m.step,
-      });
+      await startAct(slot, `Move ${m.mobName} to ${m.to}`, { type: 'planMove', mob: m.mob });
       if (useGame.getState().acts[slot]?.phase !== 'confirm') return;
       await confirmAct(slot);
     }

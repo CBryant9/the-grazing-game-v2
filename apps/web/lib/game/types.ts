@@ -570,7 +570,10 @@ export interface CatchUpDay {
 
 /** What happened on the days the player did not open the farm, shown once before today starts. */
 export interface CatchUpWire {
+  /** The last days missed, as the diary has them (at most 60). */
   days: CatchUpDay[];
+  /** How many days passed while the player was away, all of them. More than `days` when it was a long time. */
+  daysAway: number;
   /** What the hands did while the player was away, one bubble each. */
   report: BubbleWire[];
 }
@@ -581,8 +584,6 @@ export interface PlanDueWire {
   mobName: string;
   from: string | null;
   to: string;
-  /** The step of the plan the move goes to, for `resumePlan`. */
-  step: number;
   /** The plan card's words, as a fact: "Your grazing plan said today you would move from X to Y." */
   text: string;
 }
@@ -942,6 +943,8 @@ export type SimpleAction =
   | { type: 'pausePlan'; mob: number }
   | { type: 'clearPlan'; mob: number }
   | { type: 'resumePlan'; mob: number; step?: number }
+  /** The plan's next move, made now by hand (the Daily Farm plan card). */
+  | { type: 'planMove'; mob: number }
   | { type: 'buyCattle'; cls: string; qty: number }
   | { type: 'sellClass'; cls: string; qty: number }
   | {

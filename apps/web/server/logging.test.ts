@@ -26,6 +26,16 @@ describe('failure log lines', () => {
     );
   });
 
+  it('say which farm failed, by its id, and drop anything that is not an id', () => {
+    const id = 'ab'.repeat(16);
+    expect(
+      failureLine({ route: 'daily-rollover', reason: 'farm_failed', farm: id }, new Error('x')),
+    ).toBe(`failed route=daily-rollover reason=farm_failed farm=${id} error=Error`);
+    expect(
+      failureLine({ route: 'daily-rollover', reason: 'farm_failed', farm: 'me@example.test' }),
+    ).toBe('failed route=daily-rollover reason=farm_failed');
+  });
+
   it('never carry the error message, an address, a token or a link', () => {
     const bad = new AuthApiError(
       'Email address "who@example.com" is invalid https://x.supabase.co/auth?token=abc123',

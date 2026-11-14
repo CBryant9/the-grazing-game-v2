@@ -61,7 +61,12 @@ export interface SourceEnv {
 }
 
 /** Lay out a real-year farm's years from what it saved. No tables are needed. */
-function planFrom(spec: RealYearsSpec, seed: number, startMonth: number): RealYearPlan {
+function planFrom(
+  spec: RealYearsSpec,
+  seed: number,
+  startMonth: number,
+  startDate?: number,
+): RealYearPlan {
   const years: number[] = [];
   for (let y = spec.years.first; y <= spec.years.last; y++) years.push(y);
   return planRealYears({
@@ -69,6 +74,7 @@ function planFrom(spec: RealYearsSpec, seed: number, startMonth: number): RealYe
     order: spec.order,
     seed,
     startMonth,
+    startDate,
     firstYear: spec.firstYear,
   });
 }
@@ -80,7 +86,7 @@ export function realPlanOf(farm: FarmState): RealYearPlan | null {
   if (farm.seasons.kind !== 'real') return null;
   let plan = realPlans.get(farm);
   if (!plan) {
-    plan = planFrom(farm.seasons, farm.seed, farm.start.month);
+    plan = planFrom(farm.seasons, farm.seed, farm.start.month, farm.start.date);
     realPlans.set(farm, plan);
   }
   return plan;

@@ -7,9 +7,9 @@ import { plansDue } from './advance';
 import { localDate, nextMidnight } from './clock';
 import { workOf, type DailyStored } from './state';
 
-/** What the player reads when the day has ended and the farm is waiting for the day's weather and prices. */
-export const WAITING_TEXT =
-  "Yesterday's weather and prices are not in yet, so your farm is still on yesterday. It carries on as soon as they arrive. You can look around, but no job can start until then.";
+/** What the player reads when Daily Farm has nothing to run on right now. */
+export const UNAVAILABLE_TEXT =
+  'Daily Farm is not available right now, so your farm is still on its last day. You can look around, but no job can start until it is back.';
 /** What the player reads when Daily Farm is switched off. */
 export const PAUSED_TEXT = 'Daily Farm is paused right now. Your farm carries on when it is back.';
 /** What the player reads when a job is sent for a day that has ended. */
@@ -36,7 +36,9 @@ export function dailyWire(
     waiting,
     work: workOf(daily, today),
     catchUp:
-      daily.away.length > 0 || bubbles.length > 0 ? { days: daily.away, report: bubbles } : null,
+      daily.away.length > 0 || bubbles.length > 0
+        ? { days: daily.away, report: bubbles, daysAway: daily.awayTotal ?? daily.away.length }
+        : null,
     planDue: waiting || farm.over ? [] : plansDue(farm),
   };
 }

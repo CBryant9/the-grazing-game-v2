@@ -82,12 +82,12 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'window',
   ],
   daily: ['catchUp', 'endsAt', 'planDue', 'serverNow', 'timezone', 'waiting', 'work'],
-  'daily.catchUp': ['days', 'report'],
+  'daily.catchUp': ['days', 'daysAway', 'report'],
   'daily.catchUp.days[]': ['date', 'day', 'lines'],
   'daily.catchUp.days[].date': ['date', 'month', 'year'],
   'daily.catchUp.report[]': ['date', 'seq', 'text', 'who'],
   'daily.catchUp.report[].date': ['date', 'month', 'year'],
-  'daily.planDue[]': ['from', 'mob', 'mobName', 'step', 'text', 'to'],
+  'daily.planDue[]': ['from', 'mob', 'mobName', 'text', 'to'],
   date: ['date', 'month', 'year'],
   farm: ['district', 'name', 'setup'],
   'farm.setup': [
@@ -708,6 +708,7 @@ function dailyFixtures(): Snapshot[] {
     workedOn: null,
     doneOn: null,
     away: [{ day: 3, date: { year: 2026, month: 8, date: 4 }, lines: ['Rain: 5 mm.'] }],
+    awayTotal: 1,
     seenSeq: 0,
     rolledFrom: [],
   };

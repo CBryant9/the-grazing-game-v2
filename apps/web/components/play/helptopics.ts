@@ -28,7 +28,16 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Some jobs, like sowing, take none of the day.',
       'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
       'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. A skip stops early and says why if something needs you, such as a mob with no water.',
-      'On a Daily Farm there is no Next day or skip. The day ends at midnight in your time zone, and the farm runs overnight whether you open it or not.',
+    ],
+  },
+  {
+    id: 'daily',
+    title: 'Daily Farm',
+    lines: [
+      'A Daily Farm has one game day for each real day. There is no Next day or skip: the day ends at midnight in your time zone, and the farm runs overnight whether you open it or not.',
+      'The weather and prices a Daily Farm runs on are 5 days behind the real date, so the real figures are in and settled when the night runs.',
+      'If you did not open the farm on a day, the next time you do, one sheet shows what happened on each of those days and what your hands did.',
+      'A plan move that no hand will make waits for you. The plan card asks, and Not yet leaves a Move button along the bottom.',
     ],
   },
   {

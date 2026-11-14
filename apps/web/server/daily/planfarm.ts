@@ -14,7 +14,9 @@ import { loadRealData } from '@gg/engine/server';
 export const planEnv: SourceEnv = { data: loadRealData() };
 
 /** For tests: a running farm in Central West with one mob on a plan that moves it between two watered paddocks every day. */
-export function farmWithPlan(): { farm: FarmState; mob: number } {
+export function farmWithPlan(
+  plan: { rounds?: number; after?: 'repeat' | 'stay'; legs?: 1 | 2 } = {},
+): { farm: FarmState; mob: number } {
   const farm = createFarm(
     {
       seed: 11,
@@ -33,6 +35,7 @@ export function farmWithPlan(): { farm: FarmState; mob: number } {
   const here = areaIdOf(survey, mob);
   const other = wet.find((a) => a.id !== here)!;
   const mine = survey.topology.areas[here]!;
+  const third = wet.find((a) => a.id !== here && a.id !== other.id);
   const set = applyAction(
     farm,
     {
@@ -40,9 +43,22 @@ export function farmWithPlan(): { farm: FarmState; mob: number } {
       mob: mob.id,
       plan: {
         legs: [
-          { stops: [mine.cells[0]!, other.cells[0]!], rule: { mode: 'days', every: 1 }, rounds: 0 },
+          {
+            stops: [mine.cells[0]!, other.cells[0]!],
+            rule: { mode: 'days', every: 1 },
+            rounds: plan.rounds ?? 0,
+          },
+          ...(plan.legs === 2
+            ? [
+                {
+                  stops: [third!.cells[0]!, other.cells[0]!],
+                  rule: { mode: 'days' as const, every: 1 },
+                  rounds: 0,
+                },
+              ]
+            : []),
         ],
-        after: 'repeat',
+        after: plan.after ?? 'repeat',
       },
       step: 0,
     },

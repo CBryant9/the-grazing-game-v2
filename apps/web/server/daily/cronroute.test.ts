@@ -13,6 +13,8 @@ const report = {
   daysAdvanced: 0,
   farmsWaiting: 0,
   failed: 0,
+  skipped: 0,
+  failedFarms: [],
   more: false,
 };
 

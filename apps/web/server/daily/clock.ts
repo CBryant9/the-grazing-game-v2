@@ -21,15 +21,50 @@ function formatterFor(zone: string): Intl.DateTimeFormat {
   return f;
 }
 
-/** Is this an IANA time zone name the server knows? */
-export function isZone(zone: unknown): zone is string {
-  if (typeof zone !== 'string' || zone.length === 0 || zone.length > 64) return false;
-  try {
-    formatterFor(zone);
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * The time zones Daily Farm supports, exactly as named: the zones of the four launch districts
+ * (Central Queensland is Brisbane; Northern Tablelands and Central West NSW are Sydney; Western
+ * Victoria is Melbourne), the other Australian zones a grazier's device can report, and Auckland,
+ * because New Zealand graziers play too. The browser names its zone once, when the farm starts,
+ * and it is checked against this list before anything is run. An offset ("+10:00"), a name in
+ * the wrong case, an alias or a zone anywhere else is turned away with a plain message. One list
+ * in one place: add a zone here.
+ */
+export const SUPPORTED_ZONES: readonly string[] = [
+  'Australia/Brisbane',
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Australia/Adelaide',
+  'Australia/Perth',
+  'Australia/Darwin',
+  'Australia/Hobart',
+  'Pacific/Auckland',
+];
+
+/** Is this one of the zones Daily Farm supports? */
+export function isSupportedZone(zone: unknown): zone is string {
+  return typeof zone === 'string' && SUPPORTED_ZONES.includes(zone);
+}
+
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** A date as the diary says it: "14 November". */
+export function longDate(iso: string): string {
+  const d = parts(iso);
+  return `${d.date} ${MONTHS[d.month]}`;
 }
 
 /** The local date (YYYY-MM-DD) in a zone at a moment (ms since 1970). */

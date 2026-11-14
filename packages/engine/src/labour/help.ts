@@ -50,6 +50,7 @@ export function skillFor(action: Action): HelpSkill | null {
     case 'moveMob':
     case 'moveCattle':
     case 'setPlan':
+    case 'planMove':
     case 'resumePlan':
     case 'wean':
     case 'markCalves':

@@ -57,7 +57,7 @@ export interface CreateFarmOptions {
    * the first real year played, and can be left out: in order the oldest
    * year is then used, and at random the first year is drawn from the seed.
    */
-  start: { year?: number; month: number };
+  start: { year?: number; month: number; date?: number };
   /**
    * The years the farm plays (PRD 5.14). Left out, or `random`: the MVP's
    * random seasons with the stand-in market. `real`: real years from 1997,
@@ -159,6 +159,7 @@ function startRealYears(o: CreateFarmOptions, order: YearOrder, env: SourceEnv):
     order,
     seed: o.seed,
     startMonth: o.start.month,
+    startDate: o.start.date,
     firstYear: o.start.year,
   });
   const market = realMarket({
@@ -194,7 +195,13 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
   if (!real && o.start.year === undefined) {
     throw new RangeError('A farm with random seasons needs a start year.');
   }
-  const start: FarmStart = real ? real.start : { year: o.start.year!, month: o.start.month };
+  const start: FarmStart = real
+    ? real.start
+    : {
+        year: o.start.year!,
+        month: o.start.month,
+        ...(o.start.date !== undefined ? { date: o.start.date } : {}),
+      };
   const gen = generateFarm({
     seed: o.seed,
     district: o.district,
@@ -225,7 +232,11 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     saveFormat: SAVE_FORMAT_VERSION,
     seed: o.seed,
     district: o.district,
-    start: { year: start.year, month: start.month },
+    start: {
+      year: start.year,
+      month: start.month,
+      ...(start.date !== undefined ? { date: start.date } : {}),
+    },
     startType: o.startType,
     mixed: !!o.mixed,
     arablePct: gen.arablePct,

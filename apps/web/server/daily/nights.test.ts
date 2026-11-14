@@ -1,4 +1,4 @@
-import { areaIdOf, createFarm, surveyOf, worksOn, type FarmState } from '@gg/engine';
+import { applyAction, areaIdOf, createFarm, surveyOf, worksOn, type FarmState } from '@gg/engine';
 import { describe, expect, it } from 'vitest';
 import { handWorksToday, nightOf, plansDue } from './advance';
 import { farmWithPlan, planEnv, withHand } from './planfarm';
@@ -80,5 +80,52 @@ describe('a grazing plan on a Daily Farm night', () => {
     );
     expect(nightOf(farm, env).plansHeld).toBe(0);
     expect(plansDue(farm)).toEqual([]);
+  });
+
+  /** A player with no hand who says Yes to the plan card every morning, for a number of days. */
+  function playCard(start: FarmState, mob: number, days: number) {
+    let farm = start;
+    const seen: { leg: number; idx: number; rounds: number; there: boolean }[] = [];
+    for (let day = 0; day < days; day++) {
+      for (const due of plansDue(farm)) {
+        const done = applyAction(farm, { type: 'planMove', mob: due.mob }, env);
+        if (!done.ok) throw new Error(done.message);
+        farm = done.farm;
+      }
+      const run = farm.mobs.find((m) => m.id === mob)!.plan;
+      seen.push({
+        leg: run?.leg ?? -1,
+        idx: run?.idx ?? -1,
+        rounds: run?.rounds ?? -1,
+        there: run !== undefined,
+      });
+      farm = nightOf(farm, env).end.farm;
+    }
+    return { farm, seen };
+  }
+
+  it('the plan card over several days: a plan of 2 rounds that stays ends, and is not offered again', () => {
+    const { farm, mob } = farmWithPlan({ rounds: 2, after: 'stay' });
+    const { farm: after, seen } = playCard(farm, mob, 8);
+    // One move a morning: rounds go 0, 1, 1, then the plan is gone and stays gone.
+    expect(seen.slice(0, 4).map((x) => x.rounds)).toEqual([0, 1, 1, -1]);
+    expect(seen.slice(3).every((x) => !x.there)).toBe(true);
+    expect(plansDue(after)).toEqual([]);
+  });
+
+  it('the plan card over several days: a plan of 2 rounds with a second leg reaches the second leg', () => {
+    const { farm, mob } = farmWithPlan({ rounds: 2, legs: 2, after: 'stay' });
+    const { seen } = playCard(farm, mob, 6);
+    expect(seen.some((x) => x.leg === 1)).toBe(true);
+    expect(seen.find((x) => x.leg === 1)!.rounds).toBe(2);
+  });
+
+  it('the card is offered once a day, not again after the move, and the night does not move the plan as well', () => {
+    const { farm, mob } = farmWithPlan({ rounds: 0 });
+    const once = applyAction(farm, { type: 'planMove', mob }, env);
+    if (!once.ok) throw new Error(once.message);
+    expect(plansDue(once.farm)).toEqual([]);
+    const area = areaOf(once.farm, mob);
+    expect(areaOf(nightOf(once.farm, env).end.farm, mob)).toBe(area);
   });
 });

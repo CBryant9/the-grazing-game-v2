@@ -249,6 +249,7 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
       // Pausing and clearing a plan are decisions: they take none of the day.
       return { kind: 'free' };
     case 'setPlan':
+    case 'planMove':
     case 'resumePlan': {
       // Putting the mob on the plan's stop is a move: the ordinary move time, when the mob is
       // not already there. Making the plan is a decision. The moves a plan makes by itself

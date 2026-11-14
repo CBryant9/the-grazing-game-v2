@@ -1,7 +1,9 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { GameError, farmKey } from '../game/game';
+import { createFarm } from '@gg/engine';
+import { loadRealData } from '@gg/engine/server';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { GameError } from '../game/game';
 import { newFarm } from '../player';
-import { OWNER, choices, database, rig, serveThrough } from './testrig';
+import { OWNER, USER2, choices, database, rig } from './testrig';
 
 afterAll(async () => {
   await (await database()).close();
@@ -17,11 +19,12 @@ const row = async (r: Awaited<ReturnType<typeof rig>>, id: string) =>
   ).rows[0]!;
 
 describe('starting a Daily Farm', () => {
-  it('starts on today in its own time zone, with the zone locked and the clock one day behind', async () => {
+  it('starts on today in its own time zone as day 0, with the zone locked and the clock one day behind', async () => {
     const r = await rig({ date: '2026-11-13', time: '10:00:00' });
     const f = newFarm();
     const snap = await r.game.create(f.key, choices(), OWNER);
     expect(snap.date).toEqual({ year: 2026, month: 10, date: 13 });
+    expect(snap.day).toBe(0);
     expect(snap.daily).toMatchObject({
       timezone: 'Australia/Sydney',
       work: 'not-started',
@@ -33,10 +36,37 @@ describe('starting a Daily Farm', () => {
       timezone: 'Australia/Sydney',
       sim: '2026-11-12',
       d: '2026-11-13',
+      day: 0,
     });
   }, 120_000);
 
-  it('turns away a guest, a switch that is off, no database and a made-up time zone, each in plain words', async () => {
+  it('arrives on Day 1 with nothing spent and nothing decided, the herd placed today, even late in the month', async () => {
+    const r = await rig({ date: '2026-11-28', time: '10:00:00' });
+    const f = newFarm();
+    const snap = await r.game.create(f.key, choices(), OWNER);
+    expect(snap.date).toEqual({ year: 2026, month: 10, date: 28 });
+    expect(snap.day).toBe(0);
+    // The same farm made the way the engine makes any farm, on the same day: cash is what the difficulty gives.
+    const same = createFarm(
+      {
+        seed: 5,
+        district: 'cq',
+        size: 'small',
+        start: { year: 2025, month: 10, date: 28 },
+        years: { kind: 'real', order: 'in-order' },
+        startType: 'running',
+        difficulty: 'medium',
+      },
+      { data: loadRealData() },
+    );
+    expect(snap.totals.cash).toBe(Math.round(same.cash));
+    expect(snap.totals.head).toBeGreaterThan(0);
+    // Nothing has happened to the player: no diary, no days away, no joining under way.
+    expect((await r.game.record(f.key)).diary).toEqual([]);
+    expect(snap.daily!.catchUp).toBeNull();
+  }, 120_000);
+
+  it('turns away a guest, a switch that is off and no database, each in plain words', async () => {
     const r = await rig({ date: '2026-11-13', time: '10:00:00' });
     await expect(r.game.create('a'.repeat(32), choices())).rejects.toMatchObject({
       status: 403,
@@ -47,23 +77,34 @@ describe('starting a Daily Farm', () => {
       status: 403,
       code: 'daily_off',
     });
-    r.switchOn.value = true;
-    await expect(
-      r.game.create(newFarm().key, choices({ timezone: 'Mars/Olympus' }), OWNER),
-    ).rejects.toBeInstanceOf(GameError);
   }, 120_000);
 
-  it('waits to start when yesterday is not in yet, and starts once it is', async () => {
-    const r = await rig({ date: '2026-11-15', time: '10:00:00' });
-    await expect(r.game.create(newFarm().key, choices(), OWNER)).rejects.toMatchObject({
-      status: 409,
-      code: 'daily_data_late',
-    });
-    serveThrough(r, '2026-11-14');
-    const rolled = await r.roll();
-    expect(rolled.fetched).toHaveLength(8);
+  it('checks the time zone against the list of supported zones, and the farm limit, before anything is run', async () => {
+    const r = await rig({ date: '2026-11-13', time: '10:00:00' });
+    const spy = vi.spyOn(r.data, 'bundleThrough');
+    for (const timezone of ['+10:00', 'australia/sydney', 'Mars/Olympus', 'UTC', undefined]) {
+      await expect(
+        r.game.create(newFarm().key, choices({ timezone }), OWNER),
+      ).rejects.toMatchObject({ status: 400, code: 'daily_zone' });
+    }
+    expect(spy).not.toHaveBeenCalled();
+    // Two Daily Farms an account. The third is refused with the plain message, and nothing was run for it.
+    await r.game.create(newFarm().key, choices({ name: 'One' }), OWNER);
+    await r.game.create(newFarm().key, choices({ name: 'Two' }), OWNER);
+    const calls = spy.mock.calls.length;
+    await expect(
+      r.game.create(newFarm().key, choices({ name: 'Three' }), OWNER),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/most farms/) });
+    expect(spy.mock.calls.length).toBe(calls);
+    // Another account is not held back by it.
+    await r.game.create(newFarm().key, choices({ name: 'Other' }), { kind: 'user', id: USER2 });
+    expect(GameError).toBeTypeOf('function');
+  }, 240_000);
+
+  it('starts with the weather and prices not in at all: no waiting, the first day is today', async () => {
+    const r = await rig({ date: '2026-12-20', time: '10:00:00' });
     const snap = await r.game.create(newFarm().key, choices(), OWNER);
-    expect(snap.date).toEqual({ year: 2026, month: 10, date: 15 });
-    expect(farmKey).toBeTypeOf('function');
+    expect(snap.date).toEqual({ year: 2026, month: 11, date: 20 });
+    expect(snap.daily!.waiting).toBeNull();
   }, 120_000);
 });

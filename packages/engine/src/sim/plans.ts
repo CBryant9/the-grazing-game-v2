@@ -138,7 +138,7 @@ function areaMass(farm: FarmState, cells: readonly number[]): number {
   return (g + d) / cells.length;
 }
 
-type StepResult = 'moved' | 'blocked' | 'finished';
+export type StepResult = 'moved' | 'blocked' | 'finished';
 
 /**
  * One move of a plan: the old game's `planStep`. Works out where the plan
@@ -149,7 +149,7 @@ type StepResult = 'moved' | 'blocked' | 'finished';
  * the plan finishes). A plan that is waiting looks at the same next stop
  * each day and counts nothing.
  */
-function planStep(
+export function planStep(
   farm: FarmState,
   survey: Survey,
   land: GrazingLand,

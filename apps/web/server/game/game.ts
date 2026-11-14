@@ -98,11 +98,11 @@ import {
 import { setupOptions } from './setup';
 import { configuredStore } from '../db/farmstore';
 import { nightOf } from '../daily/advance';
-import { addDays, daysBetween, isoOf, isZone, localDate } from '../daily/clock';
+import { addDays, daysBetween, isoOf, isSupportedZone, localDate, longDate } from '../daily/clock';
 import type { DailyData } from '../daily/data';
 import { AWAY_KEPT, ROLLED_KEPT, type DailyStored } from '../daily/state';
 import { dailyRuntime } from '../daily/runtime';
-import { MIDNIGHT_TEXT, PAUSED_TEXT, WAITING_TEXT, dailyWire } from '../daily/wire';
+import { MIDNIGHT_TEXT, PAUSED_TEXT, UNAVAILABLE_TEXT, dailyWire } from '../daily/wire';
 import { dateText, doneWord, todoKey } from './words';
 import { pastYears, soFarView, yearView } from './years';
 
@@ -238,9 +238,9 @@ export const COMING_MESSAGE = 'Daily Farm is coming. Fast Farm is ready to play 
 /** What the player reads when a guest asks for a Daily Farm. */
 export const DAILY_NEEDS_ACCOUNT =
   'Daily Farm needs an account, so the farm is kept for you from day to day. Sign in to start one.';
-/** What the player reads when a new Daily Farm has to wait for yesterday's weather and prices. */
-export const DAILY_DATA_LATE =
-  "Daily Farm starts from yesterday's real weather and prices, and they are not in yet. Try again in a little while.";
+/** What the player reads when their time zone is not one Daily Farm supports. */
+export const dailyZoneMessage = (zone: unknown): string =>
+  `Daily Farm runs on Australian and New Zealand time zones, and ${typeof zone === 'string' && zone.length <= 40 ? `"${zone}"` : 'your device’s time zone'} is not one of them yet. Fast Farm has no time zone.`;
 /** What the player reads when they ask Next day or a skip on a Daily Farm. */
 export const DAILY_NO_SKIP = 'Daily Farm has no Next day or skip. The day ends at midnight.';
 
@@ -376,6 +376,7 @@ export function parseAction(body: unknown, farm?: FarmState): Action | null {
     case 'markCalves':
     case 'wean':
     case 'pausePlan':
+    case 'planMove':
     case 'clearPlan':
       return mob === null ? null : ({ type: a.type, mob } as Action);
     case 'moveMob': {
@@ -649,7 +650,12 @@ export class GameServer {
     if (hit) {
       // A store shared by several servers can be changed from another one (or another tab
       // that reached another server). Check the version before trusting what is held.
-      if (!this.store.version || (await this.store.version(farmId)) === hit.stored.version) {
+      // The version and the revision: a write that left the version alone (an inbox read, "opened
+      // today") still moved the revision, so a copy that missed it is never trusted.
+      if (
+        !this.store.version ||
+        (await this.store.version(farmId)) === `${hit.stored.version}:${hit.stored.rev ?? 0}`
+      ) {
         const last = this.touched.get(farmId) ?? 0;
         if (this.now() - last > 3600_000) {
           this.touched.set(farmId, this.now());
@@ -752,6 +758,7 @@ export class GameServer {
       ...held.stored,
       saved: saveFarm(farm),
       version: newVersion(),
+      rev: (held.stored.rev ?? 0) + 1,
       done: done ? [...held.stored.done, done].slice(-DONE_KEPT) : held.stored.done,
       diary: filings.length ? fileLines(held.stored.diary, filings) : held.stored.diary,
     };
@@ -763,6 +770,7 @@ export class GameServer {
     await this.persist(farmId, () =>
       this.store.put(farmId, stored, {
         expect: held.stored.version,
+        expectRev: held.stored.rev ?? 0,
         facts: this.factsOf(stored, snap),
         diaryDays: filings.map((f) => f.day),
         action: extra.action,
@@ -813,10 +821,15 @@ export class GameServer {
     // was answered, and would answer it the same way (refused) again.
     const stored: StoredFarm = {
       ...held.stored,
+      rev: (held.stored.rev ?? 0) + 1,
       done: [...held.stored.done, done].slice(-DONE_KEPT),
     };
     await this.persist(farmId, () =>
-      this.store.put(farmId, stored, { expect: held.stored.version, action: extra }),
+      this.store.put(farmId, stored, {
+        expect: held.stored.version,
+        expectRev: held.stored.rev ?? 0,
+        action: extra,
+      }),
     );
     const next: Held = { stored, farm: held.farm, snap: held.snap };
     this.remember(farmId, next);
@@ -939,9 +952,11 @@ export class GameServer {
   // ---- Daily Farm (milestone 3.3). The day rolls at local midnight in the farm's locked time zone.
 
   /**
-   * Start a Daily Farm. Accounts only, behind the switch, and from real weather: the farm starts
-   * on the 1st of the month yesterday was in and runs, night by night on that month's real
-   * weather and prices, up to today. The player's first day is today, in their own time zone.
+   * Start a Daily Farm. Accounts only, behind the switch, on a zone the game supports, with room
+   * for another (all checked before anything is run). The farm starts on today's real date in its
+   * own time zone as day 0: the pasture is run up to today the way a Fast Farm's start does it, and
+   * the start herd is placed today, so the player's first day is Day 1 with nothing spent and
+   * nothing decided for them.
    */
   private async createDaily(id: string, choices: SetupChoices, who: Owner): Promise<Snapshot> {
     if (who.kind !== 'user') throw new GameError(403, DAILY_NEEDS_ACCOUNT, 'daily_needs_account');
@@ -949,15 +964,14 @@ export class GameServer {
     if (!runtime || this.store.kind !== 'db' || !(await runtime.enabled())) {
       throw new GameError(403, COMING_MESSAGE, 'daily_off');
     }
-    if (!isZone(choices.timezone)) {
-      throw new GameError(400, 'Your time zone was not sent properly. Try again.');
+    if (!isSupportedZone(choices.timezone)) {
+      throw new GameError(400, dailyZoneMessage(choices.timezone), 'daily_zone');
+    }
+    if (this.store.hasRoom && !(await this.store.hasRoom(who, 'daily'))) {
+      throw new GameError(409, NO_ROOM_MESSAGE);
     }
     const zone = choices.timezone;
     const today = localDate(this.now(), zone);
-    const yesterday = addDays(today, -1);
-    let through = await runtime.data.through(choices.district);
-    if (through < yesterday) through = await runtime.data.through(choices.district, true);
-    if (through < yesterday) throw new GameError(409, DAILY_DATA_LATE, 'daily_data_late');
     return this.locked(id, async () => {
       let there: Held | null;
       try {
@@ -975,15 +989,14 @@ export class GameServer {
         mode: 'daily',
         timezone: zone,
       };
-      const bundle = await runtime.data.bundleThrough(yesterday);
-      dailyEnvs.set(setup, { data: await runtime.data.bundleThrough(yesterday, today) });
-      const [y, m] = yesterday.split('-').map(Number);
-      const first = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-01`;
-      const options = { ...createOptions(setup, this.seed()), start: { year: y!, month: m! - 1 } };
-      let farm = createFarm(options, { data: bundle });
-      for (let date = first; date <= yesterday && !farm.over; date = addDays(date, 1)) {
-        farm = nightOf(farm, { data: await runtime.data.bundleThrough(date) }).end.farm;
-      }
+      const [y, m, d] = today.split('-').map(Number);
+      const env: SourceEnv = { data: await runtime.data.bundleThrough(today) };
+      dailyEnvs.set(setup, env);
+      const options = {
+        ...createOptions(setup, this.seed()),
+        start: { year: y!, month: m! - 1, date: d! },
+      };
+      const farm = createFarm(options, env);
       const daily: DailyStored = {
         timezone: zone,
         startedOn: today,
@@ -991,6 +1004,7 @@ export class GameServer {
         workedOn: null,
         doneOn: null,
         away: [],
+        awayTotal: 0,
         seenSeq: farm.inboxSeq - 1,
         rolledFrom: [],
       };
@@ -1021,8 +1035,10 @@ export class GameServer {
   /**
    * Bring a Daily Farm up to today: simulate each night that has passed, in order, one saved
    * night at a time. The same rules run whether the rollover job or the player's opening the
-   * farm gets here first, so the timing never changes the outcome. A night waits when the
-   * weather and prices for its day are not in (the farm is then marked `waiting`).
+   * farm gets here first, so the timing never changes the outcome. A night never waits for
+   * weather or prices (the data lags the real date, and what is still missing is filled in and
+   * said, see server/daily/data.ts). The only reasons a farm is not brought up are that Daily Farm
+   * is switched off or has nothing to run on, and the farm then says which.
    */
   private async bringUp(farmId: string, held: Held, o: { deadline?: number } = {}): Promise<Held> {
     let cur = held;
@@ -1030,32 +1046,24 @@ export class GameServer {
       const daily = cur.stored.daily!;
       const farmDate = isoOf(dateOn(cur.farm));
       const today = localDate(this.now(), daily.timezone);
-      // What the farm is looked at and worked on with: the data up to the last night it ran.
+      // What the farm is looked at and worked on with: the data up to today, as it stands.
       if (this.daily) {
-        dailyEnvs.set(cur.stored.setup, {
-          data: await this.daily.data.bundleThrough(addDays(farmDate, -1), farmDate),
-        });
+        dailyEnvs.set(cur.stored.setup, { data: await this.daily.data.bundleThrough(farmDate) });
       }
       if (cur.farm.over || daysBetween(farmDate, today) <= 0) {
         cur.waiting = null;
         return cur;
       }
       if (!this.daily) {
-        cur.waiting = WAITING_TEXT;
+        cur.waiting = UNAVAILABLE_TEXT;
         return cur;
       }
       if (!(await this.daily.enabled())) {
         cur.waiting = PAUSED_TEXT;
         return cur;
       }
+      cur.waiting = null;
       if (o.deadline !== undefined && this.now() > o.deadline) return cur;
-      const district = cur.stored.setup.district;
-      let through = await this.daily.data.through(district);
-      if (through < farmDate) through = await this.daily.data.through(district, true);
-      if (through < farmDate) {
-        cur.waiting = WAITING_TEXT;
-        return cur;
-      }
       try {
         cur = await this.rollOne(farmId, cur, farmDate);
       } catch (e) {
@@ -1071,7 +1079,22 @@ export class GameServer {
   /** One night: the day that ends at midnight on `farmDate`. Saved with the farm's clock in one write. */
   private async rollOne(farmId: string, held: Held, farmDate: string): Promise<Held> {
     const daily = held.stored.daily!;
-    const env: SourceEnv = { data: await this.daily!.data.bundleThrough(farmDate) };
+    const data = this.daily!.data;
+    const district = held.stored.setup.district;
+    const env: SourceEnv = { data: await data.bundleThrough(farmDate) };
+    // What this night is missing from the data, said as a fact in the diary and counted for the admin.
+    const missing = await data.fallbacksOn(district, farmDate);
+    const notes: string[] = [];
+    if (missing.weather) {
+      notes.push(
+        `Weather data was not available for ${longDate(farmDate)}. The long-term average for the day was used.`,
+      );
+    }
+    if (missing.prices) {
+      notes.push(
+        `Cattle prices were not available for ${longDate(farmDate)}. The last published prices were used.`,
+      );
+    }
     const seq0 = held.farm.inboxSeq;
     const dayRan = held.farm.day;
     const { end } = nightOf(held.farm, env);
@@ -1083,28 +1106,34 @@ export class GameServer {
       stepThrough: false,
     });
     const filings = periodFilings(end.farm, seq0, summary, [end.day]);
+    if (notes.length) {
+      const own = filings.find((f) => f.day === dayRan);
+      if (own) own.lines.unshift(...notes);
+      else {
+        filings.unshift({ day: dayRan, date: dateParts(dateOn(held.farm, dayRan)), lines: notes });
+      }
+    }
     // A night that follows a date the player never opened the farm on is a missed day.
-    const away =
-      daily.openedOn === farmDate
-        ? daily.away
-        : [
-            ...daily.away,
-            {
-              day: dayRan,
-              date: dateParts(dateOn(held.farm, dayRan)),
-              lines: filings.find((f) => f.day === dayRan)?.lines ?? [],
-            },
-          ].slice(-AWAY_KEPT);
+    const missed = daily.openedOn !== farmDate;
+    const away = missed
+      ? [
+          ...daily.away,
+          {
+            day: dayRan,
+            date: dateParts(dateOn(held.farm, dayRan)),
+            lines: filings.find((f) => f.day === dayRan)?.lines ?? [],
+          },
+        ].slice(-AWAY_KEPT)
+      : daily.away;
     const next: DailyStored = {
       ...daily,
       away,
+      awayTotal: (daily.awayTotal ?? 0) + (missed ? 1 : 0),
       rolledFrom: [...daily.rolledFrom, held.stored.version].slice(-ROLLED_KEPT),
     };
-    // The farm is now on the next day: it is looked at with the data up to the night just run.
-    dailyEnvs.set(held.stored.setup, {
-      data: await this.daily!.data.bundleThrough(farmDate, addDays(farmDate, 1)),
-    });
-    return this.save(
+    // The farm is now on the next day: it is looked at with the data up to that day.
+    dailyEnvs.set(held.stored.setup, { data: await data.bundleThrough(addDays(farmDate, 1)) });
+    const saved = await this.save(
       farmId,
       held,
       end.farm,
@@ -1122,6 +1151,18 @@ export class GameServer {
         },
       },
     );
+    // Counted once the night is saved, so a night that is run again after a conflict is counted once.
+    if (missing.weather) {
+      await data
+        .noteFallback(farmDate, 'night_weather_fallback', `district=${district}`)
+        .catch(() => undefined);
+    }
+    if (missing.prices) {
+      await data
+        .noteFallback(farmDate, 'night_price_fallback', `district=${district}`)
+        .catch(() => undefined);
+    }
+    return saved;
   }
 
   /**
@@ -1156,9 +1197,14 @@ export class GameServer {
 
   /** Keep a change to what a Daily Farm records about the player. The farm itself and its version are not changed. */
   private async setDaily(id: string, held: Held, daily: DailyStored): Promise<Held> {
-    const stored: StoredFarm = { ...held.stored, daily };
+    const stored: StoredFarm = { ...held.stored, daily, rev: (held.stored.rev ?? 0) + 1 };
     try {
-      await this.persist(id, () => this.store.put(id, stored, { expect: held.stored.version }));
+      await this.persist(id, () =>
+        this.store.put(id, stored, {
+          expect: held.stored.version,
+          expectRev: held.stored.rev ?? 0,
+        }),
+      );
     } catch (e) {
       if (e instanceof SaveConflictError) return this.reload(id);
       throw e;
@@ -1197,6 +1243,7 @@ export class GameServer {
       ...d,
       openedOn: today,
       away: [],
+      awayTotal: 0,
       seenSeq: held.farm.inboxSeq - 1,
     }));
   }
@@ -1549,8 +1596,17 @@ export class GameServer {
         // Never past the newest message there is, and never backwards.
         const to = Math.max(held.stored.inboxRead ?? 0, Math.min(upTo, newest));
         if (to === (held.stored.inboxRead ?? 0)) return this.snapshotOf(held);
-        const stored: StoredFarm = { ...held.stored, inboxRead: to };
-        await this.persist(id, () => this.store.put(id, stored, { expect: held.stored.version }));
+        const stored: StoredFarm = {
+          ...held.stored,
+          inboxRead: to,
+          rev: (held.stored.rev ?? 0) + 1,
+        };
+        await this.persist(id, () =>
+          this.store.put(id, stored, {
+            expect: held.stored.version,
+            expectRev: held.stored.rev ?? 0,
+          }),
+        );
         const next = { stored, farm: held.farm };
         this.remember(id, next);
         return this.snapshotOf(next);

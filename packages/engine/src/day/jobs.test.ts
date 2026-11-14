@@ -496,6 +496,7 @@ describe('the job card and the job agree, for every kind of action', () => {
       setPlan: [{ farm: b.farm, action: setPlan }],
       pausePlan: [{ farm: planned, action: { type: 'pausePlan', mob: b.steers } }],
       resumePlan: [{ farm: paused, action: { type: 'resumePlan', mob: b.steers, step: 1 } }],
+      planMove: [{ farm: planned, action: { type: 'planMove', mob: b.steers } }],
       clearPlan: [{ farm: planned, action: { type: 'clearPlan', mob: b.steers } }],
       setSupplement: [
         { farm: b.farm, action: { type: 'setSupplement', mob: b.steers, supp: 'hay' } },
@@ -559,8 +560,8 @@ describe('the job card and the job agree, for every kind of action', () => {
       orderContractFence: [{ farm: b.farm, action: order }],
       cancelContractFence: [{ farm: ordered, action: { type: 'cancelContractFence', run: 1 } }],
     };
-    // 41 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(41);
+    // 42 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(42);
 
     const outcomes = new Set<string>();
     let refusals = 0;

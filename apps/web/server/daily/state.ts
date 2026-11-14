@@ -23,8 +23,10 @@ export interface DailyStored {
   workedOn: string | null;
   /** The last local date the player said they were done. */
   doneOn: string | null;
-  /** Days that passed with no open, oldest first, until the player has seen them. */
+  /** Days that passed with no open, oldest first, until the player has seen them. At most `AWAY_KEPT` are kept. */
   away: AwayDay[];
+  /** How many days passed with no open, all of them, kept or not. The summary says this number and that it shows the last `AWAY_KEPT`. */
+  awayTotal: number;
   /** The newest inbox message the player has seen. What the hands did after it is the worker report. */
   seenSeq: number;
   /** The farm versions from before the last few midnights, so a job shown before midnight is told why it was not done. */
@@ -64,6 +66,7 @@ export function cleanDaily(v: unknown): DailyStored | undefined {
     workedOn: typeof d.workedOn === 'string' ? d.workedOn : null,
     doneOn: typeof d.doneOn === 'string' ? d.doneOn : null,
     away: d.away.slice(-AWAY_KEPT),
+    awayTotal: typeof d.awayTotal === 'number' ? d.awayTotal : d.away.length,
     seenSeq: d.seenSeq,
     rolledFrom: Array.isArray(d.rolledFrom) ? d.rolledFrom.slice(-ROLLED_KEPT) : [],
   };

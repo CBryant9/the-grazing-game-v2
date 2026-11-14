@@ -61,7 +61,12 @@ export const AD_SLOTS = [
 ] as const;
 export type AdSlotId = (typeof AD_SLOTS)[number];
 
-/** Feature switches and their launch defaults (PRD 11.7). */
+/**
+ * Feature switches and their launch defaults (PRD 11.7), with one change: Daily Farm is OFF until
+ * Claudia turns it on (the project rule is that it sits behind a switch, switched on later). The
+ * PRD 11.7 table says On. The database seed says the same as this (the reference-data migration
+ * inserts true, and migration 20261115000400 sets it off), and a test checks they match.
+ */
 export const FEATURE_SWITCHES = {
   signups_open: true,
   daily_farm: false,

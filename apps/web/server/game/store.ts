@@ -58,6 +58,12 @@ export interface StoredFarm {
   missedWages?: number[];
   /** What only a Daily Farm keeps (milestone 3.3). Left out for a Fast Farm. */
   daily?: DailyStored;
+  /**
+   * Goes up by one on every write to the save, whatever it changes (the database keeps it). The
+   * server checks it before it trusts a cached copy, so a copy that missed a write is never used.
+   * Left out on a farm kept in a file.
+   */
+  rev?: number;
 }
 
 /** A stored farm that could not be read: bad JSON, or not a farm at all. */
@@ -100,6 +106,7 @@ export function upgradeStored(raw: unknown, version: () => string): StoredFarm {
         }
       : {}),
     ...(cleanDaily(raw.daily) ? { daily: cleanDaily(raw.daily)! } : {}),
+    ...(typeof raw.rev === 'number' ? { rev: raw.rev } : {}),
     // A farm from before the diary has none. It is not broken: the diary starts now.
     diary: Array.isArray(raw.diary) ? (raw.diary as StoredDiaryDay[]).slice(-DIARY_DAYS) : [],
   };
@@ -145,6 +152,8 @@ export interface PutOptions {
    * does not check it.
    */
   expect: string;
+  /** The revision the write was made from. The database refuses the write if the save has moved on. */
+  expectRev?: number;
   facts?: FarmFacts;
   /** The days whose diary lines changed, so a database writes only those. */
   diaryDays?: number[];
@@ -228,6 +237,8 @@ export interface FarmStore {
   past(farmId: string, day: number): Promise<PastDayWire | null>;
   /** The days that have a picture kept, newest first. */
   pastDays(farmId: string): Promise<number[]>;
+  /** Does this owner have room for another farm of this mode? Checked before a Daily Farm is run up (database only). */
+  hasRoom?(owner: Owner, mode: 'fast' | 'daily'): Promise<boolean>;
   /** The rollover (milestone 3.3, database only): claim up to `batch` Daily Farms with days owed at `at` (ms). */
   dailyClaim?(batch: number, at: number): Promise<DailyClaim[]>;
   /** Give up a claim, so the next run picks the farm up at once. */

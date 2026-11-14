@@ -4,10 +4,20 @@ import { GameError, type GameServer } from '../game/game';
 import { newFarm } from '../player';
 import { parseActionRequest } from '../game/request';
 import { addDays, daysBetween, localDate, nextMidnight } from './clock';
-import { seriesFor, type DailyFeed } from './data';
-import { runRollover } from './rollover';
-import { MIDNIGHT_TEXT, WAITING_TEXT } from './wire';
-import { OWNER, USER2, at, choices, database, keepThrough, rig, type Rig } from './testrig';
+import { type DailyFeed, type Dated, type PriceRow, type WeatherRow } from './data';
+import { MAX_FARM_FAILS_A_DAY, runRollover } from './rollover';
+import { MIDNIGHT_TEXT } from './wire';
+import {
+  OWNER,
+  USER2,
+  at,
+  choices,
+  database,
+  keepThrough,
+  rig,
+  weatherFor,
+  type Rig,
+} from './testrig';
 
 afterAll(async () => {
   await (await database()).close();
@@ -142,63 +152,140 @@ describe('the midnight rollover job', () => {
     expect(await simThrough(r)).toBe('2026-11-15');
   }, 240_000);
 
-  it('when yesterday’s weather is late the farm waits, says so, refuses jobs, and carries on once it is in', async () => {
-    const { r, farm, make } = await started();
-    const snap = await make();
-    r.clock.now = at('2026-11-14', '00:30:00');
-    const waiting = await r.roll();
-    expect(waiting.dataWaiting).toContain('cq 2026-11-13');
-    expect(waiting.farmsWaiting).toBe(1);
+  it('late data never stops a farm: the night runs on the long-term average, says so, and is never rewritten', async () => {
+    // Game date 18 November runs on the real 13th, which is not kept: the feed is off.
+    const { r, farm, make } = await started('2026-11-17', '10:00:00');
+    await make();
+    r.clock.now = at('2026-11-19', '00:30:00');
+    const run = await r.roll({ feed: false });
+    expect(run).toMatchObject({ daysAdvanced: 2, farmsWaiting: 0, failed: 0 });
     const looked = (await r.game.snapshot(farm.key))!;
-    expect(looked.daily!.waiting).toBe(WAITING_TEXT);
-    expect(looked.date.date).toBe(13);
-    await expect(aJob(r.game, farm.key, looked)).rejects.toMatchObject({
-      status: 409,
-      code: 'day_not_ready',
-    });
-    await expect(
-      r.game.preview(farm.key, { action: { type: 'markCalves', mob: 1 } }),
-    ).rejects.toMatchObject({
-      code: 'day_not_ready',
-    });
-    expect(snap.date.date).toBe(13);
-    // The weather comes in.
-    r.serveDay('2026-11-13');
-    r.clock.now = at('2026-11-14', '07:00:00');
-    const done = await r.roll();
-    expect(done.fetched).toHaveLength(4);
-    expect(done.daysAdvanced).toBe(1);
-    const next = (await r.game.snapshot(farm.key))!;
-    expect(next.date.date).toBe(14);
-    expect(next.daily!.waiting).toBeNull();
-    expect((await aJob(r.game, farm.key, next)).ok).toBe(true);
+    expect(looked.daily!.waiting).toBeNull();
+    expect(looked.date.date).toBe(19);
+    // No job is refused because data is late.
+    expect((await aJob(r.game, farm.key, looked)).ok).toBe(true);
+    // The diary states the fact for the night that needed it, and only that one.
+    const lines = (await r.game.record(farm.key)).diary.flatMap((d) => d.lines);
+    const said =
+      'Weather data was not available for 18 November. The long-term average for the day was used.';
+    expect(lines.filter((l) => l === said)).toHaveLength(1);
+    expect(lines.some((l) => l.includes('17 November'))).toBe(false);
+    // It is counted where an admin can see it.
+    const counted = await r.db.query<{ dims: string; count: string }>(
+      "select dims, count from public.daily_counts where metric = 'night_weather_fallback'",
+    );
+    expect(counted.rows).toEqual([{ dims: 'district=cq', count: 1 }]);
+    // The real day arrives later. The night already run is not rewritten.
+    const before = await saveOf(r);
+    await keepThrough(r, '2026-11-14');
+    await r.roll({ feed: false });
+    expect(await saveOf(r)).toEqual(before);
+    expect((await r.game.record(farm.key)).diary.flatMap((d) => d.lines)).toContain(said);
   }, 240_000);
 
-  it('does not keep a day whose prices could not be fetched, so the day is all in or not in', async () => {
-    const { r, make } = await started();
+  it('weather and prices are asked for apart: MLA answers nothing and then a value, and the weather is not asked for again', async () => {
+    const { r, make } = await started('2026-11-16', '10:00:00');
     await make();
-    r.clock.now = at('2026-11-14', '00:30:00');
-    r.serveDay('2026-11-13');
+    const weatherAsks: string[] = [];
+    let mla: Dated<PriceRow>[] = [];
     const feed: DailyFeed = {
-      weather: async (d, date) => r.feedRows.weather[`${d} ${date}`] ?? null,
-      prices: async () => {
-        throw new Error('MLA did not answer');
+      weather: async (district, from, to) => {
+        weatherAsks.push(`${district} ${from} ${to}`);
+        const out: Dated<WeatherRow>[] = [];
+        for (let d = from; d <= to; d = addDays(d, 1)) out.push({ date: d, row: weatherFor(d) });
+        return out;
       },
+      prices: async () => mla,
+      yardings: async () => [],
     };
-    const report = await runRollover({
-      game: r.game,
-      store: r.store,
-      data: r.data,
-      feed,
-      sql: r.sql,
-      now: () => r.clock.now,
-    });
-    expect(report.fetched).toEqual([]);
-    expect(report.dataWaiting.length).toBeGreaterThan(0);
-    const rows = await r.db.query('select 1 from public.weather_daily');
-    expect(rows.rowCount).toBe(0);
-    expect(report.daysAdvanced).toBe(0);
-    expect(seriesFor('cq')).toHaveLength(12);
+    const run = (): ReturnType<typeof runRollover> =>
+      runRollover({
+        game: r.game,
+        store: r.store,
+        data: r.data,
+        feed,
+        sql: r.sql,
+        now: () => r.clock.now,
+      });
+    const first = await run();
+    // Weather came in; MLA had nothing yet.
+    expect(first.fetched.some((f) => f.startsWith('weather cq'))).toBe(true);
+    expect(first.fetched.some((f) => f.startsWith('prices'))).toBe(false);
+    expect((await r.db.query('select 1 from public.weather_daily')).rowCount).toBe(12);
+    expect((await r.db.query('select 1 from public.price_daily')).rowCount).toBe(0);
+    // MLA answers at the next run: the prices are kept, and the weather already kept is not asked for again.
+    mla = [{ date: '2026-11-15', row: { value: 612, head: 4000 } }];
+    const asked = weatherAsks.length;
+    const second = await run();
+    expect(
+      second.fetched.some((f) => f.startsWith('prices national/restocker-yearling-steer')),
+    ).toBe(true);
+    expect(
+      (
+        await r.db.query(
+          "select 1 from public.price_daily where indicator = 'restocker-yearling-steer'",
+        )
+      ).rowCount,
+    ).toBeGreaterThan(0);
+    expect(weatherAsks.length).toBe(asked);
+  }, 240_000);
+
+  it('a month with no prices and no weather does not stop a farm loading: the last price carries forward and the diary says so', async () => {
+    const { r, farm, make } = await started('2026-12-20', '10:00:00');
+    await make();
+    r.clock.now = at('2026-12-21', '00:30:00');
+    const run = await r.roll({ feed: false });
+    expect(run).toMatchObject({ failed: 0, daysAdvanced: 1 });
+    const snap = (await r.game.snapshot(farm.key))!;
+    expect(snap.date.date).toBe(21);
+    expect(snap.market.prices.every((p) => Number.isFinite(p.cKg) && p.cKg > 0)).toBe(true);
+    const lines = (await r.game.record(farm.key)).diary.flatMap((d) => d.lines);
+    expect(lines).toContain(
+      'Weather data was not available for 20 December. The long-term average for the day was used.',
+    );
+    expect(lines).toContain(
+      'Cattle prices were not available for 20 December. The last published prices were used.',
+    );
+  }, 240_000);
+
+  it('asks the data services side by side with a cap, and starts no request once the time is used', async () => {
+    const { r, make } = await started('2026-11-16', '10:00:00');
+    await make();
+    let inFlight = 0;
+    let most = 0;
+    let asks = 0;
+    const slow = async <T>(rows: T[]): Promise<T[]> => {
+      asks++;
+      inFlight++;
+      most = Math.max(most, inFlight);
+      await new Promise((res) => setTimeout(res, 15));
+      inFlight--;
+      return rows;
+    };
+    const feed: DailyFeed = {
+      weather: () => slow<Dated<WeatherRow>>([]),
+      prices: () => slow<Dated<PriceRow>>([]),
+      yardings: () => slow([]),
+    };
+    const run = (budgetMs: number): ReturnType<typeof runRollover> =>
+      runRollover({
+        game: r.game,
+        store: r.store,
+        data: r.data,
+        feed,
+        sql: r.sql,
+        now: () => r.clock.now,
+        budgetMs,
+        concurrency: 4,
+      });
+    await run(0);
+    // No time at all: nothing is asked.
+    expect(asks).toBe(0);
+    await run(45_000);
+    // Four weather, the national and four yards' indicators and four yards' sale days, all asked.
+    expect(asks).toBeGreaterThan(20);
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(4);
   }, 180_000);
 
   it('a day already kept is not changed by a later fetch, whatever the source says now', async () => {
@@ -210,19 +297,62 @@ describe('the midnight rollover job', () => {
     const before = await r.db.query(
       'select rain_mm, et0_mm from public.weather_daily order by district',
     );
-    r.feedRows.weather['cq 2026-11-13'] = {
-      ...r.feedRows.weather['cq 2026-11-13']!,
-      rain: 99,
-      et0: 1,
-    };
     await r.sql.transaction((tx) =>
-      r.data.keepDay(tx, 'cq', '2026-11-13', r.feedRows.weather['cq 2026-11-13']!, []),
+      r.data.keepWeather(tx, 'cq', [
+        {
+          date: '2026-11-13',
+          row: { rain: 99, tmax: null, tmin: null, rad: null, evap: null, et0: 1 },
+        },
+      ]),
     );
     const after = await r.db.query(
       'select rain_mm, et0_mm from public.weather_daily order by district',
     );
     expect(after.rows).toEqual(before.rows);
   }, 180_000);
+
+  it('a farm that fails is found by its id, counted, tried again, and left alone for the day after too many tries', async () => {
+    const { r, farm, make } = await started();
+    await keepThrough(r, '2026-11-16');
+    await make();
+    r.clock.now = at('2026-11-15', '00:20:00');
+    const real = r.store.put.bind(r.store);
+    const spy = vi.spyOn(r.store, 'put').mockImplementation(async (id, f, o) => {
+      if (o.dailyThrough) throw new Error('this farm is broken');
+      return real(id, f, o);
+    });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const first = await r.roll({ feed: false });
+    expect(first.failed).toBeGreaterThanOrEqual(1);
+    expect(first.failedFarms).toContain(farm.id);
+    // The log line names the farm by its id and the reason, never the message.
+    const logged = errors.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toContain(`farm=${farm.id}`);
+    expect(logged).not.toContain('this farm is broken');
+    errors.mockRestore();
+    const listed = await r.db.query<{ dims: string; count: string }>(
+      "select dims, count from public.daily_counts where metric = 'rollover_farm_failed'",
+    );
+    expect(listed.rows.map((x) => x.dims)).toEqual([`farm=${farm.id}`]);
+    // Run after run it is tried, up to the cap, and then left alone without being loaded.
+    let skipped = 0;
+    for (let i = 0; i < 8; i++) skipped += (await r.roll({ feed: false })).skipped;
+    expect(skipped).toBeGreaterThan(0);
+    const total = Number(
+      (
+        await r.db.query<{ c: string }>(
+          "select sum(count) as c from public.daily_counts where metric = 'rollover_farm_failed'",
+        )
+      ).rows[0]!.c,
+    );
+    expect(total).toBeLessThanOrEqual(MAX_FARM_FAILS_A_DAY + 1);
+    // It is not stuck for good: mended, and the next day, it is run.
+    spy.mockRestore();
+    r.clock.now = at('2026-11-16', '00:20:00');
+    const mended = await r.roll({ feed: false });
+    expect(mended.failed).toBe(0);
+    expect(mended.daysAdvanced).toBeGreaterThan(0);
+  }, 300_000);
 });
 
 describe('the day ends at local midnight and no sooner or later', () => {
