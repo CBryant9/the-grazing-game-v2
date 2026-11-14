@@ -231,6 +231,21 @@ describe('the signed-in routes', () => {
     expect([200, 401]).toContain(res.status);
   });
 
+  it('answers a plain 404, not a server error, when accounts are not set up on this copy', async () => {
+    setAuthDeps(null);
+    try {
+      for (const [route, method, body] of ALL) {
+        const res = await call(route, method, body, {});
+        expect(res.status, route).toBe(404);
+        expect((await j(res)).error, route).toBe(
+          'Notifications are not set up on this copy of the game yet.',
+        );
+      }
+    } finally {
+      setAuthDeps(w.deps);
+    }
+  });
+
   it('refuses a request from another site, and a write that is not JSON', async () => {
     const p = await addPerson(w, 'ann');
     for (const [route, method, body] of ALL.filter((x) => x[1] === 'POST')) {

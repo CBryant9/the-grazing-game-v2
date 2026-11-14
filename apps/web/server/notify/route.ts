@@ -47,6 +47,9 @@ export function notifyRoute(
       by: 'session',
     },
     async (ctx) => {
+      // No accounts on this copy: there is nothing to show, and it is not a server fault.
+      if (!ctx.deps)
+        throw new GameError(404, 'Notifications are not set up on this copy of the game yet.');
       const { deps, user } = await requireUser(ctx);
       let body: Record<string, unknown> = {};
       if (options.write) {
