@@ -335,3 +335,14 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [x] See the farm on a past day, read only, from the Diary, with "You are looking at Day N" and a way back. *(Closes the call deferred in 1.7g. The picture is kept for every day for 14 days, then weekly to 182 days (gzipped, about 180 KB a farm at most); the file store keeps the last 14.)*
 - [x] Download my data and delete my account, with a typed confirm that says what goes and what stays. *(PRD 21a "Your data".)*
 - [x] One player never sees another's farm on a shared device: the offline copy is kept per player and cleared on sign out. *(PRD 21a.)*
+
+### Admin shell (milestone 3.5)
+
+- [x] An admin back end at `/admin`, for admin accounts only, that works on a PC and on a phone. Anyone else gets the same plain "not found". *(PRD 11, 17. Built in 3.5.)*
+- [x] Every feature switch can be turned on or off from admin without a new release, with a confirm that says what it does to players, and shows who changed it last. *(PRD 11.7. The switches the public website pages read at build time say so on the screen.)*
+- [x] Maintenance mode: the game shows "The game is down for maintenance. Your farm is safe." while admins can still play. *(PRD 11.7, BUILD_PLAN 3.5. The wording is chosen from a fixed list.)*
+- [x] Users: search by username or id, view an account (status, role, join date, farms, last seen, under 16 yes or no, history), suspend, ban, lift, change role, clear a mistyped under-14 refusal, sign out everywhere. No email address and no date of birth are shown. *(PRD 11.2.)*
+- [x] Site settings: announcement bar, districts available, community rules text, each checked on the server. *(PRD 11.8. Privacy and terms text and the market data upload come later.)*
+- [x] An audit log of every admin action, read only, newest first. *(PRD 11.8.)*
+- [x] A dashboard of the counts that are true today, with the time they were read. *(PRD 11.1. Active users, audience, income and ads say "Built in a later milestone".)*
+- [ ] Moderation, ads and sponsors, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5; each is built with its own milestone.)*

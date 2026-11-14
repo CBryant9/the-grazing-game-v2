@@ -213,6 +213,18 @@ describe('the role gate on every admin route', () => {
     expect(await auditRows()).toEqual([]);
   });
 
+  it('the first-admin statement in the log (run by the owner in the SQL editor) makes an admin', async () => {
+    const first = await person('first');
+    expect((await post('switches', BODIES.switches, first)).status).toBe(404);
+    const r = await db.query(
+      `update public.account_status
+          set role = 'admin'
+        where user_id = (select user_id from public.profiles where username = 'u_first')`,
+    );
+    expect(r.affectedRows).toBe(1);
+    expect((await post('switches', BODIES.switches, first)).status).toBe(200);
+  });
+
   it('refuses a non-admin before it says anything about the CSRF rule', async () => {
     const player = await person('player');
     const res = await post('switches', BODIES.switches, player, { origin: 'https://evil.example' });

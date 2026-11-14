@@ -126,6 +126,7 @@ The Supabase database linter flags owner-rights views (lint 0010). That is expec
 | `approve_photo(kind, row, object id, updated at, version)` | Server (the image check) | Approves a post photo, showcase photo, avatar or group photo, only if the file at its path is the exact file the check read |
 | `assign_group_owner(admin, group, user)` | Server, for an admin | Gives an ownerless group an owner (16 or over, in good standing). Logged |
 | `clear_signup_refusal(admin, user)` | Server, for an admin | The way back for an adult who mistyped their date of birth: clears that sign-in's under-14 refusal. Logged |
+| `admin_sign_out_everywhere(admin, user)` (m3.5) | Server, for an admin | Ends every session of an account (`delete from auth.sessions`), and writes its audit row (`user_sign_out_all`) first in the same step. A security definer function because the sessions are in Supabase's `auth` schema |
 
 Guards that hold for every writer, the server included: the farm limit (`farms_guard`, with a lock so two requests can't both squeeze in), a real time zone for a Daily Farm, the word filter on usernames, names, posts, comments and groups, follow approval, one level of replies, a block removing follows, photo status set only by the image check, rate limits on posts, comments, likes, follows, reports and new groups (tighter for an account under 7 days old).
 
@@ -244,3 +245,23 @@ Daily Farm slots exist in the tables and the limits. No Daily Farm can be starte
 7. Supabase runs Postgres 15 or 17; the tests run on 18. Nothing newer than 15 is used (`unique nulls not distinct` is 15).
 8. Confirm the migration role may add the trigger on `storage.objects` and the trigger on `auth.users` (the migration warns if the Storage one is refused).
 9. Add the Chrome (Firebase Cloud Messaging) and Edge (Windows Push Notification Services) push hosts to `push_service_hosts`, each with the vendor page it was read from, before push goes live (3.4). Until then only Safari and Firefox subscriptions are accepted.
+
+## What the server does for the admin screens (milestone 3.5)
+
+Code: `apps/web/server/admin/`. The pages are in `apps/web/app/admin`, the write routes in `apps/web/app/api/admin`. Migration `20261115000300_admin_tools.sql`.
+
+| Step | Where |
+|---|---|
+| The role check | `gate.ts`: the sign-in provider's `user()` (asks the auth server), then one query: `account_status.role = 'admin'`, not banned, not suspended, and a finished profile. Nothing the browser sends is read. A database that can not be read means "not an admin" |
+| First admin | A one-off statement in the Supabase SQL editor (see the "m3.5 Admin shell" log entry). There is no public route or environment variable that makes an admin |
+| Every write | One transaction (the server's `service_role` client): the change, then one `admin_audit_log` row in its fixed shape. A failed audit write rolls the change back. Two actions use the database's own functions, which write their own row first: `clear_signup_refusal` and `admin_sign_out_everywhere` (`user_sign_out_all`) |
+| Audit actions | `switch_set` (details `switch_key`, `enabled`), `setting_set` (target `site_setting`; details `count` for a text length or district count, or `value` for the place of a wording in the list; never the words), `user_suspend` (`until`), `user_ban`, `user_lift`, `user_set_role` (`role`), `user_sign_out_all`, `clear_signup_refusal`. Target kind `account`, `feature_switch` or `site_setting`, with the id or key |
+| Feature switches | Read by `featureSwitches` (30 second cache per server). An admin's change clears the cache on the server that made it and shows on the others within 30 seconds. A switch with no row uses the shared default. The screen lists exactly the keys in `FEATURE_SWITCHES`, and `feature_switches.updated_by` is who changed it last. Ad slots are not in `feature_switches` (they have their own table and come with the Ads milestone) |
+| Site settings | `announcement`, `districts_available`, `community_rules` (public) and `maintenance_wording` (not public), each parsed on the server (`settings.ts`) |
+| Maintenance mode | The `maintenance_mode` switch. While on, every game route refuses everyone but an admin in good standing with a 503, the code `maintenance` and one of three fixed wordings chosen by id (`maintenance_wording`). A row holding anything else gives the default wording |
+| Users | `searchUsers` by id (exact) or username (exact or prefix, two characters or more, wildcards escaped), never by email. `userDetail` works out "under 16" inside the query and returns only yes or no. An admin can not read a date of birth or an email address. `last seen` is the latest `farms.last_opened_at` |
+| Bans | `user_ban` sets `banned_at` and, when the provider can give the sign-in email, writes the same peppered hash `prepare_account_deletion` writes into `ban_records` (no end date). `user_lift` removes it. When the email can not be found the ban still applies, and the hash is written at deletion as before |
+| The last admin | The server refuses (with the admin rows locked) to suspend, ban or demote the last admin in good standing, and an admin can not suspend, ban or change the role of their own account. The trigger `account_status_keep_one_admin` refuses any update of `role` that would leave no admin, whoever writes (making an admin is never refused). Deleting an account is not covered by the trigger |
+| Dashboard | Counts read from the database with the database's clock: profiles, guest sessions not yet moved into an account, farms by mode and status, farms with a save since midnight Sydney time and in the last seven days (`farm_saves.updated_at`), and `farm_saves_aside` as "saves failing" |
+
+Still owed against a real project (added to the list above): `delete from auth.sessions` by the security definer function on Supabase (the owner role is expected to be allowed; confirm), `auth.admin.getUserById` for the ban hash, and that `provider.user()` on a page that can not set cookies refuses a token that has run out (an admin whose token went stale opens the game once, which refreshes it, then `/admin`).
