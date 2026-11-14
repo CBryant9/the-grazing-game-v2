@@ -99,6 +99,9 @@ import { setupOptions } from './setup';
 import { configuredStore } from '../db/farmstore';
 import { dateText, doneWord, todoKey } from './words';
 import { pastYears, soFarView, yearView } from './years';
+import { DbFarmStore } from '../db/dbstore';
+import { dbHooks, type GameHooks } from '../stage4/hooks';
+import type { BoardFarm } from '../boards/score';
 
 /**
  * The farm days a pay day was missed in a day or skip, one for each hand left
@@ -233,6 +236,27 @@ export interface GameServerOptions {
   now?: () => number;
   /** Waits (ms) between the tries of a save that fails. One more try for each. Tests set zeros. */
   saveRetryMs?: readonly number[];
+  /**
+   * What Stage 4 is told after a farm starts or days pass (the boards and the ticker). A database
+   * store gets the database hooks by default; a file store gets none. `null` turns them off.
+   */
+  hooks?: GameHooks | null;
+}
+
+/** The plain figures of a farm's finished years, for the boards (server/boards/score.ts). */
+function boardFarm(farm: FarmState, ha: number): BoardFarm {
+  return {
+    day: farm.day,
+    ha,
+    years: farm.years.map((y) => ({
+      n: y.n,
+      realYear: y.realYear ?? null,
+      total: y.score.total,
+      profit: y.score.profit,
+      gain: y.gain,
+      cover: y.score.cover,
+    })),
+  };
 }
 
 const realYears = (c: SetupChoices): boolean => c.years !== 'random';
@@ -526,10 +550,17 @@ export class GameServer {
   private readonly now: () => number;
   private readonly retryMs: readonly number[];
   private readonly touched = new Map<string, number>();
+  private readonly hooks: GameHooks | null;
 
   constructor(options: GameServerOptions) {
     this.retryMs = options.saveRetryMs ?? [150, 600];
     this.store = options.store;
+    this.hooks =
+      options.hooks !== undefined
+        ? options.hooks
+        : options.store instanceof DbFarmStore
+          ? dbHooks(options.store.client)
+          : null;
     this.seed = options.seed ?? (() => randomInt(1, 2 ** 31 - 1));
     this.maxFarms = options.maxFarms ?? MAX_FARMS;
     this.now = options.now ?? Date.now;
@@ -843,7 +874,20 @@ export class GameServer {
         throw e instanceof FarmLimitError ? new GameError(409, NO_ROOM_MESSAGE) : e;
       }
       this.remember(id, held);
+      await this.hooks?.started(id);
       return snap;
+    });
+  }
+
+  /** Tell Stage 4 that days passed (the boards and the ticker). Never throws. */
+  private async afterDays(id: string, from: number, next: Held, closed: number): Promise<void> {
+    if (!this.hooks) return;
+    const ha = this.snapshotOf(next).farm.setup.farmHa;
+    await this.hooks.advanced(id, {
+      fromDay: from,
+      toDay: next.farm.day,
+      closed,
+      farm: boardFarm(next.farm, ha),
     });
   }
 
@@ -1287,11 +1331,13 @@ export class GameServer {
           missedDays(end.farm, held.farm.labour?.nextPayDay ?? null, end.dawn),
           { past: true, action: { day: held.farm.day, action: { type: 'day' }, ok: true } },
         );
+        const years = this.yearsClosed(next, end.day.events);
+        await this.afterDays(id, held.farm.day, next, years.yearsClosed);
         return {
           ok: true,
           snapshot: this.snapshotOf(next),
           summary,
-          ...this.yearsClosed(next, end.day.events),
+          ...years,
         };
       },
       async () => this.stale(await this.reload(id)),
@@ -1348,11 +1394,13 @@ export class GameServer {
                 },
               )
             : held;
+        const years = this.yearsClosed(next, ticks);
+        if (result.daysRun > 0) await this.afterDays(id, held.farm.day, next, years.yearsClosed);
         return {
           ok: true,
           snapshot: this.snapshotOf(next),
           summary,
-          ...this.yearsClosed(next, ticks),
+          ...years,
         };
       },
       async () => this.stale(await this.reload(id)),

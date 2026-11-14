@@ -91,6 +91,11 @@ export class DbFarmStore implements FarmStore {
     private readonly clock: () => number = Date.now,
   ) {}
 
+  /** The connection, for the Stage 4 hooks (boards, ticker) that run after a farm changes. */
+  get client(): SqlClient {
+    return this.sql;
+  }
+
   private async guard<T>(work: () => Promise<T>): Promise<T> {
     try {
       return await work();

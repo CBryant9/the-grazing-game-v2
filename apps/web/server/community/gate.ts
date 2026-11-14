@@ -27,7 +27,10 @@ export interface Member {
   username: string;
 }
 
-export type CommunityPart = Extract<FeatureSwitchKey, 'feed_posts' | 'groups'>;
+export type CommunityPart = Extract<
+  FeatureSwitchKey,
+  'feed_posts' | 'groups' | 'farm_viewing' | 'activity_ticker' | 'leaderboards'
+>;
 
 export type Gate =
   { kind: 'off' } | { kind: 'denied' } | { kind: 'ok'; me: Member; deps: AuthDeps };
