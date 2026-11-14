@@ -234,6 +234,10 @@ begin
     return new;
   end if;
   v_subject := (to_jsonb(new) ->> tg_argv[1]);
+  -- A row the database made itself (a report from the word filter) has no subject.
+  if v_subject is null then
+    return new;
+  end if;
   if not app.take_rate(v_action, v_subject) then
     raise exception 'rate_limited: %', v_action using errcode = 'P0001', hint = 'rate_limited';
   end if;
