@@ -20,6 +20,7 @@ import {
   previewAction,
   saveFarm,
   sheepDistrict,
+  sheepMobsOf,
   skipDays,
   surveyOf,
   thingsToDo,
@@ -1340,12 +1341,20 @@ export class GameServer {
         const seq0 = held.farm.inboxSeq;
         const end = endDay(held.farm, envFor(held.stored.setup));
         const report = reportWire(end.farm, seq0 - 1, (d) => dateParts(dateOn(end.farm, d)));
-        const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, {
-          ...report,
-          pay: payFrom(end.dawn),
-          // One day: the bubbles sit in the summary, unless something needs the player's eye.
-          stepThrough: report.attention,
-        });
+        const summary = buildSummary(
+          'day',
+          end.summary,
+          end.stops,
+          1,
+          end.day.events,
+          {
+            ...report,
+            pay: payFrom(end.dawn),
+            // One day: the bubbles sit in the summary, unless something needs the player's eye.
+            stepThrough: report.attention,
+          },
+          sheepMobsOf(end.farm).length > 0,
+        );
         const next = await this.save(
           id,
           held,
@@ -1391,12 +1400,20 @@ export class GameServer {
         const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
         const ticks = result.days.flatMap((d) => d.events);
         const report = reportWire(result.farm, seq0 - 1, (d) => dateParts(dateOn(result.farm, d)));
-        const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks, {
-          ...report,
-          pay: payFrom(result.dawn),
-          // After more than a day the bubbles are stepped through; after one day only if something needs the eye.
-          stepThrough: result.daysRun > 1 || report.attention,
-        });
+        const summary = buildSummary(
+          'skip',
+          result.summary,
+          result.stops,
+          result.asked,
+          ticks,
+          {
+            ...report,
+            pay: payFrom(result.dawn),
+            // After more than a day the bubbles are stepped through; after one day only if something needs the eye.
+            stepThrough: result.daysRun > 1 || report.attention,
+          },
+          sheepMobsOf(result.farm).length > 0 || sheepMobsOf(held.farm).length > 0,
+        );
         const next =
           result.daysRun > 0
             ? await this.save(

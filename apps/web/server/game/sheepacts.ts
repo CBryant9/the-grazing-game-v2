@@ -17,7 +17,7 @@ import {
 } from '@gg/engine';
 import { NOT_FOR_SHEEP } from './buildwords';
 import { SHEEP_MOVE_CLASSES, fenceFact, leakyEdges, parseSellPick } from './sheepmobs';
-import { className, sellLabel } from './sheepwords';
+import { classInText, sellLabel } from './sheepwords';
 
 /**
  * The sheep jobs the browser may ask for (milestone 2.8), checked here and turned into the
@@ -179,7 +179,7 @@ export function sheepMarketLines(
     const e = events?.find((x) => x.type === 'sheep-on-the-way');
     if (e?.type !== 'sheep-on-the-way') return [];
     return [
-      `Buy ${n0(e.qty)} ${className(e.cls).toLowerCase()} for ${money(e.total)}, the head fee included.`,
+      `Buy ${n0(e.qty)} ${classInText(e.cls)} for ${money(e.total)}, the head fee included.`,
       'They arrive in the stock yards at first light tomorrow.',
       `In the bank after: ${farm.cash - e.total < 0 ? '-' : ''}${money(farm.cash - e.total)}.`,
     ];
@@ -189,7 +189,7 @@ export function sheepMarketLines(
     if (e?.type !== 'sheep-sold') return [];
     const what = a.sex ? sellLabel(a.cls as never, a.sex) : a.cls;
     return [
-      `Sell ${n0(e.head)} ${what.toLowerCase()} from ${e.mobName}${e.lambsAtFoot ? `, with ${n0(e.lambsAtFoot)} lambs at foot` : ''}, averaging ${n0(e.avgKg)} kg.`,
+      `Sell ${n0(e.head)} head (${what.toLowerCase()}) from ${e.mobName}${e.lambsAtFoot ? `, with ${n0(e.lambsAtFoot)} lambs at foot` : ''}, averaging ${n0(e.avgKg)} kg.`,
       `About ${money(e.net)} into the bank today, after selling costs.`,
       `In the bank after: ${money(farm.cash + e.net)}.`,
     ];

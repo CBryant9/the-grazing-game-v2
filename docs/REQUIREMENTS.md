@@ -180,9 +180,9 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 - [ ] The yards found for each district "work": Gracemere (Central Qld), Armidale (Northern Tablelands), Dubbo (Central West), Mortlake for cattle and Hamilton for sheep (Western Vic).
 - [ ] The Top End has no yard of its own: "find a northern equivalent somehow", possibly north Queensland or live export. *(Charters Towers is in the MLA service with current prices. Whether the district itself moves is still open.)*
 - [ ] "Just hook up to MLA and ask them later." Build on the MLA service now; the permission email comes before launch.
-- [ ] Wool: "use a stand-in for now".
+- [x] Wool: "use a stand-in for now". *(The dated September 2026 stand-in by micron; sold by itself at shearing, its own money line, milestone 2.8.)*
 - [ ] Northern cattle are drawn Brahman style, not British cattle.
-- [ ] Where sheep aren't appropriate, don't offer them.
+- [x] Where sheep aren't appropriate, don't offer them. *(Milestone 2.8: never in Central Queensland, switch or not: no setup choice, no sheep market, no netting, sheep jobs refused.)*
 
 ### Jobs, time and the farm's buildings
 
@@ -215,8 +215,9 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 
 ### Sheep
 
-- [ ] Add sheep, with their own figures, and wool as income. *(Changed: the PRD had cattle only at launch.)*
-- [ ] At setup the player chooses cattle, sheep or a mix, so the markets shown aren't too busy. In play they can still buy either, "because they might change their minds".
+- [ ] Add sheep, with their own figures, and wool as income. *(Changed: the PRD had cattle only at launch.)* *(Engine in milestones 2.3 to 2.7; on screen in milestone 2.8 behind the `sheep` feature switch, OFF by default until Claudia rules on the model's open gaps: DEVELOPMENT_LOG, "m2.8 Sheep screens".)*
+- [x] At setup the player chooses cattle, sheep or a mix, so the markets shown aren't too busy. In play they can still buy either, "because they might change their minds". *(Milestone 2.8, with the switch on: the choice is a setup step on a running farm in a sheep district; a sheep farm still has the cattle market, and a cattle farm the sheep market.)*
+- *(On screen, milestone 2.8, switch on: the sheep mob card (head by class, lambs at foot, DSE and AE at the one figure, weight, CS, where the flock is up to, wool, the contractors' days, the joining record, reasons), moves and plans with the species and fence refusals in plain words, feeding (none, lick, grain, hay) with the cost a day, buying and selling on a sale day with the money first, shearing and crutching by themselves with a way to move the shearing day, the netting fence, sheep on the map, sheep words for every engine event. No new chores.)*
 
 ### Protecting the rules
 

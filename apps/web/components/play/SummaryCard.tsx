@@ -145,7 +145,8 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
     .join(', ');
   const m = summary.money;
   // A day with sheep in it names the cattle's figures as the cattle's.
-  const sheepy = summary.sheepLines.length > 0 || m.wool > 0;
+  const sheepy = summary.hasSheep || summary.sheepLines.length > 0 || m.wool > 0;
+  const none = (c: { before: number; after: number }): boolean => c.before === 0 && c.after === 0;
 
   return (
     <div
@@ -204,14 +205,23 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
             )}
             <dl className={styles.sumlist}>
               <Change label="Cash" c={summary.cash} dollars />
-              <Change label="Head" c={summary.head} />
+              {/* On a farm with sheep these rows are the cattle's, and left out with no cattle. */}
+              {!(sheepy && none(summary.head)) && (
+                <Change label={sheepy ? 'Cattle' : 'Head'} c={summary.head} />
+              )}
               {(summary.calves.before > 0 || summary.calves.after > 0) && (
                 <Change label="Calves" c={summary.calves} />
               )}
               <Change label="Feed" c={summary.massKgHa} unit=" kg DM/ha" />
               <Change label="Green feed" c={summary.greenKgHa} unit=" kg DM/ha" />
               <Change label="Ground cover" c={summary.coverPct} unit="%" />
-              <Change label="Live weight" c={summary.liveWeightKg} unit=" kg" />
+              {!(sheepy && none(summary.liveWeightKg)) && (
+                <Change
+                  label={sheepy ? 'Cattle live weight' : 'Live weight'}
+                  c={summary.liveWeightKg}
+                  unit=" kg"
+                />
+              )}
             </dl>
             {!summary.reportFirst && summary.report.length > 0 && (
               <section aria-labelledby="away-title" className={styles.awaybox}>

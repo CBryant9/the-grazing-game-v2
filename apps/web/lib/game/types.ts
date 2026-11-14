@@ -792,6 +792,8 @@ export interface SummaryWire {
   };
   /** What the sheep did, one line each: lambs, deaths with causes, weaning, shearing. Empty with no sheep. */
   sheepLines: string[];
+  /** True on a farm with sheep: Head, Calves and Live weight above are the cattle's. */
+  hasSheep: boolean;
   arrived: { head: number; calves: number };
   bookedSold: { head: number; net: number };
   /** Where a grazing plan moved a mob, one line for each mob. */

@@ -165,7 +165,7 @@ describe('the sheep switch, on', () => {
     expect(s.market.isSaleDay).toBe(true);
     const buy = { action: { type: 'buySheep' as const, cls: 'merinoWethers', qty: 20 } };
     const card = await game.preview(A, buy);
-    expect(card.ok && card.card.summary?.[0]).toMatch(/^Buy 20 merino wethers for \$[\d,]+/);
+    expect(card.ok && card.card.summary?.[0]).toMatch(/^Buy 20 Merino wethers for \$[\d,]+/);
     const bought = await game.act(A, buy);
     expect(bought.ok).toBe(true);
     const flock = bought.snapshot.mobs.find((m) => m.species === 'sheep')!;

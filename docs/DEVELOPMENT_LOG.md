@@ -1728,6 +1728,60 @@ Same branch (`m2.7-engine-joined`). Engine 0.17.0, save format 12 (a joining's `
 
 **Not done.** Reading the DPIRD budget itself (refused). A managed cattle margin to set beside SB-GM. The web screens for the new sheep plan events and `sheep.prices` (outside this scope).
 
+### 15 Nov 2026: m2.8 Sheep screens
+
+Branch `m2.8-sheep-screens`: `m3.5-admin-shell` (78930e7) with `m2.7-engine-joined` (5337928) merged in (engine 0.17.0, save format 12). Stage 2.4, the screens half.
+
+**The join.** Only DEVELOPMENT_LOG and LESSONS clashed; both sides kept in full. What the engine change broke in the web app: one test, `mobcard.test.ts` (DSE as AE × 8). It now reads the engine's `DSE_PER_AE`, so every DSE shown is AE × 8.4 with no figure written in the web app. Nothing else broke: stored farm format 3 is unchanged, and a farm stored by the web line on engine 0.13 (save format 9, the engine's own old-code fixture wrapped in the web's stored format) opens, shows no sheep, plays a day and saves on 0.17 (`sheep.test.ts`, "old farms").
+
+**Built, all behind the `sheep` feature switch, off by default** (`FEATURE_SWITCHES.sheep`, a seed migration, an admin switch entry). Sheep show on a farm in a sheep district when the switch is on, or when the farm already has sheep. Never in Central Queensland.
+
+- Setup: a "Cattle, sheep or both?" step on a running farm in a sheep district, with the start flock in plain facts read from a probe farm the engine sets up once per district.
+- Mob card and herd list for sheep mobs (`SheepCard.tsx`): head by class, lambs at foot, DSE and AE, weight, CS, daily gain in g, where the flock is up to, wool (months, clean kg a head, micron), "Shearing on 14 November. About $9.81 a head.", crutching, the joining record (joined, scanned, born, marked, weaned), reasons when losing weight (the engine's own losing-weight reasons from its last note), and the fence fact. Paddock sheet and stocking count sheep DSE and AE at the one figure.
+- To-do lines: sheep in the yards (opens the move), no water, under the CS floor for the stage (with reasons), behind a fence that does not hold sheep.
+- Moves and plans through the existing flows. The server turns a move named by a sheep mob into the sheep move. Refusals read "Paddock 4 holds cattle. Cattle and sheep run in separate paddocks." The move card says when the paddock has cattle fence ("A cattle fence does not hold sheep."), no water, or sheep to join.
+- Feeding (none, lick, grain, hay) with the cost a day from `sheepFeedCosts`, confirm first.
+- Sheep market (Market tab, Cattle or Sheep): MLA indicators and wool prices, buy a class (arrives next morning in the yards), sell from a mob, each with the money lines on the card before anything is spent. Wool sells by itself at shearing: its own line in the summary, the diary and the year (Wool, Sheep sales, Sheep bought).
+- Shearing and crutching: dated facts on the card and herd list, "Move shearing" (month and day), the result in the summary and the diary (clip per head, micron, income, cost).
+- Netting in the build tool, at the engine's price, and each cattle fence says "A cattle fence does not hold sheep." on a farm that shows sheep; a cattle fence drawn on a farm with sheep carries the same note.
+- Words for every sheep event (`sheepwords.ts`, `SheepEvent` is every engine event named `sheep*` or `lambs-born`; a new one fails the type check until it has words). Lambs and sheep deaths with their causes in the summary.
+- The map: flocks and netting drawn (render, in code: there is no sheep art in `art/`; VISUALS "Sheep" and "Netting fence"). The server adds `flocks` to the view and sets netting segments to `VIEW_FENCE.netting`.
+- Help: three sheep topics and four terms, shown only on a farm that shows sheep. The tour is untouched.
+
+**Engine changes (said so):** `setPlan` and `clearPlan` take a sheep mob (pausePlan and resumePlan already did): without this a farm with no cattle could not make a plan. A test in `sheep/moves.test.ts`. Two exports: `SHEEP_BUDGET_COSTS` and `MAX_SHEEP_BUY`. No rule or number changed.
+
+**Tested.** `sheep.test.ts` (switch off: cattle only, no sheep word in anything sent, sheep jobs refused; switch on: never in Central Queensland, a sheep farm's card, feeding, a move, moving the shearing day, a shearing in the summary, the inbox and the year's money, buying and selling with the money first, the yards to-do, the plain species refusals both ways, the old save). The key list test has a mixed sheep farm fixture and every new key. Help topics test. Render tests (subagent). In the browser: see the report and below.
+
+**How the switch is turned on with no database:** `GG_SWITCHES_ON=sheep` (read only when no database is set; `.env.example`).
+
+**Calls for Claudia**
+
+1. **A farm that already has sheep keeps showing them if the switch goes off.** New sheep farms and the sheep market for cattle farms go with the switch. Hiding live animals that still eat and die seemed wrong.
+2. **The farm view version stays 4.** `flocks` is optional and netting is a new code, so past days' pictures still draw (the map refuses another version). A map given an engine view alone draws netting as permanent fence.
+3. **Sheep part moves are one class at a time** (the engine's `moveSheepPart`). The picker says so.
+4. **Sheep are sold on a sale day only** (the engine does not book sheep onto a later sale). The card says when the next one is.
+5. **Only the shearing day can be moved on screen.** Crutching and joining keep their dates (the engine can move them; a screen for them is easy to add).
+6. **The summary's Head, Calves and Live weight rows stay the cattle's** (the engine's period figures); sheep come as their own lines. Top bar head counts both.
+7. **Paddock "days of feed" counts the cattle only** (the engine's paddock read); on a sheep paddock it can say no stock on it.
+8. **The start flock text is general** (read from a small probe farm on 1 September), not the player's own head count, which is shown once the farm is taken.
+9. **Gain is shown in g a head a day for sheep**, kg for cattle.
+
+**The sheep model's open gaps that keep the switch off** (from the engine entries above, for Claudia to rule on):
+
+- The Tablelands winter: unfed ewes lamb at CS 1.4 and about 32% die (call 18).
+- Carrying capacity under sourced figures on Tablelands and sown pasture (C18).
+- Ewe deaths: first-cross ewes 4.2 to 4.7% against 2 to 4%; Merino adult deaths over 4.5% in single blocks (SB-43).
+- Western Victoria weaner deaths under the band (worms left out, SB-47).
+- Sheep money: start-flock first-year profit per DSE far over DPIRD's $50.46 (Central West $124.7, Western Victoria $149.9; Tablelands $11.6), SB-GM open for Tablelands and Western Victoria; wool at a dated stand-in price on every farm.
+- DSE a ewe: the model's energy DSE (1.6 to 2.0) against the budget's 2.32, so "per DSE" on screen reads higher than budgets.
+- Unmulesed flystrike rates, the fence price for netting ($10 a metre stand-in), wool selling costs (stand-ins).
+
+**Checks.** Type check, lint, format, build, browser bundle (36 engine-only terms, 9 of them sheep), JS budget: `/play` 201.7 KB of 250 (sheep add about 3 KB; no limit raised; public pages still 0 KB). Map fixtures made again: none changed. Every test passes.
+
+**In the browser** (port 3305, a fresh `GG_FARMS_DIR`, `GG_SWITCHES_ON=sheep`): a Western Victoria sheep farm through the setup flow (the stock step and the start flock text), the mob card, lick fed with its card, the flock moved (the card said the paddock has cattle fence), Merino ewes bought and a ewe sold on the 7 September sale with the money on the card first, skipped to shearing (the summary: 417 shorn, 3.6 kg clean a head at 17.9 micron, wool $38,142, shearing $4,140), sheep on the map close up (woolly, outlined, not cattle-like) and a netting line in light and dark. At 360 px nothing overflowed on the farm, the sheep card or the sheep market (measured by script). Then with the switch off and another fresh folder: no stock step, nothing about sheep in the page or the snapshot, and a Western Victoria cattle farm skipped a week as before. Not looked at by eye: phone landscape, and the sheep sprites at the far zoom.
+
+**Not done.** Moving the crutching and joining days on screen. Booking sheep onto a later sale (engine). A sheep figure for paddock days of feed. The sale line still says "cattle sale" on a day sheep are traded too.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

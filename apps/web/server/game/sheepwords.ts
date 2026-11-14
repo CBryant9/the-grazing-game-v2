@@ -234,6 +234,12 @@ const SHEEP_TYPES: Record<SheepEvent['type'], true> = {
 export const isSheepEvent = (e: FarmEvent): e is SheepEvent => Object.hasOwn(SHEEP_TYPES, e.type);
 
 /** A buy class's name, from the engine's list: "Merino ewes". */
+/** A buy class's name inside a sentence: "Merino ewes" keeps its capital, "crossbred store lambs" does not. */
+export const classInText = (id: string): string => {
+  const n = className(id);
+  return /^Merino/.test(n) ? n : n.charAt(0).toLowerCase() + n.slice(1);
+};
+
 export const className = (id: string): string =>
   (SHEEP_BUY_CLASSES as Record<string, { name: string } | undefined>)[id]?.name ?? 'sheep';
 
@@ -272,7 +278,7 @@ export function sheepMessage(e: SheepEvent, dateOf: DateOf): { kind: InboxKind; 
       return sheep(`${e.mobName} crutched: ${plural(e.head, 'head', 'head')}, ${money(e.cost)}.`);
     case 'sheep-bought':
       return sale(
-        `Bought ${n0(e.qty)} ${className(e.cls).toLowerCase()} for ${money(e.total)}. They are in ${e.mobName}.`,
+        `Bought ${n0(e.qty)} ${classInText(e.cls)} for ${money(e.total)}. They are in ${e.mobName}.`,
       );
     case 'sheep-sold':
       return sale(
@@ -306,7 +312,7 @@ export function sheepMessage(e: SheepEvent, dateOf: DateOf): { kind: InboxKind; 
       return plan(`${e.mobName} moved by its grazing plan from ${e.from} to ${e.to}.`);
     case 'sheep-on-the-way':
       return sale(
-        `Bought ${n0(e.qty)} ${className(e.cls).toLowerCase()} for ${money(e.total)}, the head fee included. They arrive in the stock yards at first light on ${fullDate(dateOf(e.arriveDay))}.`,
+        `Bought ${n0(e.qty)} ${classInText(e.cls)} for ${money(e.total)}, the head fee included. They arrive in the stock yards at first light on ${fullDate(dateOf(e.arriveDay))}.`,
       );
     case 'sheep-arrived':
       return sale(

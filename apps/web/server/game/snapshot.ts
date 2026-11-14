@@ -306,6 +306,8 @@ export function buildSummary(
     pay: { contract: number; wages: number };
     stepThrough: boolean;
   } = { bubbles: [], pay: { contract: 0, wages: 0 }, stepThrough: false },
+  /** True on a farm with sheep: the cattle's own figures are then named as the cattle's. */
+  hasSheep = false,
 ): SummaryWire {
   const deathsByCause: Record<string, number> = {};
   for (const [cause, n] of Object.entries(s.deathsByCause)) {
@@ -342,12 +344,13 @@ export function buildSummary(
       wool: round(sheep.wool),
     },
     sheepLines: sheep.lines,
+    hasSheep,
     arrived: { head: s.arrived.head, calves: s.arrived.calves },
     bookedSold: { head: s.bookedSold.head, net: round(s.bookedSold.net) },
     planMoves: planMoveLines(ticks),
     growth:
       kind === 'skip' && s.daysRun > 0 && (s.grownKg > 0 || s.eatenKg > 0)
-        ? growthLine(s.grownKg, s.eatenKg, true)
+        ? growthLine(s.grownKg, s.eatenKg, true, hasSheep ? 'The stock' : 'The cattle')
         : null,
     report: labour.bubbles,
     reportFirst: labour.stepThrough && labour.bubbles.length > 0,
