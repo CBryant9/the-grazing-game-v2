@@ -185,6 +185,44 @@ function adminScripts(rel) {
   }
   if (!ok) failed = true;
 }
+// ---- /community (milestone 4.2 and 4.3). Rendered on demand like /admin, so measured the same way.
+// Each page has its own line. The limit is the measured size with room to spare, never raised to
+// make a change pass.
+const COMMUNITY_PAGES = [
+  'community',
+  'community/people',
+  'community/requests',
+  'community/me',
+  'community/post/[id]',
+  'community/u/[username]',
+  'community/u/[username]/[list]',
+];
+const COMMUNITY_LIMIT_KB = Number(arg('--limit-community', '150'));
+for (const rel of COMMUNITY_PAGES) {
+  const srcs = adminScripts(rel);
+  if (srcs === null) {
+    console.error(`/${rel}: no build manifest. Run \`pnpm build\` first.`);
+    process.exit(1);
+  }
+  let bytes = 0;
+  for (const src of srcs) {
+    const file = join(STATIC, src.replace(/^\/_next\/static\//, '').split('?')[0]);
+    if (!existsSync(file)) {
+      console.error(`/${rel}: the manifest names ${src}, which is not in the build.`);
+      process.exit(1);
+    }
+    bytes += gzipSync(readFileSync(file), { level: 9 }).length;
+  }
+  const kb = bytes / 1024;
+  const ok = kb < COMMUNITY_LIMIT_KB;
+  console.log(
+    `${ok ? 'ok  ' : 'OVER'} /${rel.padEnd(19)} ${kb.toFixed(1)} KB compressed in ${srcs.length} scripts (limit ${COMMUNITY_LIMIT_KB} KB)`,
+  );
+  if (ok && kb >= 100) {
+    console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');
+  }
+  if (!ok) failed = true;
+}
 if (failed) {
   console.error('A page sends more JavaScript than its budget (PRD 14.10).');
   process.exit(1);

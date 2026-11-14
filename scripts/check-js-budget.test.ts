@@ -19,7 +19,14 @@ afterEach(() => {
 });
 
 /** A pretend build. `homeKb` and `playKb` are the KB of script each page asks for. */
-function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20, adminKb = 20) {
+function pretend(
+  homeKb: number,
+  playKb: number,
+  missing = false,
+  accountKb = 20,
+  adminKb = 20,
+  communityKb = 20,
+) {
   const root = mkdtempSync(join(tmpdir(), 'gg-budget-'));
   dirs.push(root);
   const chunks = join(root, 'static', 'chunks');
@@ -68,6 +75,27 @@ function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20
       'globalThis.__RSC_MANIFEST = {"chunks":["/_next/static/chunks/admin.js"]};',
     );
   }
+  // The community pages (milestone 4.2 and 4.3) are measured the same way, each on its own line.
+  writeFileSync(join(chunks, 'community.js'), randomBytes(communityKb * 1024));
+  for (const rel of [
+    'community',
+    'community/people',
+    'community/requests',
+    'community/me',
+    'community/post/[id]',
+    'community/u/[username]',
+    'community/u/[username]/[list]',
+  ]) {
+    mkdirSync(join(app, rel, 'page'), { recursive: true });
+    writeFileSync(
+      join(app, rel, 'page', 'build-manifest.json'),
+      JSON.stringify({ rootMainFiles: ['static/chunks/community.js'] }),
+    );
+    writeFileSync(
+      join(app, rel, 'page_client-reference-manifest.js'),
+      'globalThis.__RSC_MANIFEST = {"chunks":["/_next/static/chunks/community.js"]};',
+    );
+  }
   return { stat: join(root, 'static'), app, pages };
 }
 
@@ -113,6 +141,22 @@ describe('the JavaScript budget check', () => {
     const over = run(pretend(0, 100, false, 20, 200));
     expect(over.status).toBe(1);
     expect(over.stdout).toMatch(/OVER\s+\/admin\s/);
+  });
+
+  it('gives each community page its own line, measured from its manifests, and fails one that grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20, 20, 20));
+    expect(ok.status).toBe(0);
+    for (const path of [
+      '/community ',
+      '/community/people',
+      '/community/me',
+      '/community/post/[id]',
+    ]) {
+      expect(ok.stdout).toContain(path);
+    }
+    const over = run(pretend(0, 100, false, 20, 20, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/community\s/);
   });
 
   it('does not count the polyfills for old browsers (nomodule)', () => {

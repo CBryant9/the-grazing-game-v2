@@ -236,3 +236,15 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | M10 | A rate limit keyed on the `sb-*` cookie text gave a fresh count for every made-up cookie, and each try cost a call to the auth server | The key was built from something the caller writes | Visitors by address (the trusted header), admins by account id. **Rule: key a limit on what the caller can not choose** |
 | M11 | "Hide that `/admin` exists" while `robots.txt` named it and its not found carried a header an unknown address does not | Each piece was added for its own reason | `robots.txt` does not name it, the headers are the same, and `noindex` comes only after the role check passes. **Rule: when the aim is to hide something, compare the whole answer with an unknown address, not only the status** |
 
+
+### m4.2 Community
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| C1 | The first profile save hung for 60 seconds, then every later test timed out | The word check ran on the server's own connection while the player's transaction (the same single PGlite connection) was open, so each waited for the other. On a pool it would hold two connections per request | Check first, on its own, then open the player's transaction for the writes. **Rule: never run a second query on another connection from inside a transaction.** |
+| C2 | A new post was refused with "not allowed" although the rules let the author post | `insert ... returning id` asks the read rule about the new row. The read rule calls a helper that reads `posts` with the query's own snapshot, which does not yet hold the row | The id is read back afterwards (`created_at = now()`, the transaction's clock). **Rule: do not `returning` from a table whose read rule calls a helper that reads that same table.** |
+| C3 | A hand-made JPEG for the metadata test was refused as "not a photo" | Two segment lengths in the fixture were one byte out. The parser was right | The fixtures are checked against the parser before the tests that depend on them. **Rule: when a test fixture is refused, check the fixture first.** |
+| C4 | Share my farm said "That session is not valid" | The game server names a farm by its id without dashes; the database id has them | Strip the dashes where the game server is asked. **Rule: a database id is not always the id the game server uses.** |
+| C5 | A day card test could not insert a Daily Farm | A Daily Farm row must carry a time zone and the last day simulated | The fixture sets both. |
+| C6 | A test expected a blocked person to be missing from a stranger's search | The person who blocked is visible to everyone but the blocked one | The test now says which of the three people sees whom. |
+| C7 | Rendering a post card in a test failed with "expected app router to be mounted" | The card holds buttons that use the router | The test mocks the router, as the page tests do. |

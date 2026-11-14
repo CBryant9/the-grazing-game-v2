@@ -47,6 +47,12 @@ export function AccountSection() {
             <button type="button" className="btn" disabled={busy} onClick={() => void showPicker()}>
               Your farms
             </button>
+            {me.community && (
+              // Only when the server says so: the switch is on and the player is 16 or over.
+              <Link href="/community" className="btn ghost">
+                Community
+              </Link>
+            )}
             <Link href="/account" className="btn ghost">
               Your account
             </Link>

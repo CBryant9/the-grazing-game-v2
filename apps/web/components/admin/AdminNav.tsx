@@ -12,6 +12,7 @@ export const ADMIN_LINKS = [
   { href: '/admin/switches', label: 'Feature switches', later: false },
   { href: '/admin/settings', label: 'Site settings', later: false },
   { href: '/admin/audit', label: 'Audit log', later: false },
+  { href: '/admin/photos', label: 'Photo queue', later: false },
   { href: '/admin/moderation', label: 'Moderation', later: true },
   { href: '/admin/ads', label: 'Ads and sponsors', later: true },
   { href: '/admin/purchases', label: 'Purchases', later: true },
