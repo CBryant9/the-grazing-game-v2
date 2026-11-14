@@ -262,7 +262,9 @@ describe('every community page', () => {
     const html = renderToStaticMarkup((await Queue()) as never);
     expect(html).toContain('Post photo');
     expect(html).toContain('from @bobby');
-    expect(html).toContain('data:image/png;base64,');
+    // Shown through the admin preview route, never as a data address in the page (Stage 4).
+    expect(html).toContain('/api/admin/photo-preview?kind=post_photo&amp;row=');
+    expect(html).not.toContain('data:image');
     state.cookie = cookies.alice!;
     await expect(Queue()).rejects.toThrow('NEXT_NOT_FOUND');
   });

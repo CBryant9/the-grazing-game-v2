@@ -14,7 +14,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cursor?: string }>;
+  searchParams: Promise<{ cursor?: string; thread?: string }>;
 }) {
   // The post's own switch: with posts off there is no post page.
   const { me, deps } = await requireMember('feed_posts');
@@ -25,7 +25,9 @@ export default async function Page({
     if (!post) return null;
     return {
       post,
-      comments: post.removed ? null : await commentsPage(tx, me.userId, post.id, q.cursor ?? null),
+      comments: post.removed
+        ? null
+        : await commentsPage(tx, me.userId, post.id, q.cursor ?? null, q.thread ?? null),
     };
   });
   if (!data) notFound();

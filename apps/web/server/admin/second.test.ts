@@ -44,7 +44,8 @@ function walk(dir: string, match: RegExp): string[] {
 }
 // `photos` needs a real photo waiting in the queue to say yes, so its gate, CSRF, no keys, rollback
 // and pass checks are in community/community.test.ts ("the manual photo queue"), not in this walk.
-const OWN_TESTS = new Set(['photos']);
+// `photo-preview` is a read (GET only): its gate is tested in community/review.test.ts.
+const OWN_TESTS = new Set(['photos', 'photo-preview']);
 const adminRouteNames = walk('app/api/admin', /^route\.ts$/)
   .map((f) => f.replace('app/api/admin/', '').replace('/route.ts', ''))
   .filter((n) => !OWN_TESTS.has(n));

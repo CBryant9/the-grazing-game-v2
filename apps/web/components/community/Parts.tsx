@@ -226,7 +226,7 @@ export function PostCard({ post, detail = false }: { post: PostView; detail?: bo
 
 export function CommentItem({ c, postId }: { c: CommentView; postId: string }) {
   return (
-    <li className={`${styles.comment} ${c.parentId ? styles.reply : ''}`}>
+    <li id={`c-${c.id}`} className={`${styles.comment} ${c.parentId ? styles.reply : ''}`}>
       <div className={styles.phead}>
         <Avatar who={c.author} size={32} />
         <div className={styles.pwho}>
@@ -254,6 +254,13 @@ export function CommentItem({ c, postId }: { c: CommentView; postId: string }) {
             </details>
           </div>
         </>
+      )}
+      {c.moreReplies && (
+        <p>
+          <a href={`/community/post/${postId}?thread=${c.id}#c-${c.id}`} className="btn ghost">
+            Show more replies
+          </a>
+        </p>
       )}
       {!c.parentId && !c.removed && (
         <details className={styles.menu}>

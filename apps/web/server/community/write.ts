@@ -105,7 +105,8 @@ export async function updateProfile(
   const extraText: (string | null)[] = [];
   const has = (k: string): boolean => Object.prototype.hasOwnProperty.call(b, k);
 
-  if (has('displayName')) set('display_name', field(b.displayName, 'display name', 50));
+  if (has('displayName'))
+    set('display_name', field(b.displayName, 'display name', 50, { blankRefused: true }));
   if (has('bio')) set('bio', field(b.bio, 'bio', 500, { multiline: true }));
   if (has('town')) set('town', field(b.town, 'town or district name', 60));
   if (has('enterprise')) {
@@ -173,6 +174,8 @@ export async function updateProfile(
       const url = safeUrl(v);
       if (!url) bad('Links must start with https:// and be a real web address.');
       links.push({ kind: k as LinkKind, url });
+      // The word filter reads a link's words too (the parts between the dots and slashes).
+      extraText.push(url.replace(/[^a-z0-9]+/gi, ' '));
     }
   }
   let experience:

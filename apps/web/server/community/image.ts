@@ -9,8 +9,9 @@ import { crc32 } from 'node:zlib';
  * picture needs. Everything else is dropped, so the stored file carries no location:
  *
  * - JPEG: the EXIF block (where the GPS position lives), XMP, IPTC, comments and every other
- *   application block are removed. Kept: the JFIF header, the colour profile and Adobe colour
- *   flag, the tables and the picture data.
+ *   application block are removed. Kept: the JFIF header (without its thumbnail), the colour
+ *   profile and Adobe colour flag, the tables and the picture data. A file with two frame
+ *   headers is refused.
  * - PNG: every chunk except the picture's own (header, palette, data, transparency, gamma,
  *   colour and size hints). EXIF (`eXIf`), text chunks and the time chunk are removed. An
  *   animated PNG keeps only its first picture.
@@ -118,15 +119,25 @@ function cleanJpeg(b: Uint8Array): CleanImage {
     const body = b.subarray(at, at + len);
     const isSof = m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
     if (isSof) {
+      // One frame only. A decoder reads the first frame header, so a second one (a small size
+      // after a huge one) would let a decompression bomb past the size check.
+      if (size) throw new ImageError(BAD);
       if (len < 8) throw new ImageError(BAD);
       size = { h: u16(body, 3), w: u16(body, 5) };
     }
     let keep = false;
     if (isSof || m === 0xc4 || m === 0xdb || m === 0xdd || m === 0xda || m === 0xcc) keep = true;
-    else if (m === 0xe0) keep = ascii(body, 2, 6) === 'JFIF';
-    else if (m === 0xe2) keep = ascii(body, 2, 13) === 'ICC_PROFILE';
+    else if (m === 0xe0 && ascii(body, 2, 6) === 'JFIF' && len >= 16) {
+      // The JFIF header, rebuilt without its thumbnail (a second, unchecked picture).
+      const jfif = Uint8Array.from(body.subarray(0, 16));
+      jfif[0] = 0;
+      jfif[1] = 16;
+      jfif[14] = 0;
+      jfif[15] = 0;
+      out.push(Uint8Array.of(0xff, m), jfif);
+    } else if (m === 0xe2) keep = ascii(body, 2, 13) === 'ICC_PROFILE';
     else if (m === 0xee) keep = ascii(body, 2, 7) === 'Adobe';
-    // APP1 (EXIF, XMP), APP13 (IPTC), comments and the rest are dropped.
+    // APP1 (EXIF, XMP), APP13 (IPTC), JFXX thumbnails, comments and the rest are dropped.
     if (keep) out.push(Uint8Array.of(0xff, m), body);
     at += len;
     if (m === 0xda) {
@@ -300,6 +311,22 @@ export function cleanImage(bytes: Uint8Array, maxBytes: number): CleanImage {
     type === 'jpeg' ? cleanJpeg(bytes) : type === 'png' ? cleanPng(bytes) : cleanWebp(bytes);
   if (out.bytes.length > maxBytes) throw new ImageError('That photo is too big.');
   return out;
+}
+
+/**
+ * The type of a stored picture, checked again before it is served or shown: it must parse as a
+ * JPEG, PNG or WebP picture and its name must end in that type's extension. Null for anything
+ * else (a page, a script or an SVG under a picture's name, or a PNG named `.jpg`), which is
+ * then not served at all.
+ */
+export function servableType(bytes: Uint8Array, path: string): ImageType | null {
+  const type = sniff(bytes);
+  if (!type || !path.toLowerCase().endsWith(`.${EXTENSION[type]}`)) return null;
+  try {
+    return cleanImage(bytes, Math.max(bytes.length, 1)).type === type ? type : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Plain base64 (not URL-safe) with no whitespace, decoded only when its length fits the limit. */

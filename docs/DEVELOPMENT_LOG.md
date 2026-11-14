@@ -1590,6 +1590,19 @@ Milestones 4.2 (profiles and following) and 4.3 (posts and the feed), built toge
 
 **Still owed against a real project:** Storage uploads with the secret key, `storage.objects` rows matching what `approve_photo` reads, and the photo route's download; the pages by eye on a phone and a PC in both themes.
 
+**Fixes after the security review (Stage 4, Phase 1).** Migration `20261115001000_stage4_review.sql`, tests in `server/community/review.test.ts` and `packages/db/src/stage4.test.ts`, each written first and seen to fail.
+
+1. Staff see the community as any member does. The helpers the community's rules use (`can_find_profile_for`, `can_find_profile`, `can_see_profile`, `can_see_group`, `post_row_visible`, `comment_visible`, and the read rules on comments, post photos and showcase photos) no longer let a moderator or admin through. A moderator or admin gets the plain not found for an under-16 profile, its posts and its follower list, sees a private profile's card only, and no followers-only post they do not follow. Staff powers are in `/admin`, which uses the server's own connection. Tests that expected the old staff view now expect the member's view.
+2. A private profile's posts are its author's alone (PRD 9.1), whatever the post's own setting: not in Everyone, not on the post page, not in the share image. Share my farm from a private profile is refused with a plain reason.
+3. Images: a JPEG with a second frame header is refused; the JFIF header is rebuilt without its thumbnail; players can no longer write to Storage with their own token (the three insert rules are gone: only the server stores a photo); `servePhoto`, the image check and the new admin preview read the real type from the bytes, require the file name's extension to match and the file to parse, and refuse anything else.
+4. A database limit on photos: `photo` (24 an hour, 8 for a new account) and `photo_day` (80 a day, 20 for a new account), counted by a trigger on each new post or showcase photo row and each avatar change made with a player's token. Stand-in figures.
+5. The word filter now reads the farm name on Share my farm (it goes on the card) and the words of profile links.
+6. Hidden characters: the Hangul fillers (U+3164, U+115F, U+1160, U+FFA0), the braille blank (U+2800), the invisible maths signs (U+2061 to U+2064), the grapheme joiner (U+034F) and the tag characters (U+E0000 to U+E007F) are removed. A display name that would show as blank is refused.
+7. Slow queries: username search keeps its prefix index (a test checks the plan); the Friends tab reads each followed author's newest posts through a new index (`posts_author_feed`) and a lateral join; like counts come from one safe count each (`app.like_count_post`, `app.like_count_comment`: the count, told only to someone who may see the post or comment).
+8. A banned or suspended player is not shown the Community link (`/api/auth/me` asks `member_raw`); a comment shows its first 5 replies and then "Show more replies" (the thread shows up to 200); the admin photo queue loads each preview from `/api/admin/photo-preview` (admins only, only a photo still waiting) instead of a data address of up to 6 MB.
+
+Calls: a like count counts every like, including one from someone the viewer has blocked (a count is not an identity). Tag characters are removed, so an emoji flag that uses them (Scotland, Wales) shows as a plain black flag. Comments a private-profile player writes on other people's posts still show (only their own posts are hidden).
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

@@ -5,7 +5,7 @@ import { logFailure } from '../logging';
 import { asUser, type AuthDeps } from '../auth/accounts';
 import type { SqlRunner } from '../db/sql';
 import { CommunityError } from './errors';
-import { EXTENSION, MIME, cleanImage, decodeBase64, type CleanImage } from './image';
+import { EXTENSION, MIME, cleanImage, decodeBase64, servableType, type CleanImage } from './image';
 
 /**
  * Photos: upload, the pending state, the image check, and approval (BUILD_PLAN 4.3).
@@ -154,7 +154,9 @@ export async function runCheck(
     if (!before) return 'pending';
     const bytes = await photo.storage.get(bucket, path);
     if (!bytes) return 'pending';
-    const answer = await photo.check.check(bytes, MIME[sniffType(bytes)]);
+    const type = servableType(bytes, path);
+    if (!type) return 'pending';
+    const answer = await photo.check.check(bytes, MIME[type]);
     if (answer === 'review') return 'pending';
     const after = await identityOf(deps.sql, bucket, path);
     if (!after || after.id !== before.id || after.updatedAt !== before.updatedAt) return 'pending';
@@ -168,12 +170,6 @@ export async function runCheck(
     logFailure({ route: 'community-photo-check', reason: 'image_check_failed' }, e);
     return 'pending';
   }
-}
-
-function sniffType(bytes: Uint8Array): 'jpeg' | 'png' | 'webp' {
-  if (bytes[0] === 0x89) return 'png';
-  if (bytes[0] === 0x52) return 'webp';
-  return 'jpeg';
 }
 
 /** Approve one exact file, through the database's own function and nothing else. */
@@ -389,7 +385,11 @@ export async function servePhoto(
   if (!now || now.id !== object || now.updatedAt !== updated) return null;
   const bytes = await storage.get(bucket, path);
   if (!bytes) return null;
-  return { bytes, mime: MIME[sniffType(bytes)] };
+  // The bytes must be the picture type the name says, checked here and not guessed: anything
+  // else is not served, whatever the row says.
+  const type = servableType(bytes, path);
+  if (!type) return null;
+  return { bytes, mime: MIME[type] };
 }
 
 // ------------------------------------------------------------------ the manual queue
@@ -460,11 +460,30 @@ export async function pendingPhotos(sql: SqlRunner, limit = 12): Promise<Pending
   return out.slice(0, limit);
 }
 
-/** The bytes of a queued photo as a data address, for the admin page to show. Null when the file is missing. */
-export async function previewOf(p: PendingPhoto): Promise<string | null> {
+/**
+ * The bytes of a queued photo for the admin page, served by `/api/admin/photo-preview` (an image
+ * address, not a data address in the page). Only a photo still waiting, only the file the queue
+ * names, and only a real picture of the type its name says. Null otherwise.
+ */
+export async function queuedPhoto(sql: SqlRunner, kind: Kind, row: string): Promise<Served | null> {
   const storage = photoDeps().storage;
-  if (!storage || !p.file) return null;
-  const bytes = await storage.get(BUCKET[p.kind], p.path);
+  if (!storage) return null;
+  const r =
+    kind === 'post_photo'
+      ? await sql.query<{ path: string }>(
+          `select storage_path as path from public.post_photos
+            where id = $1 and moderation_status = 'pending'`,
+          [row],
+        )
+      : await sql.query<{ path: string }>(
+          `select avatar_path as path from public.profiles
+            where user_id = $1 and avatar_status = 'pending' and avatar_path is not null`,
+          [row],
+        );
+  const path = r.rows[0]?.path;
+  if (!path) return null;
+  const bytes = await storage.get(BUCKET[kind], path);
   if (!bytes) return null;
-  return `data:${MIME[sniffType(bytes)]};base64,${Buffer.from(bytes).toString('base64')}`;
+  const type = servableType(bytes, path);
+  return type ? { bytes, mime: MIME[type] } : null;
 }

@@ -15,8 +15,11 @@
  */
 
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
-const HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎]/g;
-const HAS_HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎]/;
+// Also: the Hangul fillers (U+3164, U+115F, U+1160, U+FFA0) and the braille blank (U+2800), which
+// draw nothing; the invisible maths signs (U+2061 to U+2064); the combining grapheme joiner
+// (U+034F); and the tag characters (U+E0000 to U+E007F).
+const HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎ㅤᅟᅠﾠ⁡-⁤͏⠀\u{e0000}-\u{e007f}]/gu;
+const HAS_HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎ㅤᅟᅠﾠ⁡-⁤͏⠀\u{e0000}-\u{e007f}]/u;
 
 export function cleanText(input: string, opts: { multiline?: boolean } = {}): string {
   let t = input.normalize('NFC').replace(/\r\n?/g, '\n').replace(/\t/g, ' ');
@@ -42,7 +45,7 @@ export function field(
   value: unknown,
   name: string,
   max: number,
-  opts: { required?: boolean; multiline?: boolean } = {},
+  opts: { required?: boolean; multiline?: boolean; blankRefused?: boolean } = {},
 ): string | null {
   if (value === undefined || value === null || value === '') {
     if (opts.required) throw new TextError(`Add ${name}.`);
@@ -54,6 +57,10 @@ export function field(
   const t = cleanText(value, opts);
   if (t === '') {
     if (opts.required) throw new TextError(`Add ${name}.`);
+    // Something was typed, but nothing a person can see is left (only hidden or blank characters).
+    if (opts.blankRefused && value.trim() !== '') {
+      throw new TextError(`The ${name} would show as blank. Type letters or leave it empty.`);
+    }
     return null;
   }
   if (length(t) > max) throw new TextError(`The ${name} can be up to ${max} characters.`);

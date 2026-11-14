@@ -1171,7 +1171,8 @@ describe('A photo never shows before it has been checked', () => {
     expect((await post('admin', null, {})).status).toBe(404);
     // Swap the file under the same name after the admin looked: nothing is approved.
     const path = queue[0]!.path;
-    await storage.put('post-photos', path, new Uint8Array([0xff, 0xd8, 0xff]), 'image/jpeg');
+    // A real JPEG (since Stage 4 only a real picture of the named type is served).
+    await storage.put('post-photos', path, cleanImage(jpegWithExif(), 1 << 20).bytes, 'image/jpeg');
     const stale = await ask();
     expect(stale.status).toBe(409);
     expect((await json<{ error: string }>(stale)).error).toMatch(/changed/);
@@ -1207,7 +1208,7 @@ describe('A photo never shows before it has been checked', () => {
     expect(audit.rows).toEqual([
       { action: 'photo_approve', target_type: 'photo', target_id: photo, admin_id: admin.id },
     ]);
-    // The photo is served (the stored bytes are not a whole picture, but the file is the approved one).
+    // The photo is served: the file is the approved one, and a real JPEG.
     expect((await get('photo', b, photoUrl(photo))).status).toBe(200);
     // Swapping the approved file hides it again at once, whatever the row says.
     await storage.put('post-photos', path, new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), 'image/jpeg');

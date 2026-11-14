@@ -7,6 +7,7 @@ import type { Snapshot } from '@/lib/game/types';
 import type { Card } from './data';
 import { CommunityError } from './errors';
 import { field } from './text';
+import { wordsRefused } from './write';
 
 /**
  * Share my farm posts and day cards (PRD 9.2, 9.3).
@@ -56,17 +57,29 @@ export async function shareFarm(
   const visibility = b.visibility === 'followers' ? 'followers' : 'public';
   // The player's own rows only: the database says whose farm it is.
   const farm = await asUser(deps.sql, me, async (tx) => {
-    const r = await tx.query<{ id: string; mode: ModeId; current_day: number }>(
-      'select id, mode, current_day from public.farms where id = $1 and owner_id = app.uid()',
+    const r = await tx.query<{ id: string; mode: ModeId; current_day: number; privacy: string }>(
+      `select f.id, f.mode, f.current_day, p.privacy_profile as privacy
+         from public.farms f join public.profiles p on p.user_id = f.owner_id
+        where f.id = $1 and f.owner_id = app.uid()`,
       [farmId],
     );
     return r.rows[0] ?? null;
   });
   if (!farm) throw new CommunityError(404, 'That farm was not found.');
+  // A private profile's posts are seen by nobody else (PRD 9.1), so a share would reach no one.
+  if (farm.privacy === 'private') {
+    throw new CommunityError(
+      409,
+      'Your profile is private, so nobody else would see this. Change who can see your profile to share your farm.',
+      'private',
+    );
+  }
   // The game server names a farm by its id without dashes.
   const snap = await gameServer().snapshot(farmKey(farm.id.replace(/-/g, '')));
   if (!snap)
     throw new CommunityError(409, 'That farm can not be opened right now. Try again in a moment.');
+  // The farm's name goes on the card, which the database's word filter does not read. Check it here.
+  await wordsRefused(deps.sql, [snap.farm.name]);
   const card = farmCard(snap, farm.mode);
   return deps.sql.transaction(async (tx) => {
     const ok = await tx.query<{ ok: boolean }>(`select app.take_rate('post', $1) as ok`, [me]);

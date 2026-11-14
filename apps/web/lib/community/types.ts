@@ -49,6 +49,8 @@ export interface PostView {
 
 export interface CommentView {
   id: string;
+  /** A top-level comment with more replies than the page shows: the page links to its thread. */
+  moreReplies: boolean;
   parentId: string | null;
   body: string | null;
   createdAt: string;

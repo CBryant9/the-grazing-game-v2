@@ -83,6 +83,8 @@ const BROWSER_HELPERS = [
   'is_group_owner',
   'is_member',
   'is_staff',
+  'like_count_comment',
+  'like_count_post',
   'owns_farm',
   'photo_file_visible',
   'post_author',

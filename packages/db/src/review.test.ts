@@ -53,12 +53,14 @@ describe('1. a photo is approved by its file, not its name', () => {
   it('the author swaps the file under the approved row: B never sees the new file', async () => {
     const swap = `delete from storage.objects where bucket_id = 'post-photos' and name = '${RAIN}';
       insert into storage.objects (bucket_id, name) values ('post-photos', '${RAIN}');`;
-    // As the author: the swap is allowed in their own folder.
+    // As the author: the delete is allowed in their own folder, but since Stage 4 only the server
+    // stores a file (20261115001000_stage4_review.sql), so the new file comes from the prep.
     const o = await asMany(db, 'a', [
       `delete from storage.objects where bucket_id = 'post-photos' and name = '${RAIN}'`,
       `insert into storage.objects (bucket_id, name) values ('post-photos', '${RAIN}')`,
     ]);
-    expect(o.every((x) => x.ok)).toBe(true);
+    expect(o[0]!.ok).toBe(true);
+    expect(o[1]!.ok).toBe(false);
     expect(count(await seeFile('b', 'post-photos', RAIN, swap))).toBe(0);
     const row = await as(
       db,
@@ -165,7 +167,7 @@ describe('2. avatars and group photos are owned and checked', () => {
     expect(count(await seeFile('b', 'avatars', AVATAR_A, overwrite))).toBe(0);
   });
 
-  it("group photos: only the owner uploads into the group's folder, and nobody sees one before it is checked", async () => {
+  it('group photos: nobody uploads with their own token (the server stores them), and nobody sees one before it is checked', async () => {
     const path = `${ID.group}/g.jpg`;
     expect(
       passed(
@@ -176,6 +178,7 @@ describe('2. avatars and group photos are owned and checked', () => {
         ),
       ),
     ).toBe(false);
+    // Not even the group's owner: since Stage 4 only the server stores a photo.
     expect(
       passed(
         await as(
@@ -184,7 +187,7 @@ describe('2. avatars and group photos are owned and checked', () => {
           `insert into storage.objects (bucket_id, name) values ('group-photos', '${path}')`,
         ),
       ),
-    ).toBe(true);
+    ).toBe(false);
     const wrongFolder = await as(
       db,
       'a',
@@ -427,19 +430,21 @@ describe('9. deleting an account leaves no personal data', () => {
 });
 
 describe('10. the moderator', () => {
-  it('reads reports, the moderation history, the word filter and removed posts', async () => {
+  it('reads reports, the moderation history and the word filter, but sees the community as any member does', async () => {
     const removed = `update public.posts set removed_at = now() where id = '${ID.postA}';`;
     expect(count(await as(db, 'mod', `select id from public.reports`))).toBe(1);
     expect(count(await as(db, 'mod', `select 1 from public.moderation_actions`))).toBe(1);
     expect(count(await as(db, 'mod', `select 1 from public.word_filter`))).toBe(2);
+    // Stage 4: staff powers are in the admin tools (the server's own connection), not in the
+    // community's rules. A removed post and a photo still waiting are the author's alone.
     expect(
       count(await as(db, 'mod', `select 1 from public.posts where id = '${ID.postA}'`, removed)),
-    ).toBe(1);
+    ).toBe(0);
     expect(
       count(
         await as(db, 'mod', `select 1 from public.post_photos where id = '${ID.photoPending}'`),
       ),
-    ).toBe(1);
+    ).toBe(0);
   });
 
   it('changes nothing directly, and reads no admin-only or private data', async () => {

@@ -2,7 +2,7 @@ import styles from '@/components/admin/admin.module.css';
 import communityStyles from '@/components/community/community.module.css';
 import { PhotoDecision } from '@/components/community/PhotoDecision';
 import { requireAdmin } from '@/server/admin/page';
-import { pendingPhotos, previewOf } from '@/server/community/photos';
+import { pendingPhotos } from '@/server/community/photos';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,6 @@ export default async function Page() {
   const page = await requireAdmin();
   if (!page) return null;
   const queue = await pendingPhotos(page.deps.sql);
-  const previews = await Promise.all(queue.map((p) => previewOf(p)));
   return (
     <>
       <h1 className={styles.h1}>Photo queue</h1>
@@ -24,22 +23,24 @@ export default async function Page() {
           <p className={styles.muted}>No photos are waiting.</p>
         </div>
       ) : (
-        queue.map((p, i) => (
+        queue.map((p) => (
           <div key={`${p.kind}-${p.row}`} className={styles.card}>
             <p>
               <b>{p.kind === 'avatar' ? 'Profile photo' : 'Post photo'}</b> from @{p.who}
             </p>
-            {previews[i] ? (
+            {p.file ? (
+              // Served by the admin preview route, only while it waits and only as a real picture.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 className={communityStyles.queueimg}
-                src={previews[i]!}
+                src={`/api/admin/photo-preview?kind=${p.kind}&row=${p.row}`}
                 alt={`Photo from ${p.who}`}
+                loading="lazy"
               />
             ) : (
               <p className={styles.muted}>The file could not be read, so it can not be approved.</p>
             )}
-            {p.file && previews[i] && (
+            {p.file && (
               <PhotoDecision
                 kind={p.kind}
                 row={p.row}

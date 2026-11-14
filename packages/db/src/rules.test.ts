@@ -256,8 +256,11 @@ describe('under 16: no community anywhere (PRD 8.3)', () => {
     it(`sees nothing in ${name}`, async () => {
       expect(refusedOrEmpty(await as(db, 'u16', sql))).toBe(true);
       // The same read finds rows for an adult member, so the empty result means something.
+      // (Ann, who is in the group: since Stage 4 an admin sees the community as any member does.)
       if (name !== 'blocks' && name !== 'reports') {
-        expect(count(await as(db, 'admin', sql))).toBeGreaterThan(0);
+        expect(count(await as(db, name === 'public_farms' ? 'admin' : 'a', sql))).toBeGreaterThan(
+          0,
+        );
       }
     });
   }
@@ -464,6 +467,7 @@ describe('follows', () => {
 
   it('a followers-only post shows only to accepted followers', async () => {
     expect(count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postB}'`))).toBe(1);
+    // An admin who does not follow Ben does not see it either (Stage 4: no staff view here).
     expect(
       count(
         await as(
@@ -472,7 +476,7 @@ describe('follows', () => {
           `select 1 from public.posts where id = '${ID.postB}' and author_id <> '${ID.admin}'`,
         ),
       ),
-    ).toBe(1);
+    ).toBe(0);
     const unfollow = `delete from public.follows where follower_id = '${ID.a}' and followee_id = '${ID.b}';`;
     expect(
       count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postB}'`, unfollow)),
@@ -520,7 +524,7 @@ describe('posts, photos and comments', () => {
     expect(deniedError(o)).toBe(true);
   });
 
-  it('a removed post is hidden from everyone but its author and staff', async () => {
+  it('a removed post is hidden from everyone but its author (staff use the admin tools)', async () => {
     const prep = `update public.posts set removed_at = now() where id = '${ID.postA}';`;
     expect(
       count(await as(db, 'b', `select 1 from public.posts where id = '${ID.postA}'`, prep)),
@@ -530,7 +534,7 @@ describe('posts, photos and comments', () => {
     ).toBe(1);
     expect(
       count(await as(db, 'admin', `select 1 from public.posts where id = '${ID.postA}'`, prep)),
-    ).toBe(1);
+    ).toBe(0);
   });
 
   it('a group post shows only to the group', async () => {
@@ -716,10 +720,11 @@ describe('storage', () => {
   const put = (who: Who, bucket: string, path: string): Promise<Outcome> =>
     as(db, who, `insert into storage.objects (bucket_id, name) values ('${bucket}', '${path}')`);
 
-  it('a player uploads only into their own folder', async () => {
-    expect(passed(await put('a', 'avatars', `${ID.a}/other.png`))).toBe(true);
+  it('a player uploads nothing with their own token: only the server stores a photo (Stage 4)', async () => {
+    expect(passed(await put('a', 'avatars', `${ID.a}/other.png`))).toBe(false);
     expect(passed(await put('a', 'avatars', `${ID.b}/me.png`))).toBe(false);
-    expect(passed(await put('a', 'post-photos', `${ID.a}/p.jpg`))).toBe(true);
+    expect(passed(await put('a', 'post-photos', `${ID.a}/p.jpg`))).toBe(false);
+    expect(passed(await put('service', 'post-photos', `${ID.a}/p.jpg`))).toBe(true);
     expect(passed(await put('u16', 'post-photos', `${ID.u16}/p.jpg`))).toBe(false);
     expect(passed(await put('a', 'snapshots', `${ID.a}/s.json`))).toBe(false);
     expect(passed(await put('anon', 'avatars', `${ID.a}/other.png`))).toBe(false);

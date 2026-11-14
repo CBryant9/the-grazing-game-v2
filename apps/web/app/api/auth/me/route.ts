@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
  * decides any of it: the under-16 flags come from the date of birth in the database.
  *
  * - `accounts`: false when sign-in is not set up. The screens then say so in a plain line.
- * - `community`: the community may be shown (not under 16, and the switch is on).
+ * - `community`: the community may be shown: the switch is on and the account is a member by the
+ *   database's own test (16 or over, not banned, not suspended).
  * - `interestAds`: ads may be aimed by interest (not under 16).
  */
 const NONE: MeResponse = {
@@ -49,12 +50,18 @@ export const GET = authRoute(
       };
     }
     const under = account.profile.underSixteen;
+    const member = switches.community
+      ? Boolean(
+          (await ctx.deps.sql.query<{ m: boolean }>('select app.member_raw($1) as m', [user.id]))
+            .rows[0]?.m,
+        )
+      : false;
     return {
       ...base,
       signedIn: true,
       username: account.profile.username,
       method: user.method,
-      community: !under && switches.community,
+      community: !under && member,
       interestAds: !under,
       scope: user.id,
     };

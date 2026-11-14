@@ -61,10 +61,8 @@ const ts = (col: string): string => TS_SQL.replace('%T%', col);
 
 // ------------------------------------------------------------------ posts
 
-const TAB_FILTER: Record<FeedTab, string> = {
+const TAB_FILTER: Record<Exclude<FeedTab, 'friends'>, string> = {
   everyone: `p.group_id is null and p.visibility = 'public'`,
-  friends: `p.group_id is null and p.author_id in (
-      select f.followee_id from public.follows f where f.follower_id = $1 and f.status = 'accepted')`,
   groups: `p.group_id in (select m.group_id from public.group_members m where m.user_id = $1)`,
 };
 
@@ -93,9 +91,30 @@ const POST_SELECT = `
   p.id, p.author_id, p.kind, p.body, p.link_url, p.card, p.farm_day, p.visibility, p.group_id,
   ${ts('p.edited_at')} as edited_at, p.removed_at, ${ts('p.created_at')} as created_ts,
   pp.username, pp.display_name, (pp.avatar_path is not null) as has_avatar,
-  (select count(*)::int from public.likes l where l.post_id = p.id) as likes,
+  app.like_count_post(p.id) as likes,
   (select count(*)::int from public.comments c where c.post_id = p.id and c.removed_at is null) as comments,
   exists (select 1 from public.likes l where l.post_id = p.id and l.user_id = $1) as liked`;
+
+/** For the review tests: the post columns read (like counts come from one safe count each). */
+export const postSelectSql = POST_SELECT;
+
+/**
+ * The Friends tab: each followed author's own newest posts first (the `posts_author_feed` index),
+ * then the newest of those. It never walks the whole posts table for someone who follows one quiet
+ * account. The database's rules still decide each row.
+ */
+export const friendsSql = `select ${POST_SELECT}
+       from (select f.followee_id from public.follows f
+              where f.follower_id = $1 and f.status = 'accepted') a
+       cross join lateral (
+         select q.* from public.posts q
+          where q.author_id = a.followee_id and q.group_id is null and q.removed_at is null
+            and ($2::timestamptz is null or (q.created_at, q.id) < ($2::timestamptz, $3::uuid))
+          order by q.created_at desc, q.id desc
+          limit $4) p
+       left join public.public_profiles pp on pp.user_id = p.author_id
+      order by p.created_at desc, p.id desc
+      limit $4`;
 
 /** A stored card is checked on the way out, so only the plain shape ever reaches a page. */
 export function readCard(raw: unknown): Card | null {
@@ -167,6 +186,15 @@ export async function feedPage(
   cursor: string | null,
 ): Promise<Page<PostView>> {
   const c = decodeCursor(cursor);
+  if (tab === 'friends') {
+    const r = await tx.query<PostRow>(friendsSql, [
+      me,
+      c?.ts ?? null,
+      c?.id ?? null,
+      PAGE_SIZE + 1,
+    ]);
+    return finishPage(tx, r.rows, me);
+  }
   const r = await tx.query<PostRow & { ts: string }>(
     `select ${POST_SELECT}
        from public.posts p
@@ -231,6 +259,10 @@ export async function getPost(tx: SqlRunner, me: string, id: string): Promise<Po
 }
 
 export const COMMENT_PAGE = 30;
+/** Replies shown under a comment before "Show more replies". */
+export const REPLIES_SHOWN = 5;
+/** Replies shown when one comment's thread is opened. */
+export const THREAD_MAX = 200;
 
 interface CommentRow {
   id: string;
@@ -250,12 +282,13 @@ interface CommentRow {
 const COMMENT_SELECT = `
   c.id, c.parent_id, c.body, ${ts('c.created_at')} as created_ts, ${ts('c.edited_at')} as edited_at,
   c.removed_at, c.author_id, pp.username, pp.display_name, (pp.avatar_path is not null) as has_avatar,
-  (select count(*)::int from public.likes l where l.comment_id = c.id) as likes,
+  app.like_count_comment(c.id) as likes,
   exists (select 1 from public.likes l where l.comment_id = c.id and l.user_id = $1) as liked`;
 
-function toComment(r: CommentRow, me: string): CommentView {
+function toComment(r: CommentRow, me: string, moreReplies = false): CommentView {
   const removed = r.removed_at !== null;
   return {
+    moreReplies,
     id: r.id,
     parentId: r.parent_id,
     body: removed ? null : r.body,
@@ -274,43 +307,54 @@ function toComment(r: CommentRow, me: string): CommentView {
   };
 }
 
-/** Top-level comments, oldest first, a page at a time, each with its replies (one level). */
+/**
+ * Top-level comments, oldest first, a page at a time, each with its first few replies (one level).
+ * A comment with more replies than that is marked, and the page links to its thread. `thread`
+ * (a top-level comment's id) gives that one comment with up to THREAD_MAX replies.
+ */
 export async function commentsPage(
   tx: SqlRunner,
   me: string,
   post: string,
   cursor: string | null,
+  thread: string | null = null,
 ): Promise<Page<CommentView>> {
   const c = decodeCursor(cursor);
+  const one = thread !== null && isUuid(thread) ? thread : null;
   const top = await tx.query<CommentRow>(
     `select ${COMMENT_SELECT}
        from public.comments c
        left join public.public_profiles pp on pp.user_id = c.author_id
       where c.post_id = $2 and c.parent_id is null
+        and ($6::uuid is null or c.id = $6::uuid)
         and (c.removed_at is null or c.author_id = $1)
         and ($3::timestamptz is null or (c.created_at, c.id) > ($3::timestamptz, $4::uuid))
       order by c.created_at, c.id
       limit $5`,
-    [me, post, c?.ts ?? null, c?.id ?? null, COMMENT_PAGE + 1],
+    [me, post, c?.ts ?? null, c?.id ?? null, COMMENT_PAGE + 1, one],
   );
   const more = top.rows.length > COMMENT_PAGE;
   const parents = top.rows.slice(0, COMMENT_PAGE);
+  const shown = one ? THREAD_MAX : REPLIES_SHOWN;
   const replies = parents.length
-    ? await tx.query<CommentRow>(
-        `select ${COMMENT_SELECT}
-           from public.comments c
-           left join public.public_profiles pp on pp.user_id = c.author_id
-          where c.parent_id = any($2::uuid[])
-            and (c.removed_at is null or c.author_id = $1)
-          order by c.created_at, c.id
-          limit 300`,
-        [me, parents.map((p) => p.id)],
+    ? await tx.query<CommentRow & { rn: number }>(
+        `select * from (
+           select ${COMMENT_SELECT},
+                  row_number() over (partition by c.parent_id order by c.created_at, c.id)::int as rn
+             from public.comments c
+             left join public.public_profiles pp on pp.user_id = c.author_id
+            where c.parent_id = any($2::uuid[])
+              and (c.removed_at is null or c.author_id = $1)) x
+          where x.rn <= $3
+          order by x.created_ts, x.id`,
+        [me, parents.map((p) => p.id), shown + 1],
       )
-    : { rows: [] as CommentRow[] };
+    : { rows: [] as (CommentRow & { rn: number })[] };
   const items: CommentView[] = [];
   for (const p of parents) {
-    items.push(toComment(p, me));
-    for (const r of replies.rows) if (r.parent_id === p.id) items.push(toComment(r, me));
+    const mine = replies.rows.filter((r) => r.parent_id === p.id);
+    items.push(toComment(p, me, mine.length > shown));
+    for (const r of mine.slice(0, shown)) items.push(toComment(r, me));
   }
   const last = parents[parents.length - 1];
   return { items, next: more && last ? encodeCursor(last.created_ts, last.id) : null };
