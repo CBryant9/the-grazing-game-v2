@@ -20,7 +20,8 @@ export const GET = route(
       const deps = authDeps();
       const fast = deps ? await farmLimits(deps, player.user.id, 'fast') : { limit: 0 };
       const dailyOn = deps ? (await featureSwitches(deps.sql)).daily_farm : false;
-      const daily = deps && dailyOn ? await farmLimits(deps, player.user.id, 'daily') : { limit: 0 };
+      const daily =
+        deps && dailyOn ? await farmLimits(deps, player.user.id, 'daily') : { limit: 0 };
       return {
         snapshot: null,
         pick: await gameServer().farms({ kind: 'user', id: player.user.id }, null),

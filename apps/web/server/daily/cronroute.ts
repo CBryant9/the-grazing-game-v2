@@ -14,7 +14,7 @@ export interface Skipped {
 }
 
 export interface RolloverDeps {
-  /** The secret the caller must send as a bearer token. Unset: the route is not set up and answers 503. */
+  /** The secret the caller must send as a bearer token. Unset: the route is not set up and answers 404. */
   secret: string | undefined;
   run(): Promise<RolloverReport | Skipped>;
 }
@@ -53,7 +53,7 @@ function sameSecret(sent: string, secret: string): boolean {
  * secret set the route is shut. A wrong or missing one gets 401 and nothing else: no detail.
  */
 export async function handleRollover(req: Request, deps: RolloverDeps): Promise<Response> {
-  if (!deps.secret) return fail(503, 'The daily rollover is not set up.');
+  if (!deps.secret) return fail(404, 'The daily rollover is not set up.');
   const header = req.headers.get('authorization') ?? '';
   const sent = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!sent || !sameSecret(sent, deps.secret)) return fail(401, 'Not allowed.');

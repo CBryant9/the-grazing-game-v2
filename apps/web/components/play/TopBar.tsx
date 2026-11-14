@@ -84,9 +84,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
       <div className={styles.topdl}>
         <DaylightBar clock={clock} />
       </div>
-      <div className={styles.toptimes}>
-        {daily ? <DailyTime daily={daily} /> : <TimeButtons />}
-      </div>
+      <div className={styles.toptimes}>{daily ? <DailyTime daily={daily} /> : <TimeButtons />}</div>
       <div className={styles.topextra}>
         <HelpButton />
         <span className={styles.themeslot}>

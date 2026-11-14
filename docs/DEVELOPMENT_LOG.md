@@ -1463,6 +1463,85 @@ Branch `m3.2-accounts-and-saves`, from `m2.2-hands-screens` (7296efc) with `m3.1
 
 **Third pass (15 Nov 2026): accounts off in production.** The production build with no keys answered `GET /api/auth/me` with 500 on every page load. Cause: `authRoute` worked out `siteOrigin(req)` for every request, and in production that throws without `GG_SITE_URL` (a second-pass check), before the handler could say "not set up". Fix: the address is only worked out when accounts are on. New test `accountsoff.test.ts`: every auth and account route under `NODE_ENV=production` with no keys, some keys, and all keys without the header or address answers a 200 `/me` with `accounts: false` and a 503 "not set up" for the rest, with the game still playing as a guest (failed first, 3 of 3). Failure logs are now `failed route=<route> reason=<code> error=<class> code=<plain code>` (`server/logging.ts`, tested to carry no message, address, token or link). The email-spelling tests use plainly fake local parts. The "unknown error fetching the script" in the browser pane is the pane, not the site: it registers no service worker at all (same error for `/robots.txt` and a missing file), while `/serwist/sw.js` answers 200.
 
+### 15 Nov 2026: m3.3 Daily Farm
+
+Branch `m3.3-daily-farm`, from `m3.2-accounts-and-saves` (d2c9d61). Daily Farm is the real-time mode: one game day for each real day, in the farm's own time zone. It is built behind the `daily_farm` switch, which is **off** until Claudia turns it on. With the switch off, or with no database keys, nothing about it shows except the plain "coming" card in setup; Fast Farm and guest play are untouched. No account, key or connection was made, and nothing was fetched from SILO or MLA: the live feed is written and tested on recorded answers only.
+
+**Engine.** No rule, number or calibration test changed. One line was added to `packages/engine/src/index.ts`: `worksOn` (the engine's own "does this hand work on this day" check, already used by the worker report) is now exported, so the server can ask the same question. No engine function was added, so `docs/MODEL.md` is unchanged. Every `*.mvp.test.ts` and the calibration tests are untouched.
+
+**What was built**
+
+| Piece | Where |
+|---|---|
+| Migration | `supabase/migrations/20261115000400_daily_farm.sql`: `farm_saves.daily`, `weather_daily.et0_mm` and `rad_mj`, and the switch set off. No new table (a new table needs a row in the access matrix, and the admin work is changing the same file) |
+| Time | `server/daily/clock.ts`: local date, next local midnight (a 23 or 25 hour day at a daylight saving change handled by the zone's own rules), zone check |
+| The real data | `server/daily/data.ts`: the baked tables with the days kept since on the end, as one bundle built as it stood at the end of the day being run. Sale days carry on by the district's usual weekly sale |
+| Where days come from | `server/daily/feed.ts`: a recorded-fixture feed for tests, and `liveFeed` for SILO and MLA (one day at a time, the requests the data scripts make). The contact address is read from `SILO_CONTACT_EMAIL` and is nowhere in the repo |
+| The night and the plan rule | `server/daily/advance.ts`: the engine's `endDay`; with no hand working that day the plans are held for the night and the move is offered on the plan card |
+| The game server | `server/game/game.ts`: Daily Farm creation (accounts only, behind the switch, from real data), `bringUp` (the same catch-up for the cron job and for "also on open"), the refusal of a job on a farm that is waiting, the midnight message, `dailyDone`, `dailyAck`, `catchUpFarm` |
+| The rollover | `server/daily/rollover.ts`, `server/daily/cronroute.ts`, `app/api/daily/rollover/route.ts`, `apps/web/vercel.json`: fetch what is missing, claim 25 farms at a time, a 45 second budget, counted in `daily_counts` |
+| Farm facts | `server/db/dbstore.ts`: a Daily Farm's mode, time zone and clock are written when it is made, and `daily_finish` runs inside the save's own transaction, so the saved night and the clock move together |
+| Routes | `/api/daily/done`, `/api/daily/ack`, `/api/daily/rollover`; the setup route also says whether Daily Farm is open for this player; the farms routes carry the Daily limit |
+| Screens | Setup asks the mode first. The top bar says Daily Farm or Fast Farm and, in the place of Next day and the skips, "Today ends at midnight, in 5 h 20 min" (counted from the server's clock) and Done for today. The catch-up sheet, the plan card and the plan strip are in `components/play/DailyBits.tsx`. The farm picker shows the mode, district, the farm's date and "Today's work not started / started / done" |
+| Words | Help has one new line and the guided first day's last step is reworded for a Daily Farm |
+
+**How it works, in the order a player meets it**
+
+1. **Starting.** Setup, step 1, is the mode. Daily Farm is a card with the plain reason when it can not be chosen: switched off or no database ("Daily Farm is coming. Fast Farm is ready to play now."), a guest ("needs an account, so the farm is kept for you from day to day", with a Sign in link), or both slots used. The browser names its time zone once, at the start. The server checks it, the farm records it, and nothing after that can change it. The farm starts on the 1st of the month yesterday was in and runs, night by night on the real weather and prices, up to today, so the player's first day is today's real date and its season is today's.
+2. **The day.** One day's light for the date in the farm's zone. Jobs, moves, buying and selling are Fast Farm's. There is no Next day and no skip (a request for one is refused in plain words). The clock on the top bar is from the server's time.
+3. **Midnight.** The cron route runs every 15 minutes. It fetches the days of weather and prices that are missing, then brings each farm with a night owed up to today, one saved night at a time. Run twice, it does nothing extra. Run late by three days, it brings the farm up night by night, in order, to the same farm as running each night. Interrupted halfway, the nights saved stay and the next run does the rest.
+4. **Also on open.** Opening the farm, or a job, brings the farm up first with the same code. The tests run the same seven days both ways and the two saves are identical.
+5. **Missed days.** A night after a date the player never opened the farm on is a missed day. The farm runs it with no player jobs: the hands' standing duties (the engine's dawn) and the plan moves a working hand makes still happen. On the next open, one sheet shows each missed day as the diary has it (facts only) and what the hands did, then "Start today".
+6. **Plans.** With a hand working that day the engine moves the plan in the night, as in Fast Farm, and the worker report says so. With no hand, nothing moves in the night. On opening, the plan card says "Your grazing plan said today you would move X to Y." with **Yes** (or "Yes, run today's plan" for several) and **Not yet**. Not yet leaves a strip along the bottom with a **Move** button for each. A move is the engine's own `resumePlan` at the next step.
+7. **Fairness.** The action log records each job and each night with the server's time (`at`) and the local date (`on`). A card shown before midnight, sent after it, is refused with "The day ended at midnight, so that job was not done. Here is your farm for today." and the fresh farm. A job on a farm that is waiting for data is refused with the reason. Nothing replays or takes back a day. The only things a request can carry are the job, the farm version and the one-use id.
+
+**How it was tested** (all on PGlite with a fake clock, no network)
+
+| Test file | Proves |
+|---|---|
+| `server/daily/week.test.ts` | A Daily Farm through 7 real days (13 to 19 Nov 2026) with 2 missed: each night run, the catch-up shows the 2 days once and clears, and the farm run by cron every night and the farm run only when opened have the **same engine save**, diary, totals and day |
+| `server/daily/nights.test.ts` | The plan rule on the engine alone, with and without a hand and a plan: a plan moves on the nights a hand works and is held on the nights none does, the card is offered only on the held days, the plan is as it was afterwards |
+| `server/daily/rollover.test.ts` | Run twice; run three days late equals running every night; failed halfway then finished equals uninterrupted; stops on its budget and the next run finishes; late weather (waits, says so, refuses jobs, carries on); late prices (the day is all in or not in); a day already kept is never changed; a job at 23:59:59 and at 00:00:01; 25 and 22.5 hour days; one night for each local midnight hour by hour across the April daylight saving change in Brisbane, Sydney and Melbourne, and the sim across it; the request carries no date, clock or zone; the database refuses a day not over and going back; two tabs doing a job and two tabs opening after midnight; switch off; no keys |
+| `server/daily/start.test.ts` | Starts on today in its own zone, zone locked, clock one night behind; guest, switch off and made-up zone refused; waits for yesterday's data and starts once it is in |
+| `server/daily/cronroute.test.ts` | The secret: 404 when not set, 401 with no detail for a missing, wrong or badly made one, one run for the right one, a throwing run is a plain 500 with no stack and no secret |
+| `server/daily/data.test.ts`, `feed.test.ts` | The bundle is as it stood at the end of a day; a gap stops "complete"; sale days carry on; SILO and MLA answers parse; the live feed uses the address from the environment and asks nothing without it |
+| `server/game/snapshotkeys.test.ts` | The new reply keys are on the allow-list and seen by fixtures (a plan card and a worker report) |
+
+**Test counts:** the whole run is 156 test files and 3,130 tests, all passing (the full run before the last three fixes had 3 failures that were all the new fields and the one new engine export, listed in the keys tests and the engine's read list). 37 of them are new (`server/daily/*.test.ts`), and `snapshotkeys.test.ts` now sees the Daily keys. `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm check:browser-bundle` and `pnpm check:js-budget` pass. JS: /play 200.3 KB compressed in 11 scripts (limit 250 KB, was within it before and no limit was raised), sign-in pages unchanged at 143.5 to 144.2 KB (limit 150). The production build with no keys (fresh `GG_FARMS_DIR`, port 3296) answered every new route with no 5xx: the rollover route 404 "not set up" (no secret), done and ack 404 "no farm yet", setup's Daily card "coming", a guest asking for a Daily Farm 403 with the reason, and a guest's Fast Farm and Next day working as before. Setup's first step was looked at in the browser pane on a 375 px phone: the Daily Farm card shows the plain coming state, 44 px targets, and nothing wider than the screen. Not checked in a browser: landscape, the light theme, the catch-up sheet, the plan card and the time on the top bar (they need a database and an account, which this machine has no keys for).
+
+**Calls for Claudia** (nothing stopped on a question; each is a default that is easy to change)
+
+1. **Daily Farm is off.** The brief says off by default, the PRD table (11.7) says on. It is built off: `FEATURE_SWITCHES.daily_farm` is `false` and the migration sets the row off. Flip it in admin or with `update public.feature_switches set enabled = true where key = 'daily_farm'` when ready.
+2. **Late data waits.** If a day's weather and prices are not in when the day ends, the farm stays on yesterday, says so, and refuses jobs until they arrive (looking is allowed). The other option, running the day on the day before's weather and correcting later, can not be corrected without replaying the farm. SILO publishes a day some hours after it ends, so expect a gap in the morning unless the feed runs early. The rollover tries every 15 minutes.
+3. **Start date.** A new farm starts on the 1st of the month yesterday was in and is run to today on that month's real weather, so its first day is today but its day count is not 1 and its cash has had those days' running costs. The farm picker and top bar show the date, not "Day N". The alternative (start on the 1st with no run-up) did not start "on today's real date".
+4. **Today's weather is a placeholder.** Today's rain is not known until tomorrow, so the screens' growth figures for today use no rain and the last evapotranspiration. The night that closes the day uses the real row.
+5. **Plan moves with no hand.** Held for the night, offered on the plan card. "Yes" is `resumePlan` at the next step: it costs no daylight (as plan moves never did) and restarts the round count. A plan that moves several times a day is moved one step at a time from the card.
+6. **A missed day** is a night after a date the player did not open the farm on. Opening and doing nothing counts as playing that day.
+7. **Done for today** is a fact on the farm card and in the picker. It does not skip, end or lock anything, and a later job clears it.
+8. **Real sale days past the tables** carry on by the district's usual weekly sale until real yardings are fetched. Real yardings are not fetched yet.
+9. **SILO's provisional days** (source code 75 for the last few days) are used as served and never revised once a farm has run on them.
+10. **Time zone.** Taken from the device once, locked. The database function that changes it (once every 30 days) exists but no screen or route offers it.
+11. **Slots.** 2 Daily Farms for each account, enforced by the database, counted apart from the 2 Fast Farms. The picker adds the two limits.
+12. **No notifications** (the evening warning, "Time to move your stock"): milestone 3.4.
+13. **The plan setup screen** does not yet say "you have no staff, so you will need to remember to move them".
+14. **The live feed has never been run against SILO or MLA.** It is built from the requests the data scripts make. Run it on a preview first, with `GG_DAILY_FEED=live`.
+15. **Daily Farm data version is the label `daily-1`.** The tables grow by a day each day, so a fingerprint would change daily. A re-pull of the baked tables does not stop a running farm.
+16. **Leaderboards, day cards and the read-only view of a Daily Farm** are not touched (3.5 and the community milestones).
+
+**Keys and settings Claudia must set** (nothing was made or entered by me)
+
+| Setting | What |
+|---|---|
+| Apply `20261115000400_daily_farm.sql` | With the rest (`supabase db push`) |
+| `CRON_SECRET` | A long random secret, **server only**, in Vercel (Production, Preview) and `.env.local`. Without it `/api/daily/rollover` answers 404 and runs nothing |
+| The schedule | Vercel cron from `apps/web/vercel.json` (every 15 minutes; Vercel sends `CRON_SECRET` itself, and a per-15-minute cron needs a plan that allows it, the free plan runs a cron once a day), **or** pg_cron with pg_net and the snippet in `docs/DATABASE.md` |
+| `GG_DAILY_FEED=live` | To fetch each new day from SILO and MLA. Empty: nothing is fetched and Daily Farm runs only as far as the days already kept (the baked tables end 12 Nov 2026) |
+| `SILO_CONTACT_EMAIL` | Already in `.env.example`: the address SILO asks for. Only with the live feed |
+| The `daily_farm` switch | On, in admin, when you are ready |
+| The database keys of 3.2 | Daily Farm needs them: `SUPABASE_DB_POOLER_URL` and the rest |
+
+**Not done:** the evening and morning notifications; a way to change a farm's time zone; real yardings for sale days; a read-only view of someone else's Daily Farm and day cards; an end-to-end check in a browser on a phone in both orientations and both themes (the production build was checked by fetch; see below); a run against a real Supabase project or the live SILO and MLA services; the leaderboards by days survived.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

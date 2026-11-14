@@ -298,7 +298,8 @@ const dailyEnvs = new WeakMap<object, SourceEnv>();
 const envFor = (c: SetupChoices): SourceEnv => {
   if (c.mode === 'daily') {
     const env = dailyEnvs.get(c);
-    if (!env) throw new GameError(503, 'Daily Farm is not available right now. Try again in a moment.');
+    if (!env)
+      throw new GameError(503, 'Daily Farm is not available right now. Try again in a moment.');
     return env;
   }
   return realYears(c) ? { data: loadRealData() } : {};
@@ -965,9 +966,15 @@ export class GameServer {
         if (e instanceof BrokenFarmError) throw new GameError(409, BROKEN_MESSAGE);
         throw e;
       }
-      if (there) throw new GameError(409, 'You already have a farm. Start a new one from the farm screen.');
+      if (there)
+        throw new GameError(409, 'You already have a farm. Start a new one from the farm screen.');
       await this.makeRoom();
-      const setup: SetupChoices = { ...choices, years: 'real-in-order', mode: 'daily', timezone: zone };
+      const setup: SetupChoices = {
+        ...choices,
+        years: 'real-in-order',
+        mode: 'daily',
+        timezone: zone,
+      };
       const bundle = await runtime.data.bundleThrough(yesterday);
       dailyEnvs.set(setup, { data: await runtime.data.bundleThrough(yesterday, today) });
       const [y, m] = yesterday.split('-').map(Number);
@@ -1000,7 +1007,9 @@ export class GameServer {
       const held: Held = { stored, farm };
       const snap = this.snapshotOf(held);
       try {
-        await this.persist(id, () => this.store.create(id, who, stored, this.factsOf(stored, snap)));
+        await this.persist(id, () =>
+          this.store.create(id, who, stored, this.factsOf(stored, snap)),
+        );
       } catch (e) {
         throw e instanceof FarmLimitError ? new GameError(409, NO_ROOM_MESSAGE) : e;
       }
@@ -1128,7 +1137,11 @@ export class GameServer {
       if (!held || !held.stored.daily) return { days: 0, waiting: false, over: false };
       const before = held.farm.day;
       const cur = await this.bringUp(farmId, held, { deadline });
-      return { days: cur.farm.day - before, waiting: Boolean(cur.waiting), over: cur.farm.over !== null };
+      return {
+        days: cur.farm.day - before,
+        waiting: Boolean(cur.waiting),
+        over: cur.farm.over !== null,
+      };
     });
   }
 

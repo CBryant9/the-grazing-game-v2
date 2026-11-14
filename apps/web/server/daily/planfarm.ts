@@ -39,7 +39,9 @@ export function farmWithPlan(): { farm: FarmState; mob: number } {
       type: 'setPlan',
       mob: mob.id,
       plan: {
-        legs: [{ stops: [mine.cells[0]!, other.cells[0]!], rule: { mode: 'days', every: 1 }, rounds: 0 }],
+        legs: [
+          { stops: [mine.cells[0]!, other.cells[0]!], rule: { mode: 'days', every: 1 }, rounds: 0 },
+        ],
         after: 'repeat',
       },
       step: 0,

@@ -53,7 +53,14 @@ const MLA_INDICATOR: Record<string, number> = {
 const SILO_ENDPOINT = 'https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php';
 const MLA_BASE = 'https://api-mlastatistics.mla.com.au';
 /** SILO's variable codes, as the data script asks for them: rain, max, min, radiation, pan evaporation, FAO-56 short crop. */
-const SILO_COLUMNS = ['daily_rain', 'max_temp', 'min_temp', 'radiation', 'evap_comb', 'et_short_crop'];
+const SILO_COLUMNS = [
+  'daily_rain',
+  'max_temp',
+  'min_temp',
+  'radiation',
+  'evap_comb',
+  'et_short_crop',
+];
 
 export interface LiveFeedOptions {
   fetch?: typeof fetch;

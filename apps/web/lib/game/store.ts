@@ -576,8 +576,7 @@ export const useGame = create<GameState>()((set, get) => {
             farms: pick,
             ...(limits ? { farmLimit: limits.fast, dailyLimit: limits.daily } : {}),
           });
-        }
-        else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
+        } else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
       } catch (e) {
         set({ phase: 'failed', notice: { message: messageOf(e), retry: () => void get().load() } });
       }

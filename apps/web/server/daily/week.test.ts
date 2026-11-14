@@ -41,7 +41,14 @@ async function week(how: 'cron' | 'open') {
   let snap = await r.game.create(farm.key, choices(), OWNER);
   snap = await aJob(r.game, farm.key, snap);
   const seen: { date: string; catchUp: number | null; work: string }[] = [];
-  for (const date of ['2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19']) {
+  for (const date of [
+    '2026-11-14',
+    '2026-11-15',
+    '2026-11-16',
+    '2026-11-17',
+    '2026-11-18',
+    '2026-11-19',
+  ]) {
     r.clock.now = at(date, '00:20:00');
     if (how === 'cron') await r.roll({ feed: false });
     r.clock.now = at(date, '10:00:00');
@@ -100,7 +107,8 @@ describe('a Daily Farm over seven real days with two missed', () => {
     const away = snap.daily!.catchUp!;
     // Nights of the 13th, 14th and 15th passed. The player opened only on the 13th, so the 14th and 15th were missed.
     expect(away.days.map((d) => d.date.date)).toEqual([14, 15]);
-    for (const d of away.days) for (const line of d.lines) expect(line).not.toMatch(/should|must|overgraz|—/i);
+    for (const d of away.days)
+      for (const line of d.lines) expect(line).not.toMatch(/should|must|overgraz|—/i);
     expect(snap.date.date).toBe(16);
     const cleared = await r.game.dailyAck(farm.key);
     expect(cleared.daily!.catchUp).toBeNull();

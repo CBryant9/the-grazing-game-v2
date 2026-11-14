@@ -933,13 +933,21 @@ describe('what the new replies send the browser', () => {
       'username',
     ]);
     expectKeys(farms, [
+      'dailyGoing',
+      'dailyLimit',
       'farms',
       'farms[].current',
+      'farms[].date',
+      'farms[].date.date',
+      'farms[].date.month',
+      'farms[].date.year',
       'farms[].day',
       'farms[].districtName',
       'farms[].id',
       'farms[].lastPlayed',
+      'farms[].mode',
       'farms[].name',
+      'farms[].work',
       'going',
       'limit',
       'signedIn',
@@ -951,13 +959,22 @@ describe('what the new replies send the browser', () => {
     again.cookies.set('fake_session', b.cookies.get('fake_session')!);
     const pick = await again.json(await again.call('farm', 'GET', '/api/game/farm'));
     expectKeys(pick, [
+      'limits',
+      'limits.daily',
+      'limits.fast',
       'pick',
       'pick[].current',
+      'pick[].date',
+      'pick[].date.date',
+      'pick[].date.month',
+      'pick[].date.year',
       'pick[].day',
       'pick[].districtName',
       'pick[].id',
       'pick[].lastPlayed',
+      'pick[].mode',
       'pick[].name',
+      'pick[].work',
       'snapshot',
     ]);
     for (const reply of [farms, me, pick]) expect(JSON.stringify(reply)).not.toMatch(NEVER);

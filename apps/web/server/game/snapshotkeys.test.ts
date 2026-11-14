@@ -744,7 +744,8 @@ describe('what the game routes send holds only the keys on the lists', () => {
     const dailies = dailyFixtures();
     expect(dailies[0]!.daily!.planDue.length).toBeGreaterThan(0);
     expect(dailies[1]!.daily!.catchUp!.report.length).toBeGreaterThan(0);
-    for (const s of [...snaps, engine, onWay, owing, ...dailies, ...inner]) shape(s, '', snapSeen, []);
+    for (const s of [...snaps, engine, onWay, owing, ...dailies, ...inner])
+      shape(s, '', snapSeen, []);
     if (process.env.KEYS_DUMP) {
       const dump = (m: Seen) =>
         Object.fromEntries([...m].map(([k, v]) => [k, [...v].sort()]).sort());

@@ -17,8 +17,7 @@ async function listFor(userId: string, currentId: string | null): Promise<FarmsR
   const { limit, going } = deps ? await fastLimits(deps, userId) : { limit: 0, going: 0 };
   // With Daily Farm switched off its slots are not offered.
   const dailyOn = deps ? (await featureSwitches(deps.sql)).daily_farm : false;
-  const daily =
-    deps && dailyOn ? await farmLimits(deps, userId, 'daily') : { limit: 0, going: 0 };
+  const daily = deps && dailyOn ? await farmLimits(deps, userId, 'daily') : { limit: 0, going: 0 };
   return { farms, limit, going, dailyLimit: daily.limit, dailyGoing: daily.going, signedIn: true };
 }
 

@@ -62,7 +62,14 @@ export const choices = (over: Partial<SetupChoices> = {}): SetupChoices => ({
 /** A plain day of weather, a little different each day so the rows are not all the same. */
 export function weatherFor(date: string): WeatherRow {
   const n = Number(date.slice(8, 10));
-  return { rain: n % 4 === 0 ? 6.5 : 0, tmax: 31, tmin: 18, rad: 24, evap: 7, et0: 5 + (n % 3) * 0.5 };
+  return {
+    rain: n % 4 === 0 ? 6.5 : 0,
+    tmax: 31,
+    tmin: 18,
+    rad: 24,
+    evap: 7,
+    et0: 5 + (n % 3) * 0.5,
+  };
 }
 
 export interface Rig {
@@ -74,13 +81,20 @@ export interface Rig {
   clock: { now: number };
   switchOn: { value: boolean };
   /** Weather and prices the feed will serve, by `district date` and `yard/indicator date`. */
-  feedRows: { weather: Record<string, WeatherRow>; prices: Record<string, { value: number; head: number }> };
+  feedRows: {
+    weather: Record<string, WeatherRow>;
+    prices: Record<string, { value: number; head: number }>;
+  };
   /** A new game server on the same database and clock, as another server or tab would be. */
   another(): GameServer;
   /** Serve a day's weather (and a price row for each series) for every district. */
   serveDay(date: string): void;
   /** One rollover run on the fixture feed. */
-  roll(options?: { budgetMs?: number; batch?: number; feed?: boolean }): ReturnType<typeof runRollover>;
+  roll(options?: {
+    budgetMs?: number;
+    batch?: number;
+    feed?: boolean;
+  }): ReturnType<typeof runRollover>;
   key: string;
 }
 
@@ -110,7 +124,13 @@ export async function rig(start: { date: string; time: string; zone?: string }):
   const switchOn = { value: true };
   const runtime = { data, enabled: async () => switchOn.value };
   const make = (): GameServer =>
-    new GameServer({ store, seed: () => 5, saveRetryMs: [0, 0], now: () => clock.now, daily: runtime });
+    new GameServer({
+      store,
+      seed: () => 5,
+      saveRetryMs: [0, 0],
+      now: () => clock.now,
+      daily: runtime,
+    });
   const feedRows: Rig['feedRows'] = { weather: {}, prices: {} };
   const serveDay = (date: string): void => {
     for (const d of DISTRICT_IDS) {
@@ -176,7 +196,12 @@ export async function keepThrough(r: Rig, through: string, allPrices = false): P
     for (const district of DISTRICT_IDS) {
       const prices = seriesFor(district).flatMap((series) =>
         allPrices || series.indicator === 'restocker-yearling-steer'
-          ? [{ series, row: { value: BASE_PRICE[series.indicator]! + Number(d.slice(8, 10)), head: 4000 } }]
+          ? [
+              {
+                series,
+                row: { value: BASE_PRICE[series.indicator]! + Number(d.slice(8, 10)), head: 4000 },
+              },
+            ]
           : [],
       );
       await r.sql.transaction((tx) => r.data.keepDay(tx, district, d, weatherFor(d), prices));

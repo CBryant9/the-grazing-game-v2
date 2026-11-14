@@ -97,12 +97,7 @@ function CatchUp({ daily }: { daily: DailyWire }) {
         if (e.key === 'Escape' && !busy) void ack();
       }}
     >
-      <div
-        className={play.summary}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="catchup-title"
-      >
+      <div className={play.summary} role="dialog" aria-modal="true" aria-labelledby="catchup-title">
         <h2 id="catchup-title" className={`px ${play.sumtitle}`}>
           While you were away
         </h2>
@@ -206,12 +201,7 @@ function PlanStrip({ due }: { due: PlanDueWire[] }) {
           <span>
             {m.mobName} to {m.to}
           </span>
-          <button
-            type="button"
-            className="btn sm"
-            disabled={busy}
-            onClick={() => void run([m])}
-          >
+          <button type="button" className="btn sm" disabled={busy} onClick={() => void run([m])}>
             Move
           </button>
         </div>

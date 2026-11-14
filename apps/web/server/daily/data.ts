@@ -96,7 +96,6 @@ interface Extras {
   prices: Map<string, Dated<PriceRow>[]>;
 }
 
-const seriesKey = (s: PriceSeries): string => `${s.saleyard}/${s.indicator}`;
 const fixed = (n: number | null): string => (n === null ? '' : String(n));
 const text = (t: string): string => (t.endsWith('\n') ? t : `${t}\n`);
 
@@ -207,7 +206,8 @@ export class DailyData {
     const extras = await this.extras();
     // The bundle only changes on a day a row was kept, so one bundle serves every date between two of them.
     const days = new Set<string>();
-    for (const list of extras.weather.values()) for (const d of list) if (d.date <= date) days.add(d.date);
+    for (const list of extras.weather.values())
+      for (const d of list) if (d.date <= date) days.add(d.date);
     const key = `${[...days].sort().at(-1) ?? 'base'}${today ? `+${today}` : ''}`;
     const kept = this.bundles.get(key);
     if (kept) return kept;
@@ -218,12 +218,14 @@ export class DailyData {
         const rows = (extras.weather.get(w[1] as DistrictId) ?? []).filter(
           (d) => d.date <= date && d.date > bakedThrough(w[1] as DistrictId),
         );
-        const kept = text(base) + rows
-          .map(
-            (d) =>
-              `${d.date},${d.row.rain},${fixed(d.row.tmax)},${fixed(d.row.tmin)},${fixed(d.row.rad)},${fixed(d.row.evap)},${d.row.et0}\n`,
-          )
-          .join('');
+        const kept =
+          text(base) +
+          rows
+            .map(
+              (d) =>
+                `${d.date},${d.row.rain},${fixed(d.row.tmax)},${fixed(d.row.tmin)},${fixed(d.row.rad)},${fixed(d.row.evap)},${d.row.et0}\n`,
+            )
+            .join('');
         // Today's weather is not known until tomorrow. A farm that is looked at and worked on today
         // is given a placeholder for it (no rain, the last evapotranspiration), so the screens can
         // work out today's figures. The night that closes today never sees it: that night is run
@@ -245,7 +247,10 @@ export class DailyData {
       return base;
     };
     const inner = buildRealData(read);
-    const years = Array.from({ length: LAST_PLAN_YEAR - FIRST_REAL_YEAR + 1 }, (_, i) => FIRST_REAL_YEAR + i);
+    const years = Array.from(
+      { length: LAST_PLAN_YEAR - FIRST_REAL_YEAR + 1 },
+      (_, i) => FIRST_REAL_YEAR + i,
+    );
     const wrapped: RealData = {
       district(id) {
         const d = inner.district(id);
@@ -285,7 +290,16 @@ export class DailyData {
     await tx.query(
       `insert into public.weather_daily (district, date, rain_mm, tmax_c, tmin_c, rad_mj, evap_mm, et0_mm)
        values ($1, $2::date, $3, $4, $5, $6, $7, $8) on conflict do nothing`,
-      [district, date, weather.rain, weather.tmax, weather.tmin, weather.rad, weather.evap, weather.et0],
+      [
+        district,
+        date,
+        weather.rain,
+        weather.tmax,
+        weather.tmin,
+        weather.rad,
+        weather.evap,
+        weather.et0,
+      ],
     );
   }
 }
@@ -319,7 +333,11 @@ function carryOn(real: SaleCalendar, district: DistrictId): SaleCalendar {
         if (sale) return sale;
       }
       if (type !== undefined && type !== 'prime') return null;
-      for (let s = Math.max(serial, lastSerial + 1); s <= Math.max(serial, lastSerial + 1) + 400; s++) {
+      for (
+        let s = Math.max(serial, lastSerial + 1);
+        s <= Math.max(serial, lastSerial + 1) + 400;
+        s++
+      ) {
         const sale = beyond(s);
         if (sale) return sale;
       }

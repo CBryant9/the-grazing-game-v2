@@ -47,7 +47,7 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | Table | Holds | Player | Admin |
 |---|---|---|---|
 | `farms` | Each farm: mode, setup summary, status, day, engine version, the Daily Farm clock | S own | S |
-| `farm_saves` | The engine's save, the setup, the stored format, save format, engine and data versions, the farm version, recent act requests, inbox read mark, the pay days missed (`missed_wages`, m3.2) | **Server only** | Server only |
+| `farm_saves` | The engine's save, the setup, the stored format, save format, engine and data versions, the farm version, recent act requests, inbox read mark, the pay days missed (`missed_wages`, m3.2), and for a Daily Farm what it keeps about the player (`daily`, m3.3: the local date last opened, last worked and last marked done, the days missed and waiting for the catch-up, the farm versions from before each midnight, the time zone) | **Server only** | Server only |
 | `farm_days` | One row per day: the diary lines, daylight, time used, rain, a summary | S own | |
 | `farm_snapshots` | The index of the days that have a picture kept (day, date). The picture is in `farm_snapshot_views` | S own |
 | `farm_snapshot_views` (m3.2) | The map and paddock figures of each past day, as the server built them, gzipped (`view_gz`). **Server only**, because it is game data the browser must only get through the server | Server only |
@@ -86,7 +86,7 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `notifications` | S own, mark read, D own | | |
 | `notification_settings`, `notification_prefs` | Everything on own rows | | |
 | `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts`. Any other host is refused with an error whose message starts `push_host_not_allowed:` (hint `push_host_not_allowed`), for the screens to word ("Notifications aren't available in this browser yet"). Chrome and Edge are not listed until milestone 3.4 | | |
-| `weather_daily`, `price_daily` | Server only (engine data) | | |
+| `weather_daily`, `price_daily` | Server only (engine data). Days after the baked tables end (m3.3): one weather row a district a day (rain, max and min temperature, radiation, pan evaporation and FAO-56 `et0_mm`, which the growth model reads), and price rows by indicator and yard. **A day's weather row is only ever written in the same transaction as that day's price rows**, so the row being there means the day's data is all in. A day already kept is never changed (`on conflict do nothing`): a farm may have run on it | | |
 | `daily_counts` | | | S |
 | `ad_slots` | S (id, on or off, settings) | S | S |
 | `sponsors`, `campaigns`, `ad_creatives`, `campaign_slots`, `ad_events`, `ad_daily` | | | S. The server picks the ad and logs views |
@@ -133,11 +133,12 @@ Guards that hold for every writer, the server included: the farm limit (`farms_g
 
 A farm's day D is simulated once its local date has passed D. `sim_through` is the last date simulated, so the days owed are `(local today - 1) - sim_through`, from the database's clock only.
 
-- The rollover runs every 15 minutes (milestone 3.3), calls `daily_claim_due` for a batch, simulates, saves, then `daily_finish(farm, date)`.
+- The rollover runs every 15 minutes (milestone 3.3, `/api/daily/rollover`), calls `daily_claim_due` for a batch, simulates, and saves. `daily_finish(farm, date)` runs inside the save's own transaction (`DbFarmStore.put` with `dailyThrough`), so the saved night and the farm's clock move together or not at all. A farm that is opened with nights owed is brought up first, by the same code and the same `daily_finish`, so cron timing never changes the outcome.
+- A claim is cleared by `daily_finish`, so a farm that is several nights behind is claimed again by the same run after each night saved. A farm that fails to save a night keeps its claim until the run ends, then the run releases it (`dailyRelease`), and the next run picks it up with the nights saved so far kept.
 - A claim older than 10 minutes counts as a run that died, so a missed or failed run is picked up next time with more days owed.
 - `daily_finish` refuses a date that is not over yet in the farm's time zone, and never goes back. A wound-forward device clock can't give an extra day: no player-callable function takes a time.
 - `change_farm_timezone`: once every 30 days. Moving to a zone already on a later date moves `sim_through` on by the same, so the farm waits instead of gaining a day.
-- The functions that take a time (`p_now`) are server only. The server never passes one; the tests do.
+- The functions that take a time (`p_now`) are server only. The server passes its own clock (`GameServer`'s `now`, which is `Date.now`), never anything the browser sent; the tests pass a fake clock. No route reads a date, a clock or a time zone from a request except the time zone named once when a Daily Farm is created, which is then locked.
 
 ## Guests
 
@@ -230,7 +231,22 @@ Everything above that said "the server" is built in `apps/web/server`. The datab
 | What is logged | Never an email address, token or link. A failure logs a fixed reason code (`send_link_failed`, `code_exchange_failed`, `sign_up_failed` with the SQLSTATE and so on) |
 | Deleting a sign-in with no account | A sign-in that never finished sign-up (abandoned, or refused as under 14) deletes with the word `delete`. The under-14 refusal belongs to the sign-in and goes with it (cascade), as above. Signing up again with the same address is a fresh sign-in with a fresh try, which is what this document says the database can not tell apart
 
-Daily Farm slots exist in the tables and the limits. No Daily Farm can be started from the game in this milestone: the setup flow makes Fast Farms only, whatever the switch says. It comes with the rollover (3.3).
+Daily Farm (milestone 3.3, below) uses the same tables: `farms.mode = 'daily'`, `timezone`, `sim_through` and `rollover_claimed_at`, the `daily` column on `farm_saves`, `weather_daily`, `price_daily` and `daily_counts`. The `daily_farm` feature switch is **off** until Claudia turns it on (migration `20261115000400_daily_farm.sql` sets it off, and `FEATURE_SWITCHES` in `packages/shared` says the same).
+
+## Daily Farm (milestone 3.3)
+
+| Piece | Where |
+|---|---|
+| Time zone and local midnight | `server/daily/clock.ts`: `localDate`, `nextMidnight` (found by halving, so a 23 or 25 hour day at a daylight saving change is the zone's own), `isZone`. Nothing reads a clock: every function is given the server's time |
+| The real data | `server/daily/data.ts` `DailyData`: the baked tables with the days kept since on the end, built as one data bundle **as it stood at the end of the day being run**, never later, so a farm that catches up three days late runs on what a farm rolled on time ran on. The farm records the data version `daily-1`, a label that stays the same as the tables grow. A day with no row yet is "not in yet": the night waits |
+| Where days come from | `server/daily/feed.ts`: `fixtureFeed` (tests) and `liveFeed` (SILO and MLA, one day at a time, built from the requests the data scripts make and **not run against the live services while it was built**). `GG_DAILY_FEED=live` turns it on; left out, nothing is fetched |
+| The night | `server/daily/advance.ts` `nightOf`: the engine's own `endDay`. The one thing the server decides is who moves a grazing plan: with a hand working that day the engine's plan move happens in the night (and the hand is credited in the worker report); with no hand the plans are held for the night and the move is offered on the plan card |
+| The rollover | `server/daily/rollover.ts` and `app/api/daily/rollover/route.ts`: fetch what is missing, claim farms in batches of 25, bring each up night by night, release claims at the end, count what was done in `daily_counts` (`rollover_runs`, `rollover_farms`, `rollover_days`, `rollover_waiting`, `rollover_failed`, `data_days_fetched`). A budget of 45 seconds a run |
+| The secret | `CRON_SECRET`, sent as `Authorization: Bearer <secret>`. Unset: the route answers 404 and runs nothing, so a copy with no keys answers cleanly. Wrong or missing: 401 and nothing else. Compared in constant time |
+| The schedule | `apps/web/vercel.json` runs `/api/daily/rollover` every 15 minutes (Vercel sends `CRON_SECRET` itself; a per-15-minute cron needs a Vercel plan that allows it). Or pg_cron with pg_net, set by hand because it holds the site address and the secret: `select cron.schedule('gg-daily-rollover', '*/15 * * * *', $$select net.http_post(url := 'https://<site>/api/daily/rollover', headers := jsonb_build_object('Authorization', 'Bearer <the secret>'))$$);` |
+| Late data | **Wait**. A night whose weather and prices are not in is not run, the farm says so, and jobs wait (looking is fine). Past the end of the baked tables Daily Farm needs the feed on, or someone keeping the days |
+| Sale days | The yard's sale days carry on past the last the tables hold by the district's usual weekly sale (the stand-in a random-seasons farm uses), until real yardings are fetched |
+| Today's weather | Not known until tomorrow. The screens are given a placeholder for it (no rain, the last evapotranspiration) for today's figures. The night that closes the day runs on the real row |
 
 ## Still owed against a real Supabase project
 

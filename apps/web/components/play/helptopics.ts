@@ -28,6 +28,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Some jobs, like sowing, take none of the day.',
       'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
       'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. A skip stops early and says why if something needs you, such as a mob with no water.',
+      'On a Daily Farm there is no Next day or skip. The day ends at midnight in your time zone, and the farm runs overnight whether you open it or not.',
     ],
   },
   {

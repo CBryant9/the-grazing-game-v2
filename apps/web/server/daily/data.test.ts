@@ -34,13 +34,17 @@ describe('the real data a Daily Farm runs on', () => {
     expect(isoDate(early.weather.last)).toBe(addDays(base, 1));
     expect(() => early.weather.rainOn(parts(addDays(base, 2)))).toThrow();
     const late = (await r.data.bundleThrough(addDays(base, 5))).district('cq');
-    expect(late.weather.rainOn(parts(addDays(base, 1)))).toBe(early.weather.rainOn(parts(addDays(base, 1))));
+    expect(late.weather.rainOn(parts(addDays(base, 1)))).toBe(
+      early.weather.rainOn(parts(addDays(base, 1))),
+    );
   }, 120_000);
 
   it('a gap in the days is not skipped over: the data is complete only up to the gap', async () => {
     const r = await rig({ date: '2026-11-13', time: '10:00:00' });
     const base = bakedThrough('cq');
-    await r.sql.transaction((tx) => r.data.keepDay(tx, 'cq', addDays(base, 2), weatherFor(addDays(base, 2)), []));
+    await r.sql.transaction((tx) =>
+      r.data.keepDay(tx, 'cq', addDays(base, 2), weatherFor(addDays(base, 2)), []),
+    );
     r.data.forget();
     expect(await r.data.through('cq')).toBe(base);
   }, 120_000);
@@ -53,7 +57,8 @@ describe('the real data a Daily Farm runs on', () => {
     expect(next).not.toBeNull();
     expect(daySerial(next!.date)).toBeGreaterThan(daySerial(from) - 1);
     // Every fourth week of the year somewhere has a sale: the answer never throws past the end.
-    for (let d = 1; d <= 400; d += 7) expect(() => sales.saleOn(parts(addDays(bakedThrough('cw'), d)))).not.toThrow();
+    for (let d = 1; d <= 400; d += 7)
+      expect(() => sales.saleOn(parts(addDays(bakedThrough('cw'), d)))).not.toThrow();
     expect(at('2026-11-13', '00:00:00')).toBeGreaterThan(0);
     expect(DISTRICT_IDS).toHaveLength(4);
   }, 120_000);

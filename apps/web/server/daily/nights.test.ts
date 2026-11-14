@@ -12,7 +12,10 @@ import { farmWithPlan, planEnv, withHand } from './planfarm';
 const env = planEnv;
 
 const areaOf = (farm: FarmState, mobId: number): number =>
-  areaIdOf(surveyOf(farm), farm.mobs.find((m) => m.id === mobId)!);
+  areaIdOf(
+    surveyOf(farm),
+    farm.mobs.find((m) => m.id === mobId)!,
+  );
 
 describe('a grazing plan on a Daily Farm night', () => {
   it('with no hand, the plan is held for the night and the move is offered on the plan card', () => {

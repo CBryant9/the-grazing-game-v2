@@ -55,12 +55,7 @@ export interface RolloverReport {
 export const ROLLOVER_BUDGET_MS = 45_000;
 
 /** Add to a day's counter (the admin dashboard reads `daily_counts`). */
-async function count(
-  sql: SqlClient | null,
-  day: string,
-  metric: string,
-  n: number,
-): Promise<void> {
+async function count(sql: SqlClient | null, day: string, metric: string, n: number): Promise<void> {
   if (!sql || n <= 0) return;
   await sql.query(
     `insert into public.daily_counts (day, metric, dims, count) values ($1::date, $2, '', $3)
@@ -70,18 +65,18 @@ async function count(
 }
 
 /** Keep the days of weather and prices that are missing, from the feed. One bad day or district does not stop the others. */
-async function fetchMissing(o: RolloverOptions, deadline: number, report: RolloverReport): Promise<void> {
+async function fetchMissing(
+  o: RolloverOptions,
+  deadline: number,
+  report: RolloverReport,
+): Promise<void> {
   if (!o.feed || !o.sql) return;
   const sql = o.sql;
   // The data is for dates in the district's own country, so "yesterday" is Sydney's.
   const yesterday = addDays(localDate(o.now(), 'Australia/Sydney'), -1);
   for (const district of DISTRICT_IDS) {
     let through = await o.data.through(district, true);
-    for (
-      let n = 0;
-      through < yesterday && n < (o.maxFetchDays ?? 14) && o.now() < deadline;
-      n++
-    ) {
+    for (let n = 0; through < yesterday && n < (o.maxFetchDays ?? 14) && o.now() < deadline; n++) {
       const date = addDays(through, 1);
       const tag = `${district} ${date}`;
       try {

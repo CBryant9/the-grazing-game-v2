@@ -56,7 +56,13 @@ describe('the midnight rollover job', () => {
     await make();
     r.clock.now = at('2026-11-15', '00:10:00');
     const a = await r.roll({ feed: false });
-    expect(a).toMatchObject({ claimed: 1, farmsAdvanced: 1, daysAdvanced: 2, failed: 0, more: false });
+    expect(a).toMatchObject({
+      claimed: 1,
+      farmsAdvanced: 1,
+      daysAdvanced: 2,
+      failed: 0,
+      more: false,
+    });
     const b = await r.roll({ feed: false });
     expect(b).toMatchObject({ claimed: 0, farmsAdvanced: 0, daysAdvanced: 0 });
     expect(await simThrough(r)).toBe('2026-11-14');
@@ -146,8 +152,13 @@ describe('the midnight rollover job', () => {
     const looked = (await r.game.snapshot(farm.key))!;
     expect(looked.daily!.waiting).toBe(WAITING_TEXT);
     expect(looked.date.date).toBe(13);
-    await expect(aJob(r.game, farm.key, looked)).rejects.toMatchObject({ status: 409, code: 'day_not_ready' });
-    await expect(r.game.preview(farm.key, { action: { type: 'markCalves', mob: 1 } })).rejects.toMatchObject({
+    await expect(aJob(r.game, farm.key, looked)).rejects.toMatchObject({
+      status: 409,
+      code: 'day_not_ready',
+    });
+    await expect(
+      r.game.preview(farm.key, { action: { type: 'markCalves', mob: 1 } }),
+    ).rejects.toMatchObject({
       code: 'day_not_ready',
     });
     expect(snap.date.date).toBe(13);
@@ -196,12 +207,20 @@ describe('the midnight rollover job', () => {
     r.serveDay('2026-11-13');
     r.clock.now = at('2026-11-14', '00:30:00');
     await r.roll();
-    const before = await r.db.query('select rain_mm, et0_mm from public.weather_daily order by district');
-    r.feedRows.weather['cq 2026-11-13'] = { ...r.feedRows.weather['cq 2026-11-13']!, rain: 99, et0: 1 };
+    const before = await r.db.query(
+      'select rain_mm, et0_mm from public.weather_daily order by district',
+    );
+    r.feedRows.weather['cq 2026-11-13'] = {
+      ...r.feedRows.weather['cq 2026-11-13']!,
+      rain: 99,
+      et0: 1,
+    };
     await r.sql.transaction((tx) =>
       r.data.keepDay(tx, 'cq', '2026-11-13', r.feedRows.weather['cq 2026-11-13']!, []),
     );
-    const after = await r.db.query('select rain_mm, et0_mm from public.weather_daily order by district');
+    const after = await r.db.query(
+      'select rain_mm, et0_mm from public.weather_daily order by district',
+    );
     expect(after.rows).toEqual(before.rows);
   }, 180_000);
 });
@@ -259,7 +278,8 @@ describe('the day ends at local midnight and no sooner or later', () => {
       await r.game.create(farm.key, choices({ timezone: zone, name: zone.slice(10) }), who);
       ids.push(farm.id);
     }
-    const uuid = (id: string): string => id.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
+    const uuid = (id: string): string =>
+      id.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
     const start = at('2027-04-02', '12:00:00');
     for (let h = 0; h <= 96; h++) {
       const t = start + h * 3_600_000;
@@ -281,7 +301,9 @@ describe('the day ends at local midnight and no sooner or later', () => {
     const report = await r.roll({ feed: false });
     expect(report.failed).toBe(0);
     expect(report.daysAdvanced).toBeGreaterThanOrEqual(3);
-    expect(await r.db.query("select 1 from public.farms where sim_through > '2027-04-04'")).toMatchObject({ rowCount: 0 });
+    expect(
+      await r.db.query("select 1 from public.farms where sim_through > '2027-04-04'"),
+    ).toMatchObject({ rowCount: 0 });
   }, 400_000);
 });
 
@@ -317,7 +339,6 @@ describe('nothing the device sends can give a farm an extra day or take one back
       ]),
     ).rejects.toThrow(/never goes back/);
   }, 120_000);
-
 });
 
 describe('two tabs', () => {
@@ -339,7 +360,9 @@ describe('two tabs', () => {
     const [a, b] = await Promise.all([r.game.snapshot(farm.key), tabB.snapshot(farm.key)]);
     expect(a!.date.date).toBe(14);
     expect(b!.date.date).toBe(14);
-    const nights = await r.db.query("select 1 from public.farm_actions where action ->> 'type' = 'rollover'");
+    const nights = await r.db.query(
+      "select 1 from public.farm_actions where action ->> 'type' = 'rollover'",
+    );
     expect(nights.rowCount).toBe(1);
   }, 240_000);
 });
@@ -350,7 +373,9 @@ describe('with the switch off, or no database', () => {
     await keepThrough(r, '2026-11-13');
     await make();
     r.switchOn.value = false;
-    await expect(r.game.create(newFarm().key, choices({ name: 'Second' }), OWNER)).rejects.toMatchObject({
+    await expect(
+      r.game.create(newFarm().key, choices({ name: 'Second' }), OWNER),
+    ).rejects.toMatchObject({
       code: 'daily_off',
     });
     r.clock.now = at('2026-11-14', '06:00:00');
@@ -359,7 +384,7 @@ describe('with the switch off, or no database', () => {
     expect(snap.daily!.waiting).toMatch(/paused/);
     expect(await simThrough(r)).toBe('2026-11-12');
     r.switchOn.value = true;
-    expect(((await r.game.snapshot(farm.key))!).date.date).toBe(14);
+    expect((await r.game.snapshot(farm.key))!.date.date).toBe(14);
   }, 240_000);
 
   it('with no database keys, Daily Farm answers with the plain coming state and Fast Farm is untouched', async () => {
@@ -367,8 +392,14 @@ describe('with the switch off, or no database', () => {
     const { MemoryFarmStore } = await import('../game/store');
     const game = new GameServer({ store: new MemoryFarmStore(), seed: () => 3 });
     await expect(game.create('a'.repeat(32), choices())).rejects.toBeInstanceOf(GameError);
-    await expect(game.create('b'.repeat(32), choices(), OWNER)).rejects.toMatchObject({ status: 403, code: 'daily_off' });
-    const fast = await game.create('c'.repeat(32), choices({ mode: 'fast', years: 'random', timezone: undefined }));
+    await expect(game.create('b'.repeat(32), choices(), OWNER)).rejects.toMatchObject({
+      status: 403,
+      code: 'daily_off',
+    });
+    const fast = await game.create(
+      'c'.repeat(32),
+      choices({ mode: 'fast', years: 'random', timezone: undefined }),
+    );
     expect(fast.daily).toBeNull();
   }, 120_000);
 });
