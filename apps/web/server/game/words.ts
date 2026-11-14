@@ -39,7 +39,7 @@ export function todoWire(t: ThingToDo): TodoWire {
       const bulls = t.youngBulls > 0 ? ` and ${plural(t.youngBulls, 'young bull')}` : '';
       return {
         key,
-        text: `${t.mobName} has ${plural(t.count, 'calf', 'calves')} to mark${bulls}.`,
+        text: `${t.mobName} has ${plural(t.count, 'calf', 'calves')} old enough to mark${bulls}.`,
         button: button('Mark calves'),
         urgent: false,
       };

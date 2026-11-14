@@ -19,6 +19,7 @@
     "data:mla": "node scripts/data/pull-mla.mjs",
     "data:silo": "node scripts/data/pull-silo.mjs",
     "data:cpi": "node scripts/data/pull-cpi.mjs",
+    "check:browser-bundle": "node scripts/check-browser-bundle.mjs",
     "dev:map-fixtures": "node scripts/dev/make-map-fixtures.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },

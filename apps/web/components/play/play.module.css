@@ -1,0 +1,737 @@
+/*
+ * The play screen: one set of components, three layouts (PRD 6.1, 6.1a, 6.2).
+ * `data-layout` on .screen is phone (held upright), landscape (a phone on its
+ * side) or pc. Colours are the design tokens in globals.css, so both themes work.
+ */
+
+.screen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--frame);
+  position: relative;
+  overflow: hidden;
+}
+.webhdr {
+  flex: none;
+}
+
+/* ---- Top bar ---------------------------------------------------------- */
+
+.top {
+  flex: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'name cash theme'
+    'dl dl dl'
+    'times times times';
+  gap: 6px 10px;
+  align-items: center;
+  padding: 8px var(--gutter) 10px;
+  background: var(--gamehdr);
+  border-top: 3px solid var(--accent);
+  border-bottom: 2px solid var(--gamehdr-line);
+}
+.topname {
+  grid-area: name;
+  min-width: 0;
+}
+.fname {
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.season {
+  color: var(--text);
+}
+.cash {
+  grid-area: cash;
+  font-weight: 700;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.cashlabel {
+  font-weight: 400;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.topextra {
+  grid-area: theme;
+}
+.topdl {
+  grid-area: dl;
+}
+.toptimes {
+  grid-area: times;
+}
+
+.daylight {
+  display: grid;
+  gap: 3px;
+}
+.dltrack {
+  position: relative;
+  height: 8px;
+  border-radius: 3px;
+  border: 1px solid #000;
+  background: linear-gradient(
+    90deg,
+    #f2a25e 0%,
+    #f7d679 14%,
+    #a9d8f2 45%,
+    #a9d8f2 60%,
+    #f7d679 86%,
+    #e0675c 100%
+  );
+}
+.dlused {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(11, 18, 32, 0.7);
+}
+.dlmark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #000;
+}
+.dlnote {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.times {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.times :global(.btn) {
+  padding-inline: 4px;
+}
+/* Evening: Next day invites a click. No words, just a quiet pulse. */
+.invite {
+  animation: invite 1.8s ease-in-out infinite;
+}
+@keyframes invite {
+  0%,
+  100% {
+    box-shadow:
+      inset -2px -2px 0 var(--btn-lo),
+      inset 2px 2px 0 var(--btn-hi),
+      0 3px 0 #000,
+      0 0 0 2px var(--btn-hi);
+  }
+  50% {
+    box-shadow:
+      inset -2px -2px 0 var(--btn-lo),
+      inset 2px 2px 0 var(--btn-hi),
+      0 3px 0 #000,
+      0 0 0 5px var(--btn-hi);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invite {
+    animation: none;
+  }
+}
+
+.busybar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: busy 1.1s linear infinite;
+}
+@keyframes busy {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busybar {
+    animation: none;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+}
+
+/* ---- Body: map, side panel, tabs --------------------------------------- */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+.stage:focus {
+  outline: none;
+}
+.mapwrap,
+.maphost {
+  position: absolute;
+  inset: 0;
+}
+.maphost canvas {
+  width: 100%;
+  height: 100%;
+}
+.maploading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+.mapfail {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.nav {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  background: var(--hud);
+  border-top: 1px solid var(--line);
+}
+.navbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 4px 2px;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  font-family: var(--font-px);
+  font-size: 0.5625rem;
+  color: var(--text);
+}
+.navon {
+  background: var(--panel2);
+  color: var(--accent-text);
+}
+
+/* Phone held upright: the bar sits along the bottom, the sheet slides up over the map. */
+.screen[data-layout='phone'] .nav {
+  padding: 4px 4px max(6px, env(safe-area-inset-bottom));
+}
+
+/* Phone on its side: slim one-row bar, tabs in a rail on the right, panels full screen. */
+.screen[data-layout='landscape'] .top {
+  grid-template-columns: minmax(110px, 1.1fr) minmax(90px, 1.3fr) auto auto auto;
+  grid-template-areas: 'name dl cash times theme';
+  padding: 4px 10px;
+  gap: 4px 10px;
+}
+.screen[data-layout='landscape'] .sub {
+  display: none;
+}
+.screen[data-layout='landscape'] .times {
+  gap: 4px;
+}
+.screen[data-layout='landscape'] .body {
+  flex-direction: row;
+}
+.screen[data-layout='landscape'] .nav {
+  grid-template-columns: none;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  width: 64px;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+  padding: 2px;
+}
+.screen[data-layout='landscape'] .navbtn {
+  min-height: 0;
+  font-size: 0.5rem;
+  gap: 1px;
+}
+
+/* PC and tablet: the website header, then the game header in one row, a side panel and the map. */
+.screen[data-layout='pc'] .top {
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto;
+  grid-template-areas: 'name dl cash times';
+  padding: 6px var(--gutter);
+  gap: 6px 22px;
+}
+.screen[data-layout='pc'] .topextra {
+  display: none;
+}
+.screen[data-layout='pc'] .times {
+  gap: 8px;
+}
+.screen[data-layout='pc'] .times :global(.btn) {
+  padding-inline: 12px;
+}
+.screen[data-layout='pc'] .body {
+  flex-direction: row;
+}
+.side {
+  flex: none;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+  border-right: 1px solid var(--line);
+}
+.side .nav {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 4px;
+}
+.side .navbtn {
+  min-height: 52px;
+}
+.sidebody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+/* ---- Things to do ------------------------------------------------------ */
+
+.banner {
+  position: absolute;
+  z-index: 8;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.screen[data-layout='landscape'] .banner {
+  right: auto;
+  width: min(320px, 46%);
+}
+.bannerhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 6px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  width: 100%;
+}
+.bannertitle {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+.bannerpeek {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bannerhead > :last-child {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+}
+.flip {
+  transform: rotate(180deg);
+}
+.bannerbody {
+  overflow-y: auto;
+  padding: 2px 12px 12px;
+  display: grid;
+  gap: 8px;
+}
+.minihead {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.todolist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.todo {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.todourgent {
+  border-color: var(--coral);
+}
+.todotext {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.todostatus {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.jobcard,
+.jobresult {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--coral);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+.jobresult {
+  border-color: var(--accent-line);
+  justify-items: start;
+}
+.joblines {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.jobbtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chips {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.padchip {
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+
+/* ---- Notices and game over ---------------------------------------------- */
+
+.notice,
+.gameover {
+  position: absolute;
+  z-index: 30;
+  left: 8px;
+  right: 8px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 2px solid var(--coral);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+}
+.gameover {
+  z-index: 9;
+  border-color: var(--line);
+}
+.noticebtns {
+  display: flex;
+  gap: 8px;
+}
+@media (min-width: 600px) {
+  .notice,
+  .gameover {
+    left: 50%;
+    right: auto;
+    width: min(560px, calc(100% - 16px));
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- The sheet: bottom sheet, full screen, or side panel ----------------- */
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+}
+.sheet:focus {
+  outline: none;
+}
+.screen[data-layout='phone'] .sheet {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 58%;
+  padding: 8px 14px 14px;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.screen[data-layout='landscape'] .sheet {
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  padding: 8px 18px 12px;
+}
+.screen[data-layout='pc'] .sheet {
+  flex: 1;
+  padding: 10px 14px 14px;
+}
+.grab {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ghost);
+  margin: 0 auto 8px;
+}
+.screen[data-layout='landscape'] .grab,
+.screen[data-layout='pc'] .grab {
+  display: none;
+}
+.sheethead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.sheettitle {
+  font-size: 1.0625rem;
+}
+.sheetbody {
+  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.padline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.facts div {
+  padding: 6px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.facts dt {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+.mobs {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.mobs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+
+/* ---- Coming soon --------------------------------------------------------- */
+
+.soon {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  padding: 18px;
+  background: var(--frame);
+}
+.screen[data-layout='phone'] .stage > .soon,
+.screen[data-layout='landscape'] .stage > .soon {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+}
+.soontitle {
+  font-size: 1.125rem;
+}
+
+/* ---- The day summary ------------------------------------------------------ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  background: rgba(5, 9, 18, 0.62);
+}
+.summary {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px var(--shadow);
+}
+.sumtitle {
+  font-size: 1.125rem;
+}
+.sumwhen {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.sumstops {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 8px 26px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+.sumlist {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.sumrow {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) 2fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8125rem;
+}
+.sumrow dt {
+  color: var(--muted);
+}
+.sumrow dd {
+  margin: 0;
+}
+.sumdelta {
+  color: var(--muted);
+}
+.sumfacts {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+}
+.sumbtns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Loading and failure, before the screen is up --------------------------- */
+
+.plain {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--frame);
+}
+.plainhdr {
+  flex: none;
+}
+/* Phones: the game fills the screen, so the website header is left out there (PRD 6.4). */
+@media (max-width: 899px) {
+  .plainhdr {
+    display: none;
+  }
+}
+.plainmain {
+  flex: 1;
+  display: grid;
+  place-items: start center;
+  padding: var(--gutter);
+}
+.plainmain:focus {
+  outline: none;
+}
+.failcard {
+  max-width: 420px;
+  margin-top: 40px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}

@@ -148,6 +148,9 @@ function cardWire(card: JobCard): JobCardWire {
       notes.push(`${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join.`);
     }
   }
+  if (card.action === 'markCalves') {
+    notes.push('Marking covers every bull calf and young bull in the mob that is not marked yet.');
+  }
   if (card.notToday) notes.push(card.notToday.message);
   return {
     action: card.action,

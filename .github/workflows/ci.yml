@@ -39,5 +39,7 @@ jobs:
           GG_SPEED_LIMIT_MS: 15
       - name: Build
         run: pnpm build
+      - name: The rules stay hidden (no engine text in the browser JavaScript)
+        run: pnpm check:browser-bundle
       - name: Lighthouse (mobile) on the main pages
         run: pnpm lighthouse
