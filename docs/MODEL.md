@@ -885,7 +885,7 @@ Built in milestone 1.5b (engine 0.8.0, save format 5), on Claudia's rule that **
 
 - Putting a mob on a supplement still takes 30 minutes. Claudia has said that in Fast Farm it is switched on at a daily price with no daylight cost, and that in Daily Farm feed is stock on hand in a feeder or a lick block. That is a later part.
 - Nothing a mob eats depends on the time of day yet.
-- There are no farm hands and no contractor fencing (Stage 2).
+- Farm hands and contractor fencing are section 11 (milestones 2.1 and 2.2).
 
 ## 10. Grazing plans (rebuild, milestone 1.5c)
 
@@ -973,4 +973,74 @@ The plan's report carries the live weight the mob's animals gained while on the 
 
 - The old game's confirmation before a plan moves stock onto a planting that is not ready to graze (`confirmGraze`, asked on a manual move). A plan move reports nothing about crops in the new area.
 - The old game's save-time water check dialog: `plan-set` carries `dryAreas` for a screen to ask.
-- Workers doing the planned moves, and the plan card and "Run today's plan" (screens, and Stage 2).
+- The plan card and "Run today's plan" (screens). Plan moves still need nobody: they take none of the day. On a day a farm hand is on the books, the worker report shows them as done by the hand (section 11).
+
+## 11. Farm hands and contractor fencing (rebuild, milestones 2.1 and 2.2)
+
+PRD 5.11, BUILD_PLAN 2.1 and 2.2, as Claudia wants it: "simple to play, realistic numbers". There is no roster, no daily assigning and no clock to watch. The player hires or lets go; a hand works their own days, does standing duties and takes the first part of the player's jobs; pay comes out by itself on pay day. Contract fencing is ordered once and carries on by itself.
+
+Code: `packages/engine/src/labour/` (`pool.ts`, `help.ts`, `actions.ts`, `contract.ts`, `day.ts`, `reads.ts`, `types.ts`) and the figures in `data/labour.ts` (DATA.md, "Farm hands and contractor fencing"). Tests: `labour/labour.test.ts`, `labour/noHands.test.ts`. No grass, cattle, crop, season or price formula was changed, and the daily tick (`stepDay`) is untouched.
+
+**A farm with no hands is unchanged.** A farm keeps no labour state (`farm.labour` is left out) until its first hire or contract order. With none, first light does nothing new and draws nothing from any stream, so the farm saves, hashes and plays exactly as on engine 0.12.1. A test runs a seeded year on random seasons and half a year on real years and checks the farm's digest against one taken on 0.12.1 before any of this was written.
+
+### The labour pool
+
+- The people looking for work are worked out, never stored (`labourPool(farm, day?)`). Each week (farm day ÷ 7) 1 to 3 new people start looking, drawn from the stream `labour:week:<n>` of the farm's seed. Each stays listed for 14 to 42 days. So the list on a given day is always the same for a farm, and it changes over time.
+- Each person has a name (made up, from a short list), a kind (casual 40%, short contract 30%, salaried 30%), a Pastoral Award level (1 to 8), three skills from 1 to 5 (fencing, stock work, water and pipe; around half their level), whether they bring dogs (likelier with stock skill), and the days they work. Casual and contract hands work Monday to Friday. Salaried hands work Monday to Friday, or 3 in 10 a 5-day week that takes in the weekend (Wednesday to Sunday): "Salaried hands don't work weekends. Some long-term hands do."
+- **What they ask:** the award. Salaried, the full-time weekly rate for their level; casual and contract, the casual day rate (the hourly rate with 25% loading, for 7.6 hours). Super (12%) is paid on top of every dollar of wages.
+- **The farm's standing with workers** (0 to 100, 80 to start) changes the list. With standing `s`, the list keeps a share `0.4 + 0.6 × s/100` of its people, dropping the most skilled first, and everyone asks `1 + 0.2 × (1 − s/100)` times the award. At 80 that is 4% above the award; at 100, the award.
+- A person once hired is never listed again.
+
+### Hiring, letting go, contracts
+
+- `hireHand { person }` takes someone on today's list. It is a decision: none of the day. They start the next day. A contract hand's contract runs 91 days from then; at first light on its last day they leave, paid what they are owed (`hand-left`, `contract-finished`). At most 6 hands.
+- `letHandGo { hand }` pays what the hand is owed at once and they leave. If the bank won't cover it, it is refused (`bank-limit`).
+- Hands leave only for a reason: let go, contract ended, or wages not paid. Nobody quits at random. Because there is no roster the player can't overwork a hand, so the PRD's "limit on how hard they can be worked" is not modelled (DEVELOPMENT_LOG, calls).
+
+### Wages and pay day
+
+At first light each day, every hand on the books yesterday adds to what they are owed: a salaried hand a seventh of the weekly rate for every day; a casual or contract hand the day rate for a day they worked. Super is added on top. A hand off injured earns nothing from the farm (workers compensation pays them).
+
+Pay day is every 14 days, the first 14 days after the first hand is hired. At first light on pay day each hand is paid what they are owed, first hired first, if the bank allows (cash must not go past the overdraft limit). Wages are running costs (`year.running`).
+
+- A hand who can't be paid leaves (`hand-left`, `not-paid`) and the standing falls by 20 for each (`wages-missed`, with the standing before and after).
+- When every hand is paid, the standing rises by 5, to at most 100 (`wages-paid`, with wages, super and the total).
+
+### A hand's share of the player's jobs
+
+On a day a hand works (started, not injured, one of their days), the first part of any job that takes time is the hands' share, done from their own day. It uses none of the player's light. The rest of the job is the player's and fits today or not by the rules of section 9.
+
+- An average hand's day is 0.6 of the player's day on their own. REQUIREMENTS: "with a farm hand on, one-man fencing assumes the farmer and the worker are both there, so about 800 m a day instead of 500 m". So a whole day of permanent fence with an average hand builds 800 m: 300 m by the hand and 500 m in the player's light.
+- By skill, the job's skill (fencing for fence, tape, gates and pulling down; water for pipe, troughs, hubs and portable troughs; stock for moves, plans, weaning, marking and selling): skill 1 to 5 is 2/3, 5/6, 1, 7/6 or 4/3 of the average. A hand with dogs does stock work 2.5 ÷ 1.5 times as fast (PRD 21 row 17: 2.5 km/h with dogs against 1.5).
+- Measured in the player's minutes: a hand can take `(1 − share used today) × the day's minutes × their share` minutes of the job's work. Several hands take it in the order they were hired. What is used is kept for the day (`labour.help`) and reset at first light.
+- For a line, the pieces wholly in the hands' share are the first part of the line (`JobCard.hands.pieces` and `metres`): the screen can mark them. The player's minutes (`workMin`) are the rest. A line still stops at the whole pieces that fit in the hands' share and the player's light left. At last light no job can start, as before.
+- The job card and the `job-worked` event carry the hands' minutes (`hands.workMin`, `handsMin`) and each hand's part.
+
+### Standing duties
+
+At first light, on a day hands work, they do from their own day, by the same rules and at the same price as the player: fill each portable trough under its low mark (a quarter full), and put each knocked-down electric fence or tape back up. Each uses the hands' share as the job would (30 minutes for a trough; a segment of fence at its pace). A duty the hands have no time left for, or the bank won't cover, is not done. Each is a `hand-duty` event. Plan moves need nobody (section 10); the worker report shows them as done by a hand on the days one is on the books (PRD 5.2: "A farm hand does the planned moves").
+
+### Injury
+
+At first light, for each hand who worked yesterday, one draw from the farm's own injury stream (kept in `labour.rng`, so a farm's injuries are repeatable and no other stream moves): hurt with chance `9.6 per million hours × 7.6 hours`, times 1.5 on a day they were fencing (about 1 in 14,000 a day worked, about 1 in 50 a year of full-time work). A hurt hand is off for 45 days (the median time lost), earns nothing from the farm, and the farm pays one week of their wages as its share of the claim (a stand-in; it differs by state). `hand-injured` says when, whether they were fencing and when they are back; `hand-back` when they are.
+
+### Contract fencing
+
+`orderContractFence { edges, team: 1 | 2, handsHelp? }`: permanent fence only, by a 1-man team (500 m a day) or a 2-man team (1,000 m a day). It is a decision: none of the player's day.
+
+- The pieces are the segments of the line that are not the boundary, a gate or permanent fence already, in the order drawn. The bank must be able to cover the whole run when it is ordered (materials, with materials on hand at half price first, plus labour at $5 a metre, the same for either team). Nothing is charged when it is ordered.
+- The team works Monday to Friday and starts at first light on the next day it works. Each working day at first light it adds its metres (and, with `handsHelp`, the hands' fencing day in metres of permanent fence at the player's pace) to its progress, and builds whole segments in order while the progress covers one. It is charged for what it builds that day: materials by the player's own rules and price, and labour by the metre. Materials are infrastructure (in the ledger, as for the player's fence); labour is spent (`year.infra`, not in the ledger).
+- It needs nothing from the player each day. It carries on through Next day and skips, and a skip does not stop for it.
+- `contract-built` reports each day's metres, the hands' part, the metres left, the cost and the day it will be done. `contract-finished` reports the whole.
+- **It stops for a reason only**, with `contract-stopped` and why: `no-money` (the bank won't cover the day's work; nothing is built or charged that day), or `line-changed` (a segment still to build has a different fence on it from when the run was ordered: the player put tape or electric there). A segment the player built in permanent fence, or put a gate on, is skipped without fuss.
+- `cancelContractFence { run }` stops it. What is built stays and what was charged stays paid.
+- **The player's own fence alongside is told apart in the read.** `contractView` gives each run's segments built (`built`, the contractor's fence) and still to build (`left`). Any other fence is the player's. The map draws the first in the contractor's colour while the run is under way.
+- `contractView` also gives "under way, N m left, done on <day>": the metres left, the next working day and the day it will be done at the team's pace (hands helping make it sooner and are not counted, as they may be off).
+
+### Reads and what a screen may show
+
+`labourPool`, `standingOf`, `workforceView`, `contractView`, `workerReport` (`labour/reads.ts`), and on the job card `hands` and `contract`. A screen shows names, kinds, days, pay, skill ratings, dogs, the standing as a number, pay days, what is owed, what was done, and contract fencing under way. It never shows a chance of injury, the draws behind the list, or a formula (CLAUDE.md rule 14). Every event states facts: people are described by what they do, their days and their pay. The worker report (`workerReport(farm, sinceSeq)`) is one item for each speech bubble: the workforce's inbox messages since a message number, and plan moves on days a hand was on the books.
+
+### Saves
+
+Save format 9. `farm.labour` (hands, standing, people taken, the next pay day, runs under way, today's help and the injury stream) is saved, loaded and hashed with the farm. A save from format 8 or older has none and loads with no hands and no contract fencing. Save, load and carry on equals running straight through, mid-run.

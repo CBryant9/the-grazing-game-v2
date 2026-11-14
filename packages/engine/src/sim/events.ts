@@ -362,6 +362,8 @@ export type WorkEvent =
     finished: boolean;
     /** For fence, tape and pipe: the pieces built, and the pieces that did not fit today. */
     pieces?: { built: number; notBuilt: number };
+    /** Minutes of the job's work the farm's hands did from their own day. Left out when no hand helped. */
+    handsMin?: number;
   };
 
 /** The herd a running farm starts with. */
@@ -390,4 +392,122 @@ export interface FarmStarted {
   season: { label: string; factor: number };
 }
 
-export type FarmEvent = FarmStarted | TickEvent | ActionEvent | DawnEvent;
+/** Why a hand left the farm. */
+export type HandLeftWhy =
+  /** The player let them go. */
+  | 'let-go'
+  /** Their contract came to its end. */
+  | 'contract-finished'
+  /** Their wages could not be paid on pay day. */
+  | 'not-paid';
+
+/** What a hand did by themselves, as a standing duty, on a day they worked. */
+export type HandDuty =
+  /** Filled a portable trough that was under its low-water mark. */
+  | { type: 'refill-trough'; port: number; cell: number; cost: number }
+  /** Put a knocked-down electric fence or tape back up. */
+  | { type: 'fix-fence'; edge: EdgeRef; cost: number };
+
+/** Why contract fencing stopped before it was done. */
+export type ContractStopWhy =
+  /** The bank would not cover the day's work. */
+  | 'no-money'
+  /** A segment still to build has a different fence on it from when the run was ordered. */
+  | 'line-changed';
+
+/**
+ * The workforce: farm hands and contractor fencing (milestones 2.1 and
+ * 2.2). Facts only. People are described by what they do, their days and
+ * their pay, never by a judgement.
+ */
+export type LabourEvent =
+  | {
+      type: 'hand-hired';
+      hand: number;
+      name: string;
+      kind: 'casual' | 'contract' | 'salaried';
+      /** Dollars before super: a week for a salaried hand, a day worked otherwise. */
+      rate: number;
+      startDay: number;
+      /** The farm day a contract ends, or null. */
+      endDay: number | null;
+    }
+  | {
+      type: 'hand-left';
+      hand: number;
+      name: string;
+      why: HandLeftWhy;
+      /** Dollars paid to them as they left (what they were owed), 0 if it could not be paid. */
+      paid: number;
+    }
+  /** Pay day: wages and super paid to every hand who could be paid. */
+  | { type: 'wages-paid'; hands: number; wages: number; superannuation: number; total: number }
+  /** A hand's wages could not be paid: the bank would not cover them. The farm's standing fell. */
+  | {
+      type: 'wages-missed';
+      hand: number;
+      name: string;
+      owed: number;
+      standingBefore: number;
+      standingAfter: number;
+    }
+  /**
+   * A hand was hurt at work. `fencing` is true if they were fencing that
+   * day. They are off until `backDay`, paid by workers compensation; the
+   * farm pays its share (`cost`).
+   */
+  | {
+      type: 'hand-injured';
+      hand: number;
+      name: string;
+      day: number;
+      fencing: boolean;
+      backDay: number;
+      cost: number;
+    }
+  /** A hand is back at work after an injury. */
+  | { type: 'hand-back'; hand: number; name: string }
+  /** A hand did a standing duty in their own time. */
+  | { type: 'hand-duty'; hand: number; name: string; duty: HandDuty }
+  /** Contract fencing was ordered. Nothing is charged until it is built. */
+  | {
+      type: 'contract-ordered';
+      run: number;
+      team: 1 | 2;
+      handsHelp: boolean;
+      metres: number;
+      materials: number;
+      labour: number;
+      cost: number;
+      ratePerM: number;
+      startDay: number;
+      doneDay: number;
+    }
+  /** A day of contract fencing: metres built today (by the team, and by the farm's hands helping), what is left and what it cost. */
+  | {
+      type: 'contract-built';
+      run: number;
+      metres: number;
+      byHandsM: number;
+      metresLeft: number;
+      cost: number;
+      doneDay: number;
+    }
+  | { type: 'contract-finished'; run: number; metres: number; spent: number }
+  | {
+      type: 'contract-stopped';
+      run: number;
+      why: ContractStopWhy;
+      metresBuilt: number;
+      metresLeft: number;
+      spent: number;
+    }
+  | {
+      type: 'contract-cancelled';
+      run: number;
+      metresBuilt: number;
+      metresLeft: number;
+      spent: number;
+    };
+
+export type FarmEvent = FarmStarted | TickEvent | ActionEvent | DawnEvent | LabourEvent;

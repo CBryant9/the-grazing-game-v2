@@ -299,6 +299,9 @@ function upgrade(f: Record<string, unknown>): void {
   delete (farm.clock as unknown as Record<string, unknown>).at;
   for (const key of ['workRules', 'jobs', 'nextJobId', 'bookings', 'nextBookingId']) delete f[key];
   for (const entry of farm.actionLog) delete (entry as unknown as Record<string, unknown>).job;
+  // Farm hands and contract fencing (format 9): a farm saved before had none. `labour` is
+  // left out until the first hire or order, so there is nothing to fill in.
+  if (farm.labour === null) delete farm.labour;
 }
 
 /**

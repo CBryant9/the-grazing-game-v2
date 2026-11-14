@@ -208,6 +208,12 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'cancelSale':
       // Taking stock off a sale is a decision too.
       return { kind: 'free' };
+    case 'hireHand':
+    case 'letHandGo':
+    case 'orderContractFence':
+    case 'cancelContractFence':
+      // The workforce: decisions. Contract fencing uses none of the player's day (PRD 5.11).
+      return { kind: 'free' };
 
     // ---- Stock, where the mob is
     case 'sellAnimals':

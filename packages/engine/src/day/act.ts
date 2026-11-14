@@ -22,8 +22,14 @@
  *      in the order drawn, and charged. The rest is not built and not
  *      remembered. The player draws it again another day.
  *
- * Nothing carries over from one day to the next. There are no jobs in
- * progress.
+ * Nothing the player does carries over from one day to the next. There
+ * are no jobs in progress. (Contract fencing is not the player's job: it
+ * carries on by itself, at first light, in ../labour/day.ts.)
+ *
+ * Farm hands (milestone 2.1): on a day a hand works, the first part of any
+ * job that needs work is the hands' share, done from their own day. It uses
+ * none of the player's light. The rest of the job is the player's, and
+ * fits today or not by the rules above.
  */
 
 // The one place that may use the unclocked pieces: it puts them behind the farm clock.
@@ -36,10 +42,13 @@ import type {
   ActionRefusalReason,
   ActionResult,
   JobCard,
+  JobPiece,
   JobPreview,
 } from '../actions/types';
 import { durationText } from '../daylight/daylight';
+import { handsCan, skillFor, useHands, type HelpSkill } from '../labour/help';
 import { dayMinutes, timeNow } from '../sim/clock';
+import { dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
 import { partAction, pieceMinutes, specFor, type JobSpec } from './spec';
@@ -95,6 +104,20 @@ function stampMoves(events: readonly FarmEvent[], at: number): void {
   for (const e of events) if (e.type === 'mob-moved') e.at = at;
 }
 
+/** The hands' share of a job: the skill it needs, the minutes of its work they take, and for a line the pieces they build. */
+interface HandsShare {
+  skill: HelpSkill;
+  minutes: number;
+  pieces?: JobPiece[];
+  metres?: number;
+}
+
+/** Minutes of a job's work the hands can take today. 0 with no hand at work, or for a job they do not help on. */
+function handsMinutes(farm: FarmState, skill: HelpSkill | null, dayMin: number): number {
+  if (!skill || !farm.labour) return 0;
+  return handsCan(farm, skill, dayMin).reduce((t, p) => t + p.minutes, 0);
+}
+
 /** Finish a job: move the clock, record it with its times, and make the card. */
 function finish(
   before: FarmState,
@@ -105,11 +128,36 @@ function finish(
   workMin: number,
   card: Pick<JobCard, 'outcome' | 'totalWorkMin' | 'parts' | 'cost'> &
     Partial<Pick<JobCard, 'line' | 'notToday' | 'fenceMaterials' | 'materialsKept'>>,
+  hands?: HandsShare,
 ): Worked {
   // Stock booked onto a sale, and cattle on their way: the card says so.
   const sale = did.find((e) => e.type === 'sale-booked');
   const buy = did.find((e) => e.type === 'cattle-on-the-way');
-  const extra: Partial<Pick<JobCard, 'booking' | 'arrival' | 'plan'>> = {};
+  const extra: Partial<Pick<JobCard, 'booking' | 'arrival' | 'plan' | 'hands' | 'contract'>> = {};
+  const ordered = did.find((e) => e.type === 'contract-ordered');
+  if (ordered?.type === 'contract-ordered') {
+    extra.contract = {
+      run: ordered.run,
+      team: ordered.team,
+      metres: ordered.metres,
+      materials: ordered.materials,
+      labour: ordered.labour,
+      cost: ordered.cost,
+      ratePerM: ordered.ratePerM,
+      startDay: ordered.startDay,
+      startDate: dateOn(next, ordered.startDay),
+      doneDay: ordered.doneDay,
+      doneDate: dateOn(next, ordered.doneDay),
+    };
+  }
+  if (hands && hands.minutes > NO_TIME) {
+    const byHand = useHands(next, hands.skill, light.dayMin, hands.minutes);
+    extra.hands = {
+      workMin: byHand.reduce((t, p) => t + p.minutes, 0),
+      byHand,
+      ...(hands.pieces ? { pieces: hands.pieces, metres: hands.metres ?? 0 } : {}),
+    };
+  }
   const set = did.find((e) => e.type === 'plan-set');
   const resumed = did.find((e) => e.type === 'plan-resumed');
   if (set?.type === 'plan-set') {
@@ -159,6 +207,7 @@ function finish(
       workMin,
       finished: card.outcome === 'done',
     };
+    if (extra.hands) worked.handsMin = extra.hands.workMin;
     if (card.line) {
       worked.pieces = {
         built: card.line.fits.pieces.length,
@@ -202,10 +251,14 @@ function doWhole(
   action: Action,
   trial: ActionDone,
   spec: Extract<JobSpec, { kind: 'whole' }>,
+  skill: HelpSkill | null,
 ): Worked | ActionRefusal {
   const light = lightNow(farm);
   if (light.left <= NO_TIME) return noDaylight();
-  const total = spec.parts.reduce((t, p) => t + p.minutes, 0);
+  const all = spec.parts.reduce((t, p) => t + p.minutes, 0);
+  // The hands' share first, from their own day. The rest is the player's.
+  const byHands = Math.min(all, handsMinutes(farm, skill, light.dayMin));
+  const total = all - byHands;
   let workMin = total;
   if (total > light.dayMin + NO_TIME) {
     // Builder's rule, so no job is impossible: a job that needs more than a
@@ -224,12 +277,21 @@ function doWhole(
       `${NOT_TODAY} It takes ${durationText(total)} and there is ${durationText(light.left)} of light left.`,
     );
   }
-  return finish(farm, trial.farm, action, trial.events, light, workMin, {
-    outcome: 'done',
-    totalWorkMin: total,
-    parts: spec.parts.map((p) => ({ what: p.what, minutes: p.minutes })),
-    cost: farm.cash - trial.farm.cash,
-  });
+  return finish(
+    farm,
+    trial.farm,
+    action,
+    trial.events,
+    light,
+    workMin,
+    {
+      outcome: 'done',
+      totalWorkMin: all,
+      parts: spec.parts.map((p) => ({ what: p.what, minutes: p.minutes })),
+      cost: farm.cash - trial.farm.cash,
+    },
+    skill ? { skill, minutes: byHands } : undefined,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -291,19 +353,26 @@ function doLine(
   env: ActionEnv,
   trial: ActionDone,
   spec: Extract<JobSpec, { kind: 'line' }>,
+  skill: HelpSkill | null,
 ): Worked | ActionRefusal {
   const light = lightNow(farm);
   if (light.left <= NO_TIME) return noDaylight();
   const sideM = farm.layout.scale.sideM;
   const minutes = spec.pieces.map((p) => pieceMinutes(p.work, light.dayMin));
   const total = minutes.reduce((t, m) => t + m, 0);
-  // The whole pieces that fit in the light left, in the order drawn.
+  // The first part of the line is the hands' share, from their own day.
+  const handsHave = handsMinutes(farm, skill, light.dayMin);
+  // The whole pieces that fit in the hands' share and the light left, in the order drawn.
   let fits = 0;
-  let workMin = 0;
-  while (fits < minutes.length && workMin + minutes[fits]! <= light.left + NO_TIME) {
-    workMin += minutes[fits]!;
+  let work = 0;
+  let byHandsPieces = 0;
+  while (fits < minutes.length && work + minutes[fits]! <= handsHave + light.left + NO_TIME) {
+    work += minutes[fits]!;
     fits++;
+    if (work <= handsHave + NO_TIME) byHandsPieces = fits;
   }
+  const byHands = Math.min(work, handsHave);
+  const workMin = Math.max(0, work - byHands);
   if (fits === 0) {
     return refuse(
       'not-enough-daylight',
@@ -317,29 +386,55 @@ function doLine(
   };
   const parts = [{ what: spec.what, minutes: total }];
   const cost = farm.cash - trial.farm.cash;
+  const hands: HandsShare | undefined = skill
+    ? {
+        skill,
+        minutes: byHands,
+        pieces: refs.slice(0, byHandsPieces),
+        metres: byHandsPieces * sideM,
+      }
+    : undefined;
   if (fits === refs.length) {
-    return finish(farm, trial.farm, action, trial.events, light, workMin, {
-      outcome: 'done',
-      totalWorkMin: total,
-      parts,
-      cost,
-      line,
-      ...materialsOf(farm, action, trial.events, trial.events),
-    });
+    return finish(
+      farm,
+      trial.farm,
+      action,
+      trial.events,
+      light,
+      workMin,
+      {
+        outcome: 'done',
+        totalWorkMin: total,
+        parts,
+        cost,
+        line,
+        ...materialsOf(farm, action, trial.events, trial.events),
+      },
+      hands,
+    );
   }
   // Build the pieces that fit, by the same rules as building them all. The
   // rest is not built and not remembered.
   const some = tryAction(farm, partAction(action, line.fits.pieces), env, { label: action.type });
   if (!some.ok) return some;
-  return finish(farm, some.farm, action, some.events, light, workMin, {
-    outcome: 'part',
-    totalWorkMin: total,
-    parts,
-    cost,
-    line,
-    notToday: { reason: 'not-enough-daylight', message: NOT_TODAY },
-    ...materialsOf(farm, action, trial.events, some.events),
-  });
+  return finish(
+    farm,
+    some.farm,
+    action,
+    some.events,
+    light,
+    workMin,
+    {
+      outcome: 'part',
+      totalWorkMin: total,
+      parts,
+      cost,
+      line,
+      notToday: { reason: 'not-enough-daylight', message: NOT_TODAY },
+      ...materialsOf(farm, action, trial.events, some.events),
+    },
+    hands,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +449,7 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
   const trial = tryAction(farm, action, env, { clocked: true });
   if (!trial.ok) return trial;
   const spec = specFor(farm, action, trial);
+  const skill = skillFor(action);
   switch (spec.kind) {
     case 'free':
       // It takes none of the day, so it can be done after last light too.
@@ -364,9 +460,9 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
         cost: farm.cash - trial.farm.cash,
       });
     case 'whole':
-      return doWhole(farm, action, trial, spec);
+      return doWhole(farm, action, trial, spec, skill);
     case 'line':
-      return doLine(farm, action, env, trial, spec);
+      return doLine(farm, action, env, trial, spec, skill);
   }
 }
 

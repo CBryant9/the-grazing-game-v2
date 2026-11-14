@@ -15,6 +15,7 @@ import {
 import type { Action, ActionType } from '../actions/types';
 import { EDGE, getEdge } from '../farm/topology';
 import { GRID_N, GRID_W } from '../grid';
+import { labourPool } from '../labour/pool';
 import { LAND } from '../pasture/state';
 import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
@@ -451,6 +452,12 @@ describe('the job card and the job agree, for every kind of action', () => {
     // A water hub on a square, to take out or move.
     const squareHub = setUp(b.farm, { type: 'placeSquareHub', cell: b.pipedCell });
     const pipedRow = (b.pipedCell / GRID_W) | 0;
+    // A hand to hire and let go, and contract fencing to order and cancel, away from the paddocks.
+    const person = labourPool(b.farm)[0]!.id;
+    const hire: Action = { type: 'hireHand', person };
+    const withHand = work(b.farm, hire).farm;
+    const order: Action = { type: 'orderContractFence', edges: down(34, 1, 6), team: 2 };
+    const ordered = work(b.farm, order).farm;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
       buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
       cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
@@ -546,9 +553,14 @@ describe('the job card and the job agree, for every kind of action', () => {
       removePortable: [{ farm: b.farm, action: { type: 'removePortable', port: b.port } }],
       sow: [{ farm: june, action: { type: 'sow', species: 'barley', cells: fallow } }],
       harvest: [{ farm: ready.farm, action: { type: 'harvest', field: ready.field } }],
+      // The workforce (milestones 2.1 and 2.2): decisions, none of the day.
+      hireHand: [{ farm: b.farm, action: hire }],
+      letHandGo: [{ farm: withHand, action: { type: 'letHandGo', hand: person } }],
+      orderContractFence: [{ farm: b.farm, action: order }],
+      cancelContractFence: [{ farm: ordered, action: { type: 'cancelContractFence', run: 1 } }],
     };
-    // 37 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(37);
+    // 41 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(41);
 
     const outcomes = new Set<string>();
     let refusals = 0;

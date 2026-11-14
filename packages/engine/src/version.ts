@@ -48,8 +48,18 @@
  * calf, the joining and no-bull notes carry `readyOnRecord`, and
  * `predictGains` takes a grouping, so the screens can follow the record in
  * every line. No formula changed.
+ *
+ * 0.13.0 (milestones 2.1 and 2.2): farm hands and contractor fencing. A
+ * labour pool worked out from the seed, hiring and letting go, wages and
+ * super out of the bank on pay day, the farm's standing with workers,
+ * standing duties, a hand's share of the player's jobs from their own day,
+ * injuries at the published rate, and contract fencing (permanent fence, a
+ * 1-man or 2-man team) that carries on by itself over days. No grass,
+ * cattle, crop, season or price formula changed. A farm with no hands and
+ * no contract fencing plays exactly as it did on 0.12.1 (a test holds its
+ * digest).
  */
-export const ENGINE_VERSION = '0.12.1';
+export const ENGINE_VERSION = '0.13.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -88,5 +98,11 @@ export const ENGINE_VERSION = '0.12.1';
  * 8: the herd record (14 Nov 2026, Claudia). A female is PTIC on the record
  * from `PTIC_DAYS` in calf, worked out from the cattle, so `knownInCalf` and
  * a mob's `reports` are gone. A format 7 save loads with them dropped.
+ *
+ * 9: farm hands and contractor fencing (milestones 2.1 and 2.2). A farm
+ * may have `labour` (its hands, its standing with workers, the next pay
+ * day, contract fencing under way and the injury stream). It is left out on
+ * a farm that has never hired or ordered contract fencing, so an older save
+ * loads with no hands and no contract fencing, and is otherwise unchanged.
  */
-export const SAVE_FORMAT_VERSION = 8;
+export const SAVE_FORMAT_VERSION = 9;

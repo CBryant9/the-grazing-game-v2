@@ -118,7 +118,25 @@ export type Action =
   /** Sow. It costs money, happens at once and takes none of the player's day. */
   | { type: 'sow'; species: SpeciesId; cells: number[] }
   /** Harvest, the same way. */
-  | { type: 'harvest'; field: number };
+  | { type: 'harvest'; field: number }
+  // ---- The workforce (milestones 2.1 and 2.2). Decisions: they take none of the day.
+  /**
+   * Hire a person from today's list (`labourPool`). They start the next day
+   * and work their own days. Their wages and super come out by themselves on
+   * pay day.
+   */
+  | { type: 'hireHand'; person: number }
+  /** Let a hand go. What they are owed is paid now. */
+  | { type: 'letHandGo'; hand: number }
+  /**
+   * Order contract fencing along a line: permanent fence only, by a 1-man
+   * team (500 m a day) or a 2-man team (1,000 m a day). It uses none of the
+   * player's day and carries on by itself each day the team works until it
+   * is done. `handsHelp` puts the farm's hands' day into the run too.
+   */
+  | { type: 'orderContractFence'; edges: EdgeRef[]; team: 1 | 2; handsHelp?: boolean }
+  /** Stop contract fencing. What is built stays and what was charged stays paid. */
+  | { type: 'cancelContractFence'; run: number };
 
 /** One leg of a plan as the player asks for it. `rounds` is 0 (keep going) if left out. */
 export interface PlanLegSpec {
@@ -166,7 +184,15 @@ export type ActionRefusalReason =
   /** Today's light is used up. No more jobs can start until tomorrow. */
   | 'no-daylight'
   /** There is light left, but not enough for this job, or for the first piece of this line. */
-  | 'not-enough-daylight';
+  | 'not-enough-daylight'
+  /** That person is not on today's list of people looking for work. */
+  | 'no-such-person'
+  /** The farm has as many hands as it can take on. */
+  | 'too-many-hands'
+  /** There is no such hand on the farm. */
+  | 'no-such-hand'
+  /** There is no such contract fencing under way. */
+  | 'no-such-run';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {
@@ -287,6 +313,37 @@ export interface JobCard {
     step: number;
     dryAreas: string[];
     joins: { area: string; mob: number; mobName: string; head: number }[];
+  };
+  /**
+   * The farm's hands' share of this job: the minutes of the job's work they
+   * do from their own day, which use none of the player's light, and each
+   * hand's part. For a line, `pieces` and `metres` are the first part of
+   * the line, built by the hands. Left out when no hand helped.
+   */
+  hands?: {
+    workMin: number;
+    byHand: { hand: number; minutes: number }[];
+    pieces?: JobPiece[];
+    metres?: number;
+  };
+  /**
+   * For contract fencing ordered: the team, the metres, the price (materials
+   * and labour, the labour at the same rate a metre for either team), and
+   * when it starts and is done at the team's pace. Nothing is charged today:
+   * each working day is charged for what is built that day.
+   */
+  contract?: {
+    run: number;
+    team: 1 | 2;
+    metres: number;
+    materials: number;
+    labour: number;
+    cost: number;
+    ratePerM: number;
+    startDay: number;
+    startDate: CalendarDate;
+    doneDay: number;
+    doneDate: CalendarDate;
   };
   /** For cattle bought: they arrive in the stock yards at first light on this farm day. */
   arrival?: { arriveDay: number; date: CalendarDate; head: number };

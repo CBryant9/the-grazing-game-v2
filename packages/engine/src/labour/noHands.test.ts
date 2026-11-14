@@ -89,7 +89,11 @@ describe('a farm with no hands and no contractors is unchanged', () => {
       },
       { data },
     );
-    farm = work(farm, { type: 'buildFence', edges: across(12, 3, 8), fence: 'tape' }, { data }).farm;
+    farm = work(
+      farm,
+      { type: 'buildFence', edges: across(12, 3, 8), fence: 'tape' },
+      { data },
+    ).farm;
     farm = runOn(farm, 180, { data });
     expect(farm.day).toBe(180);
     expect(digest(farm)).toBe(NO_HANDS_REAL);

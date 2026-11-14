@@ -780,3 +780,53 @@ How the arable land is laid out: it grows outwards from one square (or from the 
 | When pregnancy can be reliably found by rectal palpation | about **6 weeks** (42 days) of pregnancy; testing is usually done 8 to 10 weeks after the end of mating | Agriculture Victoria, "Pregnancy testing of beef cattle", https://agriculture.vic.gov.au/livestock-and-animals/beef/breeding/pregnancy-testing-of-beef-cattle (read 14 Nov 2026 through a search result: "pregnancies can be reliably detected as early as 6 weeks"; the page refused a direct fetch). No NSW DPI or Qld DAF page on the timing was found. |
 
 **For Claudia:** the sourced figure (about 42 days) is earlier than the engine's 50 days. The engine keeps 50 so that a cow shows as PTIC on the same day her price includes the in-calf premium, and no money changes against the old game. Moving both to 42 would change sale values against the old game.
+
+## Farm hands and contractor fencing (milestones 2.1 and 2.2)
+
+Every figure is one constant in `packages/engine/src/data/labour.ts` (`LABOUR`), marked there as here. The rules are MODEL section 11. Sources were read on 14 Nov 2026. **Sourced** is from the publication named; **Decided** and **Proposed** are Claudia's (REQUIREMENTS, PRD); **Builder** is the simplest reading, for Claudia to check; **Stand-in** could not be found in a published source and is listed for Claudia.
+
+### Wages (Pastoral Award [MA000035])
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Minimum weekly rate, full-time adult farm and livestock hand, levels 1 to 8 | $978.10, $1,004.90, $1,006.80, $1,029.10, $1,046.90, $1,062.90, $1,119.10, $1,202.50 | Sourced | Fair Work Ombudsman, "Pay Guide - Pastoral Award [MA000035]", applies from the first full pay period on or after 1 July 2026, published 18 Aug 2026. https://calculate.fairwork.gov.au/payguides/pact/MA000035/20260701 |
+| Hourly rate | weekly ÷ 38 (L1 $25.74, L5 $27.55, L8 $31.64) | Sourced | Same guide |
+| Ordinary hours | 38 a week | Sourced | Same guide (weekly ÷ hourly = 38); award clause 9.1, an average of 38 a week |
+| Casual loading | 25% | Sourced | Same guide (the 2025 guide's casual L1 $30.35 = $24.28 × 1.25) |
+| Hours in a working day | 7.6 (38 over 5 days) | Builder | — |
+| Pay cycle | every 14 days | Builder | The award allows weekly or fortnightly (clause 16.1, https://awards.fairwork.gov.au/MA000035.html, read through a page summary). Fortnightly chosen |
+| Superannuation guarantee | 12% on top of wages | Sourced | ATO, "The final SG rate increase is coming on 1 July" (12% from 1 July 2025). https://www.ato.gov.au/businesses-and-organisations/small-business-newsroom/the-final-sg-rate-increase-is-coming-on-1-july (read through a search result) |
+
+The game uses the 2026 rates on every farm, as its other costs (fence, troughs) are today's prices. Salaried hands are paid the weekly rate; casual and contract hands the casual day rate (hourly × 1.25 × 7.6) for each day worked. Weekend penalty rates, overtime, leave, allowances and the keep deduction are not modelled.
+
+### A hand's share of the work
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| An average hand's day, as a share of the player's day on their own | 0.6 (300 m of permanent fence against the player's 500 m) | Decided | REQUIREMENTS: with a hand on, one-man fencing goes "about 800 m a day instead of 500 m". (PRD 5.11 says "about 500 m ... for an average hand", which would make 1,000 m. The 800 m is kept.) |
+| By skill 1 to 5 | 2/3, 5/6, 1, 7/6, 4/3 of the average (200 to 400 m of fence a day) | Stand-in | PRD: "more or less by skill" |
+| Stock work with dogs | 2.5 ÷ 1.5 (1.67) times as fast | Proposed | PRD section 21 row 17: stock walk up to about 2.5 km/h with a hand who has dogs, against 1.5 km/h |
+| Contract length | 91 days | Proposed | PRD 5.11: "a short contract such as 3 months at a day rate" |
+| Most hands at once | 6 | Stand-in | — |
+
+### Contract fencing
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| A 1-man team, a 2-man team | 500 m and 1,000 m a day | Decided | PRD 5.4 and 5.11; REQUIREMENTS (13 Nov 2026) |
+| Labour charge | $5 a metre, either team | Stand-in | No published labour-only rate was found. Price guides list installed rural stock fence (materials and labour together) at about $8 to $25 a metre (Oneflare, https://www.oneflare.com.au/costs/rural-fencing; Airtasker about $18 to $20 a metre for simple wire mesh, https://www.airtasker.com/au/costs/fencing-installation/rural-fencing-cost; neither dated). The game's permanent fence materials are $7 a metre, so $5 of labour gives $12 a metre in all. An older document on exclusion fence put contract construction at $2,500 to $3,000 a km, undated and not verified. Section 21 row 15: "the same rate for either team" |
+| Days contractors work | Monday to Friday | Builder | — |
+| Metres a day for a team | — | not found | No published figure for metres a day by a one-man or two-man fencing team was found; the PRD's are used |
+
+### Injury
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Serious claims, agriculture, forestry and fishing | 9.6 per million hours worked (2024-25) | Sourced | Safe Work Australia, "Key Work Health and Safety Statistics Australia 2026" (Oct 2026), https://data.safeworkaustralia.gov.au/reports/key-whs-statistics-australia/latest-release. Read through a search summary: the PDF did not load. 2023-24 was 10.0 (Key WHS Statistics Australia 2025) |
+| Time off after a serious claim | 45 days (median 6.4 weeks, 2023-24) | Sourced | Safe Work Australia, "Key Work Health and Safety Statistics Australia 2025", https://data.safeworkaustralia.gov.au/reports/key-whs-statistics-australia/2025 (read through a search summary) |
+| More likely on a day of fencing | × 1.5 | Stand-in | PRD: "more likely after long days or risky jobs". No published figure for fencing alone |
+| The farm's share of a claim | one week of the hand's wages | Stand-in | While off, workers compensation pays the hand. The employer's share differs by state |
+
+### The farm's standing with workers
+
+All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.

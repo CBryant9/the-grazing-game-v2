@@ -415,7 +415,7 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
   // Plan moves take none of the day's light, as in the old game.
   const lightLeftMin = lightLeft(farm);
   // First light on the new day: cattle land, booked stock sells. Before the player can act.
-  const atDawn = dawn(next);
+  const atDawn = dawn(next, env);
   return {
     farm: next,
     day,
@@ -470,7 +470,7 @@ export function skipDays(
   for (let i = 0; i < asked; i++) {
     const day = stepDay(cur, env);
     days.push(day);
-    atDawn.push(...dawn(cur));
+    atDawn.push(...dawn(cur, env));
     stops = stopsIn(day);
     if (stops.length) break;
   }

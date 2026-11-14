@@ -1043,6 +1043,41 @@ Calls made by the coordinator, for Claudia to confirm:
 2. The profit marker (not built) must not use red on the map when it is built (VISUALS).
 3. A cow booked for sale in "Cows" who reaches 50 days in calf by sale day is paid the PTIC premium, more than a figure worked out at booking. The sale pays by the record on the day.
 
+### 14 Nov 2026: m2.1 Farm hands and contractor fencing
+
+Branch `m2.1-hands-and-contractors`, from `m1.7f-review-fixes` (34fecf2). Engine 0.13.0, save format 9. Engine and docs only: the screens are another agent's.
+
+**Built (engine).** BUILD_PLAN 2.1 and 2.2, the simplest version that keeps the real numbers (MODEL section 11; figures and sources in DATA, "Farm hands and contractor fencing"):
+
+- A labour pool worked out from the seed, week by week (`labourPool`); hiring and letting go (`hireHand`, `letHandGo`); casual, short contract and salaried hands at Pastoral Award rates (1 July 2026 pay guide) with 12% super.
+- Pay day every 14 days: wages and super come out by themselves. A hand who can't be paid leaves and the standing falls 20; paying everyone brings it back 5. The standing changes the list (shorter, the most skilled gone first, dearer).
+- A hand's share of any job the player does, from the hand's own day: an average hand adds 0.6 of the player's day, so a day of permanent fence is 800 m (REQUIREMENTS line 208). By the skill the job needs; dogs make stock work quicker.
+- Standing duties at first light: low portable troughs filled, knocked-down fence put back up. Plan moves show in the worker report as the hand's on days a hand is on the books.
+- Injuries at Safe Work Australia's rate for agriculture (9.6 serious claims per million hours), likelier on a fencing day, off 45 days (the median).
+- Contract fencing, permanent fence only: a 1-man team 500 m a day or a 2-man team 1,000 m a day, Monday to Friday, none of the player's day, charged as built (materials plus $5 a metre labour, either team). It carries on by itself over days and skips, and stops only for no money or a changed line, with an event saying why. Hands can help. The contractor's segments are told apart from the player's fence in `contractView`, with "N m left, done on <day>".
+- Reads for the screens: `labourPool`, `standingOf`, `workforceView`, `contractView`, `workerReport`, and on the job card `hands` and `contract`. Events: `hand-hired`, `hand-left`, `wages-paid`, `wages-missed`, `hand-injured`, `hand-back`, `hand-duty`, `contract-ordered`, `contract-built`, `contract-finished`, `contract-stopped`, `contract-cancelled`.
+
+**Tested.** `labour/labour.test.ts` (both "done when" lines, pay day to the cent, missed wages, the pool's repeatability and standing, contracts across a skip, stops, cancelling, hands helping, duties, injury, old saves, wording) and `labour/noHands.test.ts`: a farm with no hands and no contractors matches a digest taken on engine 0.12.1 before any labour code existed (a year on random seasons, half a year on real years). No calibration band and no `*.mvp.test.ts` file changed.
+
+**Calls for Claudia** (each is one constant in `packages/engine/src/data/labour.ts` unless it says otherwise):
+
+1. **A hand's share is 300 m of fence a day, not the PRD's 500 m.** REQUIREMENTS says one-man fencing with a hand goes "about 800 m a day instead of 500 m"; PRD 5.11 says the hand's share is "about 500 m", which would make 1,000 m. The 800 m is kept (`handDayShare` 0.6). To use the PRD's figure, set it to 1.
+2. **Hands help on every kind of job,** by the skill it needs (fencing, water, stock), not only fence: "Farm hands can do all tasks". To limit it to fence, `skillFor` in `labour/help.ts` returns null for other jobs.
+3. **No overwork limit.** With no roster the player can't work a hand past their hours, so "how hard you can work them before they quit" is not modelled. Hands leave only when let go, when a contract ends or when not paid.
+4. **The contractor's labour charge is a stand-in of $5 a metre** (`labourPerMetre`). No published labour-only rate was found; price guides put installed rural fence at about $8 to $25 a metre, and the game's materials are $7. Please give a contractor's quote.
+5. **Contractors start the next working day** after they are ordered (nothing is built on the day of the order) and **work Monday to Friday** (`contractorDays`). The PRD question at line 91 ("is a contractor's run the one kind of job that carries on from day to day?") is answered yes, as section 21 row 34 has it: contractors carry on, the player's own line does not.
+6. **The bank must cover the whole run when it is ordered,** as for the player's line; then it is charged day by day as built, and stops if a day can't be paid.
+7. **"Done on" is at the team's pace,** without hands helping (they may be off). Hands helping make it sooner.
+8. **Pay is fortnightly** (`payCycleDays`); the award allows weekly or fortnightly. The first pay day is 14 days after the first hire.
+9. **Casual and contract hands are paid the casual day rate** (hourly × 1.25 × 7.6) for days worked; salaried hands the weekly rate. Weekend penalty rates, overtime, leave and allowances are not modelled. A salaried hand on a Wednesday-to-Sunday week is paid the weekly rate.
+10. **Notice on letting go** is not modelled: the hand is paid what they are owed and leaves.
+11. **Injury:** 1.5 times likelier on a fencing day (`fencingRisk`, a stand-in), and the farm pays one week of the hand's wages as its share of a claim (`injuryCostWeeks`, a stand-in; it differs by state). No workers compensation premium is charged.
+12. **The standing figures** (80 to start; 20 off per missed wage; 5 back per pay day paid in full; at 0, 40% of the list and 20% dearer) and **the pool** (1 to 3 new people a week, listed 14 to 42 days, at most 6 hands) are stand-ins.
+13. **A skip does not stop** for anything about the workforce (a missed pay day, a hand leaving or hurt, contract fencing stopped). The events are in the inbox and the worker report. To stop for them, add them to `stopsIn` in `day/days.ts` (they come from first light, so the skip loop would need to read `dawn`'s events).
+14. **Hired today, starts tomorrow.** A hand does not help on the day they are hired.
+
+**Not done.** The screens (another agent). Sheep (2.3, 2.4). Real-year wages: every farm pays 2026 rates, as with its other costs.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
