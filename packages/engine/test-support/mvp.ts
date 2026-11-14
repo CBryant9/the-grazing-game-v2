@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { MOST_LOSS_MJ } from '../src/cattle/gains';
 import { MILK, YOUNG_GAIN_COST } from '../src/data/cattle';
 
 const MVP_PATH = fileURLToPath(
@@ -279,6 +280,15 @@ export const REBUILD_RULES: readonly {
     why: 'The MVP charged every animal 20 + 0.045 x LW MJ a kg of gain: about twice the measured cost for a 60 kg calf (Sekine and Asahida 1990). Engine: mjPerKgGain.',
     mvp: 'let gain=bal>0?bal/(20+.045*W_):bal/22;',
     rebuild: 'let gain=bal>0?bal/__ggGainCost(W_):bal/22;',
+  },
+  {
+    name: 'no milk past what the cow can pay for',
+    why: 'The MVP made full milk even when the cow could not pay for it: her loss stops at 1.5 kg a day, so the rest came from nothing. Engine: unpaidMilk.',
+    mvp: 'if(dam&&!dam.dead)mei+=dam.milk;}',
+    rebuild:
+      'if(dam&&!dam.dead)mei+=dam.milk;}' +
+      `if(a.milk>0&&mei-req<${MOST_LOSS_MJ}){const cut=Math.min(a.milk,(${MOST_LOSS_MJ}-(mei-req))*.65);` +
+      'if(cut>0){a.milk=a.milk-cut;req=req-cut/.65;}}',
   },
   {
     name: 'calf cost of gain, expected gain',

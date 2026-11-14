@@ -26,6 +26,7 @@ import { HEALTH_COST_PER_HEAD_YEAR, type SaleClassId } from '../data/cattle';
 import { SUPPLEMENTS } from '../data/feed';
 import { rngStream } from '../rng';
 import { makeSaleBatch } from './animal';
+import { MOST_LOSS_KG, milkMJ, mjPerKgGain } from './gains';
 import { settleDeaths, simMob, type SimMobInputs } from './simMob';
 import {
   animalLookup,
@@ -601,6 +602,42 @@ describe('MVP faults fixed (BUILD_PLAN 2.4)', () => {
     expect(dead.length).toBe(6);
     const { res } = engineDay(pair.e, { kind: 'lot' });
     expect(res.deaths.length).toBe(0);
+  });
+
+  it('a milking cow on bare ground makes only the milk she can pay for, and her calf drinks only that', () => {
+    // The MVP made full milk while her loss stopped at 1.5 kg a day, so some
+    // of the milk came from nothing. Engine 0.14.0 does not.
+    const scn = makeScenario(mvp as unknown as Mvp, {
+      district: 'cq',
+      start: { year: 2023, month: 0 },
+    });
+    AREA_NAMES.forEach((name) => paintArea(scn, name, 'bare'));
+    const run = new HerdRun(loaded, scn, { random: constantRandom(0.999999) }, [TROUGHS.mid]);
+    const cow = animal(run, 'dryCow');
+    const calf = animal(run, 'weanerSteer');
+    Object.assign(cow, { calf: calf.id, lact: 30, cond: 3, wt: 500 });
+    Object.assign(calf, { kind: 'calf', dam: cow.id, age: 30, wt: 60, cond: 3 });
+    const full = milkMJ(cow);
+    const m = createCattleMob();
+    m.animals = [cow, calf];
+    const calfWt = calf.wt;
+    simMob(m, {
+      place: { kind: 'paddock', area: areaOf(regAt(mvp, AREAS.mid)) },
+      land: landOf(mvp, scn, null),
+      day: 10,
+      byId: animalLookup([m]),
+      ids: { next: 1000 },
+      rng: bothStreams(rngFrom(() => 0.999999)),
+      healthPerHeadYear: HEALTH_COST_PER_HEAD_YEAR.cq,
+      totals: emptyCattleTotals(),
+    });
+    // She is at the floor: she lost 1.5 kg, and gave less than her full milk.
+    expect(cow.wt).toBeCloseTo(500 - MOST_LOSS_KG, 9);
+    expect(cow.milk).toBeLessThan(full);
+    expect(cow.milk).toBeGreaterThanOrEqual(0);
+    // The calf's gain is what the milk she made can pay for (it eats no pasture at 30 days).
+    const m75 = Math.pow(calfWt, 0.75);
+    expect(calf.wt).toBeLessThan(calfWt + (full - 0.45 * m75) / mjPerKgGain(calfWt));
   });
 
   it('a cow whose calf dies is dried off', () => {

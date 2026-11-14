@@ -863,4 +863,24 @@ Looked up for the calf growth benchmark (CALIBRATION.md, the m2.5 entry). In the
 |---|---|---|
 | Brahman cows on tropical pasture, Venezuela (no Australian source was read) | 6.2 kg a day on average over a 216-day lactation (1,340 kg), peaking in the second month | Neidhardt et al., J. Anim. Sci. 1979, 48:1-6, abstract read: https://academic.oup.com/jas/article-abstract/48/1/1/4697779 |
 
+**The limit of the calf cost of gain (m2.5 third pass).** The 0.52 MJ per kg LW^0.75 comes from Holstein calves in Japan on milk, hay and calf starter. In the game it also prices gain on pasture for weaned stock up to 200 kg, whatever the diet's ME. In the Australian feeding standards (SCA 1990, CSIRO 2007) the cost of gain depends on the animal's weight against its mature weight, its rate of gain and the diet's quality, but neither book could be read online, so no figure from them is used. What was read:
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Cattle, daily energy needs | Extra ME on top of maintenance to gain 0.5 kg a day: 6.5 MJ for a 100 kg weaner (13 MJ a kg of gain), 18.5 MJ for a 200 kg weaner (37 MJ a kg), 28.5 MJ for a 300 kg yearling. No source is given for the table and it does not vary with diet quality | FutureBeef, "Energy supplements", table 2, published 19 Sep 2011, read 15 Nov 2026: https://futurebeef.com.au/resources/energy-supplements/ |
+| Growing cattle, drought feeding | Needs set as multiples of maintenance (0.1 × LW + 5 MJ) by weight class and gain, for example 2.2 × maintenance to gain 1 kg a day under 300 kg | Agriculture Victoria, "Drought feeding and management of beef cattle", appendix II, search only |
+| The game, for comparison | 16.4 MJ a kg of gain at 100 kg, 29 MJ at 200 kg (the grown figure) | `mjPerKgGain` |
+
+At 100 kg FutureBeef's figure (13 MJ) is close to Sekine and Asahida's (16.4 MJ). At 200 kg FutureBeef's (37 MJ) is above the game's grown figure (29 MJ), so it does not support a cheaper rule for weaned stock between 100 and 200 kg. No change was made; on Claudia's list.
+
+**Calving and weaning rates in breeder herds (m2.5 third pass), for the three-year observation in CALIBRATION.md.**
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Northern Australia breeder herds (CashCow: 78,000 cows, 142 mobs, 72 businesses, three to four years); Southern Forest, Central Forest and Northern Downs. **Nearest for Central Qld** | Weaning rate averaged 72 to 77% | McGowan et al. 2014 (MLA, "CashCow"), as reported by Beef Central, 12 Sep 2023, read: https://www.beefcentral.com/genetics/weekly-genetics-review-breeding-cattle-in-northern-australia-what-have-we-learnt-so-far/ |
+| The national herd, since 1985 | 9.8 million calves weaned a year from 18.6 million beef females over a year old (about 53 per 100); ABARES surveys put national branding rates (a stand-in for lactation rate) at 70 to 80% | Fordyce, Shephard, Moravek and McGowan, Animal Production Science 2023, 63:410-421, read: https://era.dpi.qld.gov.au/id/eprint/8060/1/AN20342.pdf |
+| Southern Australia | Calving rate 82% (heifers) and 91% (cows) | National Tribune, from a producer survey, no date shown, search only |
+
+No district figure was found for the Northern Tablelands, Central West or Western Victoria.
+
 Not found: the Australian feeding standards' efficiencies for milk-fed calves (SCA 1990, CSIRO 2007) could not be read online, and no Australian lactation curve for Brahman-cross or British cows was read.

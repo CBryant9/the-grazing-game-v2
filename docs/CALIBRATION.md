@@ -22,6 +22,8 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 | Barley yield, Central West | ~2.5 t/ha | |
 | Wheat yield, Central West | ~2.4–3 t/ha | |
 | Steers on oats | ME ~10.7, CP ~18%, ~1.4 kg/day | |
+| Home-bred calves, Central Qld (m2.5) | 0.6–0.95 kg/day birth to 200 days and from 100 to 200 days; 100–146 kg at 100 days; 140–225 kg at 200 days | Nearest source, not the district's own: Brahman-Shorthorn calves in north Queensland (Fordyce et al. 1993), about 0.77 kg/day; the floors are a quarter under it (stand-in, years 25% apart); 100 kg at 100 days is FutureBeef's usual lowest weaning weight. Open: daily gain |
+| Home-bred calves, Northern Tablelands, Central West, Western Victoria (m2.5) | 0.7–1.1 kg/day birth to 200 days and from 100 to 200 days; 101–146 kg at 100 days; 171–256 kg at 200 days | Nearest source, not the districts' own: MLA More Beef from Pastures tool 5.05 (British calves, Grafton). Open in all three: daily gain and weight at 200 days |
 | Speed | under ~5 ms per simulated day with 4,000+ head | Fast-forward must stay smooth |
 
 Seasons are random. Judge a run against its season: a drought year below target is expected, but an average year outside target is a bug.
@@ -1187,16 +1189,21 @@ The condition figures barely move the calves: most cows stay above CS 2.25. What
 
 #### The calf benchmarks (new, `calibration/herds.test.ts`)
 
-Every calf born in the average-year herd runs (seeds 1 to 8, September and May starts) that reaches 200 days in the year, weaned or not. Gain a day is from its own birth weight. Each band is the nearest sourced figure, not the district's own.
+Every calf born in the average-year herd runs (seeds 1 to 8, September and May starts), weighed on the day it reached 100 days and on the day it reached 200 days, weaned or not. Gain to 200 days is from its own birth weight. Each band is the nearest sourced figure, not the district's own. Figures are engine 0.13.0, then 0.14.0 (both changes and the milk payment below).
 
-| District | Band: kg a day, kg at 200 days | Engine 0.13.0 | After the cost of gain | Engine 0.14.0 | September start / May start | Result |
-|---|---|---|---|---|---|---|
-| Central Qld (north Qld Brahman-cross) | 0.6 to 0.95, 140 to 225 | 0.28, 93 | 0.40, 115 | **0.53, 142** | 0.58, 152 / 0.48, 132 | open (`it.fails`) |
-| Northern Tablelands (MLA tool 5.05) | 0.6 to 1.1, 150 to 260 | 0.34, 103 | 0.46, 127 | **0.54, 144** | 0.56, 149 / 0.51, 139 | open |
-| Central West NSW (MLA tool 5.05) | 0.6 to 1.1, 150 to 260 | 0.32, 101 | 0.43, 123 | **0.57, 149** | 0.56, 149 / 0.57, 150 | open |
-| Western Victoria (MLA tool 5.05) | 0.6 to 1.1, 150 to 260 | 0.41, 117 | 0.52, 141 | **0.64, 163** | 0.61, 158 / 0.66, 168 | passes |
+| District | Birth to 200 days, kg a day | At 100 days, kg | At 200 days, kg | 100 to 200 days, kg a day |
+|---|---|---|---|---|
+| Central Qld, band (north Qld; floors stand-in) | 0.6 to 0.95 | 100 to 146 | 140 to 225 | 0.6 to 0.95 |
+| Central Qld, 0.13.0 → 0.14.0 | 0.28 → **0.53 open** | 73 → **111 passes** | 93 → **142 passes** | 0.20 → **0.33 open** |
+| Southern band (MLA tool 5.05, its own range) | 0.7 to 1.1 | 101 to 146 | 171 to 256 | 0.7 to 1.1 |
+| Northern Tablelands | 0.34 → **0.54 open** | 84 → **107 passes** | 103 → **143 open** | 0.20 → **0.39 open** |
+| Central West NSW | 0.32 → **0.57 open** | 84 → **120 passes** | 101 → **149 open** | 0.16 → **0.29 open** |
+| Western Victoria | 0.41 → **0.63 open** | 91 → **127 passes** | 117 → **163 open** | 0.26 → **0.36 open** |
 
-Open, for Claudia: what probably closes the gap is calving at each district's usual time (half these herds calve August to November from the May start, the rest late November to March; in Central Qld the September start, which calves in the wet, is the one near the band) and the herd paddocks' feed, which runs at ME 7 to 8 while the source's poorest pasture is ME 9.0. `it.fails` flags a row as soon as it passes.
+- **The shape.** The calves now grow well to 100 days (every district inside the 100-day band) and slowly after: 0.29 to 0.39 kg a day from 100 to 200 days against 0.6 to 1.1 in the sources. Milk tails off with the lactation line and the herd's feed runs at ME 7 to 8 with protein under 7% for months (item 8 of the third pass, below).
+- **Third pass (the review):** the southern floors are now the source's own (0.7 kg a day and 171 kg at 200 days; they were 0.6 and 150, below the source). That turned Western Victoria, which passed at 0.635 kg a day and 163 kg, into an open row. The Central Qld floors stay a quarter under the source, marked as stand-ins in the test. A 100-day row and a 100-to-200-day row were added.
+- **Open rows** are `it.fails`, named with their figure. Beside each district is a plain **regression floor** (not a benchmark): engine 0.14.0's four figures less 0.02 kg a day and 5 kg (Central Qld 0.51, 106, 137, 0.30; Tablelands 0.51, 102, 138, 0.36; Central West 0.54, 115, 144, 0.27; Western Victoria 0.61, 121, 157, 0.34), so the growth cannot slide back while the rows stay open.
+- What probably closes the gaps is on Claudia's list in DEVELOPMENT_LOG (m2.5): calving time on its own will not, on the Tablelands at least; the grass looks like the binding limit.
 
 **The found case** (`calibration/calvesFoundCase.cq.test.ts`, a plain test). Small Central Qld farm, easy, real years from 1 September 1997 (a below average season), seed 1, no player action.
 
@@ -1222,9 +1229,38 @@ Engine 0.13.0 against 0.14.0, the same runs and seeds as the tests (steers: seed
 | Central West NSW | 2.42 to 2.44% (3.37 to 3.85) | 2.39, the same | 123.2 / 135.5 to 132.9 / 146.8 | 3.38 to 3.57 | 91.3 to 90.9% |
 | Western Victoria | 2.65, the same (3.63, the same) | 2.65 to 2.70% | 177.3 / 170.5 to 191.0 / 180.7 | 2.73 to 2.58 | 91.7 to 91.3% |
 
-Bands: deaths 1.5 to 3.6% (any one herd under 6%), preg tests 0 to 9 points over and over 80% in calf, gain over 50 kg. The Tablelands preg tests moved closest to an edge (7.17 of 9 points). Why was not traced; it is on the list for Claudia.
+Bands: deaths 1.5 to 3.6% (any one herd under 6%), preg tests 0 to 9 points over and over 80% in calf, gain over 50 kg.
 
-**Other suites.** The real-year herd and steer files (`calibration/realYear*.test.ts`), crops, density, the speed check and the whole suite pass on 0.14.0 with no band changed (`pnpm test`: 122 files, 2,315 passed and 3 expected failures, the open calf rows). Their year-by-year tables in the 1.4 entry were not run again for this entry. The no-hands digests (`labour/noHands.test.ts`) were taken again: `c319ee87e5a36e84` and `a9d5034a80529087`.
+**The Tablelands preg tests moved because the yardstick moved, not because more cows got in calf** (traced by the review). The test compares the share in calf with the rate expected from each cow's condition. Cows are now thinner at the test, so the expected rate fell (83.59% to 81.35% in the review's runs), while the share actually in calf fell a little too (89.13% to 88.52%; 88.6% to 88.1% in the runs above). The gap between them widened from 5.54 to 7.17 points.
+
+**The milk payment (third pass) moved almost nothing.** With no milk made past what the cow can pay for, every herd figure above is the same to the decimal shown except Tablelands gain from the September start, 101.3 to 100.9 kg; the calf figures moved by under 0.001 kg a day and the found case not at all.
+
+**Other suites.** The real-year herd and steer files (`calibration/realYear*.test.ts`), crops, density, the speed check and the whole suite pass on 0.14.0 with no band changed. Real years, before and after: the year-by-year tables were run again on engine 0.14.0 (`GG_REAL_YEARS_RUN=1`, 9 files, 55 tests pass) and compared with the 1.4 entry (no cattle formula changed between engine 0.6.0 and 0.13.0, so those tables stand for 0.13.0).
+
+- **Steers, real years:** every figure in the 1.4 summary is the same (Central Qld no lick 34 over 29 years and 44 in the average year, with lick 124 and 131, Tablelands 98 and 104, Central West 102 and 130, Western Victoria 180 and 183; deaths unchanged).
+- **Herds, real years** (seeds 1 and 2), 1.4 → 0.14.0: Central Qld deaths over 29 years 2.9% → 2.9%, average year 2.8% → 2.9%, gain 123 → 135 kg over 29 years and 129 → 143 kg in the average year. Tablelands 3.8% → 3.7%, 3.9% → 3.5%, gain 91 → 95 and 97 → 101. Central West 4.8% → 3.8%, 3.0% → 3.0%, gain 97 → 105 and 121 → 130. Western Victoria 3.6% → 3.6%, 3.6% → 3.6%, gain 174 → 187 and 175 → 189.
+- **Central West herds in the droughts, left alone,** lose fewer now that a thin cow stops milking: from September 2002 11.4% → 4.0%, 2006 32.4% → 18.5%, 2019 12.6% → 5.8%; 2017 rose, 4.6% → 6.1%.
+
+The no-hands digests (`labour/noHands.test.ts`) were taken again in each model commit; the last are in the test with a comment pointing here.
+
+#### What the change does to the herd (third pass, recorded observation)
+
+No benchmark covers how many cows calve in later years or how thin they get. Over three average years from the September start with no player action:
+
+| | Central Qld, 0.13.0 | Central Qld, 0.14.0 | Tablelands, 0.13.0 | Tablelands, 0.14.0 |
+|---|---|---|---|---|
+| Calves born per 100 females 400 days or older, years 1 / 2 / 3 (the review's runs) | 86.1 / 72.2 / 59.6 | 84.7 / 70.8 / 52.1 | 84.8 / 68.1 / 55.6 | 83.7 / 61.8 / 51.4 |
+| The same, `calibration/herdYears.test.ts` (medium farm, seeds 1 to 4) | 86.0 / 67.7 / 61.4 | 85.1 / 66.2 / 55.3 | 85.4 / 63.6 / 58.4 | 84.0 / 57.9 / 55.4 |
+| % of cows under CS 2.25, August to October, years 1 / 2 / 3 (the test) | 0 / 0 / 0 | 0.5 / 0 / 4.5 | 0.7 / 0 / 0.2 | 3.1 / 17.0 / 16.6 |
+| The same, the review (its own measure, three years) | 0 | 5 to 16 in year 3 | 0 to 1 | 21 to 27 each year |
+
+Deaths did not rise. The cows milk off their backs, get thin late in the dry or the winter, and fewer get back in calf. `calibration/herdYears.test.ts` pins the test's figures (5 calves per 100 females, 8 points of cows) so later changes show up; on engine 0.13.0 it fails, which shows it can see the change.
+
+**Against the sources** (DATA.md, "Calving and weaning rates in breeder herds"): northern breeder herds in CashCow weaned 72 to 77 calves per 100 cows on average in the Southern Forest, Central Forest and Northern Downs; the national herd weans about 53 calves per 100 females over a year old, and national branding rates run 70 to 80%. The model's year-1 calving (84 to 85 per 100) sits above those, which count calves weaned, not born. Years 2 and 3 (52 to 66 per 100 born, before calf losses) sit at or under the bottom of them, for herds with no player action at all, no lick for the Tablelands herds and no weaning by hand. Whether that is fair for a herd left alone is for Claudia. No southern district figure was found.
+
+#### Calving time alone will not close the Tablelands gap (third pass, the review)
+
+With a May start the Tablelands herds calve in spring. 79 to 82% of their cows sit under CS 2.25 in September and October, the herd averages CS 1.99 at its lowest, and those calves do worse than the September-start ones (0.51 against 0.56 kg a day). The grass looks like the binding limit: diet ME runs 6.9 to 9.5 on the Tablelands and 6.8 to 8.8 in Central Qld, with protein under 7% for 5 to 6 months, and the feed is never short in amount.
 
 ### Earlier checks (build sessions, older model versions)
 

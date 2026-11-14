@@ -20,7 +20,8 @@
  * feedlot, a cow whose calf dies is dried off, and stock under 200 kg pay
  * the measured cost for a kg of gain, not the grown animal's
  * (`mjPerKgGain`, engine 0.14.0), and a cow's milk falls with her
- * condition, not with the feed's ME (`milkMJ`, engine 0.14.0).
+ * condition, not with the feed's ME (`milkMJ`, engine 0.14.0), and no
+ * milk is made past what her loss for the day can pay for (`unpaidMilk`).
  */
 
 import type { Supplement } from '../data/feed';
@@ -38,7 +39,7 @@ import {
   cycling,
   weanOne,
 } from './breeding';
-import { milkMJ, mjPerKgGain, predictGains } from './gains';
+import { MOST_LOSS_KG, milkMJ, mjPerKgGain, predictGains, unpaidMilk } from './gains';
 import { LOT_DIET, dietOf, grazeAlloc, intakeOf, type Diet, type PlantingGraze } from './graze';
 import type { CattleNote } from './notes';
 import type {
@@ -265,11 +266,20 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
       const dam = byId.get(a.dam);
       if (dam && !dam.dead) mei += dam.milk;
     }
+    // A cow pays for all her milk: what her loss can't pay for is not made.
+    // Dams go before calves, so the calf drinks only what was made.
+    if (a.milk > 0) {
+      const cut = unpaidMilk(a.milk, mei - req);
+      if (cut > 0) {
+        a.milk = a.milk - cut;
+        req = req - cut / 0.65;
+      }
+    }
     const bal = mei - req;
     // Light stock pay the measured calf cost for a kg of gain (mjPerKgGain).
     let gain = bal > 0 ? bal / mjPerKgGain(W_) : bal / 22;
     const cap = a.kind === 'steer' ? 1.6 : a.kind === 'bull' ? 1.4 : a.kind === 'calf' ? 1.15 : 1.1;
-    gain = clamp(gain, -1.5, cap);
+    gain = clamp(gain, -MOST_LOSS_KG, cap);
     // No water: fast weight loss.
     if (m.dry > 0) gain = -W_ * 0.04;
     a.wt = Math.max(25, W_ + gain);

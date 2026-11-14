@@ -103,8 +103,10 @@ describe('a farm with no hands and no contractors is unchanged', () => {
 // Taken on engine 0.12.1, before labour existed: '119de6c1e6862bb2' and
 // 'a52568e82c5f4cdf'. Taken again on engine 0.14.0 (m2.5), because the
 // cattle model changed on purpose: stock under 200 kg pay the measured cost
-// for a kg of gain, and a cow's milk falls with her condition, not with the
-// feed (docs/CALIBRATION.md, the m2.5 calf growth entry). Labour did not
-// change. The farms are the same; only the cattle figures moved.
-const NO_HANDS_RANDOM = 'c319ee87e5a36e84';
+// for a kg of gain, a cow's milk falls with her condition, not with the
+// feed, and no milk is made past what her loss can pay for
+// (docs/CALIBRATION.md, the m2.5 calf growth entry). Labour did not
+// change. The farms are the same; only the cattle figures moved. The real
+// years digest did not move with the last of these.
+const NO_HANDS_RANDOM = '154b92c7a442c890';
 const NO_HANDS_REAL = 'a9d5034a80529087';

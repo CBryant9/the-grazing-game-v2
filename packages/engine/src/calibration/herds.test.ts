@@ -3,6 +3,7 @@ import type { DistrictId } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AVERAGE_YEAR,
+  CALF_EARLY_AGE,
   CALF_WEIGH_AGE,
   herdRun,
   type HerdRun,
@@ -41,60 +42,126 @@ const NAMES: Record<DistrictId, string> = {
 };
 
 /*
- * Calves born on the farm, growth to 200 days (docs/CALIBRATION.md,
+ * Calves born on the farm, growth to 100 and 200 days (docs/CALIBRATION.md,
  * Benchmarks; the sources are in docs/DATA.md, "Calf growth to weaning").
- * Every calf born in the average-year runs that reaches 200 days in the
- * year, weaned or not, all herds together. Gain a day is from its own
- * birth weight.
+ * Every calf born in the average-year runs, all herds together, weighed on
+ * the day it reached 100 days and on the day it reached 200 days, weaned or
+ * not. Gain a day to 200 days is from its own birth weight.
  *
  * NONE OF THESE IS THE DISTRICT'S OWN FIGURE. It is the nearest one found:
+ *   Northern Tablelands, Central West NSW, Western Victoria: British calves,
+ *     MLA More Beef from Pastures tool 5.05 (Grafton research), the
+ *     source's own range: 0.7 to 1.1 kg a day, 101 to 146 kg at 100 days
+ *     and 171 to 256 kg at 200 days. The tool projects a steady gain over
+ *     the whole time, so 100 to 200 days is held at 0.7 to 1.1 kg a day too.
  *   Central Qld: Brahman-Shorthorn calves at Swan's Lagoon, north
  *     Queensland (Fordyce et al. 1993): about 0.77 kg a day to weaning and
- *     161 to 173 kg at 180 days, with years 25% apart. Band 0.6 to 0.95
- *     kg a day, 140 to 225 kg at 200 days.
- *   Northern Tablelands, Central West NSW, Western Victoria: British
- *     calves, MLA More Beef from Pastures tool 5.05 (Grafton research):
- *     0.7 to 1.1 kg a day, 171 to 256 kg at 200 days. Band 0.6 to 1.1 kg a
- *     day, 150 to 260 kg at 200 days.
+ *     161 to 173 kg at 180 days. STAND-IN FLOORS: the source's years differ
+ *     by up to 25%, so the floors are a quarter under it (0.6 kg a day,
+ *     140 kg); the tops are 0.95 kg a day and 225 kg. No 100-day figure
+ *     was found for the north: the floor is FutureBeef's usual lowest
+ *     weaning weight, 100 kg at about three months, and the top is MLA's
+ *     146 kg.
  *
- * The herds calve from late November to early March in every district
- * (the start herd's PTIC cows), which is the usual time for Central Qld
- * only. A district that misses its band is an open failure (test.fails),
- * named with its figure; it is on Claudia's list in docs/CALIBRATION.md.
+ * A row the district misses is an open failure (it.fails), named with its
+ * figure; it is on Claudia's list in docs/CALIBRATION.md, and it.fails
+ * flags it the day it passes. Beside each district is a plain REGRESSION
+ * FLOOR: today's figures less a small margin, so the growth cannot slide
+ * back unseen. The floor is not a benchmark.
  */
-interface CalfBand {
-  /** Kg a day, birth to 200 days. */
-  adg: [number, number];
-  /** Kg at 200 days. */
-  kg: [number, number];
-  /** Set while the district misses its band: the reason and the figure. */
+interface CalfRow {
+  lo: number;
+  hi: number;
+  /** Set while the district misses the row: its figure and why. */
   open?: string;
 }
 
-const NORTH_QLD: Pick<CalfBand, 'adg' | 'kg'> = { adg: [0.6, 0.95], kg: [140, 225] };
-const MLA_TOOL_505: Pick<CalfBand, 'adg' | 'kg'> = { adg: [0.6, 1.1], kg: [150, 260] };
+interface CalfBands {
+  /** Kg a day, birth to 200 days. */
+  adg: CalfRow;
+  /** Kg at 200 days. */
+  kg200: CalfRow;
+  /** Kg at 100 days. */
+  kg100: CalfRow;
+  /** Kg a day, 100 to 200 days. */
+  late: CalfRow;
+}
 
-/*
- * Open rows, engine 0.14.0 (docs/CALIBRATION.md, the m2.5 entry). Each is
- * under its band on gain a day. What probably closes the gap is on
- * Claudia's list: calving at the district's usual time (half these herds
- * calve August to November from the May start, the rest late November to
- * March), and herd paddocks whose feed runs at ME 7 to 8, under the
- * source's lowest pasture (ME 9.0).
- */
-const CALF_BANDS: Record<DistrictId, CalfBand> = {
-  cq: { ...NORTH_QLD, open: '0.53 kg a day and 142 kg; under 0.6 kg a day' },
-  nsw: { ...MLA_TOOL_505, open: '0.54 kg a day and 144 kg; under 0.6 kg a day and 150 kg' },
-  cw: { ...MLA_TOOL_505, open: '0.57 kg a day and 149 kg; under 0.6 kg a day and 150 kg' },
-  wv: { ...MLA_TOOL_505 },
+const NORTH_QLD: CalfBands = {
+  adg: { lo: 0.6, hi: 0.95 },
+  kg200: { lo: 140, hi: 225 },
+  kg100: { lo: 100, hi: 146 },
+  late: { lo: 0.6, hi: 0.95 },
+};
+const MLA_TOOL_505: CalfBands = {
+  adg: { lo: 0.7, hi: 1.1 },
+  kg200: { lo: 171, hi: 256 },
+  kg100: { lo: 101, hi: 146 },
+  late: { lo: 0.7, hi: 1.1 },
 };
 
-function calfFigures(runs: readonly HerdRun[]): { n: number; adg: number; kg: number } {
+/** A district's bands with some rows marked open, each with its figure. */
+const withOpen = (bands: CalfBands, open: Partial<Record<keyof CalfBands, string>>): CalfBands => ({
+  adg: { ...bands.adg, open: open.adg },
+  kg200: { ...bands.kg200, open: open.kg200 },
+  kg100: { ...bands.kg100, open: open.kg100 },
+  late: { ...bands.late, open: open.late },
+});
+
+/*
+ * Open rows, engine 0.14.0 (docs/CALIBRATION.md, the m2.5 entry). The
+ * calves grow well to 100 days and slowly after, as milk tails off and the
+ * herd's feed runs at ME 7 to 8 with protein under 7% for months.
+ */
+const LATE = 'milk tails off and the feed is poor';
+const CALF_BANDS: Record<DistrictId, CalfBands> = {
+  cq: withOpen(NORTH_QLD, { adg: `0.53 kg a day; ${LATE}`, late: `0.33 kg a day; ${LATE}` }),
+  nsw: withOpen(MLA_TOOL_505, {
+    adg: `0.54 kg a day; ${LATE}`,
+    kg200: `143 kg; ${LATE}`,
+    late: `0.39 kg a day; ${LATE}`,
+  }),
+  cw: withOpen(MLA_TOOL_505, {
+    adg: `0.57 kg a day; ${LATE}`,
+    kg200: `149 kg; ${LATE}`,
+    late: `0.29 kg a day; ${LATE}`,
+  }),
+  wv: withOpen(MLA_TOOL_505, {
+    adg: `0.63 kg a day; ${LATE}`,
+    kg200: `163 kg; ${LATE}`,
+    late: `0.36 kg a day; ${LATE}`,
+  }),
+};
+
+/**
+ * REGRESSION FLOORS, not benchmarks: engine 0.14.0's figures less 0.02 kg a
+ * day and 5 kg, rounded down. Raise them when the calves grow better; never
+ * lower them without a CALIBRATION.md entry saying why.
+ */
+const CALF_FLOORS: Record<DistrictId, Record<keyof CalfBands, number>> = {
+  // Engine 0.14.0: 0.532 kg a day, 111.1 kg at 100 days, 142.4 at 200, 0.326 from 100 to 200.
+  cq: { adg: 0.51, kg200: 137, kg100: 106, late: 0.3 },
+  // 0.537, 107.2, 143.5, 0.387.
+  nsw: { adg: 0.51, kg200: 138, kg100: 102, late: 0.36 },
+  // 0.566, 120.3, 149.2, 0.292.
+  cw: { adg: 0.54, kg200: 144, kg100: 115, late: 0.27 },
+  // 0.635, 126.9, 163.0, 0.360.
+  wv: { adg: 0.61, kg200: 157, kg100: 121, late: 0.34 },
+};
+
+type CalfFigures = Record<keyof CalfBands, number> & { n: number };
+
+function calfFigures(runs: readonly HerdRun[]): CalfFigures {
   const calves = runs.flatMap((r) => r.calves);
-  const n = calves.length;
-  const kg = calves.reduce((s, c) => s + c.kg, 0) / n;
-  const adg = calves.reduce((s, c) => s + (c.kg - c.birthKg) / CALF_WEIGH_AGE, 0) / n;
-  return { n, adg, kg };
+  const at100 = runs.flatMap((r) => r.calves100);
+  const mean = (xs: readonly number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
+  return {
+    n: calves.length,
+    adg: mean(calves.map((c) => (c.kg - c.birthKg) / CALF_WEIGH_AGE)),
+    kg200: mean(calves.map((c) => c.kg)),
+    kg100: mean(at100),
+    late: mean(calves.map((c) => (c.kg - c.kg100) / (CALF_WEIGH_AGE - CALF_EARLY_AGE))),
+  };
 }
 
 const pooledDeaths = (runs: readonly HerdRun[]): number =>
@@ -140,25 +207,46 @@ for (const district of ['cq', 'nsw', 'cw', 'wv'] as const) {
       expect(inCalf / tested).toBeGreaterThan(0.8);
     });
 
-    const band = CALF_BANDS[district];
-    const calfName = `calves born on the farm grow ${band.adg[0]} to ${band.adg[1]} kg a day and weigh ${band.kg[0]} to ${band.kg[1]} kg at 200 days in the average year (nearest sourced figure, not the district's own)`;
-    const calfTest = (): void => {
+    const bands = CALF_BANDS[district];
+    const calves = (): CalfFigures => {
       const c = calfFigures(average);
-      if (process.env.GG_CALF_PRINT === '1') {
-        const sep = calfFigures(average.slice(0, SEEDS.length));
-        const may = calfFigures(average.slice(SEEDS.length));
-        console.log(
-          `${district} calves: n ${c.n}, ${c.adg.toFixed(3)} kg/day, ${c.kg.toFixed(1)} kg at 200 days (Sep start ${sep.adg.toFixed(3)}, ${sep.kg.toFixed(1)}; May start ${may.adg.toFixed(3)}, ${may.kg.toFixed(1)})`,
-        );
-      }
       expect(c.n).toBeGreaterThan(40);
-      expect(c.adg).toBeGreaterThanOrEqual(band.adg[0]);
-      expect(c.adg).toBeLessThanOrEqual(band.adg[1]);
-      expect(c.kg).toBeGreaterThanOrEqual(band.kg[0]);
-      expect(c.kg).toBeLessThanOrEqual(band.kg[1]);
+      return c;
     };
-    if (band.open) it.fails(`OPEN: ${calfName}: ${band.open}`, calfTest);
-    else it(calfName, calfTest);
+    if (process.env.GG_CALF_PRINT === '1') {
+      const f = (x: CalfFigures): string =>
+        `${x.adg.toFixed(3)} kg/day, ${x.kg100.toFixed(1)} kg at 100, ${x.kg200.toFixed(1)} kg at 200, ${x.late.toFixed(3)} kg/day 100-200`;
+      const sep = calfFigures(average.slice(0, SEEDS.length));
+      const may = calfFigures(average.slice(SEEDS.length));
+      const all = calfFigures(average);
+      console.log(`${district} calves: n ${all.n}, ${f(all)} | Sep ${f(sep)} | May ${f(may)}`);
+    }
+    const rows: { key: keyof CalfBands; what: string; unit: string }[] = [
+      { key: 'adg', what: 'grow', unit: 'kg a day from birth to 200 days' },
+      { key: 'kg200', what: 'weigh', unit: 'kg at 200 days' },
+      { key: 'kg100', what: 'weigh', unit: 'kg at 100 days' },
+      { key: 'late', what: 'grow', unit: 'kg a day from 100 to 200 days' },
+    ];
+    for (const row of rows) {
+      const band = bands[row.key];
+      const name = `calves born on the farm ${row.what} ${band.lo} to ${band.hi} ${row.unit} in the average year (nearest sourced figure, not the district's own)`;
+      const test = (): void => {
+        const v = calves()[row.key];
+        expect(v).toBeGreaterThanOrEqual(band.lo);
+        expect(v).toBeLessThanOrEqual(band.hi);
+      };
+      if (band.open) it.fails(`OPEN: ${name}: ${band.open}`, test);
+      else it(name, test);
+    }
+
+    const floor = CALF_FLOORS[district];
+    it(`REGRESSION FLOOR, not a benchmark: calves grow at least ${floor.adg} kg a day to 200 days and ${floor.late} from 100 to 200, and weigh at least ${floor.kg100} kg at 100 days and ${floor.kg200} kg at 200`, () => {
+      const c = calves();
+      expect(c.adg).toBeGreaterThanOrEqual(floor.adg);
+      expect(c.late).toBeGreaterThanOrEqual(floor.late);
+      expect(c.kg100).toBeGreaterThanOrEqual(floor.kg100);
+      expect(c.kg200).toBeGreaterThanOrEqual(floor.kg200);
+    });
 
     it('runs a day in well under 5 ms', () => {
       // A loose check beside the rest of the suite. The benchmark itself is `pnpm test:speed`.

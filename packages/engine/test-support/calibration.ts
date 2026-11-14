@@ -189,6 +189,8 @@ export interface PregTest {
 export interface CalfAt200 {
   /** Weight on the day it was born, kg. */
   birthKg: number;
+  /** Weight on the day it reached 100 days, kg. */
+  kg100: number;
   /** Weight on the day it reached 200 days, kg, weaned or not. */
   kg: number;
 }
@@ -200,7 +202,10 @@ export interface CalfAt200 {
 export class CalfWatch {
   private readonly born = new Map<number, number>();
   private readonly weanedIds = new Set<number>();
+  private readonly kg100 = new Map<number, number>();
   readonly at200: CalfAt200[] = [];
+  /** Weight of each calf born on the farm on the day it reached 100 days, kg. */
+  readonly at100: number[] = [];
   /** Calves born on the farm, on the day they were weaned: age in days and kg. */
   readonly weaned: { age: number; kg: number }[] = [];
 
@@ -210,8 +215,15 @@ export class CalfWatch {
         if (a.dead) continue;
         if (a.kind === 'calf' && a.age === 0 && !this.born.has(a.id)) this.born.set(a.id, a.wt);
         else if (this.born.has(a.id)) {
-          if (a.age === CALF_WEIGH_AGE)
-            this.at200.push({ birthKg: this.born.get(a.id)!, kg: a.wt });
+          if (a.age === CALF_EARLY_AGE) {
+            this.kg100.set(a.id, a.wt);
+            this.at100.push(a.wt);
+          } else if (a.age === CALF_WEIGH_AGE) {
+            const kg100 = this.kg100.get(a.id);
+            if (kg100 !== undefined) {
+              this.at200.push({ birthKg: this.born.get(a.id)!, kg100, kg: a.wt });
+            }
+          }
           if (a.kind !== 'calf' && !this.weanedIds.has(a.id)) {
             this.weanedIds.add(a.id);
             this.weaned.push({ age: a.age, kg: a.wt });
@@ -224,6 +236,9 @@ export class CalfWatch {
 
 /** The age the calf benchmarks weigh at: MLA tool 5.05 reads weights at 200 days. */
 export const CALF_WEIGH_AGE = 200;
+
+/** The earlier weighing: MLA tool 5.05 also reads weights at 100 days. */
+export const CALF_EARLY_AGE = 100;
 
 export interface HerdRun {
   seed: number;
@@ -238,6 +253,8 @@ export interface HerdRun {
   msPerDay: number;
   /** Calves born in the run that reached 200 days in it. */
   calves: CalfAt200[];
+  /** Weights of calves born in the run on the day they reached 100 days, kg. */
+  calves100: number[];
 }
 
 /**
@@ -292,5 +309,6 @@ export function herdRun(
     seasons: seasonsOver(farm, 365, env),
     msPerDay,
     calves: calves.at200,
+    calves100: calves.at100,
   };
 }

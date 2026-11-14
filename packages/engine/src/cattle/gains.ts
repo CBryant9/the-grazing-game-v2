@@ -32,6 +32,24 @@ export function milkMJ(a: Animal): number {
   );
 }
 
+/** The most weight an animal loses in a day, kg (the MVP's floor on a day's gain). */
+export const MOST_LOSS_KG = 1.5;
+
+/** The energy a day's loss at that floor stands for, MJ (a kg of loss gives 22 MJ). */
+export const MOST_LOSS_MJ = -MOST_LOSS_KG * 22;
+
+/**
+ * How much of today's milk, MJ, a cow cannot pay for. Her loss stops at
+ * MOST_LOSS_KG a day, so energy past that would come from nothing; that
+ * much milk (at 0.65 MJ of milk for each MJ she spends) is not made.
+ * `bal` is her energy balance with the full milk counted, MJ (engine
+ * 0.14.0; the MVP made the milk anyway).
+ */
+export function unpaidMilk(milk: number, bal: number): number {
+  if (milk <= 0 || bal >= MOST_LOSS_MJ) return 0;
+  return Math.min(milk, (MOST_LOSS_MJ - bal) * 0.65);
+}
+
 /**
  * MJ of ME for each kg an animal of this live weight gains (YOUNG_GAIN_COST).
  * From 200 kg it is the MVP's 20 + 0.045 x LW for every animal. Lighter
