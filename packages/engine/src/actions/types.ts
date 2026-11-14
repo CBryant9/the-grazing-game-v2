@@ -10,6 +10,7 @@ import type { CalendarDate } from '../calendar';
 import type { CropRefusalReason } from '../crops/fields';
 import type { CattleClassId, GroupId, MarketClassId, SaleClassId } from '../data/cattle';
 import type { Supplement } from '../data/feed';
+import type { SheepFeed } from '../data/sheep';
 import type { SpeciesId } from '../data/species';
 import type { RefusalReason } from '../farm/layout';
 import type { EdgeRef } from '../farm/topology';
@@ -136,7 +137,26 @@ export type Action =
    */
   | { type: 'orderContractFence'; edges: EdgeRef[]; team: 1 | 2; handsHelp?: boolean }
   /** Stop contract fencing. What is built stays and what was charged stays paid. */
-  | { type: 'cancelContractFence'; run: number };
+  | { type: 'cancelContractFence'; run: number }
+  // ---- Sheep (milestone 2.4, engine half). Decisions: they take none of the day.
+  /** What a sheep mob is fed on top of the pasture: none, lick, grain or hay (charged each day). */
+  | { type: 'setSheepFeed'; mob: number; feed: SheepFeed }
+  /**
+   * Move a sheep mob's joining day, or its shearing or crutching day (the
+   * contractors come on it each year by themselves); null cancels shearing or
+   * crutching. Left out leaves it as it is.
+   */
+  | {
+      type: 'setSheepDates';
+      mob: number;
+      join?: { month: number; date: number };
+      shear?: { month: number; date: number } | null;
+      crutch?: { month: number; date: number } | null;
+    }
+  /** Buy sheep of a class into a paddock (not where cattle graze; never in Central Queensland). */
+  | { type: 'buySheep'; cls: string; qty: number; to: { cell: number } }
+  /** Sell sheep of a class from a sheep mob. Ewes with lambs at foot go with their share of the lambs. */
+  | { type: 'sellSheep'; mob: number; cls: string; qty: number };
 
 /** One leg of a plan as the player asks for it. `rounds` is 0 (keep going) if left out. */
 export interface PlanLegSpec {

@@ -282,16 +282,14 @@ export function simFlock(m: SheepMob, inp: SimFlockInputs): FlockDayResult {
               ? R.kgDay.latePreg
               : R.kgDay.dry;
         const cap =
-          stage *
-          (1 + SHEEP_RATION.perFiveKg * Math.max(0, (s.wt - SHEEP_RATION.refKg) / 5));
+          stage * (1 + SHEEP_RATION.perFiveKg * Math.max(0, (s.wt - SHEEP_RATION.refKg) / 5));
         fed = Math.min(cap, gap / R.me);
         mei += fed * R.me;
         feedCost += fed * s.n * (m.feed === 'grain' ? FEED_COST.pelletKg : FEED_COST.hayKg);
       }
     }
     if (m.feed === 'lick' && s.weaned) {
-      feedCost +=
-        ((FEED_COST.lick * (diet.cp < 9 ? 1 : LICK.greenFeedShare)) / DSE_PER_AE) * s.n;
+      feedCost += ((FEED_COST.lick * (diet.cp < 9 ? 1 : LICK.greenFeedShare)) / DSE_PER_AE) * s.n;
     }
     let milkIn = 0;
     const l = lpe[k]!;

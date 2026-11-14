@@ -20,6 +20,7 @@ import { squareGrazed } from '../crops/fields';
 import type { Survey } from '../farm/layout';
 import {
   BOUGHT,
+  GESTATION_DAYS,
   JOIN_START,
   KG_PER_CS_SHARE,
   SHEEP_WATER_L,
@@ -31,7 +32,10 @@ import { rngFromState, rngStream } from '../rng';
 import { areaIdOf, areaNameOf, grazingArea, placeAnchor } from '../sim/derived';
 import type { TickEvent } from '../sim/events';
 import type { FarmState, MobWhere } from '../sim/state';
-import { matureKg } from './energy';
+import { SHEARING_RATE, SHEEP_HEALTH_PER_HEAD_YEAR } from '../data/sheepMarket';
+import { isAdultRam, matureKg } from './energy';
+import { woolValue } from './market';
+import { crutchMob, shearMob } from './wool';
 import type { SheepDeathCause } from './notes';
 import {
   headOf,
@@ -157,6 +161,39 @@ export function makeSheep(
   };
 }
 
+/**
+ * When contractors shear and crutch by default, worked out from the joining
+ * date (sourced, 15 Nov 2026): the NSW sheep calendar (NSW Government,
+ * "Sheep calendar of operations", 12 Nov 2025) crutches ewes in mid-June
+ * before an August lambing and shears in November, so crutching is
+ * `CRUTCH_BEFORE_LAMBING` days before lambing starts and shearing
+ * `SHEAR_AFTER_LAMBING` days after (my arithmetic from those months); the
+ * Tasmanian guide (S48) puts crutching six to eight months after shearing,
+ * which this fits.
+ */
+export const CRUTCH_BEFORE_LAMBING = 60;
+export const SHEAR_AFTER_LAMBING = 80;
+
+/** The calendar day a number of days after a day and month (a year with no 29 February). */
+function dayAfter(
+  on: { month: number; date: number },
+  days: number,
+): { month: number; date: number } {
+  const d = new Date(Date.UTC(2021, on.month, on.date) + days * 86400000);
+  return { month: d.getUTCMonth(), date: d.getUTCDate() };
+}
+
+/** The default shearing and crutching days for a joining date. */
+export function sheepJobDates(joinOn: { month: number; date: number }): {
+  shearOn: { month: number; date: number };
+  crutchOn: { month: number; date: number };
+} {
+  return {
+    shearOn: dayAfter(joinOn, GESTATION_DAYS + SHEAR_AFTER_LAMBING),
+    crutchOn: dayAfter(joinOn, GESTATION_DAYS - CRUTCH_BEFORE_LAMBING),
+  };
+}
+
 /** A new, empty sheep mob. */
 export function createSheepMob(
   id: number,
@@ -173,6 +210,7 @@ export function createSheepMob(
     dry: 0,
     st: null,
     joinOn: joinOnFor(district),
+    ...sheepJobDates(joinOnFor(district)),
     join: null,
     shorn: -1,
     crutched: -1,
@@ -201,6 +239,29 @@ export function sheepAreas(farm: FarmState, survey: Survey): Set<number> {
   return out;
 }
 
+/** One record for a group of like sheep put on the farm (bought, or a start flock). No random numbers. */
+export function groupRecord(
+  ids: { next: number },
+  breed: SheepBreed,
+  srw: number,
+  g: SheepGroupSpec,
+): Sheep {
+  const sex: SheepSex = g.sex ?? (g.cls === 'wether' ? 'W' : g.cls === 'ram' ? 'M' : 'F');
+  const adult = g.cls === 'ewe' || g.cls === 'wether' || g.cls === 'ram';
+  const young = g.cls === 'hogget' ? 'hogget' : 'weaner';
+  const age = g.ageDays ?? (adult ? BOUGHT.ageDays.adult : BOUGHT.ageDays[young]);
+  const cs = g.cs ?? 3;
+  const mature = matureKg({ srw, sex });
+  const atCs = mature * (1 + KG_PER_CS_SHARE * (cs - 3));
+  const wt = g.wt ?? (adult ? atCs : atCs * BOUGHT.wtShare[young]);
+  const s = makeSheep(ids.next++, { sex, breed, srw, age, cs, wt, weaned: true, n: g.head });
+  if (!adult) {
+    s.wwt = BOUGHT.weanShareOfSrw * srw;
+    s.wage = Math.max(1, age - BOUGHT.weanedDaysAgo[young]);
+  }
+  return s;
+}
+
 /**
  * Put a mob of sheep on the farm (an engine and test helper until the
  * market sells sheep in milestone 2.4). Refused in Central Queensland, and
@@ -224,32 +285,7 @@ export function addSheepMob(farm: FarmState, survey: Survey, spec: AddSheepSpec)
     farm.district,
   );
   const srw = spec.srw ?? (spec.breed === 'xb' ? SRW.xb : SRW.merino);
-  for (const g of spec.groups) {
-    const sex: SheepSex = g.sex ?? (g.cls === 'wether' ? 'W' : g.cls === 'ram' ? 'M' : 'F');
-    const adult = g.cls === 'ewe' || g.cls === 'wether' || g.cls === 'ram';
-    const young = g.cls === 'hogget' ? 'hogget' : 'weaner';
-    const age = g.ageDays ?? (adult ? BOUGHT.ageDays.adult : BOUGHT.ageDays[young]);
-    const cs = g.cs ?? 3;
-    const mature = matureKg({ srw, sex });
-    const atCs = mature * (1 + KG_PER_CS_SHARE * (cs - 3));
-    const wt = g.wt ?? (adult ? atCs : atCs * BOUGHT.wtShare[young]);
-    // One record for the group: like animals.
-    const s = makeSheep(farm.animalIds.next++, {
-      sex,
-      breed: spec.breed,
-      srw,
-      age,
-      cs,
-      wt,
-      weaned: true,
-      n: g.head,
-    });
-    if (!adult) {
-      s.wwt = BOUGHT.weanShareOfSrw * srw;
-      s.wage = Math.max(1, age - BOUGHT.weanedDaysAgo[young]);
-    }
-    m.sheep.push(s);
-  }
+  for (const g of spec.groups) m.sheep.push(groupRecord(farm.animalIds, spec.breed, srw, g));
   state.mobs.push(m);
   return { ok: true, mob: m };
 }
@@ -274,6 +310,41 @@ export function sheepWaterLitres(m: SheepMob, month: number): number {
       s.n;
   }
   return l;
+}
+
+/** Shear a mob today: contractors' cost, and the wool sold at the stand-in price (call C20). */
+export function shearToday(farm: FarmState, m: SheepMob, events: TickEvent[]): void {
+  let rams = 0;
+  for (const x of m.sheep) if (x.weaned && isAdultRam(x)) rams += x.n;
+  const r = shearMob(m, farm.day);
+  if (!r.head) return;
+  const cost = (r.head - rams) * SHEARING_RATE.sheep + rams * SHEARING_RATE.ram;
+  const income = woolValue(r.cleanKg, r.micron);
+  farm.cash += income - cost;
+  farm.year.wool = (farm.year.wool ?? 0) + income;
+  farm.year.running += cost;
+  events.push({
+    type: 'sheep-shorn',
+    mob: m.id,
+    mobName: m.name,
+    head: r.head,
+    cleanKg: r.cleanKg,
+    greasyKg: r.greasyKg,
+    micron: r.micron,
+    months: r.months,
+    woolIncome: income,
+    cost,
+  });
+}
+
+/** Crutch a mob today: the contractors' cost. */
+export function crutchToday(farm: FarmState, m: SheepMob, events: TickEvent[]): void {
+  const head = crutchMob(m, farm.day);
+  if (!head) return;
+  const cost = head * SHEARING_RATE.crutch;
+  farm.cash -= cost;
+  farm.year.running += cost;
+  events.push({ type: 'sheep-crutched', mob: m.id, mobName: m.name, head, cost });
 }
 
 /** What the sheep step reports back to the tick. */
@@ -366,6 +437,19 @@ export function sheepDay(
         });
       }
     }
+    // Contractors shear and crutch on the mob's days, by themselves (none of the player's day).
+    if (m.shearOn && date.month === m.shearOn.month && date.date === m.shearOn.date) {
+      shearToday(farm, m, events);
+    }
+    if (m.crutchOn && date.month === m.crutchOn.month && date.date === m.crutchOn.date) {
+      crutchToday(farm, m, events);
+    }
+    // Animal health, a head a day.
+    const health = (headOf(m.sheep.filter((x) => x.weaned)) * SHEEP_HEALTH_PER_HEAD_YEAR) / 365;
+    if (health > 0) {
+      farm.cash -= health;
+      farm.year.running += health;
+    }
     const areaId = areaIdOf(survey, m);
     const res = simFlock(m, {
       place: { kind: 'paddock', area: grazingArea(survey, areaId) },
@@ -400,6 +484,7 @@ export function sheepDay(
       const by = new Map<SheepDeathCause, number>();
       for (const d of res.deaths) {
         deaths.push(d);
+        farm.year.sheepDeaths = (farm.year.sheepDeaths ?? 0) + d.count;
         by.set(d.cause, (by.get(d.cause) ?? 0) + d.count);
         out.deaths.push({ id: d.sheep.id, mob: m.id, cause: d.cause, count: d.count });
       }
@@ -408,8 +493,8 @@ export function sheepDay(
       }
     }
   }
-  // Sheep deaths stay out of the year's cattle totals (and its score) until
-  // milestone 2.4 decides how sheep score.
+  // Sheep deaths are counted in the year's `sheepDeaths` (the score counts each as one DSE's
+  // share of a beast).
   settleSheepDeaths(state.mobs, deaths, byId, farm.animalIds, rng.deaths);
   state.mobs = state.mobs.filter((m) => m.sheep.length);
   state.rng = {

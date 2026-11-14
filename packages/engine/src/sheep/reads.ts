@@ -5,7 +5,7 @@
  */
 
 import { aeOf } from '../cattle/animal';
-import { DRESSING, DSE_PER_AE } from '../data/sheep';
+import { DSE_PER_AE } from '../data/sheep';
 import { surveyOf, areaNameOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { aeFromDse, dseOf, sheepClassOf } from './energy';
@@ -199,17 +199,5 @@ export function fleeceOf(s: Pick<Sheep, 'fleece' | 'micronKg' | 'woolDays'>): {
   return { cleanKg: s.fleece, micron: fleeceMicron(s), months: s.woolDays / (365 / 12) };
 }
 
-/**
- * Dressing percentage (call C31): lambs 47.5% (crossbred) or 45% (Merino),
- * adults by fat score (taken as CS rounded). For the sale in milestone 2.4.
- */
-export function dressingShare(s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'weaned'>): number {
-  if (s.age < 365) return DRESSING.lambXb - (s.breed === 'merino' ? DRESSING.merinoLambLess : 0);
-  const fs = Math.min(5, Math.max(1, Math.round(s.cond)));
-  return DRESSING.mutton[s.sex === 'F' ? 'F' : 'W'][fs - 1]!;
-}
-
-/** Hot standard carcase weight, kg: live weight × dressing percentage. The MLA indicators are quoted on it. */
-export const carcaseKg = (
-  s: Pick<Sheep, 'sex' | 'breed' | 'cond' | 'age' | 'weaned' | 'wt'>,
-): number => s.wt * dressingShare(s);
+/** Dressing percentage and carcase weight, for the sale (call C31). */
+export { carcaseKg, dressingShare } from './market';

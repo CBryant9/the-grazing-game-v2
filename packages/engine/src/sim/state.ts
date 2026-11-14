@@ -162,8 +162,12 @@ export interface YearTotals {
   sales: number;
   /** Dollars spent buying cattle, freight included. */
   buys: number;
-  /** Dollars spent on supplements and the feedlot. */
+  /** Dollars spent on supplements and the feedlot (and on feeding sheep). */
   feed: number;
+  /** Dollars from wool sold at shearing. Left out until a farm first sells wool. */
+  wool?: number;
+  /** Sheep that died (lambs included). Left out until a farm first has sheep die. */
+  sheepDeaths?: number;
   /** Dollars from grain. */
   grain: number;
   /** Dollars spent on sowing forages and crops, and on harvesting. */

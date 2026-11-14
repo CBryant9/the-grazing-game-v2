@@ -19,6 +19,7 @@ import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
 import type { ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
+import type { SheepFeed } from '../data/sheep';
 import type { SheepDeathCause, SheepNote } from '../sheep/notes';
 import type { GameOverReason, MobWhere, PlanWaitReason, YearRecord } from './state';
 
@@ -97,6 +98,68 @@ export type TickEvent =
       count: number;
       avgKg: number;
       into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
+    }
+  /**
+   * Contractors shore a sheep mob (on its shearing day, by themselves): head
+   * shorn, the wool (clean and greasy kg, micron, months of wool), what it
+   * sold for at the stand-in price and the contractors' cost, dollars.
+   */
+  | {
+      type: 'sheep-shorn';
+      mob: number;
+      mobName: string;
+      head: number;
+      cleanKg: number;
+      greasyKg: number;
+      micron: number;
+      months: number;
+      woolIncome: number;
+      cost: number;
+    }
+  /** Contractors crutched a sheep mob: head and cost, dollars. */
+  | { type: 'sheep-crutched'; mob: number; mobName: string; head: number; cost: number }
+  /** Sheep bought (`buySheep`): the class, head, dollars paid with the head fee, and the mob. */
+  | {
+      type: 'sheep-bought';
+      cls: string;
+      qty: number;
+      total: number;
+      mob: number;
+      mobName: string;
+    }
+  /** Sheep sold (`sellSheep`): head, lambs at foot that went with their ewes, average kg, dollars banked. */
+  | {
+      type: 'sheep-sold';
+      mob: number;
+      mobName: string;
+      head: number;
+      lambsAtFoot: number;
+      avgKg: number;
+      net: number;
+    }
+  /**
+   * Hungry or thirsty sheep got through a fence that does not hold sheep
+   * into the next area (`edge`), from `from` to `to` (area names).
+   */
+  | {
+      type: 'sheep-breakout';
+      mob: number;
+      mobName: string;
+      reason: 'hungry' | 'thirsty';
+      edge: EdgeRef;
+      from: string;
+      to: string;
+    }
+  /** A sheep mob's feed was set. */
+  | { type: 'sheep-feed-set'; mob: number; mobName: string; feed: SheepFeed }
+  /** A sheep mob's joining, shearing and crutching days, as they now stand (null: not booked). */
+  | {
+      type: 'sheep-dates-set';
+      mob: number;
+      mobName: string;
+      joinOn: { month: number; date: number };
+      shearOn: { month: number; date: number } | null;
+      crutchOn: { month: number; date: number } | null;
     }
   /** Two mobs that share a grazing area, the feedlot or the yards now run as one. */
   | {

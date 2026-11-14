@@ -14,6 +14,8 @@ import { netSaleValue, type Prices } from '../market/prices';
 import { coverPct } from '../pasture/summary';
 import { pricesOf } from '../sim/derived';
 import type { FarmState, InfraLedger, YearRecord, YearScore, YearTotals } from '../sim/state';
+import { DSE_PER_AE } from '../data/stocking';
+import { sheepWorth } from '../sheep/market';
 import { INFRA_WORTH_SHARE, segmentCost } from './costs';
 
 const sum = (r: Record<string, number>): number => {
@@ -98,6 +100,8 @@ export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): numb
   let v =
     farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm) - wagesOwedOf(farm);
   for (const m of farm.mobs) for (const a of m.animals) v += Math.max(0, netSaleValue(a, prices));
+  // Sheep at what they would fetch today. A farm with no sheep adds nothing.
+  if (farm.sheep) v += sheepWorth(farm.sheep.mobs);
   return v;
 }
 
@@ -114,7 +118,10 @@ export function netWorthParts(farm: FarmState): {
   const owed = wagesOwedOf(farm);
   return {
     cash: farm.cash,
-    stock: stockWorth(farm, prices) + arrivalsWorth(farm),
+    stock:
+      stockWorth(farm, prices) +
+      arrivalsWorth(farm) +
+      (farm.sheep ? sheepWorth(farm.sheep.mobs) : 0),
     infrastructure: infraInPlace(farm) * INFRA_WORTH_SHARE,
     ...(owed > 0 ? { wagesOwed: owed } : {}),
     total: netWorth(farm, prices),
@@ -171,7 +178,10 @@ export const SCORE = {
  * when the year has no monthly readings yet.
  */
 export function scoreYear(
-  y: Pick<YearTotals, 'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'covers'> & {
+  y: Pick<
+    YearTotals,
+    'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'sheepDeaths' | 'covers'
+  > & {
     worth1: number;
   },
   coverNow: number,
@@ -191,7 +201,8 @@ export function scoreYear(
     (cover < S.coverLow ? (S.coverLow - cover) * S.coverShort : 0);
   const profitPts = profit / S.dollarsPerPoint;
   const gainPts = y.gain * S.gainPts;
-  const deathPts = -y.deaths * S.death;
+  // A sheep death counts as one DSE's share of a beast (call, 15 Nov 2026). 0 with no sheep.
+  const deathPts = -(y.deaths + (y.sheepDeaths ?? 0) / DSE_PER_AE) * S.death;
   return {
     profit,
     util,

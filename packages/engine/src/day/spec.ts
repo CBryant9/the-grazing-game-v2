@@ -208,6 +208,13 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'cancelSale':
       // Taking stock off a sale is a decision too.
       return { kind: 'free' };
+    case 'setSheepFeed':
+    case 'setSheepDates':
+    case 'buySheep':
+    case 'sellSheep':
+      // Sheep decisions (milestone 2.4, engine half): feeding and the contractors' days are set
+      // like the cattle supplement; buying and selling are decisions, as buying cattle is.
+      return { kind: 'free' };
     case 'hireHand':
     case 'letHandGo':
     case 'orderContractFence':

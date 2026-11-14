@@ -173,6 +173,14 @@ export interface SheepMob {
   joinOn: { month: number; date: number };
   /** The joining under way or the last one, or null. */
   join: SheepJoining | null;
+  /**
+   * The day and month contractors shear and crutch the mob each year, by
+   * themselves (`sheepJobDates`; the player may move them with
+   * `setSheepDates`).
+   */
+  shearOn: { month: number; date: number } | null;
+  /** Null when no crutching is booked (and `shearOn` null when no shearing is). */
+  crutchOn: { month: number; date: number } | null;
   /** The farm day the mob was last shorn and last crutched, or -1. */
   shorn: number;
   crutched: number;

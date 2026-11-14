@@ -140,6 +140,9 @@ export function sheepYearRun(
   });
   if (!r.ok) throw new Error('addSheepMob refused: ' + r.reason);
   const m = r.mob;
+  // The benchmark runs shear and crutch on their own days (below), not the contractors' days.
+  m.shearOn = null;
+  m.crutchOn = null;
   if (c.stock === 'weaners') {
     for (const s of m.sheep) {
       s.wage = s.age - 14;
@@ -188,7 +191,8 @@ export function sheepYearRun(
         // Weaners are fed to keep growing 50 g a day (S17); the rest to hold CS 2.7.
         const young = h > 0 && w.every((x) => x.age < 365);
         const adg = h ? w.reduce((t, x) => t + x.adg * x.n, 0) / h : 0;
-        if (young) sm.feed = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
+        if (young)
+          sm.feed = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
         else if (cs < FEED_FROM_CS) sm.feed = 'grain';
         else if (cs >= FEED_TO_CS) sm.feed = 'none';
       }
