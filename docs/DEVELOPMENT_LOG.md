@@ -1286,6 +1286,87 @@ Not done:
 - The legal pages are drafts, with no lawyer's review.
 - No audience numbers or ad prices on Advertise.
 - Cookie and consent banner (milestone 5.3, when analytics arrive).
+### 15 Nov 2026: m3.1 Database
+
+Branch `m3.1-database`, from `m1.7g-scores-diary` (the checked Stage 1 line, fa07767). The database half of milestone 3.1: the Supabase tables, access rules on every table, server functions, seed data and the tests that prove the rules. Sign-in screens are the other half and are not in this piece. Nothing in `apps/web`, `packages/engine` or `packages/render` changed. No account, project or key was made with any outside service.
+
+What was built (details in [DATABASE.md](DATABASE.md)):
+
+- **16 migrations** in `supabase/migrations` (after the second pass): 57 tables, three column-safe views, the access helpers, grants and policies, guards, server functions, five storage buckets with their rules, the reference rows (switches, ad slots, farm limits, products, rate limits, site settings) and two nightly pg_cron jobs.
+- **Tables:** accounts (`profiles`, `account_private`, `account_status`, profile links, experience, education, showcase photos, `guest_sessions`, `farm_limits`); game (`farms`, `farm_saves`, `farm_days`, `farm_snapshots`, `farm_actions`, `farm_scores`, `challenges`, `challenge_entries`, `leaderboard_entries`); community (`follows`, `blocks`, `groups`, `group_members`, `posts`, `post_photos`, `comments`, `likes`, `activity_events`, `reports`, `moderation_actions`, `word_filter`); system (`feature_switches`, `site_settings`, `admin_audit_log`, `rate_limit_rules`, `rate_limit_hits`, `notifications`, `notification_settings`, `notification_prefs`, `push_subscriptions`, `weather_daily`, `price_daily`, `daily_counts`); money (`ad_slots`, `sponsors`, `campaigns`, `ad_creatives`, `campaign_slots`, `ad_events`, `ad_daily`, `products`, `purchases`, `account_entitlements`, `stripe_customers`, `stripe_events`).
+- **`farm_saves` holds what `apps/web/server/game/store.ts` keeps in a file today** (stored format 3: the engine save, setup, farm version, recent act requests, inbox read mark), plus the save format, engine version and data version as columns. The diary moves to one `farm_days` row per day.
+- **`packages/db`**: the test harness on PGlite 0.5.13 (a dev dependency of that package only), the stand-ins for what Supabase supplies (test folder only), and four test files.
+- `.env.example`: the Supabase and Resend variables.
+
+How it was tested: 391 database tests in 4 files, about 20 seconds: every table against a visitor, player A, player B, an under-16 player, an admin and the server for select, insert, update and delete (270 cells and impersonation checks), whole-database checks (row level security on everywhere, every table in the matrix, grants, callable functions, search paths, reference rows matching `packages/shared`), and the rules and functions one by one. Then `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` (2,748 tests in 130 files, all passing), `pnpm build`, `pnpm check:browser-bundle` (clean) and `pnpm check:js-budget` (`/` 140.7 KB, `/play` 191.5 KB, unchanged). No PGlite code is in the browser build: it is a dev dependency of `packages/db` only, which nothing in `apps/web` imports. `pnpm test:speed` was not run (asked to skip). The tests prove the rules on Postgres semantics; one run against a real Supabase project is still owed (DATABASE.md, "Still owed").
+
+**Calls for Claudia** (what, why, how to change it):
+
+1. **Feature switches start at the PRD 11.7 launch defaults** (replaced in the second pass; the first cut had them all off, which was wrong: with sign-ups off not even you could finish sign-up). Sign-ups, both modes, leaderboards and push are on; the community, ads, purchases and maintenance mode are off. A test checks the seed equals `FEATURE_SWITCHES` key for key. PRD 11.7 and `FEATURE_SWITCHES` agree on every key they share; `FEATURE_SWITCHES` also has `video_ads` and `banner_ads`, which the PRD table does not name (both off), and the PRD's "Each ad slot" switches are the `ad_slots` rows (all off).
+2. **Guests are sessions the server makes** (a hashed cookie secret in `guest_sessions`), not Supabase anonymous sign-ins. No Auth user per visitor, no CAPTCHA, and it is how the game server already works. A guest's farm moves into the account on sign-up (`convert_guest`). To change: Supabase anonymous sign-ins could replace it later; `complete_sign_up` already refuses an anonymous session.
+3. **A guest whose account has no room** (already 2 Fast Farms) is refused and nothing moves; the server is to offer the choice. To change: `convert_guest`.
+4. **A guest not seen for 30 days is removed with their farm.** PRD 8.1 says the farm lives on the device only; 30 days is my number. To change: `prune_housekeeping`.
+5. **The under-16 rule is worked out live from the date of birth on today's Sydney date**, not a flag stored daily (PRD 15). It is always right and opens on the 16th birthday. To change to the player's own time zone: `app.today_sydney`.
+6. **Admins can use the community while its switches are off**, to check it before launch. An admin still has to be 16 or over. To change: `app.community_ok`.
+7. **Admins can't read a date of birth.** Only the player can. Admin sees role and bans, farms, scores, reports and ads.
+8. **Moderators** read reports, the moderation history, the word filter and every post (removed ones too). All moderation changes go through the server and the audit log.
+9. **Privacy defaults:** profile Public, farm view Followers only, ticker activity off until the player turns it on. To change: column defaults on `profiles`.
+10. **A followers-only or private profile still shows its card** (username, display name, checked photo, district) to other members, so a post's author can be named and a follow can be asked. The details stay hidden. A private profile can't be followed. If "private" should mean invisible, change `app.can_find_profile_for`.
+11. **Blocks hide both ways everywhere**, including leaderboard rows: the blocked player's row is left out for the viewer. Ranks are not stored; 4.1 works them out.
+12. **Under 16, or a private profile, on leaderboards: username and district only**, with no account id, photo or farm name. A deleted, banned or suspended account shows as "Former player".
+13. **Rate limits** (per account): posts 20 an hour (5 for the first 7 days), comments 60 (15), likes 300 an hour, follows 100 a day (30), reports 20 a day (5), new groups 5 a day (1), sign-ups 3 an hour, jobs 1,200 an hour, farm starts 10 an hour, ticker lines 6 an hour. To change: `rate_limit_rules` rows.
+14. **The word filter** matches whole words in text and letters in usernames. "Block" refuses; "flag" lets it through and puts it in the moderation queue. The seed has two placeholder words only; the real list is yours to supply.
+15. **Download my data leaves out the engine save and the action log**, because they hold the hidden rules. It includes the farms' days, diary and scores. Worth a word with the lawyer about the Privacy Act.
+16. **Deleting an account hands each group it owns to the longest-standing other member** (a community member first), and deletes a group only when the owner was its only member (second pass). To change: `app.before_account_delete`.
+17. **Not made from PRD 15:** `farm_jobs` (jobs in progress were removed on 14 Nov), `farm_messages` (the farm inbox lives in the engine save; the account inbox is `notifications`), `subscriptions` and `plan_features` (v1.1 replaced the subscription with one-off purchases: `products`, `purchases`, `account_entitlements`, and farm limits in `farm_limits`).
+18. **Products are seeded inactive at the PRD 10.3 prices**, with the proposed perks: the A$30 pack gives the farm pack, supporter badge and full diary; the A$50 pack adds no ads; the A$20 upgrade gives no ads. Keep going: Fast A$5, Daily A$15, A$25, A$50 and A$100 by age. No Stripe price ids until you make the products in Stripe.
+19. **Farm ids are uuids.** The file store uses 32 hex characters; the server is to drop the dashes. 3.2 settles it when the store is swapped.
+20. **The Daily Farm time zone change** is locked for 30 days, and moving to a zone already on a later date makes the farm wait a day rather than gain one.
+21. **pg_cron runs only the database's own nightly jobs** (ad roll-up, housekeeping). The 15-minute rollover needs the engine, so it is a scheduled call to the web server, set up in 3.3.
+22. **The seed accounts have no email addresses** (no contact details in the repo). To sign in as one locally, set its email in the local Studio.
+23. **Avatars and group photos are in private buckets** and are checked like post photos: nothing shows until the image check passes on that exact file, so a new avatar shows initials (the screens' choice) until then. Ad media is a public bucket, with no SVG.
+24. **Sign-up itself checks the sign-ups switch**, so it can be closed without a release.
+25. **Three views run with their owner's rights** (`public_profiles`, `leaderboard_rows`, `public_farms`). The Supabase linter flags this (lint 0010); it is the column-safe view the brief asked for.
+26. **PGlite is pinned to 0.5.13**, a release more than two weeks old, rather than the newest (0.5.16, 9 Nov).
+
+**Second pass (an Opus security review, same day).** Each hole has a test in `packages/db/src/review.test.ts` that tries it as the attacking role. The tests were written alongside the fixes, not run against the unfixed rules first. Fixed: photos approved by their exact file (storage id and change time), with a Storage trigger that sends a row back to pending when its file changes and approval refusing a missing file; avatars and group photos owned by folder and checked; groups handed on when their owner is deleted; pending follows hidden from third parties; an under-14 refusal recorded against the sign-in; banned and suspended accounts gone from member lists and shown as "Former player" on boards; a removed post can't be deleted by its author; the data download now has ticker lines, board rows, challenge entries and ad events; no Stripe payload kept; no email in the audit log; reports cleared and every `<account id>/` file listed on deletion; a hashed ban record that outlives deletion; exact view columns, a moderator in the seed with tests, leap-day and Sydney-date tests; browser roles limited to the helpers the rules need; the guest conversion locks its row; the action log is append only; push hosts kept in one table; no SVG in ad media; notification links can't start with // or a slash and backslash; private profiles on boards show the username only; an anonymous sign-in counts as not signed in; bucket limits update on re-run; switches at the PRD defaults.
+
+Checked after the second pass: 445 database tests in 5 files; `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` (2,802 tests in 131 files, all passing), `pnpm build` and `pnpm check:browser-bundle` (clean).
+
+**Calls for Claudia, added in the second pass:**
+
+27. **An under-14 refusal is kept against that sign-in only.** A different email address is a different sign-in and gets a fresh try; the database can't tell it is the same person. Date of birth alone may not be "reasonable steps" (PRD 18): a question for the lawyer.
+28. **Privacy call for you and your lawyer: a ban outlives a deleted account.** When a banned or suspended player deletes their account, a row stays in `ban_records` with only a one-way hash of their sign-in email (a peppered HMAC since the third pass, call 33) and the ban's end date, used only to refuse a new sign-up with that email while the ban runs. The moderation history itself is deleted with the account. A different email gets past it.
+29. **The push services allowed** are only those whose hosts I could read in the vendor's own documents: Apple (any host under push.apple.com, Apple's web push page) and Mozilla (updates.push.services.mozilla.com, Mozilla's autopush docs). Chrome and Edge could not be confirmed from a vendor page, so they are not listed yet, and Chrome and Edge subscriptions are refused until they are added (one row each in `push_service_hosts`, with the source). Needed before push goes live in 3.4.
+30. **The audit log takes ids and action names only.** A trigger refuses anything that looks like an email address in its details. Admin pages must write ids, never names or free text about a person.
+31. **A 29 February birthday counts from 1 March in other years** (14 and 16 are both reached on 1 March in a non-leap year). This is how Postgres counts ages.
+
+**Third pass (a second Opus security review of feee0fc).** Each test in `packages/db/src/third.test.ts` was written first and seen to fail on the unfixed rules (21 of 25 failed; the other 4 guard behaviour that already held). Fixed: approval only through `approve_photo()`, with the id, change time and version of the file the check read (the read, swap, approve race is refused, and a bare status change is refused for every role); group handover only to a member 16 or over in good standing, otherwise the group stays ownerless and an admin assigns an owner; the ban hash is a peppered HMAC made on the server (the database computes no hash, takes the finished one, needs it before sign-up and before deleting a banned account); notification links refuse control and space characters; the audit log takes a fixed shape with no free text; an admin can clear a mistyped under-14 refusal (logged); the helpers the browser can run answer only what the caller may know; deletion clears the Stripe customer id from Stripe events and farm names from boards; avatars can't be changed in place; an unlisted push host is refused with `push_host_not_allowed`.
+
+**Calls for Claudia, added in the third pass:**
+
+32. **Ownerless groups.** When a deleted owner leaves no member 16 or over in good standing, the group stays with no owner rather than taking other members' posts with it. Members can read, post and leave; nobody can change it, invite or remove members until an admin gives it an owner (`assign_group_owner`, logged).
+33. **The ban list needs `BAN_HASH_PEPPER`.** The server hashes each sign-in email with it (HMAC-SHA-256 of the normalised address) before sign-up and before deleting a banned account. Without the pepper the list is useless, which is the point: a database copy or backup can't be tested against known emails. Rotating it makes every ban on a deleted account stop matching. Normalising uses only rules read on the provider's own help page: Gmail dots and googlemail.com (Google), Fastmail `+tags` (Fastmail). Gmail `+tags` and Outlook, Apple and Yahoo aliases are not normalised yet, because no provider page stating them could be found: they get past the list until one is.
+34. **The way back for a mistyped date of birth.** An admin clears that sign-in's under-14 refusal (`clear_signup_refusal`, logged). The admin page that calls it is for 3.5.
+35. **Reports other people wrote about a deleted player stay** (the reporter's data and the moderation history). For the privacy notes and your lawyer.
+36. **Sign-up now needs a server step first** (`record_signup_email`), so the sign-up screen in 3.1's other half calls the server before `complete_sign_up`.
+37. **Chrome and Edge push** stay off the allowed list until 3.4; subscribing there is refused with `push_host_not_allowed`, for the screens to word plainly.
+
+**Keys and accounts Claudia must set up** (BUILD_PLAN section 8, row 3.1). I made none of these and entered no keys.
+
+| Account | What to copy | Where it goes |
+|---|---|---|
+| Supabase project, Free plan, Sydney region | Project URL | `NEXT_PUBLIC_SUPABASE_URL` in Vercel (all environments) and `.env.local` |
+| | Publishable key (older projects: anon key) | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, same places |
+| | Secret key (older projects: service role key) | `SUPABASE_SECRET_KEY`, Vercel only as a server variable, and `.env.local`. Never a `NEXT_PUBLIC_` name |
+| | Database connection string (URI) | `SUPABASE_DB_URL`, only on the machine or CI that applies migrations |
+| | Dashboard settings | Data API exposes `public` only (the exposed schemas setting must never include `app`); **anonymous sign-ins must stay off** (the rules treat an anonymous token as not signed in, but keep them off as well); two-step sign-in on your own Supabase login |
+| Google sign-in | A Google OAuth client (client id and secret) | Pasted into the Supabase dashboard (Authentication, Providers, Google), not into an environment variable |
+| Nothing new: a secret you make | A long random pepper for the ban list (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) | `BAN_HASH_PEPPER` in Vercel as a server variable and in `.env.local`. Never in the database or the repo. Keep a copy somewhere safe: losing it loses every ban on a deleted account |
+| Resend (Free) and a domain with DNS access | API key | `RESEND_API_KEY` in Vercel and `.env.local`, and in Supabase Auth's SMTP settings for sign-in links |
+| Vercel project (Hobby), linked to the repo, previews locked | | Paste the variables above |
+
+Not done in this piece: the sign-in screens and Supabase client in `apps/web` (the other half of 3.1), swapping the file store for the database (3.2), the rollover route (3.3), and the run against a real Supabase project.
 
 ## Ideas raised but not built yet
 
