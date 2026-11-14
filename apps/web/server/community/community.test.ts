@@ -1281,6 +1281,38 @@ describe('A photo never shows before it has been checked', () => {
     ).toBe('rejected');
   });
 
+  it('the photo queue route has the admin gate: 404 for everyone but an admin, 403 across sites, 404 with no keys', async () => {
+    const a = await person('alice');
+    const admin = await person('theadmin', { role: 'admin' });
+    const kid = await person('kidsmith', { ageYears: 15 });
+    const susp = await person('suspadmin', { role: 'admin', suspended: true });
+    const body = {
+      kind: 'post_photo',
+      row: '00000000-0000-4000-8000-000000000001',
+      objectId: '00000000-0000-4000-8000-000000000002',
+      updatedAt: '2026-01-01T00:00:00.000000Z',
+      version: null,
+      decision: 'approve',
+    };
+    for (const who of [null, a, kid, susp]) {
+      const res = await post('admin', who, body);
+      expect(res.status, who?.username ?? 'visitor').toBe(404);
+      expect(res.headers.get('x-robots-tag')).toBeNull();
+    }
+    expect(
+      (await post('admin', admin, body, { headers: { origin: 'https://evil.example' } })).status,
+    ).toBe(403);
+    expect(
+      (await post('admin', admin, body, { headers: { 'sec-fetch-site': 'cross-site' } })).status,
+    ).toBe(403);
+    // A photo that is not waiting is a plain 409, and nothing is written.
+    const res = await post('admin', admin, body);
+    expect(res.status).toBe(409);
+    expect((await db.query('select 1 from public.admin_audit_log')).rows).toHaveLength(0);
+    setAuthDeps(null);
+    expect((await post('admin', admin, body)).status).toBe(404);
+  });
+
   it('only the author adds photos, to a post that is theirs, up to four, and refuses files that are not pictures', async () => {
     const a = await person('alice');
     const b = await person('bobby');
@@ -1331,9 +1363,7 @@ describe('A photo never shows before it has been checked', () => {
     expect(wt).not.toMatch(/EXIF|XMP|secret/);
     expect(wt).toContain('VP8L');
     // The WebP's header flags no longer say EXIF or XMP, and its size is right.
-    expect(w.bytes.readUInt32LE?.(4) ?? Buffer.from(w.bytes).readUInt32LE(4)).toBe(
-      w.bytes.length - 8,
-    );
+    expect(Buffer.from(w.bytes).readUInt32LE(4)).toBe(w.bytes.length - 8);
     const x = Buffer.from(w.bytes).subarray(20, 21)[0]!;
     expect(x & (0x08 | 0x04)).toBe(0);
   });

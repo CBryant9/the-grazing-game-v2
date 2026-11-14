@@ -2,7 +2,6 @@ import 'server-only';
 import type { SqlClient, SqlRunner } from '../db/sql';
 import { safeHref } from './text';
 import type {
-  Author,
   Card,
   CommentView,
   FeedTab,

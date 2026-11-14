@@ -14,7 +14,6 @@
  * string. Text is only ever rendered as text, never as markup.
  */
 
-// eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
 const HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎]/g;
 const HAS_HIDDEN = /[​‌⁠﻿‎‏؜‪-‮⁦-⁩­᠎]/;
@@ -71,7 +70,6 @@ export function safeUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const raw = value.trim();
   if (raw.length === 0 || raw.length > 300) return null;
-  // eslint-disable-next-line no-control-regex
   if (/[\s\u0000-\u001f\u007f-\u009f]/.test(raw) || HAS_HIDDEN.test(raw)) return null;
   let u: URL;
   try {

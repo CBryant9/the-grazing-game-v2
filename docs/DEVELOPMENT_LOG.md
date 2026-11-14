@@ -1543,6 +1543,53 @@ It should say `UPDATE 1`. A test runs this exact statement. There is no public r
 
 **Not done:** the redirect route (or `proxy.ts`) that would refresh an admin's sign-in on a page load; the unknown `/api/...` path answers differently from an admin route's JSON 404 (an admin route's answer is the same for everyone who is not an admin, which is what was asked); the access matrix has no new table to add (the new test file covers the new rules); nothing was checked in a real browser or a real Supabase project.
 
+### 15 Nov 2026: m4.2 Community
+
+Milestones 4.2 (profiles and following) and 4.3 (posts and the feed), built together on branch `m4.2-community` from `m3.5-admin-shell`. All of it sits behind the Community switch (and `feed_posts` for the post routes), off by default. With the switch off, or with no database keys, no community page, link or route answers: every one is the same plain 404, and the game and website are untouched. No migration was needed: the rules were already in the database (docs/DATABASE.md, "What the server does for the community").
+
+**What was built**
+
+- Profiles (`/community/me` to edit, `/community/u/<name>` to view): display name, photo, bio, town, district, farming answers, links, experience, courses, privacy (profile, farm view, ticker). A private profile shows its card only. "See it as others see it" shows a stranger's view.
+- Following: follow, unfollow, requests for followers-only profiles (accept, decline, cancel), followers and following lists, block and unblock with a plain Yes or No confirm, search by the start of a username.
+- Posts, comments (one level of replies), likes, reports (post, comment, profile, the PRD's reasons), edit and delete your own. A removed post shows as removed to its author and can not be deleted by them.
+- Feed (`/community`): Friends' days, Everyone, Groups, paged by a keyset cursor, with empty states.
+- Share my farm and day cards: plain facts stored at posting time. A share image (`/api/community/share-image?post=`) for public posts.
+- Photos: upload to the server, cleaned (metadata removed), stored in the player's own folder, pending, an image-check interface with a "held for review" default, and the admin queue (`/admin/photos`).
+- Navigation: a Community button in the More tab's account section, only when the server says the switch is on and the player is 16 or over.
+
+**How it was tested** (`apps/web/server/community/*.test.ts`, on PGlite with the fake sign-in provider and a fake storage and image check)
+
+- `community.test.ts`: the walked routes (a route file must use `communityRoute`, export only GET or POST, and be in the test table, so a new route can not skip the gate, CSRF and limits); visitor, under 16, banned, suspended, no profile, switch off (admin too) and no keys all get the same 404 on every route; cross-site and non-JSON writes get 403; limits; profiles and privacy; follows, requests, blocks both ways; posts, comments, likes, reports; the word filter (including a zero-width trick), rate limits, script tags, `javascript:` links, bidi and zero-width characters; cursor paging over 45 posts; day cards; Share my farm; the whole photo path.
+- Named tests: "An under-16 test account sees no community anywhere" (routes in `community.test.ts`, pages in `pages.test.ts`) and "A photo never shows before it has been checked" (pending to nobody, the author's note only, swapped file, approval by exact file, queue, check pass and fail).
+- `pages.test.ts`: every page and the layout as each caller; every page calls `requireMember()` itself.
+- `image.test` cases inside `community.test.ts`: JPEG, PNG and WebP metadata removal, bombs, oversize, renamed files.
+- `scripts/check-js-budget.test.ts` has a community case; `admin/pages.test.ts` lists the new `/photos` page.
+
+**Results.** Full `pnpm test`: 157 files, 3,252 tests (the one run with a failure was the generic admin route walk, which could not give the photo queue a real photo; it now skips `photos`, whose own gate, CSRF, no-keys and rollback tests are in `community.test.ts`). `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build` and `pnpm check:browser-bundle` pass. JS (gzip): `/` 0.0 KB (limit 1), `/play` 198.7 KB, `/community` 145.4, `/community/me` 147.1, the other community pages 144.3 (new line, limit 150 each, never raised), `/admin` 147.8 (unchanged limit). Production build with no keys on port 3301: every community page and route answers 404 (`/admin/photos` shows the "needs accounts" notice like the other admin pages), no 5xx, `/` and `/play` 200, and the farm API answers as a guest.
+
+**How photos are cleaned.** No image library is installed, so the server rebuilds each file keeping only the picture's own parts (image.ts): JPEG without EXIF, XMP, IPTC and comments; PNG without text, `eXIf` and time chunks; WebP without `EXIF`, `XMP ` and the colour profile (header flags rewritten); animated WebP refused. It reads the real type from the bytes and the size from the header (over 12,000 a side or 36 million pixels is refused). It does not re-compress. The page shrinks and re-encodes in the browser first, which also applies the camera's rotation.
+
+**Calls for Claudia**
+
+1. **An admin does not see the community with the switch off** on this site, although the database would let them. This keeps "switch off means nothing is reachable" true. To check it before launch, turn the switch on in a preview copy. One line in `server/community/gate.ts` would let admins through.
+2. **Photos are stripped, not re-compressed.** Adding `sharp` (already in the build for Next) as a dependency would re-encode them on the server. It needs your say-so because it changes the lock file.
+3. **Photos upload through the server**, not straight from the browser to Storage: 6 MB for a post photo, 2 MB for a profile photo.
+4. **The image check is an interface with no service behind it.** Until you choose one, every photo waits in `/admin/photos`. `IMAGE_CHECK_API_KEY` is listed in `.env.example` and does nothing yet.
+5. **A post needs some words.** A photo-only post is not allowed (the database wants a body for a plain post).
+6. **Everyone is newest first.** The PRD says "newest and popular"; popular ordering is not built.
+7. **Day cards are built and tested (`makeDayCard`) but nothing calls it.** The Daily Farm rollover belongs to the Daily Farm work and is to call it after each day.
+8. **A private profile's page lists no posts**, but its public posts still appear in the Everyone feed, because that is how the database rule for posts works. If a private profile should post only to followers, that is a change to the post rule.
+9. **Share my farm shows**: farm and district, date, season, head, average pasture, ground cover, net worth: all on the farm screen already.
+10. **The Groups tab reads group posts, but there is no group screen yet** (the groups milestone). Reports of groups are left for it.
+11. **Search is by the start of a username only**, not display name.
+12. **Real farm photos (showcase photos), the ticker, the leaderboard tabs, pull to refresh (the mockup does not show it) and looking at someone's farm (4.5) are not built.**
+13. **The Community link is in the More tab**, not the bottom bar, and not on the public site header (public pages send no script).
+14. **Photo queue decisions are audited** as `photo_approve` and `photo_reject`.
+
+**Keys Claudia must set up:** none for 4.2 and 4.3 beyond those already listed (Supabase URL, publishable key, secret key, pooler URL, ban pepper, site address). Photos use Storage through the secret key. For the image check: an image-check service (BUILD_PLAN section 8), then its key as `IMAGE_CHECK_API_KEY`, and an adapter written for it.
+
+**Still owed against a real project:** Storage uploads with the secret key, `storage.objects` rows matching what `approve_photo` reads, and the photo route's download; the pages by eye on a phone and a PC in both themes.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

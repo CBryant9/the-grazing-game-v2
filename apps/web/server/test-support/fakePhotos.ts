@@ -10,9 +10,11 @@ import type { CheckResult, ImageCheck, PhotoStorage } from '../community/photos'
 export class FakeStorage implements PhotoStorage {
   readonly files = new Map<string, Uint8Array>();
   readonly removed: string[] = [];
+  readonly mimes = new Map<string, string>();
   constructor(private readonly db: PGlite) {}
 
-  async put(bucket: string, path: string, bytes: Uint8Array): Promise<void> {
+  async put(bucket: string, path: string, bytes: Uint8Array, mime?: string): Promise<void> {
+    if (mime) this.mimes.set(`${bucket}/${path}`, mime);
     this.files.set(`${bucket}/${path}`, bytes);
     await this.db.query(
       `insert into storage.objects (bucket_id, name) values ($1, $2)

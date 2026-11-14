@@ -42,9 +42,12 @@ function walk(dir: string, match: RegExp): string[] {
   }
   return out;
 }
-const adminRouteNames = walk('app/api/admin', /^route\.ts$/).map((f) =>
-  f.replace('app/api/admin/', '').replace('/route.ts', ''),
-);
+// `photos` needs a real photo waiting in the queue to say yes, so its gate, CSRF, no keys, rollback
+// and pass checks are in community/community.test.ts ("the manual photo queue"), not in this walk.
+const OWN_TESTS = new Set(['photos']);
+const adminRouteNames = walk('app/api/admin', /^route\.ts$/)
+  .map((f) => f.replace('app/api/admin/', '').replace('/route.ts', ''))
+  .filter((n) => !OWN_TESTS.has(n));
 const adminModules = import.meta.glob('../../app/api/admin/**/route.ts');
 const gameModules = import.meta.glob('../../app/api/game/**/route.ts');
 const gameRouteFiles = walk('app/api/game', /^route\.ts$/);
