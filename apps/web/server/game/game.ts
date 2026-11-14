@@ -55,7 +55,7 @@ import {
   refundNote,
 } from './buildwords';
 import { cropLines, parseSow } from './crops';
-import { buyLines, cancelLines, sellLines } from './marketwords';
+import { buyLines, cancelLines, saleClassLabel, sellLines } from './marketwords';
 import { suppPerDay } from './mobs';
 import { GROUP_NAME, lostWaterNote, moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
@@ -690,7 +690,7 @@ export class GameServer {
         return buyLines({
           qty: action.qty,
           one: c.one,
-          label: c.label,
+          label: saleClassLabel(action.cls) ?? c.label,
           total: Math.round(card.cost),
           cashBefore: Math.round(farm.cash),
           units: 'calf' in c,

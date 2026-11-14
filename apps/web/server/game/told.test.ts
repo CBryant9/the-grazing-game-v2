@@ -66,7 +66,7 @@ describe('the mob card shows the record', () => {
   it('no preg test or count of cows in calf reaches the inbox, and no cow is called empty', () => {
     const farm = farmAt(200);
     const s = snap(farm);
-    const text = JSON.stringify({ inbox: s.inbox, mobs: s.mobs });
+    const text = JSON.stringify({ inbox: s.inbox, mobs: s.mobs, market: s.market });
     expect(text).not.toMatch(/preg test|in calf now|got in calf|empty/i);
   });
 });

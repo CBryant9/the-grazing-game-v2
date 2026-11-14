@@ -1025,6 +1025,24 @@ Questions for Claudia:
 5. **No water is purple on the map** (labels, markers, the pickable outline) but keeps the site colour in the panels. Right?
 6. **Unused farms are removed after 90 days.** Right?
 
+### 14 Nov 2026: milestone 1.7f, third pass (a review of the second)
+
+Same branch. Engine 0.12.1 (notes carry more; no formula changed), save format 8.
+
+- **The inbox no longer gives away early pregnancy.** The `slipped` note carries the days in calf; the inbox says "A PTIC cow in Mob 1 lost her pregnancy." only from `PTIC_DAYS`, and nothing before. Tested at 10, 49 and 50 days.
+- **Ready-to-join counts follow the record.** The joining and no-bull notes carry `readyOnRecord` (joining-age females not PTIC on the record), which the inbox shows. The notes are still raised by the model's own count, so a note can stay silent when every female is in calf but under 50 days: a small give-away, accepted.
+- **The mob card's "why" lines** group cattle by `recordClassOf` (`predictGains` takes a grouping; the old game comparison still uses the live class and passes unchanged).
+- **No "empty" on screen:** the buy list, the buy card and the inbox say "Dry cows" from a server-side name list (the engine's label stays for its tables). The booking card adds "A cow that is PTIC on the record by then is paid as PTIC." (it shows no figure at booking; the price is set on the sale day).
+- Stale comments and docs brought up to date (summary, animal, prices, worth, the farm view, MODEL, REQUIREMENTS), Claudia's quote word for word, LESSONS E1 rewritten and E2 added, the told test checks the bought cattle where they land.
+- **The long layout comparison** ("40 farms vs MVP") ran past its 240 s limit when every test file ran beside it on a busy machine (about 70 s alone). Its own limit is now 10 minutes; it checks the same farms and jobs. No worker cap was added.
+- The herd list line wraps inside its row on a narrow screen.
+
+Calls made by the coordinator, for Claudia to confirm:
+
+1. The move tool's map key describes the map, so its no-water line stays purple like the map. Everything else in the panels keeps the site colour.
+2. The profit marker (not built) must not use red on the map when it is built (VISUALS).
+3. A cow booked for sale in "Cows" who reaches 50 days in calf by sale day is paid the PTIC premium, more than a figure worked out at booking. The sale pays by the record on the day.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

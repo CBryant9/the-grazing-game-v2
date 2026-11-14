@@ -57,10 +57,10 @@ export interface MobSummary {
   /** The mob's figures from its last day: weight, CS, gain, diet ME and CP, intake. Null before its first day. */
   day: MobDay | null;
   /**
-   * What the mob would put in the bank if sold today, dollars. NOT FOR THE
-   * PLAYER'S SCREENS as it stands: it carries the pregnancy premium from a
-   * female's 50th day in calf, before any preg test (docs/MODEL.md, section
-   * 3, "What the player is told").
+   * What the mob would put in the bank if sold today, dollars. It carries
+   * the pregnancy premium from a female's 50th day in calf, the day she goes
+   * on the record as PTIC (`PTIC_DAYS`), so it agrees with the record
+   * (docs/MODEL.md, section 3, "The herd record").
    */
   saleValue: number;
   /** Head in the mob (calves at foot included) that are booked onto a sale, so a screen can mark them. */

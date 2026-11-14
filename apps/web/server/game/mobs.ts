@@ -151,7 +151,8 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
   // The engine's own reasons, for a mob that is not gaining or is short of feed.
   let forecasts: GainForecast[] = [];
   if (area && m.st && (m.st.adg < 0.05 || m.st.f < 0.9)) {
-    forecasts = predictGains(m, r.land, area).filter((g) => g.why.length > 0);
+    // Grouped by the record, so the lines never move on the day a cow conceives.
+    forecasts = predictGains(m, r.land, area, recordClassOf).filter((g) => g.why.length > 0);
   }
   const why = mobWhy({
     name: s.name,

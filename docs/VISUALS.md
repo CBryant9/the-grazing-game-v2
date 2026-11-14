@@ -63,7 +63,7 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 | Arable land | pale yellow wash (stronger on cropped squares). Also shown while using the Sow tool. |
 | Pipe | blue `#5ab4f0` lines when connected to the bore, grey `#7e8a96` when not |
 | Labels | paddock name (big paddocks in capitals), ha, "no water" in purple (the map's no-water colour, Claudia, 14 Nov 2026; the panels keep the site colour) or "water via gate"; planting name under crops |
-| Profit | small green/red marker over each beast |
+| Profit | small green/red marker over each beast. *(Not built yet. When it is, it must not use red on the map: red on the map is only for "can't do this" while drawing. Claudia, 14 Nov 2026.)* |
 
 ## Infrastructure
 

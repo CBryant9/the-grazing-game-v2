@@ -283,7 +283,7 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
       if (a.preg >= 0) {
         a.preg++;
         if (a.cond < 1.6 && inp.rng.breeding.chance(0.002)) {
-          notes.push({ type: 'slipped', kind: a.kind });
+          notes.push({ type: 'slipped', kind: a.kind, days: a.preg });
           a.preg = -1;
         } else if (a.preg >= GESTATION_DAYS) {
           calve(a, m, { ids: inp.ids, rng: inp.rng.breeding, day, totals, notes, births });

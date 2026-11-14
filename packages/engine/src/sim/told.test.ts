@@ -102,7 +102,12 @@ describe('the record', () => {
     const before = breedingReports(farm).reduce((t, r) => t + r.ptic.cows, 0);
     const after = breedingReports(landed).reduce((t, r) => t + r.ptic.cows, 0);
     expect(after - before).toBeGreaterThanOrEqual(8);
-    for (const a of landed.arrivals.flatMap((x) => x.animals)) expect(onRecordPtic(a)).toBe(true);
+    // The bought cattle, where they are now (landed in the yards): every one is PTIC on the record.
+    const ids = new Set(bought.arrivals.flatMap((x) => x.animals.map((a) => a.id)));
+    const here = landed.mobs.flatMap((m) => m.animals).filter((a) => ids.has(a.id));
+    const cows = here.filter((a) => a.kind !== 'calf');
+    expect(cows.length).toBe(8);
+    for (const a of cows) expect(onRecordPtic(a)).toBe(true);
   });
 });
 

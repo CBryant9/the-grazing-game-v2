@@ -446,7 +446,9 @@ function randomJob(layout: FarmLayout, rng: Rng, tally: Tally, where: string): F
 }
 
 describe('layout jobs, against the MVP', () => {
-  it('40 farms, 150 random jobs each, compared after every job', { timeout: 240000 }, () => {
+  // About 70 s alone. With every test file running beside it on a busy machine it has
+  // taken over 240 s, so the limit is 10 minutes. It still runs every farm and every job.
+  it('40 farms, 150 random jobs each, compared after every job', { timeout: 600_000 }, () => {
     const tally: Tally = { done: {}, refused: {} };
     for (let farm = 0; farm < 40; farm++) {
       const rng = rngStream(farm, 'layout-jobs');

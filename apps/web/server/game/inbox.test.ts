@@ -145,6 +145,29 @@ describe('the words for the inbox', () => {
     expect(m.text).not.toMatch(BANNED);
   });
 
+  it('says a female lost her pregnancy only when she was PTIC on the record', () => {
+    expect(noteWord('Cows A', null, { type: 'slipped', kind: 'cow', days: 49 })).toBeNull();
+    expect(noteWord('Cows A', null, { type: 'slipped', kind: 'cow', days: 10 })).toBeNull();
+    expect(noteWord('Cows A', null, { type: 'slipped', kind: 'cow', days: 50 })).toBe(
+      'A PTIC cow in Cows A lost her pregnancy. She was under CS 1.6.',
+    );
+  });
+
+  it('counts the females by the record when a joining starts or there is no bull', () => {
+    expect(
+      noteWord('Cows A', null, {
+        type: 'joiningStarted',
+        adultBulls: 2,
+        ready: 70,
+        femalesPerBull: 40,
+        readyOnRecord: 80,
+      }),
+    ).toBe('Joining has started in Cows A: 2 bulls with 80 females of joining age not PTIC.');
+    expect(noteWord('Cows A', null, { type: 'noBull', ready: 5, readyOnRecord: 9 })).toBe(
+      'Cows A has 9 females of joining age not PTIC, and no bull.',
+    );
+  });
+
   it('says nothing of a joining report or a preg test', () => {
     // No preg test and no count of cows in calf is reported (Claudia, 14 Nov 2026).
     expect(

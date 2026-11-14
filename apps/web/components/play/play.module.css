@@ -1163,6 +1163,7 @@
   display: grid;
   gap: 2px;
   width: 100%;
+  min-width: 0;
   min-height: 56px;
   padding: 8px 12px;
   text-align: left;
@@ -1181,6 +1182,8 @@
   font-size: 0.75rem;
   color: var(--muted);
   line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {

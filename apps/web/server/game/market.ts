@@ -21,7 +21,14 @@ import type {
   PriceRowWire,
   SellClassWire,
 } from '../../lib/game/types';
-import { MLA_CREDIT, buyReason, saleLine, sellNote, weightText } from './marketwords';
+import {
+  MLA_CREDIT,
+  buyReason,
+  saleClassLabel,
+  saleLine,
+  sellNote,
+  weightText,
+} from './marketwords';
 
 const dateParts = (d: { year: number; month: number; date: number }): DateParts => ({
   year: d.year,
@@ -124,7 +131,7 @@ function buyClasses(farm: FarmState): BuyClassWire[] {
     } as const;
     return {
       id,
-      label: c.label,
+      label: saleClassLabel(id) ?? c.label,
       weightText: weightText(wt),
       // Bulls are priced by the head, not by weight.
       cKg: c.kind === 'bull' ? null : Math.round(centsPerKg(typical, prices)),
@@ -172,7 +179,7 @@ export function marketWire(farm: FarmState, view: MarketView): MarketWire {
     onTheWay: view.onTheWay.map((a) => ({
       date: dateParts(a.date),
       daysAway: a.daysAway,
-      cls: SALE_CLASSES[a.cls]?.label ?? 'Cattle',
+      cls: saleClassLabel(a.cls) ?? 'Cattle',
       head: a.head,
     })),
     saleLine: saleLine(view.isSaleDay, nextSale),

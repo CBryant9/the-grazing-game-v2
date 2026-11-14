@@ -37,7 +37,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] Bulls join with cows. Condition score drives the chance each cow gets back in calf, on a realistic cycle and timeline, with some random dry cows.
 - [ ] Bull calves stay entire until marked. You are prompted to mark them. Unmarked young bulls get cows in calf ("you wouldn't have any dry cows").
 - [ ] With no bull: "Your cows are ready to get back in calf. You need a bull."
-- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect").
+- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect"). *(Reversed 14 Nov 2026: no preg test; a cow shows as PTIC on the record by herself from 50 days in calf. See "pregnancy on the record".)*
 
 ## Water and fencing
 
@@ -305,7 +305,7 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
 
 ## 14 Nov 2026: pregnancy on the record, no preg test
 
-Her words: "I think we're probably not going to preg test the mobs or need that animal husbandry, but we do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry." "You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows."
+Her words: "I think we're probably not going to pretest the mobs or need that animal husbandry, but we obviously do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the kind of general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry, I guess. I guess what they're considered is dry until they are progested. That's fine. What you pay in the calf sale premium is only for cows known to be... You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows. That's correct." (dictated; 'pretest' and 'progested' mean preg test and preg tested)
 
 - [ ] **No preg test job.** Not on the screens, the to-do list, the banner or the help.
 - [ ] **A cow or heifer is PTIC on the record by herself once she is a set number of days in calf** (the engine's `PTIC_DAYS`, 50: the day the price starts paying the in-calf premium; DATA "When a cow shows as PTIC"). Before that she is a cow or heifer (dry with no calf at foot), whether or not she is really in calf.

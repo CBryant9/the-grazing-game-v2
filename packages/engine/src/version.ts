@@ -43,8 +43,13 @@
  * player was told. Every class and group the player sees or picks from
  * uses that rule (`recordClassOf`, `recordGroupOf`). No grass, cattle,
  * crop, season or price formula changed.
+ *
+ * 0.12.1 (14 Nov 2026, a review): the `slipped` note carries the days in
+ * calf, the joining and no-bull notes carry `readyOnRecord`, and
+ * `predictGains` takes a grouping, so the screens can follow the record in
+ * every line. No formula changed.
  */
-export const ENGINE_VERSION = '0.12.0';
+export const ENGINE_VERSION = '0.12.1';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.

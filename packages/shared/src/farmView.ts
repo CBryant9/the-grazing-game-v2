@@ -281,9 +281,9 @@ export interface FarmViewMob {
   /** Adult equivalents. */
   ae: number;
   /**
-   * Head in each class, by the class's id, as the player knows it: a female
-   * counts as PTIC only when a preg test or the saleyard has said she is in
-   * calf (14 Nov 2026). Before that she is counted as if empty.
+   * Head in each class, by the class's id, on the herd record: a female
+   * counts as PTIC from the engine's PTIC_DAYS in calf (14 Nov 2026). Before
+   * that she is counted as a cow or heifer not in calf.
    */
   classes: Record<string, number>;
   /** The mob by kind, for the map to draw. */

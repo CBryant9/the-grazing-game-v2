@@ -1,5 +1,5 @@
 import 'server-only';
-import { weekdayOf } from '@gg/engine';
+import { SALE_CLASSES, weekdayOf } from '@gg/engine';
 import type { DateParts } from '../../lib/game/types';
 
 /**
@@ -143,8 +143,17 @@ export function sellLines(s: SellLines): string[] {
     ...calves,
     'Nothing is paid now.',
     'The price is set on the day of the sale.',
+    'A cow that is PTIC on the record by then is paid as PTIC.',
     'They stay on the farm and graze until then.',
   ];
+}
+
+/** What a sale class is called on the screens. Nothing calls a cow "empty" (Claudia, 14 Nov 2026). */
+const SALE_CLASS_NAME: Record<string, string> = { dryCow: 'Dry cows' };
+
+/** A sale class's name for the screens: the engine's label, except where the screens say it plainly. */
+export function saleClassLabel(id: string): string | null {
+  return SALE_CLASS_NAME[id] ?? SALE_CLASSES[id as keyof typeof SALE_CLASSES]?.label ?? null;
 }
 
 /** The line on the Cancel card. */
