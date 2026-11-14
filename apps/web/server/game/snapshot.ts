@@ -79,7 +79,7 @@ export function setupSummary(farm: FarmState, setup: SetupChoices): SetupSummary
  */
 export function buildSnapshot(
   farm: FarmState,
-  stored: { name: string; setup: SetupChoices; inboxRead?: number },
+  stored: { name: string; setup: SetupChoices; inboxRead?: number; version: string },
   env: SourceEnv,
 ): Snapshot {
   const view = farmView(farm, env);
@@ -142,6 +142,7 @@ export function buildSnapshot(
 
   return {
     version: SNAPSHOT_VERSION,
+    farmVersion: stored.version,
     farm: {
       name: stored.name,
       district: farm.district,

@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import {
   applyAction,
   CLASS_LABELS,
@@ -44,6 +44,7 @@ import type {
   SimpleAction,
   SkipRequestLength,
   Snapshot,
+  StaleResponse,
 } from '../../lib/game/types';
 import { parseBuildAction } from './build';
 import { gateNotes, lineWords } from './buildwords';
@@ -53,14 +54,23 @@ import { buildMobs } from './mobs';
 import { moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
 import { buildSnapshot, buildSummary } from './snapshot';
-import { FileFarmStore, type FarmStore, type StoredFarm } from './store';
+import {
+  BrokenFarmError,
+  DONE_KEPT,
+  FileFarmStore,
+  STORED_FORMAT,
+  upgradeStored,
+  type DoneRequest,
+  type FarmStore,
+  type StoredFarm,
+} from './store';
 import { dateText, doneWord, todoKey } from './words';
 import { join } from 'node:path';
 
 /** A refusal the route turns into a plain message with this status. Never carries a stack. */
 export class GameError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 404 | 409 | 413 | 503,
     message: string,
   ) {
     super(message);
@@ -72,6 +82,26 @@ export const START_MONTH = 8;
 /** The year a random-seasons farm starts in. */
 export const RANDOM_START_YEAR = 2026;
 const CACHE_LIMIT = 64;
+
+/**
+ * Farm files the server keeps at most. A new farm is refused once there are
+ * this many, after farms not used for `FARM_STALE_DAYS` are removed, so the
+ * disk can not fill (milestone 1.7f).
+ */
+export const MAX_FARMS = 10_000;
+/** A farm not used for this many days is removed. The session cookie lasts 90 days. */
+export const FARM_STALE_DAYS = 90;
+/** How often, at most, stale farms are looked for when a farm is made. */
+const PRUNE_EVERY_MS = 6 * 3600_000;
+
+/** What the player reads when the farm they were looking at has changed. */
+export const STALE_MESSAGE = 'The farm has changed since this was shown. Here is the latest.';
+/** What the player reads when their farm can not be opened. */
+export const BROKEN_MESSAGE =
+  'Your farm could not be opened. Try again, or start a new farm. The old farm is kept aside.';
+
+/** A new farm version: a short random string, so an old one never comes back. */
+const newVersion = (): string => randomBytes(6).toString('hex');
 const SESSION = /^[0-9a-f]{32}$/;
 
 export const isSessionId = (id: unknown): id is string =>
@@ -91,10 +121,22 @@ interface Held {
   farm: FarmState;
 }
 
+/** What an act request carries beyond the job: the farm it was shown on, and its one-use id. */
+export interface ActMeta {
+  /** The farm version the card was made on. Left out only by code on the server (tests). */
+  version?: string;
+  /** Made by the browser for each Confirm. A repeat gets the same answer. */
+  requestId?: string;
+}
+
 export interface GameServerOptions {
   store: FarmStore;
   /** Where each new farm's seed comes from. Random unless a test sets it. */
   seed?: () => number;
+  /** The most farms kept. `MAX_FARMS` unless a test sets it. */
+  maxFarms?: number;
+  /** The clock, in ms. The real one unless a test sets it. */
+  now?: () => number;
 }
 
 const realYears = (c: SetupChoices): boolean => c.years !== 'random';
@@ -340,10 +382,14 @@ export class GameServer {
   private readonly seed: () => number;
   private readonly cache = new Map<string, Held>();
   private readonly queues = new Map<string, Promise<unknown>>();
+  private readonly maxFarms: number;
+  private readonly now: () => number;
 
   constructor(options: GameServerOptions) {
     this.store = options.store;
     this.seed = options.seed ?? (() => randomInt(1, 2 ** 31 - 1));
+    this.maxFarms = options.maxFarms ?? MAX_FARMS;
+    this.now = options.now ?? Date.now;
   }
 
   /** Run one thing at a time for a farm, so two quick taps never save over each other. */
@@ -370,49 +416,135 @@ export class GameServer {
   private async load(farmId: string): Promise<Held | null> {
     const hit = this.cache.get(farmId);
     if (hit) return hit;
-    const stored = await this.store.get(farmId);
-    if (!stored) return null;
-    const held = { stored, farm: loadFarm(stored.saved) };
+    const raw = await this.store.get(farmId);
+    if (raw === null || raw === undefined) return null;
+    let held: Held;
+    try {
+      const stored = upgradeStored(raw, newVersion);
+      held = { stored, farm: loadFarm(stored.saved) };
+    } catch (e) {
+      throw e instanceof BrokenFarmError ? e : new BrokenFarmError('The save would not load.');
+    }
+    await this.store.touch(farmId);
     this.remember(farmId, held);
     return held;
   }
 
+  /** The farm, or a plain refusal when there is none or it can't be opened. */
   private async need(farmId: string): Promise<Held> {
-    const held = await this.load(farmId);
+    let held: Held | null;
+    try {
+      held = await this.load(farmId);
+    } catch (e) {
+      if (e instanceof BrokenFarmError) throw new GameError(409, BROKEN_MESSAGE);
+      throw e;
+    }
     if (!held) throw new GameError(404, 'There is no farm yet. Set one up first.');
     return held;
   }
 
-  private async save(farmId: string, held: Held, farm: FarmState): Promise<Held> {
-    const stored: StoredFarm = { ...held.stored, saved: saveFarm(farm) };
+  /** Keep a changed farm: it gets a new version. `done` is the act request to remember, if any. */
+  private async save(
+    farmId: string,
+    held: Held,
+    farm: FarmState,
+    done?: DoneRequest,
+  ): Promise<Held> {
+    const stored: StoredFarm = {
+      ...held.stored,
+      saved: saveFarm(farm),
+      version: newVersion(),
+      done: done ? [...held.stored.done, done].slice(-DONE_KEPT) : held.stored.done,
+    };
     await this.store.put(farmId, stored);
     const next = { stored, farm };
     this.remember(farmId, next);
     return next;
   }
 
+  /** Remember an act request that changed nothing (a refusal), so a repeat gets the same answer. */
+  private async note(farmId: string, held: Held, done: DoneRequest): Promise<void> {
+    const stored: StoredFarm = {
+      ...held.stored,
+      done: [...held.stored.done, done].slice(-DONE_KEPT),
+    };
+    await this.store.put(farmId, stored);
+    this.remember(farmId, { stored, farm: held.farm });
+  }
+
   private snapshotOf(held: Held): Snapshot {
     return buildSnapshot(held.farm, held.stored, envFor(held.stored.setup));
   }
 
-  /** The farm for this session, or null if it has none. */
-  async snapshot(sessionId: string): Promise<Snapshot | null> {
+  /** The answer when the browser was looking at an older farm: the plain message and the latest snapshot. */
+  private stale(held: Held): StaleResponse {
+    return { ok: false, reason: 'stale', message: STALE_MESSAGE, snapshot: this.snapshotOf(held) };
+  }
+
+  /**
+   * The farm for this session: its snapshot, null if it has none, or
+   * `broken` when it is there and can't be opened.
+   */
+  async snapshot(sessionId: string): Promise<Snapshot | null>;
+  async snapshot(sessionId: string, report: true): Promise<Snapshot | null | 'broken'>;
+  async snapshot(sessionId: string, report = false): Promise<Snapshot | null | 'broken'> {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
-      const held = await this.load(id);
-      return held ? this.snapshotOf(held) : null;
+      try {
+        const held = await this.load(id);
+        return held ? this.snapshotOf(held) : null;
+      } catch (e) {
+        if (e instanceof BrokenFarmError && report) return 'broken';
+        if (e instanceof BrokenFarmError) throw new GameError(409, BROKEN_MESSAGE);
+        throw e;
+      }
     });
+  }
+
+  private lastPrune = 0;
+
+  /**
+   * Room for one more farm: stale farms go every few hours, and when the
+   * store is full. Still full, a new farm is refused with a plain message.
+   */
+  private async makeRoom(): Promise<void> {
+    const now = this.now();
+    const before = now - FARM_STALE_DAYS * 86_400_000;
+    if (now - this.lastPrune >= PRUNE_EVERY_MS) {
+      this.lastPrune = now;
+      await this.store.prune(before);
+    }
+    if ((await this.store.count()) < this.maxFarms) return;
+    await this.store.prune(before);
+    if ((await this.store.count()) >= this.maxFarms) {
+      throw new GameError(503, 'The game is full right now. Try again later.');
+    }
   }
 
   /** Start the session's farm from the setup choices. A session has one farm. */
   async create(sessionId: string, choices: SetupChoices): Promise<Snapshot> {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
-      if (await this.load(id)) {
+      let there: Held | null;
+      try {
+        there = await this.load(id);
+      } catch (e) {
+        if (e instanceof BrokenFarmError) throw new GameError(409, BROKEN_MESSAGE);
+        throw e;
+      }
+      if (there) {
         throw new GameError(409, 'You already have a farm. Start a new one from the farm screen.');
       }
+      await this.makeRoom();
       const farm = createFarm(createOptions(choices, this.seed()), envFor(choices));
-      const stored: StoredFarm = { name: choices.name, setup: choices, saved: saveFarm(farm) };
+      const stored: StoredFarm = {
+        format: STORED_FORMAT,
+        name: choices.name,
+        setup: choices,
+        saved: saveFarm(farm),
+        version: newVersion(),
+        done: [],
+      };
       await this.store.put(id, stored);
       const held = { stored, farm };
       this.remember(id, held);
@@ -420,10 +552,22 @@ export class GameServer {
     });
   }
 
-  /** Throw the session's farm away, so it can start another. */
+  /**
+   * Throw the session's farm away, so it can start another. A farm that
+   * can't be opened is kept aside under another name, not deleted.
+   */
   async remove(sessionId: string): Promise<void> {
     const id = farmIdFor(sessionId);
     await this.locked(id, async () => {
+      this.cache.delete(id);
+      try {
+        await this.load(id);
+      } catch (e) {
+        if (!(e instanceof BrokenFarmError)) throw e;
+        this.cache.delete(id);
+        await this.store.setAside(id);
+        return;
+      }
       this.cache.delete(id);
       await this.store.delete(id);
     });
@@ -563,8 +707,11 @@ export class GameServer {
     return this.locked(id, async () => {
       const { farm, stored } = await this.need(id);
       const action = this.resolve(farm, req);
+      const version = stored.version;
       const result = previewAction(farm, action, envFor(stored.setup));
-      if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
+      if (!result.ok) {
+        return { ok: false, reason: result.reason, message: result.message, version };
+      }
       const x = this.extras(farm, stored, action);
       x.summary = this.summary(
         farm,
@@ -573,29 +720,72 @@ export class GameServer {
         result.card,
         this.trialEvents(farm, stored, action),
       );
-      return { ok: true, card: cardWire(result.card, x) };
+      return { ok: true, card: cardWire(result.card, x), version };
     });
   }
 
-  /** Do an action. A refusal says why in plain words, and nothing changes. */
-  async act(sessionId: string, req: ActionRequest): Promise<ActResponse> {
+  /**
+   * Do an action. A refusal says why in plain words, and nothing changes.
+   *
+   * A request id seen before gets the answer it got then, and nothing runs
+   * again (a double click, or a retry after a lost reply). A version that is
+   * not the farm's (another tab, or a card shown before a change) is refused
+   * with the latest snapshot.
+   */
+  async act(sessionId: string, req: ActionRequest, meta: ActMeta = {}): Promise<ActResponse> {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
+      const seen = meta.requestId
+        ? held.stored.done.find((d) => d.id === meta.requestId)
+        : undefined;
+      if (seen) {
+        const snapshot = this.snapshotOf(held);
+        return seen.ok
+          ? { ok: true, message: seen.message, card: seen.card, snapshot, repeat: true }
+          : {
+              ok: false,
+              reason: seen.reason ?? 'refused',
+              message: seen.message,
+              snapshot,
+              repeat: true,
+            };
+      }
+      if (meta.version !== undefined && meta.version !== held.stored.version) {
+        return this.stale(held);
+      }
       const action = this.resolve(held.farm, req);
       const x = this.extras(held.farm, held.stored, action);
       const result = applyAction(held.farm, action, envFor(held.stored.setup));
-      if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
+      if (!result.ok) {
+        if (meta.requestId) {
+          await this.note(id, held, {
+            id: meta.requestId,
+            ok: false,
+            reason: result.reason,
+            message: result.message,
+            card: null,
+          });
+        }
+        return {
+          ok: false,
+          reason: result.reason,
+          message: result.message,
+          snapshot: this.snapshotOf(held),
+        };
+      }
       if (result.job) {
         x.summary = this.summary(held.farm, held.stored, action, result.job, result.events);
       }
-      const next = await this.save(id, held, result.farm);
-      return {
-        ok: true,
-        message: doneWord(result.events),
-        card: result.job ? cardWire(result.job, x) : null,
-        snapshot: this.snapshotOf(next),
-      };
+      const message = doneWord(result.events);
+      const card = result.job ? cardWire(result.job, x) : null;
+      const next = await this.save(
+        id,
+        held,
+        result.farm,
+        meta.requestId ? { id: meta.requestId, ok: true, message, card } : undefined,
+      );
+      return { ok: true, message, card, snapshot: this.snapshotOf(next) };
     });
   }
 
@@ -617,13 +807,17 @@ export class GameServer {
   }
 
   /** Next day: the daily tick runs and the new day starts at first light. */
-  async endDay(sessionId: string): Promise<DayResponse> {
+  async endDay(sessionId: string): Promise<DayResponse>;
+  async endDay(sessionId: string, version: string): Promise<DayResponse | StaleResponse>;
+  async endDay(sessionId: string, version?: string): Promise<DayResponse | StaleResponse> {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
+      if (version !== undefined && version !== held.stored.version) return this.stale(held);
       const end = endDay(held.farm, envFor(held.stored.setup));
       const next = await this.save(id, held, end.farm);
       return {
+        ok: true,
         snapshot: this.snapshotOf(next),
         summary: buildSummary('day', end.summary, end.stops, 1, end.day.events),
       };
@@ -631,13 +825,27 @@ export class GameServer {
   }
 
   /** Skip a week, a month or a year. It stops early for the reasons the engine gives. */
-  async skip(sessionId: string, length: SkipRequestLength, anyway = false): Promise<DayResponse> {
+  async skip(sessionId: string, length: SkipRequestLength, anyway?: boolean): Promise<DayResponse>;
+  async skip(
+    sessionId: string,
+    length: SkipRequestLength,
+    anyway: boolean,
+    version: string,
+  ): Promise<DayResponse | StaleResponse>;
+  async skip(
+    sessionId: string,
+    length: SkipRequestLength,
+    anyway = false,
+    version?: string,
+  ): Promise<DayResponse | StaleResponse> {
     const id = farmIdFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
+      if (version !== undefined && version !== held.stored.version) return this.stale(held);
       const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
       const next = result.daysRun > 0 ? await this.save(id, held, result.farm) : held;
       return {
+        ok: true,
         snapshot: this.snapshotOf(next),
         summary: buildSummary(
           'skip',

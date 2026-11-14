@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import { useGame } from '@/lib/game/store';
 import { PlayScreen } from './PlayScreen';
@@ -43,8 +43,52 @@ export function PlayApp() {
             </button>
           </div>
         )}
+        {phase === 'broken' && <BrokenFarm message={notice?.message} />}
         {phase === 'setup' && <SetupFlow />}
       </main>
+    </div>
+  );
+}
+
+/**
+ * The farm is there but can not be opened. Two ways on: try again, or start
+ * a new farm. The broken farm is kept aside on the server, not deleted.
+ */
+function BrokenFarm({ message }: { message?: string }) {
+  const load = useGame((s) => s.load);
+  const restart = useGame((s) => s.restart);
+  const busy = useGame((s) => s.busy > 0);
+  const [asking, setAsking] = useState(false);
+  return (
+    <div className={`card ${styles.failcard}`} role="alert">
+      <p>{message ?? 'Your farm could not be opened.'}</p>
+      {!asking ? (
+        <div className={styles.jobbtns}>
+          <button type="button" className="btn coral" onClick={() => void load()}>
+            Try again
+          </button>
+          <button type="button" className="btn ghost" onClick={() => setAsking(true)}>
+            Start a new farm
+          </button>
+        </div>
+      ) : (
+        <>
+          <p>Start a new farm? The old farm can not be opened again in the game.</p>
+          <div className={styles.jobbtns}>
+            <button
+              type="button"
+              className="btn coral"
+              disabled={busy}
+              onClick={() => void restart()}
+            >
+              Start a new farm
+            </button>
+            <button type="button" className="btn ghost" onClick={() => setAsking(false)}>
+              Keep trying
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

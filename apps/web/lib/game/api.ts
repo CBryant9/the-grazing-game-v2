@@ -1,5 +1,6 @@
 import type {
   ActionRequest,
+  ActRequest,
   ActResponse,
   DayResponse,
   FarmResponse,
@@ -7,6 +8,7 @@ import type {
   SetupChoices,
   SetupOptions,
   SkipRequestLength,
+  StaleResponse,
 } from './types';
 
 /** An error with a plain message the player can read. Never a stack or a code. */
@@ -53,9 +55,9 @@ export const api = {
   create: (choices: SetupChoices) => request<FarmResponse>('farm', 'POST', choices),
   remove: () => request<FarmResponse>('farm', 'DELETE'),
   preview: (req: ActionRequest) => request<PreviewResponse>('preview', 'POST', req),
-  act: (req: ActionRequest) => request<ActResponse>('act', 'POST', req),
-  day: () => request<DayResponse>('day', 'POST', {}),
+  act: (req: ActRequest) => request<ActResponse>('act', 'POST', req),
+  day: (version: string) => request<DayResponse | StaleResponse>('day', 'POST', { version }),
   inboxRead: (upTo: number) => request<FarmResponse>('inbox', 'POST', { upTo }),
-  skip: (length: SkipRequestLength, anyway = false) =>
-    request<DayResponse>('skip', 'POST', { length, anyway }),
+  skip: (length: SkipRequestLength, anyway: boolean, version: string) =>
+    request<DayResponse | StaleResponse>('skip', 'POST', { length, anyway, version }),
 };

@@ -26,7 +26,7 @@ const view = {
   squares: { paddock: new Array(1040).fill(0) },
   fences: { h: new Array(27 * 40).fill(0), v: new Array(26 * 41).fill(0) },
   gates: [],
-  water: { bore: 5, pipe: [], pipeDry: [], troughs: [], hubs: [] },
+  water: { bore: 5, pipe: [], pipeDry: [], troughs: [], hubs: [], squareHubs: [] },
   paddocks: [{ id: 0, name: 'Paddock 1' }],
 } as unknown as FarmView;
 
@@ -48,7 +48,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   ...over,
 });
 
-const okPreview = (c: JobCardWire): PreviewResponse => ({ ok: true, card: c });
+const okPreview = (c: JobCardWire): PreviewResponse => ({ ok: true, card: c, version: 'v1' });
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -200,6 +200,7 @@ describe('drawing a fence', () => {
       ok: false,
       reason: 'not-enough-daylight',
       message: "You don't have enough time to do this today. The first piece takes 2 h.",
+      version: 'v1',
     } satisfies PreviewResponse);
     const g = useGame.getState();
     g.buildDrag({ phase: 'start', corner: corner(2, 3), square: -1 });
@@ -282,6 +283,7 @@ describe('drawing a fence', () => {
       ok: false,
       reason: 'bank-limit',
       message: 'The bank will not lend that much.',
+      snapshot: snap(),
     } satisfies ActResponse);
     await useGame.getState().buildConfirm();
     expect(build().phase).toBe('blocked');

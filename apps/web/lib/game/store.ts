@@ -22,6 +22,8 @@ import {
 import { dragPick, newPick, type SowPick } from './sow';
 import { choiceJob, moveJob, tapOutcome, type TapInfo } from './taps';
 import type {
+  ActionRequest,
+  ActResponse,
   EdgeWire,
   FenceKindId,
   JobCardWire,
@@ -29,7 +31,9 @@ import type {
   SetupChoices,
   SimpleAction,
   SkipRequestLength,
+  Shown,
   Snapshot,
+  StaleResponse,
   SummaryWire,
 } from './types';
 
@@ -46,7 +50,25 @@ export interface JobState {
   message?: string;
   /** The job as it was checked, so Confirm sends exactly what the card showed. */
   action?: SimpleAction;
+  /** What the card on show was made for: Confirm sends exactly this. Set with the card. */
+  shown?: Shown;
+  /** The preview this job is waiting on: an answer to an older one is dropped. */
+  ticket?: number;
 }
+
+/** A one-use id for a Confirm. */
+export function newRequestId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** The card and what Confirm will send, from a preview answer for `req`. */
+const shownOf = (req: ActionRequest, version: string): Shown => ({
+  req,
+  version,
+  requestId: newRequestId(),
+});
 
 /**
  * Moving cattle: "pick the paddock, done". The tool asks for a mob and a
@@ -66,6 +88,9 @@ export interface MoveState {
   mobName?: string;
   card?: JobCardWire;
   message?: string;
+  shown?: Shown;
+  /** The preview this state is waiting on: an answer to an older one is dropped. */
+  ticket?: number;
 }
 
 /** Making or changing a grazing plan: the form, then the server's card, then the result. */
@@ -74,6 +99,8 @@ export interface PlanState {
   phase: 'edit' | 'previewing' | 'confirm' | 'applying' | 'done' | 'refused';
   card?: JobCardWire;
   message?: string;
+  shown?: Shown;
+  ticket?: number;
   /** Kept for the result line, since the form is gone once it is done. */
   mobName?: string;
 }
@@ -91,7 +118,8 @@ export interface Notice {
 }
 
 interface GameState {
-  phase: 'loading' | 'setup' | 'ready' | 'failed';
+  /** 'broken': the farm is there and can't be opened. */
+  phase: 'loading' | 'setup' | 'ready' | 'failed' | 'broken';
   snapshot: Snapshot | null;
   /** Requests under way. The map can always be looked at while this is above zero. */
   busy: number;
@@ -121,8 +149,8 @@ interface GameState {
   confirmJob: (key: string) => Promise<void>;
   dismissJob: (key: string) => void;
   startAct: (slot: string, label: string, action: SimpleAction) => Promise<void>;
-  /** With no action, it sends the one that was checked. */
-  confirmAct: (slot: string, action?: SimpleAction) => Promise<void>;
+  /** Sends exactly the job the card on show was made for. */
+  confirmAct: (slot: string) => Promise<void>;
   dismissAct: (slot: string) => void;
   openPaddock: (id: number) => void;
   closePaddock: () => void;
@@ -184,6 +212,10 @@ interface GameState {
 const messageOf = (e: unknown): string =>
   e instanceof ApiError ? e.message : 'Something went wrong. Try again in a moment.';
 
+let tickets = 0;
+/** A number for each preview asked, so only the answer to the newest is used. */
+const nextTicket = (): number => ++tickets;
+
 export const useGame = create<GameState>()((set, get) => {
   /** Run a request with the quiet busy state, and turn a failure into a notice with a retry. */
   async function run<T>(retry: () => void, work: () => Promise<T>): Promise<T | undefined> {
@@ -211,6 +243,66 @@ export const useGame = create<GameState>()((set, get) => {
       mobId: mobId !== null && snapshot.mobs.some((m) => m.id === mobId) ? mobId : null,
     };
   };
+
+  /** Fetch the farm again, quietly: after a failed or refused job, so the screen shows the farm as it is. */
+  async function reload(): Promise<void> {
+    try {
+      const r = await api.farm();
+      if (r.snapshot) set(adopt(r.snapshot));
+    } catch {
+      // The notice for the failed job is enough. The next request tries again.
+    }
+  }
+
+  /** The version the screen shows, to send with Next day and skips. */
+  const versionNow = (): string => get().snapshot?.farmVersion ?? '';
+
+  /**
+   * Send the job a card was made for: its request, the version it was made
+   * on and its one-use id. Every answer carries the farm as it is now, which
+   * the screen takes. After a failure the farm is fetched again.
+   */
+  async function sendAct(
+    shown: Shown,
+  ): Promise<
+    | { ok: true; message: string; card: JobCardWire | null }
+    | { ok: false; message: string; reason?: string }
+  > {
+    set((s) => ({ busy: s.busy + 1 }));
+    try {
+      const r: ActResponse = await api.act({
+        ...shown.req,
+        version: shown.version,
+        requestId: shown.requestId,
+      });
+      if (r.snapshot) set(adopt(r.snapshot));
+      if (r.ok) return { ok: true, message: r.message, card: r.card };
+      return { ok: false, message: r.message, reason: r.reason };
+    } catch (e) {
+      void reload();
+      return { ok: false, message: messageOf(e) };
+    } finally {
+      set((s) => ({ busy: s.busy - 1 }));
+    }
+  }
+
+  /**
+   * The farm changed since the screen was drawn (another tab, or a job just
+   * done): nothing was run. Show the latest farm with the plain message, and
+   * close any card made on the old one.
+   */
+  function staleNotice(r: StaleResponse): void {
+    set({
+      ...adopt(r.snapshot),
+      notice: { message: r.message },
+      jobs: {},
+      acts: {},
+      move: null,
+      plan: null,
+      sow: null,
+      build: null,
+    });
+  }
 
   const setJob = (key: string, patch: Partial<JobState> | null): void =>
     set((s) => {
@@ -252,13 +344,22 @@ export const useGame = create<GameState>()((set, get) => {
       setMove({ phase: 'pick', message: 'Pick how many head to move first.' });
       return;
     }
-    setMove({ phase: 'previewing', mobName: mob?.name, message: undefined });
+    const ticket = nextTicket();
+    setMove({
+      phase: 'previewing',
+      mobName: mob?.name,
+      message: undefined,
+      ticket,
+      shown: undefined,
+    });
+    const mine = (): boolean => get().move?.ticket === ticket;
     try {
       const r = await api.preview({ action });
-      if (r.ok) setMove({ phase: 'confirm', card: r.card });
+      if (!mine()) return;
+      if (r.ok) setMove({ phase: 'confirm', card: r.card, shown: shownOf({ action }, r.version) });
       else setMove({ phase: 'refused', message: r.message });
     } catch (e) {
-      setMove({ phase: 'refused', message: messageOf(e) });
+      if (mine()) setMove({ phase: 'refused', message: messageOf(e) });
     }
   }
 
@@ -273,16 +374,26 @@ export const useGame = create<GameState>()((set, get) => {
   const lineChecker = latestOnly<SimpleAction, PreviewResponse>({
     everyMs: 300,
     call: (action) => api.preview({ action }),
-    done: (r) => {
+    done: (r, action) => {
       const b = get().build;
       if (!b || !isLineTool(b.tool) || b.phase === 'applying' || b.phase === 'done') return;
-      if (r.ok) setBuild({ phase: 'confirm', card: r.card, message: undefined, allLate: false });
-      else {
+      // Only an answer for the line as it is drawn now.
+      if (JSON.stringify(lineAction(b)) !== JSON.stringify(action)) return;
+      if (r.ok) {
+        setBuild({
+          phase: 'confirm',
+          card: r.card,
+          message: undefined,
+          allLate: false,
+          shown: shownOf({ action }, r.version),
+        });
+      } else {
         setBuild({
           phase: 'blocked',
           card: undefined,
           message: r.message,
           allLate: tooLate(r.reason),
+          shown: undefined,
         });
       }
     },
@@ -293,7 +404,8 @@ export const useGame = create<GameState>()((set, get) => {
     },
   });
 
-  let lastFence: FenceKindId = 'electric';
+  // A normal fence is the one a grazier goes for: electric is picked on purpose (Claudia, 14 Nov 2026).
+  let lastFence: FenceKindId = 'permanent';
   let lastHubOn: HubOn = 'corner';
 
   /** Ask for the card for a job picked with a tap. */
@@ -305,12 +417,18 @@ export const useGame = create<GameState>()((set, get) => {
       phase: 'previewing',
       card: undefined,
       message: undefined,
+      shown: undefined,
     });
     try {
       const r = await api.preview({ action: job.action });
       if (get().build?.picked !== job) return;
-      if (r.ok) setBuild({ phase: 'confirm', card: r.card });
-      else setBuild({ phase: 'blocked', message: r.message });
+      if (r.ok) {
+        setBuild({
+          phase: 'confirm',
+          card: r.card,
+          shown: shownOf({ action: job.action }, r.version),
+        });
+      } else setBuild({ phase: 'blocked', message: r.message });
     } catch (e) {
       if (get().build?.picked === job) setBuild({ phase: 'blocked', message: messageOf(e) });
     }
@@ -335,8 +453,9 @@ export const useGame = create<GameState>()((set, get) => {
     async load() {
       set({ phase: 'loading', notice: null });
       try {
-        const { snapshot } = await api.farm();
-        set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
+        const { snapshot, broken } = await api.farm();
+        if (broken) set({ phase: 'broken', snapshot: null, notice: { message: broken } });
+        else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
       } catch (e) {
         set({ phase: 'failed', notice: { message: messageOf(e), retry: () => void get().load() } });
       }
@@ -388,8 +507,13 @@ export const useGame = create<GameState>()((set, get) => {
       await run(
         () => void get().nextDay(),
         async () => {
-          const { snapshot, summary } = await api.day();
+          const r = await api.day(versionNow());
           lineChecker.cancel();
+          if (!r.ok) {
+            staleNotice(r);
+            return;
+          }
+          const { snapshot, summary } = r;
           set({
             ...adopt(snapshot),
             summary,
@@ -409,7 +533,13 @@ export const useGame = create<GameState>()((set, get) => {
       await run(
         () => void get().skip(length, anyway),
         async () => {
-          const { snapshot, summary } = await api.skip(length, anyway);
+          const r = await api.skip(length, anyway, versionNow());
+          if (!r.ok) {
+            lineChecker.cancel();
+            staleNotice(r);
+            return;
+          }
+          const { snapshot, summary } = r;
           const ran = summary.daysRun > 0;
           set({
             ...adopt(snapshot),
@@ -434,76 +564,62 @@ export const useGame = create<GameState>()((set, get) => {
           [key]: { key, text: item.text, button: item.button!, phase: 'previewing' },
         },
       }));
+      const ticket = nextTicket();
+      setJob(key, { ticket });
+      const mine = (): boolean => get().jobs[key]?.ticket === ticket;
       try {
         const r = await api.preview({ todo: key });
-        if (r.ok) setJob(key, { phase: 'confirm', card: r.card });
+        if (!mine()) return;
+        if (r.ok)
+          setJob(key, { phase: 'confirm', card: r.card, shown: shownOf({ todo: key }, r.version) });
         else setJob(key, { phase: 'refused', message: r.message });
       } catch (e) {
-        setJob(key, { phase: 'refused', message: messageOf(e) });
+        if (mine()) setJob(key, { phase: 'refused', message: messageOf(e) });
       }
     },
 
     async confirmJob(key) {
-      if (get().jobs[key]?.phase !== 'confirm' || get().busy > 0) return;
+      const job = get().jobs[key];
+      if (job?.phase !== 'confirm' || !job.shown || get().busy > 0) return;
       setJob(key, { phase: 'applying' });
-      set((s) => ({ busy: s.busy + 1 }));
-      try {
-        const r = await api.act({ todo: key });
-        if (r.ok) {
-          set({ ...adopt(r.snapshot) });
-          setJob(key, { phase: 'done', message: r.message, card: r.card ?? get().jobs[key]?.card });
-        } else {
-          setJob(key, { phase: 'refused', message: r.message });
-        }
-      } catch (e) {
-        setJob(key, { phase: 'refused', message: messageOf(e) });
-      } finally {
-        set((s) => ({ busy: s.busy - 1 }));
-      }
+      const r = await sendAct(job.shown);
+      if (r.ok) setJob(key, { phase: 'done', message: r.message, card: r.card ?? job.card });
+      else setJob(key, { phase: 'refused', message: r.message });
     },
 
     dismissJob: (key) => setJob(key, null),
 
     async startAct(slot, label, action) {
       const now = get().acts[slot]?.phase;
-      if (now === 'previewing' || now === 'applying') return;
+      // A new ask while one is out replaces it (its answer is dropped). Not while a job is being done.
+      if (now === 'applying') return;
+      const ticket = nextTicket();
       set((s) => ({
         acts: {
           ...s.acts,
-          [slot]: { key: slot, text: label, button: label, phase: 'previewing', action },
+          [slot]: { key: slot, text: label, button: label, phase: 'previewing', action, ticket },
         },
       }));
+      // Asking again (supplement A, then B) makes the first answer stale: it is dropped.
+      const mine = (): boolean => get().acts[slot]?.ticket === ticket;
       try {
         const r = await api.preview({ action });
-        if (r.ok) setAct(slot, { phase: 'confirm', card: r.card });
-        else setAct(slot, { phase: 'refused', message: r.message });
+        if (!mine()) return;
+        if (r.ok) {
+          setAct(slot, { phase: 'confirm', card: r.card, shown: shownOf({ action }, r.version) });
+        } else setAct(slot, { phase: 'refused', message: r.message });
       } catch (e) {
-        setAct(slot, { phase: 'refused', message: messageOf(e) });
+        if (mine()) setAct(slot, { phase: 'refused', message: messageOf(e) });
       }
     },
 
-    async confirmAct(slot, given) {
-      const send = given ?? get().acts[slot]?.action;
-      if (!send || get().acts[slot]?.phase !== 'confirm' || get().busy > 0) return;
+    async confirmAct(slot) {
+      const act = get().acts[slot];
+      if (act?.phase !== 'confirm' || !act.shown || get().busy > 0) return;
       setAct(slot, { phase: 'applying' });
-      set((s) => ({ busy: s.busy + 1 }));
-      try {
-        const r = await api.act({ action: send });
-        if (r.ok) {
-          set({ ...adopt(r.snapshot) });
-          setAct(slot, {
-            phase: 'done',
-            message: r.message,
-            card: r.card ?? get().acts[slot]?.card,
-          });
-        } else {
-          setAct(slot, { phase: 'refused', message: r.message });
-        }
-      } catch (e) {
-        setAct(slot, { phase: 'refused', message: messageOf(e) });
-      } finally {
-        set((s) => ({ busy: s.busy - 1 }));
-      }
+      const r = await sendAct(act.shown);
+      if (r.ok) setAct(slot, { phase: 'done', message: r.message, card: r.card ?? act.card });
+      else setAct(slot, { phase: 'refused', message: r.message });
     },
 
     dismissAct: (slot) => setAct(slot, null),
@@ -564,32 +680,48 @@ export const useGame = create<GameState>()((set, get) => {
       await previewMove();
     },
 
-    movePart: (on) => setMove({ part: on, message: undefined }),
+    // A change to what is moved makes any card on show out of date: it goes back to picking.
+    movePart: (on) =>
+      setMove({
+        part: on,
+        message: undefined,
+        ...(get().move?.phase === 'confirm'
+          ? { phase: 'pick', card: undefined, shown: undefined, ticket: undefined }
+          : {}),
+      }),
     moveQty: (cls, qty) =>
-      set((s) => (s.move ? { move: { ...s.move, qtys: { ...s.move.qtys, [cls]: qty } } } : {})),
+      set((s) =>
+        s.move
+          ? {
+              move: {
+                ...s.move,
+                qtys: { ...s.move.qtys, [cls]: qty },
+                ...(s.move.phase === 'confirm'
+                  ? { phase: 'pick' as const, card: undefined, shown: undefined, ticket: undefined }
+                  : {}),
+              },
+            }
+          : {},
+      ),
 
     async moveConfirm() {
       const { move } = get();
-      const action = moveAction();
-      if (!move || move.phase !== 'confirm' || !action || get().busy > 0) return;
+      if (!move || move.phase !== 'confirm' || !move.shown || get().busy > 0) return;
       setMove({ phase: 'applying' });
-      set((s) => ({ busy: s.busy + 1 }));
-      try {
-        const r = await api.act({ action });
-        if (r.ok) {
-          set({ ...adopt(r.snapshot) });
-          setMove({ phase: 'done', message: r.message, card: r.card ?? move.card });
-        } else {
-          setMove({ phase: 'refused', message: r.message });
-        }
-      } catch (e) {
-        setMove({ phase: 'refused', message: messageOf(e) });
-      } finally {
-        set((s) => ({ busy: s.busy - 1 }));
-      }
+      const r = await sendAct(move.shown);
+      if (r.ok) setMove({ phase: 'done', message: r.message, card: r.card ?? move.card });
+      else setMove({ phase: 'refused', message: r.message });
     },
 
-    moveBack: () => setMove({ phase: 'pick', target: null, card: undefined, message: undefined }),
+    moveBack: () =>
+      setMove({
+        phase: 'pick',
+        target: null,
+        card: undefined,
+        message: undefined,
+        shown: undefined,
+        ticket: undefined,
+      }),
     moveEnd: () => set({ move: null }),
 
     startPlan({ mobId, planId }) {
@@ -626,6 +758,8 @@ export const useGame = create<GameState>()((set, get) => {
                 phase: 'edit',
                 card: undefined,
                 message: undefined,
+                shown: undefined,
+                ticket: undefined,
               },
             }
           : {},
@@ -650,45 +784,51 @@ export const useGame = create<GameState>()((set, get) => {
       const action = draftAction(plan.draft, snapshot.paddocks, snapshot.planForm);
       if (!action) return;
       const mobName = snapshot.mobs.find((m) => m.id === plan.draft.mobId)?.name;
-      set({ plan: { ...plan, phase: 'previewing', mobName, message: undefined } });
+      const ticket = nextTicket();
+      set({ plan: { ...plan, phase: 'previewing', mobName, message: undefined, ticket } });
       try {
         const r = await api.preview({ action });
         const now = get().plan;
-        if (!now || now.phase !== 'previewing') return;
-        if (r.ok) set({ plan: { ...now, phase: 'confirm', card: r.card } });
-        else set({ plan: { ...now, phase: 'refused', message: r.message } });
+        if (!now || now.phase !== 'previewing' || now.ticket !== ticket) return;
+        if (r.ok) {
+          set({
+            plan: { ...now, phase: 'confirm', card: r.card, shown: shownOf({ action }, r.version) },
+          });
+        } else set({ plan: { ...now, phase: 'refused', message: r.message } });
       } catch (e) {
         const now = get().plan;
-        if (now) set({ plan: { ...now, phase: 'refused', message: messageOf(e) } });
+        if (now && now.ticket === ticket) {
+          set({ plan: { ...now, phase: 'refused', message: messageOf(e) } });
+        }
       }
     },
 
     async planConfirm() {
-      const { plan, snapshot } = get();
-      if (!plan || !snapshot || plan.phase !== 'confirm' || get().busy > 0) return;
-      const action = draftAction(plan.draft, snapshot.paddocks, snapshot.planForm);
-      if (!action) return;
+      const { plan } = get();
+      if (!plan || plan.phase !== 'confirm' || !plan.shown || get().busy > 0) return;
       set({ plan: { ...plan, phase: 'applying' } });
-      set((s) => ({ busy: s.busy + 1 }));
-      try {
-        const r = await api.act({ action });
-        const now = get().plan;
-        if (r.ok) {
-          set({ ...adopt(r.snapshot) });
-          if (now)
-            set({ plan: { ...now, phase: 'done', message: r.message, card: r.card ?? now.card } });
-        } else if (now) set({ plan: { ...now, phase: 'refused', message: r.message } });
-      } catch (e) {
-        const now = get().plan;
-        if (now) set({ plan: { ...now, phase: 'refused', message: messageOf(e) } });
-      } finally {
-        set((s) => ({ busy: s.busy - 1 }));
-      }
+      const r = await sendAct(plan.shown);
+      const now = get().plan;
+      if (!now) return;
+      if (r.ok)
+        set({ plan: { ...now, phase: 'done', message: r.message, card: r.card ?? now.card } });
+      else set({ plan: { ...now, phase: 'refused', message: r.message } });
     },
 
     planBack() {
       set((s) =>
-        s.plan ? { plan: { ...s.plan, phase: 'edit', card: undefined, message: undefined } } : {},
+        s.plan
+          ? {
+              plan: {
+                ...s.plan,
+                phase: 'edit',
+                card: undefined,
+                message: undefined,
+                shown: undefined,
+                ticket: undefined,
+              },
+            }
+          : {},
       );
     },
 
@@ -736,13 +876,26 @@ export const useGame = create<GameState>()((set, get) => {
       const b = get().build;
       if (!b || b.tool !== 'fence') return;
       const action = lineAction({ ...b, fence });
-      setBuild({ fence, phase: action ? 'previewing' : 'pick', message: undefined });
+      setBuild({
+        fence,
+        phase: action ? 'previewing' : 'pick',
+        message: undefined,
+        card: undefined,
+        shown: undefined,
+      });
       if (action) lineChecker.flush(action);
     },
 
     setHubOn(on) {
       lastHubOn = on;
-      setBuild({ hubOn: on, picked: null, phase: 'pick', card: undefined, message: undefined });
+      setBuild({
+        hubOn: on,
+        picked: null,
+        phase: 'pick',
+        card: undefined,
+        message: undefined,
+        shown: undefined,
+      });
     },
 
     buildDrag(e) {
@@ -761,7 +914,14 @@ export const useGame = create<GameState>()((set, get) => {
       const next = { ...b, corners, cells };
       const action = lineAction(next);
       const enough = b.tool === 'fence' ? corners.length > 1 : cells.length > 0;
-      set({ build: { ...next, phase: enough ? 'previewing' : 'pick', message: undefined } });
+      set({
+        build: {
+          ...next,
+          phase: enough ? 'previewing' : 'pick',
+          message: undefined,
+          shown: undefined,
+        },
+      });
       if (!action || !enough) {
         lineChecker.cancel();
         return;
@@ -802,25 +962,20 @@ export const useGame = create<GameState>()((set, get) => {
 
     async buildConfirm() {
       const b = get().build;
-      if (!b || b.phase !== 'confirm' || get().busy > 0) return;
-      const action = isLineTool(b.tool) ? lineAction(b) : (b.picked?.action ?? null);
-      if (!action) return;
+      if (!b || b.phase !== 'confirm' || !b.shown || get().busy > 0) return;
       lineChecker.cancel();
       setBuild({ phase: 'applying' });
-      set((s) => ({ busy: s.busy + 1 }));
-      try {
-        const r = await api.act({ action });
-        if (r.ok) {
-          set({ ...adopt(r.snapshot) });
-          // Done: the tool is back to Look, and the result shows until it is dismissed.
-          setBuild({ phase: 'done', message: r.message, card: r.card ?? b.card, allLate: false });
-        } else {
-          setBuild({ phase: 'blocked', message: r.message, allLate: tooLate(r.reason) });
-        }
-      } catch (e) {
-        setBuild({ phase: 'blocked', message: messageOf(e) });
-      } finally {
-        set((s) => ({ busy: s.busy - 1 }));
+      const r = await sendAct(b.shown);
+      if (r.ok) {
+        // Done: the tool is back to Look, and the result shows until it is dismissed.
+        setBuild({ phase: 'done', message: r.message, card: r.card ?? b.card, allLate: false });
+      } else {
+        setBuild({
+          phase: 'blocked',
+          message: r.message,
+          allLate: r.reason !== undefined && tooLate(r.reason),
+          shown: undefined,
+        });
       }
     },
 

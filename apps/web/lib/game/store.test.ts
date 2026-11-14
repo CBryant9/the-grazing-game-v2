@@ -88,7 +88,11 @@ describe('the game store', () => {
 
   it('replaces the snapshot after Next day and keeps the summary to show', async () => {
     useGame.setState({ phase: 'ready', snapshot: snap() });
-    api.day.mockResolvedValueOnce({ snapshot: snap({ day: 1 }), summary } satisfies DayResponse);
+    api.day.mockResolvedValueOnce({
+      ok: true,
+      snapshot: snap({ day: 1 }),
+      summary,
+    } satisfies DayResponse);
     await useGame.getState().nextDay();
     const s = useGame.getState();
     expect(s.snapshot?.day).toBe(1);
@@ -106,7 +110,7 @@ describe('the game store', () => {
     expect(useGame.getState().busy).toBe(1);
     await useGame.getState().nextDay();
     expect(api.day).toHaveBeenCalledTimes(1);
-    release({ snapshot: snap({ day: 1 }), summary });
+    release({ ok: true, snapshot: snap({ day: 1 }), summary });
     await first;
     expect(useGame.getState().busy).toBe(0);
   });
@@ -120,7 +124,7 @@ describe('the game store', () => {
     const s = useGame.getState();
     expect(s.snapshot?.day).toBe(0);
     expect(s.notice?.message).toMatch(/Try again/);
-    api.skip.mockResolvedValueOnce({ snapshot: snap({ day: 7 }), summary });
+    api.skip.mockResolvedValueOnce({ ok: true, snapshot: snap({ day: 7 }), summary });
     s.notice?.retry?.();
     await vi.waitFor(() => expect(useGame.getState().snapshot?.day).toBe(7));
     expect(useGame.getState().notice).toBeNull();
@@ -129,7 +133,7 @@ describe('the game store', () => {
   it('runs a job: card first, result on the same row after it is done and gone from the list', async () => {
     useGame.setState({ phase: 'ready', snapshot: snap() });
     const card = { action: 'markCalves', workMin: 30, cost: 72 } as never;
-    api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+    api.preview.mockResolvedValueOnce({ ok: true, card, version: 'v1' } satisfies PreviewResponse);
     await useGame.getState().startJob('calves-to-mark:1');
     expect(useGame.getState().jobs['calves-to-mark:1']).toMatchObject({ phase: 'confirm', card });
     expect(api.act).not.toHaveBeenCalled();
@@ -157,12 +161,14 @@ describe('the game store', () => {
     api.preview.mockResolvedValueOnce({
       ok: true,
       card: { action: 'markCalves' } as never,
+      version: 'v1',
     });
     await useGame.getState().startJob('calves-to-mark:1');
     api.act.mockResolvedValueOnce({
       ok: false,
       reason: 'not-enough-daylight',
       message: "You don't have enough time to do this today.",
+      snapshot: snap(),
     });
     await useGame.getState().confirmJob('calves-to-mark:1');
     expect(useGame.getState().jobs['calves-to-mark:1']).toMatchObject({
@@ -178,6 +184,7 @@ describe('the game store', () => {
       ok: false,
       reason: 'no-daylight',
       message: 'Today is done.',
+      version: 'v1',
     });
     await useGame.getState().startJob('calves-to-mark:1');
     expect(useGame.getState().jobs['calves-to-mark:1']).toMatchObject({
@@ -191,6 +198,7 @@ describe('the game store', () => {
     useGame.getState().openPaddock(1);
     expect(useGame.getState().paddockId).toBe(1);
     api.day.mockResolvedValueOnce({
+      ok: true,
       snapshot: snap({ view: { paddocks: [{ id: 0 }] } as never }),
       summary,
     });
@@ -231,7 +239,7 @@ describe('the game store', () => {
       useGame.setState({ phase: 'ready', snapshot: farm() });
       useGame.getState().openMob(1);
       expect(useGame.getState().mobId).toBe(1);
-      api.day.mockResolvedValueOnce({ snapshot: farm({ mobs: [] }), summary });
+      api.day.mockResolvedValueOnce({ ok: true, snapshot: farm({ mobs: [] }), summary });
       await useGame.getState().nextDay();
       expect(useGame.getState().mobId).toBeNull();
     });
@@ -239,7 +247,11 @@ describe('the game store', () => {
     it('runs a husbandry job on the card: job card, then confirm, then the result there', async () => {
       useGame.setState({ phase: 'ready', snapshot: farm() });
       const action = { type: 'markCalves', mob: 1 } as const;
-      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      api.preview.mockResolvedValueOnce({
+        ok: true,
+        card,
+        version: 'v1',
+      } satisfies PreviewResponse);
       await useGame.getState().startAct('1:mark', 'Mark calves', action);
       expect(api.preview).toHaveBeenCalledWith({ action });
       expect(useGame.getState().acts['1:mark']).toMatchObject({ phase: 'confirm', card });
@@ -250,7 +262,7 @@ describe('the game store', () => {
         card,
         snapshot: farm(),
       } satisfies ActResponse);
-      await useGame.getState().confirmAct('1:mark', action);
+      await useGame.getState().confirmAct('1:mark');
       expect(useGame.getState().acts['1:mark']).toMatchObject({
         phase: 'done',
         message: '4 calves marked in Steers A.',
@@ -265,6 +277,7 @@ describe('the game store', () => {
         ok: false,
         reason: 'nothing-to-mark',
         message: 'There are no calves to mark in this mob.',
+        version: 'v1',
       });
       await useGame.getState().startAct('1:mark', 'Mark calves', { type: 'markCalves', mob: 1 });
       expect(useGame.getState().acts['1:mark']).toMatchObject({
@@ -279,7 +292,11 @@ describe('the game store', () => {
       expect(useGame.getState().move).toMatchObject({ mobId: 1, target: null, phase: 'pick' });
       expect(api.preview).not.toHaveBeenCalled();
 
-      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      api.preview.mockResolvedValueOnce({
+        ok: true,
+        card,
+        version: 'v1',
+      } satisfies PreviewResponse);
       await useGame.getState().moveTargetPicked(1);
       expect(api.preview).toHaveBeenCalledWith({
         action: { type: 'moveMob', mob: 1, cell: 20 },
@@ -305,7 +322,11 @@ describe('the game store', () => {
       useGame.setState({ phase: 'ready', snapshot: farm() });
       await useGame.getState().startMove({ paddockId: 1 });
       expect(useGame.getState().move).toMatchObject({ mobId: null, target: 1 });
-      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      api.preview.mockResolvedValueOnce({
+        ok: true,
+        card,
+        version: 'v1',
+      } satisfies PreviewResponse);
       await useGame.getState().moveMobPicked(1);
       expect(useGame.getState().move).toMatchObject({ mobId: 1, target: 1, phase: 'confirm' });
     });
@@ -318,7 +339,11 @@ describe('the game store', () => {
       expect(api.preview).not.toHaveBeenCalled();
       expect(useGame.getState().move?.message).toBe('Pick how many head to move first.');
       useGame.getState().moveQty('weanerSteer', 4);
-      api.preview.mockResolvedValueOnce({ ok: true, card } satisfies PreviewResponse);
+      api.preview.mockResolvedValueOnce({
+        ok: true,
+        card,
+        version: 'v1',
+      } satisfies PreviewResponse);
       await useGame.getState().moveTargetPicked(1);
       expect(api.preview).toHaveBeenCalledWith({
         action: {
@@ -336,6 +361,7 @@ describe('the game store', () => {
         ok: false,
         reason: 'no-daylight',
         message: 'Today is done.',
+        version: 'v1',
       });
       await useGame.getState().moveTargetPicked(1);
       expect(useGame.getState().move).toMatchObject({
@@ -349,9 +375,118 @@ describe('the game store', () => {
     it('ends the move tool when the day moves on', async () => {
       useGame.setState({ phase: 'ready', snapshot: farm() });
       await useGame.getState().startMove({ mobId: 1 });
-      api.day.mockResolvedValueOnce({ snapshot: farm(), summary });
+      api.day.mockResolvedValueOnce({ ok: true, snapshot: farm(), summary });
       await useGame.getState().nextDay();
       expect(useGame.getState().move).toBeNull();
+    });
+  });
+  describe('the card and the job agree', () => {
+    const cardFor = (price: number) =>
+      ({ action: 'setSupplement', workMin: 0, cost: 0, perDay: price, notes: [] }) as never;
+    const farmSnap = (over: Partial<Snapshot> = {}) =>
+      snap({ farmVersion: 'v1', mobs: [{ id: 1, name: 'Mob 1' }] as never, ...over });
+
+    it('switching A then B quickly never shows A while Confirm sends B: the old answer is dropped', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farmSnap() });
+      let answerA: (r: PreviewResponse) => void = () => {};
+      api.preview.mockReturnValueOnce(new Promise<PreviewResponse>((r) => (answerA = r)));
+      const a = useGame.getState().startAct('1:supp', 'Switch on Lick', {
+        type: 'setSupplement',
+        mob: 1,
+        supp: 'lick',
+      });
+      api.preview.mockResolvedValueOnce({ ok: true, card: cardFor(9), version: 'v1' });
+      await useGame.getState().startAct('1:supp', 'Switch on Hay', {
+        type: 'setSupplement',
+        mob: 1,
+        supp: 'hay',
+      });
+      // A's answer comes last. It is dropped.
+      answerA({ ok: true, card: cardFor(2), version: 'v1' });
+      await a;
+      const job = useGame.getState().acts['1:supp']!;
+      expect(job.card).toEqual(cardFor(9));
+      api.act.mockResolvedValueOnce({
+        ok: true,
+        message: 'Hay on.',
+        card: null,
+        snapshot: farmSnap(),
+      });
+      await useGame.getState().confirmAct('1:supp');
+      expect(api.act).toHaveBeenCalledWith({
+        action: { type: 'setSupplement', mob: 1, supp: 'hay' },
+        version: 'v1',
+        requestId: expect.any(String),
+      });
+    });
+
+    it('Confirm sends the version the card was made on and a one-use id; a double click sends once', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farmSnap() });
+      api.preview.mockResolvedValueOnce({ ok: true, card: cardFor(1), version: 'v7' });
+      await useGame.getState().startJob('calves-to-mark:1');
+      let release: (r: ActResponse) => void = () => {};
+      api.act.mockReturnValueOnce(new Promise<ActResponse>((r) => (release = r)));
+      const one = useGame.getState().confirmJob('calves-to-mark:1');
+      const two = useGame.getState().confirmJob('calves-to-mark:1');
+      release({
+        ok: true,
+        message: 'Done.',
+        card: null,
+        snapshot: farmSnap({ farmVersion: 'v8' }),
+      });
+      await Promise.all([one, two]);
+      expect(api.act).toHaveBeenCalledTimes(1);
+      expect(api.act.mock.calls[0]![0]).toMatchObject({ todo: 'calves-to-mark:1', version: 'v7' });
+      expect(api.act.mock.calls[0]![0].requestId).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
+      expect(useGame.getState().snapshot?.farmVersion).toBe('v8');
+    });
+
+    it('a refused act shows the farm the server sent; a failed one fetches the farm again', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farmSnap() });
+      api.preview.mockResolvedValue({ ok: true, card: cardFor(1), version: 'v1' });
+      await useGame.getState().startJob('calves-to-mark:1');
+      api.act.mockResolvedValueOnce({
+        ok: false,
+        reason: 'stale',
+        message: 'The farm has changed since this was shown. Here is the latest.',
+        snapshot: farmSnap({ farmVersion: 'v2', day: 3 }),
+      });
+      await useGame.getState().confirmJob('calves-to-mark:1');
+      expect(useGame.getState().snapshot?.day).toBe(3);
+      expect(useGame.getState().jobs['calves-to-mark:1']).toMatchObject({
+        phase: 'refused',
+        message: 'The farm has changed since this was shown. Here is the latest.',
+      });
+      // The reply is lost: the farm is fetched again.
+      useGame.setState({ snapshot: farmSnap({ day: 3, todo: snap().todo }) });
+      await useGame.getState().startJob('calves-to-mark:1');
+      api.act.mockRejectedValueOnce(new ApiError('Offline.'));
+      api.farm.mockResolvedValueOnce({ snapshot: farmSnap({ farmVersion: 'v3', day: 4 }) });
+      await useGame.getState().confirmJob('calves-to-mark:1');
+      await vi.waitFor(() => expect(useGame.getState().snapshot?.day).toBe(4));
+      expect(api.farm).toHaveBeenCalled();
+    });
+
+    it('Next day sends the version on screen; a stale answer shows the latest farm and the plain message', async () => {
+      useGame.setState({ phase: 'ready', snapshot: farmSnap({ farmVersion: 'v5' }) });
+      api.day.mockResolvedValueOnce({
+        ok: false,
+        reason: 'stale',
+        message: 'The farm has changed since this was shown. Here is the latest.',
+        snapshot: farmSnap({ farmVersion: 'v6', day: 2 }),
+      });
+      await useGame.getState().nextDay();
+      expect(api.day).toHaveBeenCalledWith('v5');
+      expect(useGame.getState().snapshot?.day).toBe(2);
+      expect(useGame.getState().notice?.message).toMatch(/has changed/);
+      expect(useGame.getState().summary).toBeNull();
+    });
+
+    it('a farm that can not be opened shows its message, not the setup', async () => {
+      api.farm.mockResolvedValueOnce({ snapshot: null, broken: 'Your farm could not be opened.' });
+      await useGame.getState().load();
+      expect(useGame.getState().phase).toBe('broken');
+      expect(useGame.getState().notice?.message).toBe('Your farm could not be opened.');
     });
   });
 });

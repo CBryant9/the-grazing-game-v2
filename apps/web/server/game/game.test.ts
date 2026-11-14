@@ -298,7 +298,9 @@ describe('the game server', () => {
     expect(await two.snapshot(A)).toEqual(after);
     const next = await two.endDay(A);
     const same = await one.endDay(A);
-    expect(next.snapshot).toEqual(same.snapshot);
+    // The same farm, saved twice: everything matches but the version, which is new at every save.
+    expect(next.snapshot.farmVersion).not.toBe(same.snapshot.farmVersion);
+    expect({ ...next.snapshot, farmVersion: '' }).toEqual({ ...same.snapshot, farmVersion: '' });
   }, 60_000);
 
   it("does not let one session read or change another session's farm", async () => {
@@ -419,6 +421,9 @@ describe('the snapshot keeps the rules hidden', () => {
     farm = endDay(farm).farm;
     expect(farmTotals(farm).head).toBeGreaterThan(4000);
     const stored: StoredFarm = {
+      format: 2,
+      version: 'abc123',
+      done: [],
       name: 'Big Run',
       setup: choices({ district: 'cq' }),
       saved: saveFarm(farm),
@@ -486,7 +491,7 @@ describe('the snapshot keeps the rules hidden', () => {
     expect(thingsToDo(farm)).toBeInstanceOf(Array);
     const snap: Snapshot = buildSnapshot(
       farm,
-      { name: 'X', setup: choices({ district: 'wv' }) },
+      { name: 'X', setup: choices({ district: 'wv' }), version: 'abc' },
       {},
     );
     expect(snap.farm.district).toBe('wv');

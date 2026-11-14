@@ -2,7 +2,7 @@ import type { FarmView, ViewEdge } from '@gg/shared';
 import type { MapDraft, NotFit } from '@gg/render/draft';
 import { fenceDraft, markDraft, markSquares, pipeDraft } from '@gg/render/draft';
 import { edgesOfPath, tapeRun, vertexCorner, type Corner } from '@gg/render/lines';
-import type { BuildToolId, EdgeWire, FenceKindId, JobCardWire, SimpleAction } from './types';
+import type { BuildToolId, EdgeWire, FenceKindId, JobCardWire, Shown, SimpleAction } from './types';
 
 /**
  * The build tools as the page holds them: what the player has drawn or
@@ -72,11 +72,14 @@ export interface BuildState {
   message?: string;
   /** True when the server said none of the line fits today, so all of it is red. */
   allLate: boolean;
+  /** What the card on show was made for: Confirm sends exactly this. */
+  shown?: Shown;
 }
 
 export const newBuild = (tool: BuildTool, over: Partial<BuildState> = {}): BuildState => ({
   tool,
-  fence: 'electric',
+  // A normal fence is the one a grazier goes for. Electric is picked on purpose (Claudia, 14 Nov 2026).
+  fence: 'permanent',
   hubOn: 'corner',
   corners: [],
   cells: [],

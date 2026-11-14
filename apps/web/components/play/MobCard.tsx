@@ -4,7 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { dateText, num, plural, priceText, shortDate } from '@/lib/game/format';
 import { sellLimits } from '@/lib/game/lists';
 import { useGame } from '@/lib/game/store';
-import type { MobWire, SellGroupId, SimpleAction, Snapshot, SuppId } from '@/lib/game/types';
+import type { MobWire, SellGroupId, Snapshot, SuppId } from '@/lib/game/types';
 import { JobBox } from './JobBox';
 import { Sheet } from './Sheet';
 import styles from './play.module.css';
@@ -29,7 +29,6 @@ function Job({
   hint,
   onStart,
   confirmLabel,
-  action,
   children,
 }: {
   slot: string;
@@ -39,7 +38,6 @@ function Job({
   hint?: string | null;
   onStart: () => void;
   confirmLabel: string;
-  action: () => SimpleAction;
   children?: ReactNode;
 }) {
   const job = useGame((s) => s.acts[slot]);
@@ -76,7 +74,7 @@ function Job({
           job={job}
           confirmLabel={confirmLabel}
           busy={busy}
-          onConfirm={() => void confirmAct(slot, action())}
+          onConfirm={() => void confirmAct(slot)}
           onCancel={() => dismissAct(slot)}
           onDismiss={() => dismissAct(slot)}
         />
@@ -108,12 +106,6 @@ function SellPicker({ mob, snapshot }: { mob: MobWire; snapshot: Snapshot }) {
       hint={open ? null : sale}
       confirmLabel="Sell"
       onStart={() => setOpen(!open)}
-      action={() => ({
-        type: 'sellGroup',
-        mob: mob.id,
-        group: group as SellGroupId,
-        qty: lim.qty,
-      })}
     >
       {open && mob.sellGroups.length > 0 && (
         <div className={styles.picker} role="group" aria-label="Sell: pick a group and a number">
@@ -224,7 +216,7 @@ function SuppSwitch({ mob }: { mob: MobWire }) {
             job={job}
             confirmLabel={job.text}
             busy={busy}
-            onConfirm={() => void confirmAct(`${mob.id}:supp`, action(picked))}
+            onConfirm={() => void confirmAct(`${mob.id}:supp`)}
             onCancel={() => {
               setPicked(mob.supp);
               dismissAct(`${mob.id}:supp`);
@@ -317,7 +309,6 @@ export function MobCard({
           onStart={() =>
             void startAct(`${mob.id}:mark`, 'Mark calves', { type: 'markCalves', mob: mob.id })
           }
-          action={() => ({ type: 'markCalves', mob: mob.id })}
         />
         <Job
           slot={`${mob.id}:wean`}
@@ -326,7 +317,6 @@ export function MobCard({
           hint={`${plural(mob.weanCount, 'calf', 'calves')} old enough to wean`}
           confirmLabel="Wean"
           onStart={() => void startAct(`${mob.id}:wean`, 'Wean', { type: 'wean', mob: mob.id })}
-          action={() => ({ type: 'wean', mob: mob.id })}
         />
         <SellPicker mob={mob} snapshot={snapshot} />
         <li className={styles.hrow}>
@@ -364,7 +354,6 @@ export function MobCard({
                   mob: mob.id,
                 })
               }
-              action={() => ({ type: 'cancelSale', mob: mob.id })}
             />
           </ul>
         </div>

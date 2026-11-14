@@ -421,6 +421,11 @@ export interface CropsWire {
 
 export interface Snapshot {
   version: typeof SNAPSHOT_VERSION;
+  /**
+   * The farm's version: it changes with every change to the farm. Jobs, Next
+   * day and skips send back the one the player was looking at.
+   */
+  farmVersion: string;
   farm: {
     name: string;
     district: DistrictId;
@@ -492,10 +497,25 @@ export interface Refusal {
   message: string;
 }
 
-export type PreviewResponse = { ok: true; card: JobCardWire } | Refusal;
+/** A job card, with the farm version it was made on. Confirm sends that version back. */
+export type PreviewResponse =
+  { ok: true; card: JobCardWire; version: string } | (Refusal & { version: string });
 
+/**
+ * What a job did, or why it was refused, with the farm as it is now.
+ * `repeat` is true when the same request had been answered before.
+ */
 export type ActResponse =
-  { ok: true; message: string; card: JobCardWire | null; snapshot: Snapshot } | Refusal;
+  | { ok: true; message: string; card: JobCardWire | null; snapshot: Snapshot; repeat?: true }
+  | (Refusal & { snapshot: Snapshot; repeat?: true });
+
+/** The farm changed since the player last saw it: nothing was done. Here is the latest. */
+export interface StaleResponse {
+  ok: false;
+  reason: 'stale';
+  message: string;
+  snapshot: Snapshot;
+}
 
 export interface ChangeWire {
   before: number;
@@ -532,12 +552,15 @@ export interface SummaryWire {
 }
 
 export interface DayResponse {
+  ok: true;
   snapshot: Snapshot;
   summary: SummaryWire;
 }
 
 export interface FarmResponse {
   snapshot: Snapshot | null;
+  /** Set when the farm is there but can not be opened: what to tell the player. */
+  broken?: string;
 }
 
 // ---- Setup
@@ -572,6 +595,21 @@ export interface SetupChoices {
 
 /** What the browser may ask the server to do to a farm. The server checks every request. */
 export type ActionRequest = { todo: string } | { action: SimpleAction };
+
+/**
+ * What a job card on screen was made for: the request, the farm version it
+ * was made on, and the one-use id Confirm sends. The server refuses a
+ * version that is not the farm's, and answers a repeated id with the answer
+ * it gave before, so a card can never do something other than it showed.
+ */
+export interface Shown {
+  req: ActionRequest;
+  version: string;
+  requestId: string;
+}
+
+/** An act request: the job, the farm version its card was made on, and a one-use id. */
+export type ActRequest = ActionRequest & { version: string; requestId: string };
 
 export type SimpleAction =
   | { type: 'markCalves'; mob: number }

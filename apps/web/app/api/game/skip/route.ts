@@ -1,5 +1,6 @@
 import { GameError, gameServer } from '@/server/game/game';
 import { readJson, route } from '@/server/game/http';
+import { parseVersion } from '@/server/game/request';
 import type { SkipRequestLength } from '@/lib/game/types';
 
 export const dynamic = 'force-dynamic';
@@ -14,5 +15,10 @@ export const POST = route({ name: 'skip', write: true, max: 10 }, async ({ req, 
   if (typeof length !== 'string' || !LENGTHS.includes(length as SkipRequestLength)) {
     throw new GameError(400, 'Choose a week, a month or a year.');
   }
-  return gameServer().skip(sessionId, length as SkipRequestLength, body?.anyway === true);
+  return gameServer().skip(
+    sessionId,
+    length as SkipRequestLength,
+    body?.anyway === true,
+    parseVersion(body),
+  );
 });
