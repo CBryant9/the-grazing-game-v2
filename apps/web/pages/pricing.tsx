@@ -1,13 +1,13 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { FARM_LIMITS } from '@gg/shared';
 import { PageShell } from '@/components/site/PageShell';
 import styles from '@/components/site/site.module.css';
-import { pageMetadata } from '@/lib/metadata';
-import { PACK_PERKS, PRICES, dollars } from '@/lib/pricing';
+import { PACK_PERKS, PRICES, priceText } from '@/lib/pricing';
 import { siteSwitchOn } from '@/lib/site';
 
-export const metadata: Metadata = pageMetadata('/pricing');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 /** How many farms a plan holds, naming Daily Farm only when that mode is switched on. */
 function farms(limits: { daily: number; fast: number }, dailyOn: boolean): string {
@@ -38,8 +38,9 @@ export default function PricingPage() {
           </ul>
         </div>
         <p className={`${styles.lead} muted`} style={{ marginTop: 16 }}>
-          Nothing in the game is for sale today. If that changes, nothing that gives an edge in play
-          will be sold.
+          {purchasesOn
+            ? 'The game is free to play. The packs below are optional, and nothing that gives an edge in play is sold.'
+            : 'Nothing in the game is for sale today. If that changes, nothing that gives an edge in play will be sold.'}
         </p>
       </section>
 
@@ -62,7 +63,7 @@ export default function PricingPage() {
             </li>
             <li className={`card ${styles.card}`}>
               <h3 className="px">Farm pack</h3>
-              <p className={styles.price}>About {dollars(PRICES.farmPack)}</p>
+              <p className={styles.price}>{priceText(PRICES.farmPack)}</p>
               <ul className={styles.ticks}>
                 <li>{farms(FARM_LIMITS.pack, dailyOn)}</li>
                 {PACK_PERKS.map((perk) => (
@@ -72,11 +73,11 @@ export default function PricingPage() {
             </li>
             <li className={`card ${styles.card}`}>
               <h3 className="px">Farm pack, no ads</h3>
-              <p className={styles.price}>About {dollars(PRICES.farmPackNoAds)}</p>
+              <p className={styles.price}>{priceText(PRICES.farmPackNoAds)}</p>
               <ul className={styles.ticks}>
                 <li>Everything in the Farm pack</li>
                 <li>No banners or videos</li>
-                <li>{dollars(PRICES.upgradeToNoAds)} to upgrade from the Farm pack</li>
+                <li>{priceText(PRICES.upgradeToNoAds)} to upgrade from the Farm pack</li>
               </ul>
             </li>
           </ul>
@@ -111,12 +112,12 @@ export default function PricingPage() {
               <tbody>
                 <tr>
                   <th scope="row">Fast Farm</th>
-                  <td>{dollars(PRICES.keepGoingFast)}</td>
+                  <td>{priceText(PRICES.keepGoingFast)}</td>
                 </tr>
-                {PRICES.keepGoingDaily.map((row) => (
+                {(dailyOn ? PRICES.keepGoingDaily : []).map((row) => (
                   <tr key={row.label}>
                     <th scope="row">Daily Farm, {row.label.toLowerCase()}</th>
-                    <td>{dollars(row.price)}</td>
+                    <td>{priceText(row.price)}</td>
                   </tr>
                 ))}
               </tbody>

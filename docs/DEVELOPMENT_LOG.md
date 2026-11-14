@@ -133,7 +133,7 @@ Lighthouse (mobile, local): Accessibility 100, Best Practices 100, SEO 100 on bo
 
 Not done, and why:
 
-- Performance is not a steady 100 on the landing shell. First-load JavaScript is 141 KB compressed, over the PRD's 100 KB budget for website pages. Most of it is the framework's own runtime. To be dealt with in milestone 5.4 (LESSONS R1).
+- Performance is not a steady 100 on the landing shell. First-load JavaScript is 141 KB compressed, over the PRD's 100 KB budget for website pages. Most of it is the framework's own runtime. Dealt with for the public pages in milestone 5.4: they send no script (LESSONS R1).
 - TypeScript is held at 6.0, because the lint tooling does not support 7 yet.
 - Playwright end-to-end tests come with the game screens (1.7).
 
@@ -1153,22 +1153,51 @@ Not done or not checked: a real phone (install, the iPhone steps, offline in air
 
 ### 14 Nov 2026: milestone 5.4, the public website
 
-Branch `claude/m5-4-website-363c83`. Touches only the website: `apps/web/app` (new pages, `page.tsx`, `layout.tsx`, `robots.ts`, `sitemap.ts`), `apps/web/components/site`, `apps/web/components/SiteHeader.*`, `apps/web/lib` (new files only), `.env.example`, `lighthouserc.json`. Nothing under `app/play`, `app/api`, `components/play`, `server`, `lib/game`, `packages/`. No new package or outside service.
+Branch `claude/m5-4-website-363c83`, with `m1.7g-scores-diary` merged in (conflicts in `layout.tsx`, `lighthouserc.json` and this log, kept both sides). Touches the website only: `apps/web/pages` (the public pages), `apps/web/components/site`, `apps/web/components/SiteHeader.*`, `apps/web/lib` (new files, `fonts.ts` and `themeToggleScript.ts` among them), `apps/web/app` (`layout.tsx` uses the shared fonts, `robots.ts`, `sitemap.ts`, the share images), `.env.example`, `lighthouserc.json`, `vitest.config.ts` (JSX for the page tests), and the two build checks in `scripts/` (they now know the home page is built into `.next/server/pages`). Nothing under `app/play`, `app/api`, `components/play`, `server`, `lib/game` or `packages/`. No new package or outside service.
 
-**Pages (all static, no game code):** `/` (landing and sales page), `/pricing`, `/advertise`, `/about`, `/privacy`, `/terms`, `/community-rules`. Each has its own title, description, canonical address, Open Graph and Twitter text, a share image made in code (`opengraph-image.tsx` through `lib/shareImage.tsx`), and a breadcrumb in structured data. The landing page also carries `WebSite`, `VideoGame` (free, browser, AUD 0) and `FAQPage` data. `sitemap.xml` and `robots.txt` read one list of pages (`lib/site.ts`). The farm picture on the landing page is an inline SVG drawn in code (`components/site/FarmScene.tsx`), the same every build. No ad slot and no activity ticker is rendered.
+**Pages (static, no script):** `/` (landing and sales page), `/pricing`, `/advertise`, `/about`, `/privacy`, `/terms`, `/community-rules`. Each has a title, description, canonical address, Open Graph and Twitter text, a share image made in code (`app/**/opengraph-image.tsx` through `lib/shareImage.tsx`) and a breadcrumb. The landing page adds `WebSite`, `VideoGame` (free, browser, AUD 0) and `FAQPage` data. `sitemap.xml` and `robots.txt` read one page list (`lib/site.ts`). The landing picture is an inline SVG drawn in code. No ad slot and no activity ticker is rendered.
 
-**Only what is true.** Today's page says: Fast Farm, four districts, real or random years, paddocks, fences, water, plans, saleyard sale days, crops, no sign-up. Daily Farm, sheep, leaderboards, community, purchases, sign-ups and analytics appear only inside sections read through `siteSwitchOn` (`lib/site.ts`). Those switches are all off unless `SITE_SWITCHES_ON` names them (see `.env.example`), because the shared defaults turn on Daily Farm, leaderboards and sign-ups, which are not built. The key names are the shared ones plus `sheep`, `farm_hands` and `analytics`, which the shared list does not have yet. Prices come only from `lib/pricing.ts`, which copies PRD 10.3 and shows only when `purchases` is on. The contact address comes from `SITE_CONTACT_EMAIL`; with it unset every contact link is left out. The legal pages are drafts, headed "Draft. Not yet reviewed."
+**No script on the public pages.** The App Router sends about 120 KB of script even when no component is a client component, which is why the first pass scored 82 to 100 and never held 100. The public pages are now pages-router pages (`apps/web/pages`) with `unstable_runtimeJS: false`. They send no script file. The light and dark button is plain HTML with a small inline script (`lib/themeToggleScript.ts`) that does what the game's React toggle does. The game stays in the App Router. `pnpm check:js-budget`: `/` 0 KB (limit lowered from 142 KB to 1 KB), `/play` 192 KB (limit 250 KB). `pnpm check:browser-bundle` passes. The service worker's page list still holds only `/` and `/play`, and the public pages register nothing (`PwaRegister` is only in `/play`).
 
-**Public pages do not load the game.** Links to `/play` from public pages used to make the browser prefetch the game's JavaScript (34 KB). Every public link now goes through `SiteLink`, which does not prefetch (LESSONS, process). `pnpm check:browser-bundle` passes, and no `/play` request appears in any public page's network list.
+**Only what is true.** The pages say what is live: Fast Farm, four districts, real or random years, paddocks, fences, water, plans, saleyard sale days, crops, no sign-up. Daily Farm, sheep, leaderboards, community, purchases, sign-ups and analytics sit inside sections read through `siteSwitchOn` (`lib/site.ts`), all off unless `SITE_SWITCHES_ON` names them. The shared defaults turn on Daily Farm, leaderboards and sign-ups, which are not built, so the site keeps its own off-by-default read. Pricing is linked from the header, footer and About page only while `purchases` is on; the page stays reachable. The prices come only from `lib/pricing.ts` (PRD 10.3, with "about" where the PRD has it, and "To be set" for the under-6-months Daily Farm price the PRD still marks Open). Contact address: `SITE_CONTACT_EMAIL`. Owner: `SITE_OWNER_NAME`. While either is unset, the draft pages show "Contact details will be added before launch."
 
-**How it was tested:** `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` and `pnpm check:browser-bundle` pass. A headless Chrome run over every page at 390 by 844, 844 by 390 and 1440 by 900, light and dark, found no sideways scroll and no text under WCAG AA contrast (4.5, or 3 for large text), by script. Lighthouse (mobile, local production build, `lhci collect`, 3 runs each): Accessibility, Best Practices and SEO were 100 on every page in every run (21 runs). Performance, three runs per page (median in brackets): `/` 97, 92, 97 (97); `/pricing` 98, 93, 92 (93); `/advertise` 95, 82, 94 (94); `/about` 96, 99, 89 (96); `/privacy` 98, 99, 95 (98); `/terms` 100, 99, 92 (99); `/community-rules` 97, 96, 99 (97). Largest Contentful Paint 0.9 to 1.2 s and Cumulative Layout Shift 0 on every page. The same pages scored 100 on quieter runs earlier in the day (for example `/terms` three times in a row), so the spread is mostly this PC being shared with other sessions' test runs.
+**Tests:** `lib/pricing.test.ts` checks every price against PRD 10.3 (line numbers cited). `lib/sitePages.test.ts` renders each page with the switches off and on (quiet when off, shown when on, no contact link without an address, no Pricing link, no Open price), checks switch keys against `SHARED_SWITCH_KEYS` and checks the sitemap lists only public pages. `scripts/check-js-budget.test.ts` was updated.
+
+**Lighthouse** (mobile, local production build, `lhci collect`, 3 runs per page): Accessibility, Best Practices and SEO were 100 on every run of every page. Performance medians: `/` 100 (8 runs, range 90 to 100), `/pricing` 99 (8 runs, 66 to 100), `/advertise` 100 (6 runs, 92 to 100), `/about` 100 (3), `/privacy` 100 (3), `/terms` 100 (8 runs, 97 to 100), `/community-rules` 100 (3). Largest Contentful Paint 0.7 to 1.2 s (one `/` run 1.9 s), Cumulative Layout Shift 0 on every run. Before the change (first pass, with the App Router) the medians were 93 to 99 and no page held 100. Runs below 100 now are this PC being shared (the worst, 3.6 s of blocking time on `/pricing`, happened on a page with no script to block), not the pages.
+
+**Launch checklist (the "Draft. Not yet reviewed." line stays until every item is done):**
+
+- [ ] `SITE_OWNER_NAME` set (and the owner and ABN decided, PRD 18).
+- [ ] `SITE_CONTACT_EMAIL` set to an address Claudia chooses.
+- [ ] A lawyer has read the privacy page, the terms and the community rules (PRD 18), including the under-16 wording and purchases by under 18s.
+- [ ] `NEXT_PUBLIC_SITE_URL` set to the real domain.
+- [ ] `SITE_SWITCHES_ON` set for what is live at launch, then the site rebuilt (the pages are static, so this is read when the site is built).
+- [ ] The privacy page matches what the game really keeps (providers and where they keep data, how long, cookies, analytics).
+
+**Calls for Claudia:**
+
+1. **Domain.** Not chosen. `NEXT_PUBLIC_SITE_URL`. Canonical links, the sitemap and share images use it.
+2. **Owner name and ABN** for the terms and the privacy page (PRD 18: her business or AgriProve). `SITE_OWNER_NAME`. Until set, the pages say "the owner of The Grazing Game".
+3. **Contact address.** `SITE_CONTACT_EMAIL`. Until set, there is no contact link anywhere and no way to make a privacy request or an advertising enquiry.
+4. **A lawyer's review** of the three legal pages. They are plain-English drafts built from the PRD, not legal advice.
+5. **Providers named in the privacy page.** It says "hosting and database providers" and that data may be kept outside Australia. It names none. Vercel and Supabase (Sydney) are the plan (PRD 14, 19). Naming them, and where each keeps data, needs her yes once the accounts exist. Stripe is named only when `purchases` is on.
+6. **How long data is kept.** Only the guest-farm rule is written ("removed if it goes unused for a long time", the server's 90 days). Account data retention is not decided.
+7. **Which switches are on at launch** (`SITE_SWITCHES_ON`). Today none.
+8. **Daily Farm keep-going price under 6 months.** PRD 10.3 marks it Open (A$15 until set). The page says "To be set".
+9. **Audience totals and ad rates** for the Advertise page. The PRD has no rate card and there is no audience yet, so the page has none. It says no ads are running.
+10. **Analytics only with consent.** The privacy page says analytics run only with the player's consent and that they can still play if they say no. That is stricter than PRD 12 ("where needed"), and it binds the PostHog work (milestone 5.3) to a consent gate.
+11. **Wording that matters:** the SILO credit change notice ("soil water and pasture growth figures are worked out from it by The Grazing Game", DATA.md leaves it to her); "removed if it goes unused for a long time" for guest farms; "Looking is free and takes no time"; community rules shown with a note that the game has no community today.
+12. **Privacy complaints.** The page points to the Office of the Australian Information Commissioner's "Privacy complaints" page (https://www.oaic.gov.au/privacy/privacy-complaints), looked up 14 Nov 2026. It says to tell us first. Check it before launch.
+13. **Lighthouse.** `/pricing` has a median of 99 over 8 runs, not 100, and a few single runs on other pages fall below 100, all on a busy PC with no script to cause it. `lighthouserc.json` asserts performance 1.0 as an error on every public page (median of 3 runs), and `/play` keeps its own 0.95 rule. If CI fails on a busy runner, run it again before looking for a cause; if one page fails on a quiet runner, that page needs work.
+
+**PRD defaults used:** PRD 10.3 prices and perks (21, rows 29 and 30) exactly as written, with the Open price left unset; PRD 6.3 page list and layout (big heading and a short line under it); PRD 10.1 slot places and formats for the Advertise page, listing only slots for places that exist; PRD 8.3 under-16 rules in the community rules; PRD 9.9 reporting and moderation actions in the community rules; PRD 14.10 targets (Lighthouse 100 on website pages, script under 100 KB).
 
 Not done:
 
-- A steady Lighthouse Performance of 100 on every page. See the scores above. The score is set by total blocking time: the framework's own start-up (React and the Next.js client, about 117 KB over the wire) runs as one task of 50 to 100 ms on this PC, and the landing page's longer markup makes it a little longer. Things tried that did not help: serving the picture as an image file (the picture became the largest paint and slowed it), `content-visibility` on the lower sections, Suspense around sections, a lighter picture. Things that did help: no link prefetch on public pages (about 40 points on the plain pages). Next step if 100 is a hard rule on the landing page: a lighter page with fewer sections, or moving the lower sections to their own page.
 - Share images use the default font (the display font is not available to `ImageResponse` without bundling it).
-- The wording in the privacy, terms and community rules drafts is not reviewed by a lawyer (PRD 18). The terms leave the owner's name open (Claudia's own business or AgriProve, PRD 18).
-- No audience numbers or ad prices on Advertise: the PRD has none.
+- The legal pages are drafts, with no lawyer's review.
+- No audience numbers or ad prices on Advertise.
+- Cookie and consent banner (milestone 5.3, when analytics arrive).
 
 ## Ideas raised but not built yet
 

@@ -1,13 +1,13 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { MIN_COMMUNITY_AGE } from '@gg/shared';
 import { DraftNotice } from '@/components/site/DraftNotice';
 import { PageShell } from '@/components/site/PageShell';
 import styles from '@/components/site/site.module.css';
-import { pageMetadata } from '@/lib/metadata';
-import { contactEmail, siteSwitchOn } from '@/lib/site';
+import { DETAILS_TO_COME, contactEmail, siteSwitchOn } from '@/lib/site';
 
-export const metadata: Metadata = pageMetadata('/community-rules');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 export default function CommunityRulesPage() {
   const email = contactEmail();
@@ -67,12 +67,16 @@ export default function CommunityRulesPage() {
           for a number of days, or ban it. New accounts have limits on how fast they can post and
           comment.
         </p>
-        {email ? (
-          <p>
-            If something is wrong and you cannot report it in the game,{' '}
-            <a href={`mailto:${email}`}>contact us</a>.
-          </p>
-        ) : null}
+        <p>
+          {email ? (
+            <>
+              If something is wrong and you cannot report it in the game,{' '}
+              <a href={`mailto:${email}`}>contact us</a>.
+            </>
+          ) : (
+            DETAILS_TO_COME
+          )}
+        </p>
         <p>
           These rules sit alongside the <Link href="/terms">terms of use</Link> and the{' '}
           <Link href="/privacy">privacy page</Link>.

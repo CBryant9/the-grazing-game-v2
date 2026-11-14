@@ -1,6 +1,6 @@
 import Link from '@/components/site/SiteLink';
 import { SITE } from '@gg/shared';
-import { SITE_PAGES, contactEmail } from '@/lib/site';
+import { contactEmail, linkedPages } from '@/lib/site';
 import styles from './site.module.css';
 
 /** The footer on every public page: the page links, and the contact link only when an address is set. */
@@ -14,7 +14,7 @@ export function SiteFooter() {
             <li>
               <Link href="/">Home</Link>
             </li>
-            {SITE_PAGES.filter((p) => p.footer).map((p) => (
+            {linkedPages('footer').map((p) => (
               <li key={p.path}>
                 <Link href={p.path}>{p.title}</Link>
               </li>

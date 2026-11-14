@@ -7,6 +7,6 @@ export const contentType = 'image/png';
 export default function Image() {
   return shareImage({
     heading: 'Pricing',
-    line: 'Free to play. See what is free today and what is for sale.',
+    line: 'Free to play on your phone or PC. No sign-up.',
   });
 }

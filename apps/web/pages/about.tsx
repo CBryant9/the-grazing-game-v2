@@ -1,12 +1,12 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { DISTRICTS, DISTRICT_IDS, MIN_ACCOUNT_AGE } from '@gg/shared';
 import { PageShell } from '@/components/site/PageShell';
 import styles from '@/components/site/site.module.css';
-import { pageMetadata } from '@/lib/metadata';
 import { siteSwitchOn } from '@/lib/site';
 
-export const metadata: Metadata = pageMetadata('/about');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 export default function AboutPage() {
   const signupsOn = siteSwitchOn('signups_open');
@@ -86,9 +86,11 @@ export default function AboutPage() {
 
         <h2>Read more</h2>
         <ul>
-          <li>
-            <Link href="/pricing">Pricing</Link>
-          </li>
+          {siteSwitchOn('purchases') ? (
+            <li>
+              <Link href="/pricing">Pricing</Link>
+            </li>
+          ) : null}
           <li>
             <Link href="/privacy">Privacy</Link>, <Link href="/terms">terms of use</Link> and{' '}
             <Link href="/community-rules">community rules</Link>

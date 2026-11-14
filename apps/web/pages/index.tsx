@@ -1,16 +1,16 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { DISTRICTS, DISTRICT_IDS, MODES, SITE } from '@gg/shared';
-import { SiteHeader } from '@/components/SiteHeader';
+import { PublicHeader } from '@/components/site/PublicHeader';
+import { PageHead } from '@/components/site/PageHead';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { FarmScene } from '@/components/site/FarmScene';
-import { JsonLd } from '@/components/site/JsonLd';
 import site from '@/components/site/site.module.css';
-import { pageMetadata } from '@/lib/metadata';
 import { absoluteUrl, siteSwitchOn } from '@/lib/site';
-import styles from './page.module.css';
+import styles from '@/components/site/landing.module.css';
 
-export const metadata: Metadata = pageMetadata('/');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 /** Questions and answers. They are shown on the page and sent to search engines as the same text. */
 const FAQ: { q: string; a: string }[] = [
@@ -36,6 +36,42 @@ const FAQ: { q: string; a: string }[] = [
   },
 ];
 
+const LANDING_DATA = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${absoluteUrl('/')}#website`,
+      name: SITE.name,
+      url: absoluteUrl('/'),
+      inLanguage: 'en-AU',
+      description: SITE.description,
+    },
+    {
+      '@type': 'VideoGame',
+      name: SITE.name,
+      url: absoluteUrl('/play'),
+      description: SITE.description,
+      genre: ['Simulation', 'Strategy'],
+      applicationCategory: 'Game',
+      gamePlatform: 'Web browser',
+      operatingSystem: 'Any',
+      playMode: 'SinglePlayer',
+      inLanguage: 'en-AU',
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'AUD' },
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: FAQ.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      })),
+    },
+  ],
+};
+
 export default function LandingPage() {
   const dailyOn = siteSwitchOn('daily_farm');
   const sheepOn = siteSwitchOn('sheep');
@@ -44,7 +80,8 @@ export default function LandingPage() {
 
   return (
     <>
-      <SiteHeader current="/" />
+      <PageHead path="/" jsonLd={[LANDING_DATA]} />
+      <PublicHeader current="/" />
       <main id="main">
         <section className={styles.hero}>
           <div className="wrap">
@@ -252,43 +289,6 @@ export default function LandingPage() {
         </section>
       </main>
       <SiteFooter />
-      <JsonLd
-        data={{
-          '@context': 'https://schema.org',
-          '@graph': [
-            {
-              '@type': 'WebSite',
-              '@id': `${absoluteUrl('/')}#website`,
-              name: SITE.name,
-              url: absoluteUrl('/'),
-              inLanguage: 'en-AU',
-              description: SITE.description,
-            },
-            {
-              '@type': 'VideoGame',
-              name: SITE.name,
-              url: absoluteUrl('/play'),
-              description: SITE.description,
-              genre: ['Simulation', 'Strategy'],
-              applicationCategory: 'Game',
-              gamePlatform: 'Web browser',
-              operatingSystem: 'Any',
-              playMode: 'SinglePlayer',
-              inLanguage: 'en-AU',
-              isAccessibleForFree: true,
-              offers: { '@type': 'Offer', price: '0', priceCurrency: 'AUD' },
-            },
-            {
-              '@type': 'FAQPage',
-              mainEntity: FAQ.map((item) => ({
-                '@type': 'Question',
-                name: item.q,
-                acceptedAnswer: { '@type': 'Answer', text: item.a },
-              })),
-            },
-          ],
-        }}
-      />
     </>
   );
 }

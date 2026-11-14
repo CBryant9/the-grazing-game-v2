@@ -1,12 +1,12 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import { AD_SLOTS } from '@gg/shared';
 import { PageShell } from '@/components/site/PageShell';
 import styles from '@/components/site/site.module.css';
 import { AD_SLOT_INFO } from '@/lib/adSlotInfo';
-import { pageMetadata } from '@/lib/metadata';
 import { contactEmail, siteSwitchOn } from '@/lib/site';
 
-export const metadata: Metadata = pageMetadata('/advertise');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 export default function AdvertisePage() {
   const email = contactEmail();

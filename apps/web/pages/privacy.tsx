@@ -1,16 +1,17 @@
-import type { Metadata } from 'next';
+import type { PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { MIN_ACCOUNT_AGE, MIN_COMMUNITY_AGE } from '@gg/shared';
 import { DraftNotice } from '@/components/site/DraftNotice';
 import { PageShell } from '@/components/site/PageShell';
 import styles from '@/components/site/site.module.css';
-import { pageMetadata } from '@/lib/metadata';
-import { contactEmail, siteSwitchOn } from '@/lib/site';
+import { DETAILS_TO_COME, contactEmail, ownerName, siteSwitchOn } from '@/lib/site';
 
-export const metadata: Metadata = pageMetadata('/privacy');
+// No JavaScript is sent to the browser for this page.
+export const config: PageConfig = { unstable_runtimeJS: false };
 
 export default function PrivacyPage() {
   const email = contactEmail();
+  const owner = ownerName();
   const accounts = siteSwitchOn('signups_open');
   const community = siteSwitchOn('community');
   const analytics = siteSwitchOn('analytics');
@@ -24,6 +25,12 @@ export default function PrivacyPage() {
     >
       <div className={styles.prose}>
         <DraftNotice />
+        <h2>Who we are</h2>
+        <p>
+          In this page, &ldquo;we&rdquo; means {owner ?? 'the owner of The Grazing Game'}.{' '}
+          {owner && email ? null : DETAILS_TO_COME}
+        </p>
+
         <h2>The short version</h2>
         <p>
           We keep only what the game needs to work. We do not sell your information. Advertisers, if
@@ -120,11 +127,23 @@ export default function PrivacyPage() {
           You can ask to see what we keep about you, to correct it, or to have it deleted. We will
           help, and we will tell you if there is something we are required to keep.
         </p>
-        {email ? (
-          <p>
-            To ask, <a href={`mailto:${email}`}>contact us</a>.
-          </p>
-        ) : null}
+        <p>
+          {email ? (
+            <>
+              To ask, <a href={`mailto:${email}`}>contact us</a>.
+            </>
+          ) : (
+            DETAILS_TO_COME
+          )}
+        </p>
+
+        <h2>If you are not happy</h2>
+        <p>
+          Tell us first, and we will try to put it right. If we do not, you can complain to the
+          Office of the Australian Information Commissioner, the national privacy regulator. It
+          explains how to complain on its page about{' '}
+          <a href="https://www.oaic.gov.au/privacy/privacy-complaints">privacy complaints</a>.
+        </p>
 
         <h2>Changes</h2>
         <p>

@@ -135,8 +135,11 @@ const missing = [];
 for (const url of precacheUrls) {
   const path = url.split('?')[0];
   let file;
-  if (path === '/') file = join(APP, 'index.html');
-  else if (path === '/play') file = join(APP, 'play.html');
+  // The home page is a pages-router page (apps/web/pages), built beside the app folder.
+  if (path === '/') {
+    const home = join(dirname(APP), 'pages', 'index.html');
+    file = existsSync(home) ? home : join(APP, 'index.html');
+  } else if (path === '/play') file = join(APP, 'play.html');
   else if (path.startsWith('/_next/static/'))
     file = join(STATIC, path.slice('/_next/static/'.length));
   else file = join(PUBLIC, path);

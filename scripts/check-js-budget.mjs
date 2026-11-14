@@ -7,12 +7,13 @@
 // the page is usable. Scripts the page loads later (the map, PixiJS) are
 // not in the page's HTML and are not counted here.
 //
-//   /        website page    PRD target 100 KB (held at 150 KB for now, see PAGES)
+//   /        website page    PRD target 100 KB. The public pages are built with the pages
+//                            router and send no script file at all (limit 1 KB)
 //   /play    game page       under 250 KB before the art and map load
 //
 // gzip is a little larger than the brotli that Vercel serves, so a pass here
 // is a pass there. For its own test the folders and limits can be given:
-//   --static <dir> --app <dir> --limit-home <KB> --limit-play <KB>
+//   --static <dir> --app <dir> --pages <dir> --limit-home <KB> --limit-play <KB>
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -26,24 +27,31 @@ const arg = (name, fallback) => {
 };
 const STATIC = resolve(arg('--static', join(ROOT, 'apps/web/.next/static')));
 const APP = resolve(arg('--app', join(ROOT, 'apps/web/.next/server/app')));
+const PAGES_DIR = resolve(arg('--pages', join(ROOT, 'apps/web/.next/server/pages')));
 
-// `targetKb` is the PRD 14.10 figure. `limitKb` is what the check enforces:
-// the same, except for `/`, which is above the target today (React and the
-// Next.js client alone are about 120 KB). It is held where it is so it can
-// only go down, and is brought to the target when the website pages are built
-// (Stage 5). Over the target but under the limit prints a note.
+// `targetKb` is the PRD 14.10 figure. `limitKb` is what the check enforces.
+// The public website pages are pages-router pages with the runtime switched off
+// (apps/web/pages), so `/` sends no script file: its limit is 1 KB, there only
+// so a script that creeps back in is caught. The game page is an app-router
+// page and its limit is the PRD figure. Over the target but under the limit
+// prints a note.
 const PAGES = [
   {
     path: '/',
+    dir: PAGES_DIR,
     file: 'index.html',
     targetKb: 100,
-    limitKb: Number(arg('--limit-home', '142')),
+    limitKb: Number(arg('--limit-home', '1')),
+    // A website page with no script file is the aim. It must still be a real page.
+    mayHaveNoScripts: true,
   },
   {
     path: '/play',
+    dir: APP,
     file: 'play.html',
     targetKb: 250,
     limitKb: Number(arg('--limit-play', '250')),
+    mayHaveNoScripts: false,
   },
 ];
 
@@ -60,13 +68,19 @@ function scriptsOf(html) {
 
 let failed = false;
 for (const page of PAGES) {
-  const htmlFile = join(APP, page.file);
+  const htmlFile = join(page.dir, page.file);
   if (!existsSync(htmlFile)) {
     console.error(`Missing ${htmlFile}. Run \`pnpm build\` first.`);
     process.exit(1);
   }
   const html = readFileSync(htmlFile, 'utf8');
   const srcs = scriptsOf(html);
+  if (srcs.length === 0 && page.mayHaveNoScripts && /<main[\s>]/.test(html)) {
+    console.log(
+      `ok   ${page.path.padEnd(6)} 0.0 KB compressed in 0 scripts (limit ${page.limitKb} KB)`,
+    );
+    continue;
+  }
   if (srcs.length === 0) {
     console.error(
       `${page.path}: no scripts found in the page, so the check can not mean anything.`,

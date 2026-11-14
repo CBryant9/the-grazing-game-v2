@@ -26,6 +26,19 @@ export function contactEmail(): string | null {
 }
 
 /**
+ * Who the site belongs to, for "we" in the privacy page and the terms. From the
+ * environment, never written in the repo (the owner is not decided: PRD 18).
+ * When it is not set, the pages say so plainly.
+ */
+export function ownerName(): string | null {
+  const value = process.env.SITE_OWNER_NAME?.trim();
+  return value ? value : null;
+}
+
+/** The line the draft pages show where a contact address or an owner will go. */
+export const DETAILS_TO_COME = 'Contact details will be added before launch.';
+
+/**
  * Switches that only the website needs beyond the game's own keys.
  * `sheep` and `farm_hands` arrive in Stage 2, `analytics` in milestone 5.3.
  */
@@ -64,7 +77,16 @@ export type SitePage = {
   footer: boolean;
   /** Shown in the header on wide screens. */
   header: boolean;
+  /** Linked from the header and footer only while this switch is on. The page stays reachable either way. */
+  linkedWhen?: SiteSwitchKey;
 };
+
+/** The pages to link from the header or the footer, leaving out any whose switch is off. */
+export function linkedPages(place: 'header' | 'footer'): SitePage[] {
+  return SITE_PAGES.filter(
+    (p) => p[place] && (p.linkedWhen === undefined || siteSwitchOn(p.linkedWhen)),
+  );
+}
 
 /** Every public page. The sitemap, the footer and the header read this one list. */
 export const SITE_PAGES: readonly SitePage[] = [
@@ -80,9 +102,10 @@ export const SITE_PAGES: readonly SitePage[] = [
     path: '/pricing',
     title: 'Pricing',
     description:
-      'The Grazing Game is free to play on your phone or PC. This page says what is free today and what is for sale, with prices.',
+      'The Grazing Game is free to play on your phone or PC, with no sign-up. This page says what is free and what costs money.',
     footer: true,
     header: true,
+    linkedWhen: 'purchases',
   },
   {
     path: '/advertise',

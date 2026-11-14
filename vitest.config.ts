@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config';
 const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
+  // The website page tests render .tsx pages. The apps use the "preserve" JSX setting, which Node can not run.
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       // `server-only` throws outside a Next.js server build. In tests we are the server.
