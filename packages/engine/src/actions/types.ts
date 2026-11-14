@@ -224,6 +224,10 @@ export interface JobCard {
     saleDay: number;
     date: CalendarDate;
     daysAway: number;
+    /** Always true: booking stock onto a sale pays nothing today. */
+    nothingPaidNow: true;
+    /** Always true: the price is set on the sale day, at that day's price. */
+    priceSetOnSaleDay: true;
   };
   /** For cattle bought: they arrive in the stock yards at first light on this farm day. */
   arrival?: { arriveDay: number; date: CalendarDate; head: number };

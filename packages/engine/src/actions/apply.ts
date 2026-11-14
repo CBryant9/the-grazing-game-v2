@@ -505,20 +505,29 @@ function cancelSale(j: Job, a: Extract<Action, { type: 'cancelSale' }>): Out {
     return refuse('bad-request', 'No cattle were picked.');
   }
   const pick = a.ids === undefined ? null : new Set<number>(a.ids);
+  // Only animals still on the farm count, as `marketView` counts them. A tag
+  // that has since died or been sold comes off the booking but is not counted
+  // as stock taken off the sale.
+  const onFarm = animalLookup(farm.mobs);
   let head = 0;
   let saleDay = -1;
   for (const b of farm.saleBookings) {
     const keep: number[] = [];
     for (const id of b.animalIds) {
       if (pick === null || pick.has(id)) {
-        head++;
-        if (saleDay < 0) saleDay = b.saleDay;
+        if (onFarm.has(id)) {
+          head++;
+          if (saleDay < 0) saleDay = b.saleDay;
+        }
       } else keep.push(id);
     }
     b.animalIds = Int32Array.from(keep);
   }
   if (!head) {
-    return refuse('nothing-booked', 'None of those cattle are booked onto a sale.');
+    return refuse(
+      'nothing-booked',
+      'None of those cattle are still booked onto a sale. They may have been sold, or died, since they were booked.',
+    );
   }
   farm.saleBookings = farm.saleBookings.filter((b) => b.animalIds.length > 0);
   j.events.push({ type: 'sale-cancelled', head, saleDay, saleDate: dateOn(farm, saleDay) });

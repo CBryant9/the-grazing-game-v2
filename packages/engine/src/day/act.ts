@@ -117,6 +117,8 @@ function finish(
       saleDay: sale.saleDay,
       date: sale.saleDate,
       daysAway: sale.daysAway,
+      nothingPaidNow: true,
+      priceSetOnSaleDay: true,
     };
   }
   if (buy?.type === 'cattle-on-the-way') {

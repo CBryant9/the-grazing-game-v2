@@ -212,6 +212,10 @@ describe('buying', () => {
         mobName: yards[0]!.name,
         count: 20,
         days: 0,
+        // The yards have water and only their own square to graze.
+        hasWater: true,
+        feed: 'almost-none',
+        grazingHa: next.farm.layout.scale.haPerSquare,
         does: 'moveMob',
         action: null,
       },
@@ -335,6 +339,9 @@ describe('selling', () => {
       saleDay: 6,
       date: { year: 2023, month: 8, date: 7 },
       daysAway: 6,
+      // Nothing is paid today, and the price is the sale day's.
+      nothingPaidNow: true,
+      priceSetOnSaleDay: true,
     });
     const view = marketView(sold.farm);
     expect(view.isSaleDay).toBe(false);
@@ -444,6 +451,34 @@ describe('selling', () => {
     // With nothing booked it is refused, with a reason.
     const no = turnedDown(farm, { type: 'cancelSale' });
     expect(no.reason).toBe('nothing-booked');
+  });
+
+  it('cancelling counts only animals still on the farm, and refuses if none of them is', () => {
+    const { farm, mob } = stocked();
+    const booked = work(farm, { type: 'sellGroup', mob, group: 'steer', qty: 10 }).farm;
+    const ids = [...booked.saleBookings[0]!.animalIds];
+    // Three of the booked animals die, and one is sold at a sale before it.
+    const gone = new Set(ids.slice(0, 4));
+    const cut = cloneFarm(booked);
+    for (const m of cut.mobs) m.animals = m.animals.filter((a) => !gone.has(a.id));
+    expect(marketView(cut).booked[0]!.head).toBe(6);
+    const all = work(cut, { type: 'cancelSale' });
+    // The sale-cancelled event counts the six still there, not the ten booked.
+    expect(all.events).toMatchObject([{ type: 'sale-cancelled', head: 6, saleDay: 6 }]);
+    expect(all.farm.saleBookings).toEqual([]);
+    // Naming dead tags with live ones counts only the live ones.
+    const mixed = work(cut, { type: 'cancelSale', ids: ids.slice(2, 7) });
+    expect(mixed.events).toMatchObject([{ type: 'sale-cancelled', head: 3 }]);
+    expect(marketView(mixed.farm).booked[0]!.head).toBe(3);
+    // Naming only animals that are gone is refused, with the reason, and nothing changes.
+    const before = farmHash(cut);
+    const no = turnedDown(cut, { type: 'cancelSale', ids: ids.slice(0, 4) });
+    expect(no.reason).toBe('nothing-booked');
+    expect(no.message).toContain('still booked');
+    expect(farmHash(cut)).toBe(before);
+    // A booking made only of animals that have gone is refused the same way.
+    for (const m of cut.mobs) m.animals = m.animals.filter((a) => !ids.includes(a.id));
+    expect(turnedDown(cut, { type: 'cancelSale' }).reason).toBe('nothing-booked');
   });
 
   it('what is booked can still be moved about, and is sold wherever it is', () => {

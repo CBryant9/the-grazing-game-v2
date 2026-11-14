@@ -104,7 +104,23 @@ export type ThingToDo =
      * head, calves at foot included, and `days` is how many days it has
      * been there. The player picks the paddock to move it to.
      */
-    | { type: 'in-yards'; mob: number; mobName: string; count: number; days: number }
+    | {
+        type: 'in-yards';
+        mob: number;
+        mobName: string;
+        count: number;
+        days: number;
+        /** The yards have water. */
+        hasWater: true;
+        /**
+         * What the mob can graze there: almost none. Stock in the yards graze
+         * only the square the yards stand on, so a mob left there runs short
+         * of feed.
+         */
+        feed: 'almost-none';
+        /** Hectares the mob can graze in the yards: the one square they stand on. */
+        grazingHa: number;
+      }
     /** A fence segment that has been knocked down. `count` is 1. */
     | { type: 'fence-down'; edge: EdgeRef; fence: 'electric' | 'tape'; count: number }
     /** A portable trough that is empty, or under a quarter full. `count` is the litres left. */
@@ -167,6 +183,9 @@ export function thingsToDo(farm: FarmState): ThingToDo[] {
         mobName: m.name,
         count: m.animals.length,
         days: Math.max(0, farm.day - (m.where.since ?? farm.day)),
+        hasWater: true,
+        feed: 'almost-none',
+        grazingHa: farm.layout.scale.haPerSquare,
         does: 'moveMob',
         action: null,
       });
