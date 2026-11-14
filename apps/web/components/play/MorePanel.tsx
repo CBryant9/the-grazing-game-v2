@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { InstallEntry } from '@/components/shell/InstallEntry';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { shortDate } from '@/lib/game/format';
 import { kindName, setupFacts, unreadSeqs, unreadWord } from '@/lib/game/more';
@@ -118,6 +119,7 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
             Back to the home page
           </Link>
         </div>
+        <InstallEntry />
       </section>
     </section>
   );

@@ -41,5 +41,7 @@ jobs:
         run: pnpm build
       - name: The rules stay hidden (no engine text in the browser JavaScript)
         run: pnpm check:browser-bundle
-      - name: Lighthouse (mobile) on the main pages
+      - name: JavaScript size budget (PRD 14.10, pages / and /play, compressed)
+        run: pnpm check:js-budget
+      - name: Lighthouse (mobile) on / and /play, with the PRD 14.10 budgets
         run: pnpm lighthouse

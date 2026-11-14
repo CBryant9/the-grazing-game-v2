@@ -1004,6 +1004,55 @@ Questions for Claudia:
 3. **The Short label chip** is a red-orange (`#ec6a48`). It is a word chip, not a line, so it was left. Change it too?
 4. **Stale farms.** A farm not played for 90 days is removed (the session cookie lasts 90 days). Right?
 
+### 14 Nov 2026: milestone 1.8, Stage 1 wrap (install, offline, errors, speed budgets, cost)
+
+Branch `claude/m1-8-stage1-wrap-eafda9`. Part of 1.8 only: the Stage 1 report and Claudia's real-phone play are not in this entry. New packages: `@serwist/turbopack`, `serwist` and `esbuild` (to build the service worker). No outside service, no art from outside the repo.
+
+**Install to the home screen.**
+
+- The manifest (`app/manifest.ts`) lists the SVG and three PNG icons. The icons are made by `scripts/make-icons.mjs` (`pnpm icons`): the pixel glyph already in `icon.svg`, lime on the frame colour from `globals.css`, with a small PNG writer in the script. `icon-maskable-512.png` keeps the glyph inside the safe circle that a launcher mask leaves. `apple-icon.png` is for iPhone.
+- The service worker is `app/sw.ts`. Next.js 16 builds with Turbopack, which `@serwist/next` does not support, so `app/serwist/[path]/route.ts` (`@serwist/turbopack`) builds it when the site is built and serves it at `/serwist/sw.js`. It keeps the build's scripts, styles, fonts and the public files (58 files, 1.6 MB) and the pages `/` and `/play`. `/api` is never stored (a network-only rule). No source map is published for it.
+- It is started from `/play` only, 8 seconds after the page has loaded, so the 1.6 MB it saves never competes with the farm's first load. It is not started on `next dev`.
+- The More tab has an Install entry (`components/shell/InstallEntry.tsx`, one line in `MorePanel.tsx`). It shows only when the browser has offered install (an Install button) or on an iPhone or iPad in a browser (the two steps: tap Share, tap Add to Home Screen). Nothing shows once installed. No pop-up.
+
+**Looking at the farm offline.**
+
+- `lib/game/offline.ts` keeps the last snapshot in `localStorage` (about 50 KB for a 1,000 ha farm), checked for shape and format on the way back. Every storage call is wrapped. If the snapshot does not fit, the old copy is dropped so a stale farm is never shown.
+- `lib/game/offlineWatch.ts` (started by `components/shell/PlayOffline.tsx`) keeps the copy fresh (after each snapshot, 0.4 s later, and when the page is hidden), shows it when `/play` can not reach the game, and holds every action off. The play components already switch Next day, skips and every job button off while the store's `busy` count is above zero, so being offline holds that count up by one. Looking (the map, paddocks, mobs, tabs) keeps working. One plain line shows above the play screen: "You are offline. This is the farm as you last saw it." A check every 15 seconds, and one when the browser says it is online, brings the live farm back and releases the buttons. If the farm was thrown away elsewhere, the normal screens take over.
+- `lib/game/store.ts` was not changed. `lib/game/api.ts` exports the "could not be reached" message as `UNREACHABLE`, so the watch can tell it from a server error.
+- Not available offline: setup, jobs, the market, the inbox being marked read. They need the connection.
+
+**Error screens.** `app/error.tsx`, `app/global-error.tsx` (brings its own html and a plain link home), `app/not-found.tsx`, and `PlayBoundary` around the play screen (Try again clears what was open and starts from the farm tab; Home page). Plain words, no stack, no code; the error goes to the console until Sentry in Stage 3. `/dev/crash?where=page|client|play` shows them (404 on a live build, like the other `/dev` pages).
+
+**Speed budgets in CI** (PRD 14.10). `pnpm test:speed` was already in CI (15 ms limit for the shared machine; 5 ms is held on the build PC). Added: `pnpm check:js-budget` (`scripts/check-js-budget.mjs`, with a test): the compressed size of the scripts each page asks for in its own HTML, `/` under 150 KB (the PRD target is 100 KB: React and the Next.js client are about 120 KB, so it is held at today's 141 KB and says so) and `/play` under 250 KB (184 KB). Lighthouse (`lighthouserc.json`, one set of assertions for each page): performance 0.95 median, Accessibility, Best Practices and SEO 1, LCP 2.0 s, CLS 0.05; TBT 200 ms as a warning (local runs swing between 60 and 630 ms with other work on the PC). On `/play` the LCP is a warning too (below). Nothing existing was loosened.
+
+**Lighthouse, run here** (mobile, `next start`, three runs each, the PC was shared with other work):
+
+| Page | Performance (median) | Accessibility | Best Practices | SEO | LCP | CLS |
+|---|---|---|---|---|---|---|
+| `/` | 0.95 (runs 0.84, 0.99, 0.95; an earlier set 0.98, 1.00, 0.99) | 1 | 1 | 1 | 0.9 s | 0 |
+| `/play` | 0.89 (runs 0.89, 0.91, 0.88) | 1 | 1 | 1 | 3.3 s | 0 |
+
+`/play` does not reach the 0.95 target, and did not before this change: the same build without it scored 0.87. The largest paint is the setup form's first heading ("Where is your farm?"), which waits for the page's scripts, then the farm request, then the setup request, one after the other. Fixing that means changing what the play page draws first (`PlayApp`, `SetupFlow`) and is not in this piece. The first paint is at 0.9 s.
+
+**Cost measurement** (`pnpm build`, then `pnpm measure:cost`; the script starts the built server on its own port with its own empty farm folder). Farm of 3,000 ha (Northern Tablelands NSW, large), 959 head at the start, Windows laptop, Node 24, with other work running, round trip on this machine:
+
+| What the player does | Runs | Median | Worst | Answer |
+|---|---|---|---|---|
+| Start the farm | 1 | 979 ms | | 52 KB |
+| Open the farm | 5 | 29 ms | 38 ms | 52 KB |
+| Next day | 10 | 86 ms | 182 ms | 53 KB |
+| +1 week skip | 1 | 175 ms | | 54 KB |
+| +1 year skip | 3 | 1,673 ms | 1,831 ms | 63 KB |
+
+A year skip ran 359 days on average: 4.7 ms a simulated day, in line with the engine's own 2 to 3 ms a day. A Next day is 86 ms, so most of it is the request, the save and the snapshot, not the simulation.
+
+The stored farm is one JSON file: 191 KB when started (67 KB compressed), 339 KB after about a year and a half of play (146 KB compressed). It grows as history is kept. BUILD_PLAN 5.2 says a farm at rest is "a few tens of KB": the stored file is several times that, and the snapshot sent to the browser is 52 KB. Worth looking at before Stage 3 sets storage limits.
+
+**How it was tested.** `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` 2,283 tests in 120 files, 16 of them new; one earlier full run had two files fail while the PC was busy with other work and they passed on the next run, so those two were not looked into, `pnpm build` and `pnpm check:browser-bundle` pass. Tests: the offline storage (round trip, bad data, no storage, no room), iPhone detection, the JavaScript budget check (pass, over, polyfills, missing file). In the pane's browser on a production build: at 390 by 844 (light) and 844 by 390 (dark), with the server stopped and the page reloaded, the farm opened from the service worker's copy with the line above it, Next day and the three skips disabled, the map drawn, and no sideways scroll. Reconnecting (the page's game requests blocked, then let through) took the line away and enabled the buttons; the server itself was not restarted under an open page. The 404 and the page error (390 by 844, light), and the play screen's error (both sizes, both themes) showed two buttons with no sideways scroll; the last-resort error showed its words and buttons (its width was not measured). The Install entry was hidden, appeared when a `beforeinstallprompt` event was sent, and asked the browser to install when tapped. `/api` was not in any cache.
+
+Not done or not checked: a real phone (install, the iPhone steps, offline in airplane mode, the Android install bar), the iPhone status bar in an installed app, and going offline while a request is in flight.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
