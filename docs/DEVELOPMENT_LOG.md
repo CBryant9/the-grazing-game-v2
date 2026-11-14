@@ -1004,6 +1004,25 @@ Questions for Claudia:
 3. **The Short label chip** is a red-orange (`#ec6a48`). It is a word chip, not a line, so it was left. Change it too?
 4. **Stale farms.** A farm not played for 90 days is removed (the session cookie lasts 90 days). Right?
 
+### 14 Nov 2026: milestone 5.4, the public website
+
+Branch `claude/m5-4-website-363c83`. Touches only the website: `apps/web/app` (new pages, `page.tsx`, `layout.tsx`, `robots.ts`, `sitemap.ts`), `apps/web/components/site`, `apps/web/components/SiteHeader.*`, `apps/web/lib` (new files only), `.env.example`, `lighthouserc.json`. Nothing under `app/play`, `app/api`, `components/play`, `server`, `lib/game`, `packages/`. No new package or outside service.
+
+**Pages (all static, no game code):** `/` (landing and sales page), `/pricing`, `/advertise`, `/about`, `/privacy`, `/terms`, `/community-rules`. Each has its own title, description, canonical address, Open Graph and Twitter text, a share image made in code (`opengraph-image.tsx` through `lib/shareImage.tsx`), and a breadcrumb in structured data. The landing page also carries `WebSite`, `VideoGame` (free, browser, AUD 0) and `FAQPage` data. `sitemap.xml` and `robots.txt` read one list of pages (`lib/site.ts`). The farm picture on the landing page is an inline SVG drawn in code (`components/site/FarmScene.tsx`), the same every build. No ad slot and no activity ticker is rendered.
+
+**Only what is true.** Today's page says: Fast Farm, four districts, real or random years, paddocks, fences, water, plans, saleyard sale days, crops, no sign-up. Daily Farm, sheep, leaderboards, community, purchases, sign-ups and analytics appear only inside sections read through `siteSwitchOn` (`lib/site.ts`). Those switches are all off unless `SITE_SWITCHES_ON` names them (see `.env.example`), because the shared defaults turn on Daily Farm, leaderboards and sign-ups, which are not built. The key names are the shared ones plus `sheep`, `farm_hands` and `analytics`, which the shared list does not have yet. Prices come only from `lib/pricing.ts`, which copies PRD 10.3 and shows only when `purchases` is on. The contact address comes from `SITE_CONTACT_EMAIL`; with it unset every contact link is left out. The legal pages are drafts, headed "Draft. Not yet reviewed."
+
+**Public pages do not load the game.** Links to `/play` from public pages used to make the browser prefetch the game's JavaScript (34 KB). Every public link now goes through `SiteLink`, which does not prefetch (LESSONS, process). `pnpm check:browser-bundle` passes, and no `/play` request appears in any public page's network list.
+
+**How it was tested:** `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` and `pnpm check:browser-bundle` pass. A headless Chrome run over every page at 390 by 844, 844 by 390 and 1440 by 900, light and dark, found no sideways scroll and no text under WCAG AA contrast (4.5, or 3 for large text), by script. Lighthouse (mobile, local production build, `lhci collect`, 3 runs each): Accessibility, Best Practices and SEO were 100 on every page in every run (21 runs). Performance, three runs per page (median in brackets): `/` 97, 92, 97 (97); `/pricing` 98, 93, 92 (93); `/advertise` 95, 82, 94 (94); `/about` 96, 99, 89 (96); `/privacy` 98, 99, 95 (98); `/terms` 100, 99, 92 (99); `/community-rules` 97, 96, 99 (97). Largest Contentful Paint 0.9 to 1.2 s and Cumulative Layout Shift 0 on every page. The same pages scored 100 on quieter runs earlier in the day (for example `/terms` three times in a row), so the spread is mostly this PC being shared with other sessions' test runs.
+
+Not done:
+
+- A steady Lighthouse Performance of 100 on every page. See the scores above. The score is set by total blocking time: the framework's own start-up (React and the Next.js client, about 117 KB over the wire) runs as one task of 50 to 100 ms on this PC, and the landing page's longer markup makes it a little longer. Things tried that did not help: serving the picture as an image file (the picture became the largest paint and slowed it), `content-visibility` on the lower sections, Suspense around sections, a lighter picture. Things that did help: no link prefetch on public pages (about 40 points on the plain pages). Next step if 100 is a hard rule on the landing page: a lighter page with fewer sections, or moving the lower sections to their own page.
+- Share images use the default font (the display font is not available to `ImageResponse` without bundling it).
+- The wording in the privacy, terms and community rules drafts is not reviewed by a lawyer (PRD 18). The terms leave the owner's name open (Claudia's own business or AgriProve, PRD 18).
+- No audience numbers or ad prices on Advertise: the PRD has none.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

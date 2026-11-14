@@ -59,23 +59,21 @@ function build() {
   }));
 
   // Hills along the horizon, two layers.
-  const farHills: Box[] = [];
-  const nearHills: Box[] = [];
-  for (let x = 0; x < W; x++) {
-    const far = Math.round(5 + 3 * Math.sin(x * 0.05 + 1) + 2 * Math.sin(x * 0.13));
-    const near = Math.round(3 + 2.5 * Math.sin(x * 0.08 + 2));
-    farHills.push([x, SKY_H - far, 1, far]);
-    nearHills.push([x, SKY_H - near, 1, near]);
-  }
+  const hill = (f: (x: number) => number): string => {
+    let d = `M0 ${SKY_H}`;
+    for (let x = 0; x <= W; x += 2) d += `L${x} ${SKY_H - Math.round(f(x))}`;
+    return `${d}L${W} ${SKY_H}z`;
+  };
+  const farHills = hill((x) => 5 + 3 * Math.sin(x * 0.05 + 1) + 2 * Math.sin(x * 0.13));
+  const nearHills = hill((x) => 3 + 2.5 * Math.sin(x * 0.08 + 2));
 
   // The sun, sitting on the horizon.
   const sun: Box[] = [];
   const sx = 118;
   const sy = SKY_H - 2;
   for (let dy = -6; dy <= 0; dy++) {
-    for (let dx = -6; dx <= 6; dx++) {
-      if (Math.hypot(dx, dy) <= 6) sun.push([sx + dx, sy + dy, 1, 1]);
-    }
+    const half = Math.floor(Math.sqrt(36 - dy * dy));
+    sun.push([sx - half, sy + dy, half * 2 + 1, 1]);
   }
 
   // A few stars.
@@ -94,9 +92,9 @@ function build() {
   const tufts = new Map<string, Box[]>();
   for (const c of cells) {
     const list = tufts.get(c.tuft) ?? [];
-    for (let y = c.py0 + 2; y < c.py1 - 1; y += 3) {
+    for (let y = c.py0 + 3; y < c.py1 - 1; y += 4) {
       const off = (Math.round(y) % 2) * 2;
-      for (let x = c.px0 + 2 + off; x < c.px1 - 1; x += 4) {
+      for (let x = c.px0 + 2 + off; x < c.px1 - 1; x += 6) {
         if (c.base === '#7c5c3c' && rnd() < 0.55) continue;
         list.push([x, y - 1, 1, 2]);
       }
@@ -151,8 +149,8 @@ function build() {
 
   return {
     skyBands,
-    farHills: path(farHills),
-    nearHills: path(nearHills),
+    farHills,
+    nearHills,
     sun: path(sun),
     stars: path(stars),
     cells,
