@@ -1087,6 +1087,10 @@ Branch `m2.1-hands-and-contractors`, from `m1.7f-review-fixes` (34fecf2). Engine
 
 **Not done.** The screens (another agent). Sheep (2.3, 2.4). Real-year wages: every farm pays 2026 rates, as with its other costs.
 
+### 15 Nov 2026: m2.6 grass quality review (a document, no model change)
+
+An evidence review of pasture feed quality, for Claudia to rule on: [GRASS_QUALITY_REVIEW.md](GRASS_QUALITY_REVIEW.md). It measures what the game's paddocks offer in each district (native and sown, average and real years, three stocking rates), sets it against published Australian figures with their sources, and reports what candidate fixes would do, tried only in a scratch copy. No model code, data or test changed, and no calibration figure moved. The recommendation (intake on poor feed, dead feed at PROGRAZE's 47%, slower dead feed breakdown, winter-active natives on the Tablelands, then carrying capacity as its own change) waits on the rulings listed in its part 1.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
