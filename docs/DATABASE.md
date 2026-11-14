@@ -19,8 +19,8 @@ Supabase (Postgres) for accounts, farms, the community, ads and purchases. Built
 7. **Blocks hide both ways**, in every community rule and in the views.
 8. **Leaderboards and scores are written by the server only.** Players read them through `leaderboard_rows`.
 9. **Admin-only data is read by role; every admin change goes through the server**, which checks the role on each request and writes the audit log. The audit log is append only, for the server too.
-10. **Security definer functions** sit in the `app` schema (not exposed by the Data API) or, for the few the browser or server calls, in `public` with an exact grant. Every one sets `search_path = ''`. The browser roles may run only the `app` helpers a policy, view or storage rule calls (`20261114001500_app_grants.sql`); helpers that answer about another account by id, the rate limiter and the farm limit are server only.
-11. **A photo is approved by its file, not its name.** The image check records the exact file (its storage id and change time) on the row. Others read a photo only when the row they may see still points at that file. Changing the path, or adding, changing or removing the file, sends the row back to pending. Avatars and group photos follow the same rule and must sit in their owner's (or group's) folder.
+10. **Security definer functions** sit in the `app` schema (not exposed by the Data API) or, for the few the browser or server calls, in `public` with an exact grant. Every one sets `search_path = ''`. The browser roles may run only the `app` helpers a policy, view or storage rule calls (`20261114001500_app_grants.sql`). Policies run their helpers with the caller's rights, so these need execute; each one that takes another person's id answers only what the caller may know (`blocked_between` answers only when the caller is one of the two, `is_member` says nothing to a visitor or an under-16 account, `is_group_member` and `is_group_owner` answer only about the caller, `post_author` names the author only to someone who may see the post). The raw forms that answer about anyone, the rate limiter and the farm limit are server only. Keep `app` out of the Data API's exposed schemas.
+11. **A photo is approved by its file, not its name.** Only `approve_photo()` (server only) can approve, given the id, change time and version of the file the image check actually read; if the file at the path is not that file now, nothing is approved. A bare change of status to approved is refused for every role. The row records the exact file. Others read a photo only when the row they may see still points at that file. Changing the path, or adding, changing or removing the file, sends the row back to pending. Avatars and group photos follow the same rule and must sit in their owner's (or group's) folder.
 12. **An anonymous sign-in counts as not signed in.** Every rule asks `app.uid()`, which is null for a token with `is_anonymous` set. Anonymous sign-ins must also stay off in the project settings.
 
 ## Tables and who can do what
@@ -37,7 +37,9 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `profile_links`, `profile_experience`, `profile_education`, `farm_showcase_photos` | Profile extras (9.1) | S, I, U, D own while in the community | S when the profile's details are visible; showcase photos only once approved | S |
 | `guest_sessions` | Guest cookie hashes | Server only | | |
 | `signup_refusals` | Sign-ins refused as under 14, so they can't retry with an older date | Server only | | |
-| `ban_records` | A running ban that outlived its account: a SHA-256 of the sign-in email and an end date, nothing else | Server only | | |
+| `ban_records` | A running ban that outlived its account: a peppered hash of the sign-in email and an end date, nothing else | Server only | | |
+| `signup_email_checks` | The peppered hash of each sign-in's email, recorded by the server before sign-up | Server only | | |
+| `deletion_tokens` | The server has done what deleting an account needs (a running ban's hash) | Server only | | |
 | `farm_limits` | Farms at once by tier and mode (PRD 5.5) | S | S (visitors too) | S |
 
 ### Game
@@ -60,7 +62,7 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 |---|---|---|
 | `follows` | Follow a member (status set for them: accepted for a public profile, pending for followers-only, refused for private); accept a request made to them; unfollow or remove a follower | Either side is them, or both profiles are visible to them |
 | `blocks` | Block and unblock | Never: only the blocker sees a block. A block removes follows both ways |
-| `groups` | Make one (they become owner), change or delete their own | Public group: any member. Private: its members |
+| `groups` | Make one (they become owner), change or delete their own. A group whose owner was deleted with no member able to take over has no owner: members can read, post and leave; nobody can change it, invite or remove members until an admin gives it an owner (`assign_group_owner`) | Public group: any member. Private: its members |
 | `group_members` | Join through `join_group()` (code for private, member limit); leave; an owner removes members; hand over with `hand_over_group()` | They can see the group |
 | `posts` | Write plain posts (share cards and day cards come from the server), edit and delete their own | Public, or followers only and they follow, or in a group they are in; not removed; no block |
 | `post_photos` | Add to their own posts (status always starts pending); delete | The post is visible and the photo has passed the image check |
@@ -76,12 +78,12 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 |---|---|---|---|
 | `feature_switches` | S key and state | S key and state | S; the server writes |
 | `site_settings` | S public rows | S public rows | S all |
-| `admin_audit_log` | | | S. Nobody changes or removes a row. It takes ids and action names only, never personal details (a trigger refuses anything like an email address), because it outlives deleted accounts |
+| `admin_audit_log` | | | S. Nobody changes or removes a row. It outlives deleted accounts, so every column takes a fixed shape with no free text: an action name (lower case and underscores), a target kind and id (letters, digits, dashes), and details whose only keys are `switch_key`, `slot_id`, `enabled`, `count`, `value`, `role`, `until` and `ids` (a list of account or row ids), each with a fixed type. Anything else is refused. It can still name an account by its id, which is how an admin action is traced |
 | `push_service_hosts` | Server only: the web push services a subscription may point at, each with the vendor page it was read from | | |
 | `rate_limit_rules`, `rate_limit_hits` | Server only | | |
 | `notifications` | S own, mark read, D own | | |
 | `notification_settings`, `notification_prefs` | Everything on own rows | | |
-| `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts` | | |
+| `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts`. Any other host is refused with an error whose message starts `push_host_not_allowed:` (hint `push_host_not_allowed`), for the screens to word ("Notifications aren't available in this browser yet"). Chrome and Edge are not listed until milestone 3.4 | | |
 | `weather_daily`, `price_daily` | Server only (engine data) | | |
 | `daily_counts` | | | S |
 | `ad_slots` | S (id, on or off, settings) | S | S |
@@ -107,7 +109,7 @@ The Supabase database linter flags owner-rights views (lint 0010). That is expec
 
 | Function | Who calls it | What it does |
 |---|---|---|
-| `complete_sign_up(username, date_of_birth, display_name)` | A signed-in player with no profile | Checks sign-ups are open, the date of birth, 14 or over, a rate limit, the word filter and running bans. Makes the profile, private row, status row and notification settings, and returns `signed_up`. Under 14 it returns `too_young` and records the refusal, so the same sign-in can't try again with an older date. A fresh email address is a fresh sign-in and does get a fresh try: the database can't tell it is the same person. Refuses an anonymous session |
+| `complete_sign_up(username, date_of_birth, display_name)` | A signed-in player with no profile | Needs the server to have recorded the sign-in's email hash first (`record_signup_email`), then checks running bans, sign-ups are open, the date of birth, 14 or over, a rate limit and the word filter. Makes the profile, private row, status row and notification settings, and returns `signed_up`. Under 14 it returns `too_young` and records the refusal, so the same sign-in can't try again with an older date. A fresh email address is a fresh sign-in and does get a fresh try: the database can't tell it is the same person. Refuses an anonymous session |
 | `my_farm_limits()` | Player | Limit and farms going, by mode |
 | `join_group`, `group_invite_code`, `hand_over_group` | Player | Groups (9.6) |
 | `export_my_data()` | Player | Everything kept about them, as JSON, except the engine save and the action log (they hold the hidden rules) |
@@ -117,6 +119,11 @@ The Supabase database linter flags owner-rights views (lint 0010). That is expec
 | `take_rate_limit(action, subject)` | Server | Rate limits for jobs, farm starts and the ticker |
 | `account_storage_paths(user)` | Server | Every file to remove before deleting an account: each bucket's `<account id>/` folder (linked to a row or not), the farms' snapshots, and the photos of groups that go with the account |
 | `rollup_ad_events(day)`, `prune_housekeeping()` | pg_cron, nightly | Ad roll-up; old rate-limit windows and stale guests |
+| `record_signup_email(user, hash)` | Server, before sign-up | Records the peppered hash of the sign-in email |
+| `prepare_account_deletion(user, hash)` | Server, before deleting an account | Keeps a running ban's record (hash and end only); the delete is refused for a banned or suspended account until this has run |
+| `approve_photo(kind, row, object id, updated at, version)` | Server (the image check) | Approves a post photo, showcase photo, avatar or group photo, only if the file at its path is the exact file the check read |
+| `assign_group_owner(admin, group, user)` | Server, for an admin | Gives an ownerless group an owner (16 or over, in good standing). Logged |
+| `clear_signup_refusal(admin, user)` | Server, for an admin | The way back for an adult who mistyped their date of birth: clears that sign-in's under-14 refusal. Logged |
 
 Guards that hold for every writer, the server included: the farm limit (`farms_guard`, with a lock so two requests can't both squeeze in), a real time zone for a Daily Farm, the word filter on usernames, names, posts, comments and groups, follow approval, one level of replies, a block removing follows, photo status set only by the image check, rate limits on posts, comments, likes, follows, reports and new groups (tighter for an account under 7 days old).
 
@@ -140,10 +147,19 @@ A guest plays one Fast Farm through a session the server makes (PRD 8.1, 5.16):
 4. When the guest makes an account, the server calls `convert_guest(session, user)`. The farm moves into the account (owner set, guest cleared) and the session is marked converted. If the account has no room in that mode, nothing moves and the server offers the choice.
 5. A guest not seen for 30 days is removed with their farm (`prune_housekeeping`).
 
+## The ban list
+
+A ban or suspension still running when an account is deleted leaves a row in `ban_records`: an email hash and an end date, nothing else. Sign-up checks it.
+
+- **The hash is made on the server, never in the database.** It is HMAC-SHA-256 of the normalised sign-in email, keyed with `BAN_HASH_PEPPER`, a secret kept only in the server's environment (never in the database, a backup or the repo). The database stores and compares the finished hash only. Without the pepper the list can't be tested against known emails, so a copy of the database or a backup gives nothing away.
+- **Normalising** before hashing (the server's job, milestone 3.2): lower case and trim every address. For `gmail.com` and `googlemail.com`, treat the two domains as one and take the dots out of the name: Google's own help says both hold for personal Gmail (support.google.com/mail/answer/7436150 for dots, which does not apply to Google Workspace addresses; answer/10313 for googlemail.com). For Fastmail, drop a `+tag` from the name: Fastmail's help says mail to `alias+anything` reaches the same account (fastmail.help/hc/en-us/articles/360060591053). No other provider rule is applied yet. Google's page on plus addresses, and Microsoft's, Apple's and Yahoo's consumer pages, could not be found stating their rules, so a Gmail `+tag` or an Outlook alias still gets past the list until a provider page is found and the rule added.
+- **Rotating the pepper** makes every existing ban record stop matching (the old hashes can't be recomputed without the emails). Rotate only if the pepper leaks, and accept that running bans on deleted accounts are lost; bans on accounts that still exist are unaffected.
+- A different email address is a different sign-in and is not caught. The same holds for the under-14 refusal (`signup_refusals`, against the sign-in only); an admin can clear a refusal for an adult who mistyped (`clear_signup_refusal`).
+
 ## Deleting an account and downloading data
 
 - **Download:** the player calls `export_my_data()`.
-- **Delete:** the server lists the files with `account_storage_paths`, removes them from Storage, then deletes the Auth user (`auth.admin.deleteUser`). A trigger on `auth.users` runs first: each group the player owns goes to its longest-standing other member (a community member first), and goes only when the player was its only member; what they wrote in reports is cleared; a ban or suspension still running leaves a `ban_records` row holding only a SHA-256 of the sign-in email and the end date, so the same email can't sign up again while it runs. Then the cascades remove the profile, private rows, farms and saves (the action log goes with its farm), posts, comments, likes, follows, notifications, push devices and the moderation history. Leaderboard rows stay with no account and no farm ("Former player"). Audit log rows stay with no admin (they hold ids and action names only). Purchases stay with no account (records for the accounts). Stripe events hold ids only.
+- **Delete:** the server lists the files with `account_storage_paths`, removes them from Storage, then deletes the Auth user (`auth.admin.deleteUser`). For a banned or suspended account the server first calls `prepare_account_deletion` with the peppered email hash (the delete is refused until it has). A trigger on `auth.users` then runs: each group the player owns goes to its longest-standing other member who is a community member in good standing (16 or over, not banned or suspended); if there are other members but none qualifies, the group stays with no owner (an admin can assign one); a group goes only when the player was its only member, so other members' posts are never deleted; what they wrote in reports is cleared; their Stripe customer id is cleared from Stripe events and their farm names from leaderboard rows. Reports other people wrote about the deleted player stay: they are the reporter's data and part of the moderation history. Then the cascades remove the profile, private rows, farms and saves (the action log goes with its farm), posts, comments, likes, follows, notifications, push devices and the moderation history. Leaderboard rows stay with no account, farm or farm name ("Former player"). Audit log rows stay with no admin (fixed shape, no free text). Purchases stay with no account (records for the accounts). Stripe events hold ids only.
 
 ## Storage
 
@@ -155,17 +171,18 @@ A guest plays one Fast Farm through a session the server makes (PRD 8.1, 5.16):
 | `snapshots` | No | Server only |
 | `ad-media` | Yes | Server writes. Read by its public address so ads load fast. No SVG (a public SVG can carry script) |
 
-A trigger on `storage.objects` sends a photo row back to pending whenever a file at its path is added, changed or removed. If a project will not let the migration role add that trigger, the migration warns and goes on; the id and change-time match still keeps a swapped file hidden. Re-running the bucket setup brings an existing bucket's limits and file types up to date.
+A player can not change an avatar file in place (no update rule): a new photo is delete then upload, so it has a new id. A trigger on `storage.objects` sends a photo row back to pending whenever a file at its path is added, changed or removed. If a project will not let the migration role add that trigger, the migration warns and goes on; the id and change-time match still keeps a swapped file hidden. Re-running the bucket setup brings an existing bucket's limits and file types up to date.
 
 ## The tests
 
-`pnpm test` runs `packages/db/src/*.test.ts` (445 tests, under a minute on this PC):
+`pnpm test` runs `packages/db/src/*.test.ts` (480 tests, about a minute on this PC):
 
 - `matrix.test.ts`: every table, as a visitor, player A, player B, the under-16 player, an admin and the server, for select, insert, update and delete. Each must pass or be refused exactly as `matrix.ts` says. Plus B trying to write each row as A.
 - `coverage.test.ts`: fails if a table has row level security off or is missing from the matrix; checks what a visitor can read, that server-only tables have no browser grant, which functions each role can call, that every security definer function pins its search path, and that the switches, ad slots and farm limits match `packages/shared`.
 - `rules.test.ts`: each private field, the save, leaderboards, the under-16 rule on every community table and view, blocks, follows, photos, the switches, farm viewing and storage.
 - `functions.test.ts`: sign-up and the age rules, farm limits, guests, the Daily Farm clock, groups, deleting an account.
-- `review.test.ts`: each hole the security review found, tried as the role that would attack it: photo swaps, avatar and group photo ownership, groups on deletion, pending follows, under-14 retries, banned accounts, removed posts, the data download, personal data after deletion, the moderator, ages on leap days and the Sydney date, push hosts, notification links, private profiles on the boards, anonymous sign-ins, bucket limits.
+- `third.test.ts`: the second security review: the approval race, group handover, the peppered ban hash, notification links, the audit log shape, caller-bound helpers, data left after deletion, avatar files, push refusals. Each was written first and seen to fail before its fix.
+- `review.test.ts`: each hole the first security review found, tried as the role that would attack it: photo swaps, avatar and group photo ownership, groups on deletion, pending follows, under-14 retries, banned accounts, removed posts, the data download, personal data after deletion, the moderator, ages on leap days and the Sydney date, push hosts, notification links, private profiles on the boards, anonymous sign-ins, bucket limits.
 
 ### What the tests stand on
 
@@ -186,7 +203,7 @@ Claudia makes the project (BUILD_PLAN section 8). Then, from a machine with the 
 1. `supabase init` (once, makes `supabase/config.toml`), then `supabase link --project-ref <the project ref>`.
 2. `supabase db push` applies every migration in `supabase/migrations` in order. Or `supabase db push --db-url "$SUPABASE_DB_URL"`.
 3. For a local or preview database only: `supabase db reset` applies the migrations and then `supabase/seed.sql`. Never seed production.
-4. In the dashboard: Data API exposes `public` only (not `app`); **anonymous sign-ins must stay off** (Authentication, Sign In / Providers); turn on email link and Google sign-in.
+4. In the dashboard: Data API exposes `public` only (the exposed schemas setting must never include `app`); **anonymous sign-ins must stay off** (Authentication, Sign In / Providers); turn on email link and Google sign-in.
 5. Turn on the switches in admin (or `update public.feature_switches set enabled = true where key = '...'`) when each part is ready.
 
 ## Still owed against a real Supabase project

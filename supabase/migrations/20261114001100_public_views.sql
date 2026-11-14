@@ -61,18 +61,11 @@ select
   e.score,
   e.days,
   e.continued,
-  case when p.user_id is null or app.is_restricted(e.user_id) then 'Former player'
-       else p.username end as username,
-  case when e.user_id = app.uid()
-         or (app.is_member(e.user_id) and p.privacy_profile <> 'private')
-       then e.user_id end as user_id,
-  case when (e.user_id = app.uid()
-         or (app.is_member(e.user_id) and p.privacy_profile <> 'private'))
-         and p.avatar_status = 'approved'
+  app.board_username(e.user_id) as username,
+  case when app.board_shows_owner(e.user_id) then e.user_id end as user_id,
+  case when app.board_shows_owner(e.user_id) and p.avatar_status = 'approved'
        then p.avatar_path end as avatar_path,
-  case when e.user_id = app.uid()
-         or (app.is_member(e.user_id) and p.privacy_profile <> 'private')
-       then e.farm_name end as farm_name,
+  case when app.board_shows_owner(e.user_id) then e.farm_name end as farm_name,
   coalesce(e.user_id = app.uid(), false) as is_mine
 from public.leaderboard_entries e
 left join public.profiles p on p.user_id = e.user_id

@@ -186,10 +186,37 @@ alter table public.signup_refusals enable row level security;
 create trigger signup_refusals_touch before update on public.signup_refusals
   for each row execute function app.touch_updated_at();
 
+-- The sign-in email's ban hash, recorded by the server before sign-up (the
+-- server works it out with a secret pepper the database never sees: an HMAC
+-- of the normalised address, docs/DATABASE.md). complete_sign_up() refuses a
+-- sign-in with no row here, and one whose hash is on the ban list. Server only;
+-- goes with the account.
+create table public.signup_email_checks (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.signup_email_checks enable row level security;
+create trigger signup_email_checks_touch before update on public.signup_email_checks
+  for each row execute function app.touch_updated_at();
+
+-- Set by prepare_account_deletion(): the server has recorded what deletion
+-- needs (a running ban's hash). Goes with the account. Server only.
+create table public.deletion_tokens (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.deletion_tokens enable row level security;
+create trigger deletion_tokens_touch before update on public.deletion_tokens
+  for each row execute function app.touch_updated_at();
+
 -- A ban or suspension that outlives a deleted account (9.9), so a banned
 -- player can't delete and come straight back. No personal data but a one-way
--- hash (SHA-256) of the sign-in email, used only to refuse a new sign-up
--- while the ban runs. Server only.
+-- hash of the sign-in email, used only to refuse a new sign-up while the ban
+-- runs. The hash is an HMAC with a pepper kept only in the server's
+-- environment (BAN_HASH_PEPPER), so the list is useless without it. Server only.
 create table public.ban_records (
   id uuid primary key default gen_random_uuid(),
   email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),

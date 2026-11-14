@@ -245,7 +245,7 @@ grant insert (author_id, body, link_url, visibility, group_id) on public.posts t
 grant update (body, link_url, visibility) on public.posts to authenticated;
 grant delete on public.posts to authenticated;
 create policy posts_read on public.posts for select to authenticated
-  using (app.post_row_visible(author_id, visibility, group_id, removed_at));
+  using (app.post_visible(id));
 create policy posts_insert on public.posts for insert to authenticated
   with check (
     author_id = (select app.uid())

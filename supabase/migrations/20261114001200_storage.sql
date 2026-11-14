@@ -43,9 +43,8 @@ create policy gg_photos_read on storage.objects for select to authenticated
 -- Avatars: the owner's own folder.
 create policy gg_avatars_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select app.uid())::text);
-create policy gg_avatars_update on storage.objects for update to authenticated
-  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select app.uid())::text)
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select app.uid())::text);
+-- No update rule: an avatar is never changed in place. A new photo is delete
+-- then upload, so it always has a new id and goes back through the check.
 create policy gg_avatars_delete on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select app.uid())::text);
 

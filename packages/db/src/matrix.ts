@@ -192,6 +192,21 @@ export const MATRIX: Record<string, TableSpec> = {
     'updated_at = now()',
     `insert into public.signup_refusals (user_id, reason) values ('${ID.c}', 'too_young');`,
   ),
+  signup_email_checks: serverOnly(
+    'signup_email_checks',
+    `user_id = '${ID.a}'`,
+    (me) =>
+      `insert into public.signup_email_checks (user_id, email_hash) values ('${me}', '${'cd'.repeat(32)}')`,
+    `email_hash = '${'ee'.repeat(32)}'`,
+    `insert into public.signup_email_checks (user_id, email_hash) values ('${ID.a}', '${'ab'.repeat(32)}');`,
+  ),
+  deletion_tokens: serverOnly(
+    'deletion_tokens',
+    `user_id = '${ID.c}'`,
+    (me) => `insert into public.deletion_tokens (user_id) values ('${me}')`,
+    'updated_at = now()',
+    `insert into public.deletion_tokens (user_id) values ('${ID.c}');`,
+  ),
   ban_records: serverOnly(
     'ban_records',
     `email_hash = '${'ef'.repeat(32)}'`,

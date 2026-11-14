@@ -237,7 +237,8 @@ create table public.leaderboard_entries (
   score numeric(14, 2) not null,
   days integer not null default 0 check (days >= 0),
   continued boolean not null default false,
-  farm_name text not null check (char_length(farm_name) between 1 and 60),
+  -- Cleared when the account is deleted.
+  farm_name text check (char_length(farm_name) between 1 and 60),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check ((board = 'real_year') = (real_year is not null))

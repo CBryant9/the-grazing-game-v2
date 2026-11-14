@@ -89,10 +89,10 @@ describe('1. a photo is approved by its file, not its name', () => {
   it('a row can not be approved before its file exists', async () => {
     const o = await asMany(db, 'service', [
       `insert into public.post_photos (post_id, storage_path, position) values ('${ID.postA}', '${ID.a}/later.jpg', 3)`,
-      `update public.post_photos set moderation_status = 'approved' where storage_path = '${ID.a}/later.jpg'`,
+      `select public.approve_photo('post_photo', (select id from public.post_photos where storage_path = '${ID.a}/later.jpg'), gen_random_uuid(), now())`,
     ]);
     expect(o[0]!.ok).toBe(true);
-    expect(errorOf(o[1]!)).toMatch(/photo_file_missing/);
+    expect(errorOf(o[1]!)).toMatch(/photo_file_changed/);
   });
 
   it('approving records the exact file', async () => {
@@ -207,7 +207,8 @@ describe('2. avatars and group photos are owned and checked', () => {
     });
     expect(count(await seeFile('b', 'group-photos', path, uploaded))).toBe(0);
     const checked =
-      uploaded + `update public.groups set photo_status = 'approved' where id = '${ID.group}';`;
+      uploaded +
+      `select public.approve_photo('group', '${ID.group}', o.id, o.updated_at, o.version) from storage.objects o where o.name = '${path}';`;
     expect(count(await seeFile('b', 'group-photos', path, checked))).toBe(1);
     expect(count(await seeFile('c', 'group-photos', path, checked))).toBe(0);
   });
@@ -262,6 +263,7 @@ describe('5. a refused under-14 sign-up can not try again', () => {
     await db.exec('begin');
     try {
       await db.exec(`insert into auth.users (id) values ('${ID.fresh}');
+        insert into public.signup_email_checks (user_id, email_hash) values ('${ID.fresh}', repeat('cd', 32));
         set local role authenticated; select set_config('request.jwt.claims', '${jwt}', true);`);
       for (const sql of [
         `select public.complete_sign_up('little_one', ((now() at time zone 'Australia/Sydney')::date - interval '12 years')::date) as r`,
@@ -350,7 +352,7 @@ describe('9. deleting an account leaves no personal data', () => {
       'service',
       `insert into public.admin_audit_log (admin_id, action, details) values ('${ID.admin}', 'ban', '{"note": "someone@example.org"}')`,
     );
-    expect(errorOf(o)).toMatch(/never an email/);
+    expect(errorOf(o)).toMatch(/audit_details_ok|check constraint/);
     const ok = await as(
       db,
       'service',
@@ -388,8 +390,10 @@ describe('9. deleting an account leaves no personal data', () => {
   });
 
   it('a ban outlives the account as a hash only, and refuses the same email a new sign-up', async () => {
-    const prep = `update auth.users set email = 'Ben@Example.org' where id = '${ID.b}';
-      update public.account_status set banned_at = now() where user_id = '${ID.b}';
+    // The server works out the peppered hash; the database keeps only that.
+    const hash = 'be'.repeat(32);
+    const prep = `update public.account_status set banned_at = now() where user_id = '${ID.b}';
+      select public.prepare_account_deletion('${ID.b}', '${hash}');
       delete from auth.users where id = '${ID.b}';`;
     const rec = await as(
       db,
@@ -401,7 +405,9 @@ describe('9. deleting an account leaves no personal data', () => {
     expect(String(first(rec).email_hash)).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(rowsOf(rec))).not.toMatch(/ben/i);
     const back =
-      prep + `insert into auth.users (id, email) values ('${ID.fresh}', 'ben@example.org');`;
+      prep +
+      `insert into auth.users (id, email) values ('${ID.fresh}', 'ben@example.org');
+       insert into public.signup_email_checks (user_id, email_hash) values ('${ID.fresh}', '${hash}');`;
     const jwt = JSON.stringify({ sub: ID.fresh, role: 'authenticated' });
     await db.exec('begin');
     let err = '';

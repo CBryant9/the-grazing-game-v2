@@ -30,18 +30,70 @@ alter table public.site_settings enable row level security;
 create trigger site_settings_touch before update on public.site_settings
   for each row execute function app.touch_updated_at();
 
+-- The only shape the audit log's details may take: ids, counts, switch and
+-- slot keys, on/off and number values, a role and an end time. No free text,
+-- so no names, emails or notes about a person. Unknown keys are refused.
+create or replace function app.audit_details_ok(d jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  k text;
+  v jsonb;
+begin
+  if jsonb_typeof(d) <> 'object' then
+    return false;
+  end if;
+  for k, v in select * from jsonb_each(d) loop
+    if k in ('switch_key', 'slot_id') then
+      if jsonb_typeof(v) <> 'string' or (v #>> '{}') !~ '^[a-z][a-z0-9_]{0,60}$' then
+        return false;
+      end if;
+    elsif k = 'enabled' then
+      if jsonb_typeof(v) <> 'boolean' then return false; end if;
+    elsif k = 'count' then
+      if jsonb_typeof(v) <> 'number' then return false; end if;
+    elsif k = 'value' then
+      if jsonb_typeof(v) not in ('boolean', 'number') then return false; end if;
+    elsif k = 'role' then
+      if jsonb_typeof(v) <> 'string' or (v #>> '{}') not in ('player', 'moderator', 'admin') then
+        return false;
+      end if;
+    elsif k = 'until' then
+      if jsonb_typeof(v) <> 'string'
+         or (v #>> '{}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9:.]+(Z|[+-][0-9]{2}:?[0-9]{2})?)?$' then
+        return false;
+      end if;
+    elsif k = 'ids' then
+      if jsonb_typeof(v) <> 'array' then return false; end if;
+      if exists (
+        select 1 from jsonb_array_elements(v) e
+        where jsonb_typeof(e) <> 'string'
+           or (e #>> '{}') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      ) then
+        return false;
+      end if;
+    else
+      return false;
+    end if;
+  end loop;
+  return true;
+end;
+$$;
+
 -- Every admin action (11.8). Append only: no one can change or remove a row,
--- not even the server (trigger below).
+-- not even the server (trigger below). It outlives deleted accounts, so every
+-- column takes a fixed shape with no free text: an action name, a target kind
+-- and id, and details in the shape app.audit_details_ok allows.
 create table public.admin_audit_log (
   id bigint generated always as identity primary key,
   admin_id uuid references auth.users (id) on delete set null,
-  action text not null check (char_length(action) between 1 and 80),
-  target_type text check (char_length(target_type) <= 40),
-  target_id text check (char_length(target_id) <= 80),
-  -- Ids and action names only, never personal details (no names, emails or
-  -- free text about a person): the log outlives deleted accounts. A trigger
-  -- refuses anything that looks like an email address.
-  details jsonb not null default '{}'::jsonb check (jsonb_typeof(details) = 'object'),
+  action text not null check (action ~ '^[a-z][a-z0-9_]{0,79}$'),
+  target_type text check (target_type ~ '^[a-z][a-z_]{0,39}$'),
+  target_id text check (target_id ~ '^[A-Za-z0-9_-]{1,80}$'),
+  details jsonb not null default '{}'::jsonb check (app.audit_details_ok(details)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -106,7 +158,11 @@ create table public.notifications (
   title text not null check (char_length(title) between 1 and 120),
   body text check (char_length(body) <= 500),
   -- A path on this site: one slash, then not another slash or a backslash (so never //host).
-  link text check (link ~ '^/([^/\\]|$)' and char_length(link) <= 300),
+  -- No control or space characters anywhere: browsers drop a tab or newline,
+  -- which would turn /<tab>/host into //host.
+  link text check (
+    link ~ '^/([^/\\]|$)' and link !~ '[[:cntrl:][:space:]]' and char_length(link) <= 300
+  ),
   farm_id uuid references public.farms (id) on delete cascade,
   read_at timestamptz,
   created_at timestamptz not null default now(),

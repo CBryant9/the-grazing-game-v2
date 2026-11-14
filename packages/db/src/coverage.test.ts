@@ -33,6 +33,8 @@ const SERVER_ONLY = [
   'signup_refusals',
   'ban_records',
   'push_service_hosts',
+  'signup_email_checks',
+  'deletion_tokens',
 ];
 
 /** What a visitor with no account may read. Nothing else, and never a write. */
@@ -57,11 +59,15 @@ const PLAYER_FUNCTIONS = [
 
 /**
  * The app helpers the browser roles may run: exactly those a policy, a view
- * or a storage rule calls with their rights. Nothing that answers about
- * another account by id, no rate limiter, no farm limit, no trigger function.
+ * or a storage rule calls with their rights. Those that take another
+ * person's id answer only what the caller may know (third.test.ts, N1); the
+ * raw forms, the rate limiter, the farm limit and the trigger functions are
+ * not here.
  */
 const BROWSER_HELPERS = [
   'blocked_between',
+  'board_shows_owner',
+  'board_username',
   'can_find_profile',
   'can_see_group',
   'can_see_profile',
@@ -74,12 +80,10 @@ const BROWSER_HELPERS = [
   'is_group_member',
   'is_group_owner',
   'is_member',
-  'is_restricted',
   'is_staff',
   'owns_farm',
   'photo_file_visible',
   'post_author',
-  'post_row_visible',
   'post_visible',
   'ticker_visible',
   'try_uuid',
@@ -155,6 +159,11 @@ const SERVER_FUNCTIONS = [
   'prune_housekeeping',
   'rollup_ad_events',
   'take_rate_limit',
+  'record_signup_email',
+  'prepare_account_deletion',
+  'approve_photo',
+  'assign_group_owner',
+  'clear_signup_refusal',
 ];
 
 describe('every table', () => {

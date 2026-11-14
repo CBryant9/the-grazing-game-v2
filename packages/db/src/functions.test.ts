@@ -41,7 +41,8 @@ async function asFresh(
   await db.exec('begin');
   try {
     await db.exec(
-      `insert into auth.users (id, aud, role) values ('${ID.fresh}', 'authenticated', 'authenticated'); ${prep}`,
+      `insert into auth.users (id, aud, role) values ('${ID.fresh}', 'authenticated', 'authenticated');
+       insert into public.signup_email_checks (user_id, email_hash) values ('${ID.fresh}', repeat('cd', 32)); ${prep}`,
     );
     await db.exec(
       `set local role authenticated; select set_config('request.jwt.claims', '${jwt}', true);`,

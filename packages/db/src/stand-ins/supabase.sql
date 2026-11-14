@@ -76,6 +76,8 @@ create table storage.objects (
   name text not null,
   owner uuid,
   metadata jsonb,
+  -- Supabase keeps a version for each stored file, new on every upload.
+  version text default gen_random_uuid()::text,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   unique (bucket_id, name)
@@ -86,6 +88,7 @@ alter table storage.objects enable row level security;
 create function storage.touch_object() returns trigger language plpgsql as $$
 begin
   new.updated_at := clock_timestamp();
+  new.version := gen_random_uuid()::text;
   return new;
 end;
 $$;

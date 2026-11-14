@@ -66,11 +66,15 @@ insert into storage.objects (bucket_id, name) values
   ('avatars', '00000000-0000-4000-8000-000000000003/me.png');
 update public.profiles set avatar_path = user_id::text || '/me.png'
   where user_id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
-update public.profiles set avatar_status = 'approved'
-  where user_id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
+-- The image check approves each one through approve_photo(), with the file it read.
+select public.approve_photo('avatar', p.user_id, o.id, o.updated_at, o.version)
+  from public.profiles p join storage.objects o on o.bucket_id = 'avatars' and o.name = p.avatar_path
+  where p.user_id in ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
 
-insert into public.farm_showcase_photos (user_id, storage_path, caption, moderation_status) values
-  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001/yards.jpg', 'The yards', 'approved');
+insert into public.farm_showcase_photos (id, user_id, storage_path, caption) values
+  ('00000000-0000-4000-8000-0000000003c1', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001/yards.jpg', 'The yards');
+select public.approve_photo('showcase', '00000000-0000-4000-8000-0000000003c1', o.id, o.updated_at, o.version)
+  from storage.objects o where o.bucket_id = 'post-photos' and o.name = '00000000-0000-4000-8000-000000000001/yards.jpg';
 
 -- A guest with one Fast Farm.
 insert into public.guest_sessions (id, token_hash) values
@@ -138,8 +142,10 @@ insert into public.posts (id, author_id, kind, body, visibility, group_id, farm_
   ('00000000-0000-4000-8000-0000000001a3', '00000000-0000-4000-8000-000000000001', 'post', 'Group: who is joining in March?', 'public', '00000000-0000-4000-8000-0000000000f1', null, null, null);
 
 insert into public.post_photos (id, post_id, storage_path, position, moderation_status) values
-  ('00000000-0000-4000-8000-0000000003a1', '00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-000000000001/rain.jpg', 1, 'approved'),
+  ('00000000-0000-4000-8000-0000000003a1', '00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-000000000001/rain.jpg', 1, 'pending'),
   ('00000000-0000-4000-8000-0000000003a2', '00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-000000000001/gauge.jpg', 2, 'pending');
+select public.approve_photo('post_photo', '00000000-0000-4000-8000-0000000003a1', o.id, o.updated_at, o.version)
+  from storage.objects o where o.bucket_id = 'post-photos' and o.name = '00000000-0000-4000-8000-000000000001/rain.jpg';
 
 insert into public.comments (id, post_id, author_id, body) values
   ('00000000-0000-4000-8000-0000000004b1', '00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-000000000002', 'We got 15 mm here.');
@@ -205,7 +211,7 @@ insert into public.ad_daily (day, slot_id, campaign_id, kind, count) values
   (date '2026-11-01', 'pc_farm_rail', '00000000-0000-4000-8000-0000000007b1', 'view', 1);
 
 insert into public.admin_audit_log (admin_id, action, target_type, target_id, details) values
-  ('00000000-0000-4000-8000-00000000000a', 'seed', 'database', 'seed', '{"sample": true}');
+  ('00000000-0000-4000-8000-00000000000a', 'seed', 'database', 'seed', '{"count": 1}');
 insert into public.daily_counts (day, metric, dims, count) values
   (date '2026-11-01', 'signups', '', 3);
 

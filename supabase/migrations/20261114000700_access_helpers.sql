@@ -83,7 +83,7 @@ $$;
 -- An account that may take part in the community: has a profile, is 16 or
 -- over today (Sydney date), and is not banned or suspended (PRD 8.3, 9.9).
 -- Turning 16 opens the community by itself: nothing has to run.
-create or replace function app.is_member(p_user uuid)
+create or replace function app.member_raw(p_user uuid)
 returns boolean
 language sql
 stable
@@ -128,7 +128,7 @@ security definer
 set search_path = ''
 as $$
   select p_user is not null
-    and app.is_member(p_user)
+    and app.member_raw(p_user)
     and (
       app.is_admin_user(p_user)
       or (app.feature_on('community') and (p_part is null or app.feature_on(p_part)))
@@ -146,7 +146,7 @@ as $$
 $$;
 
 -- Has either blocked the other? Blocks hide both ways (9.2).
-create or replace function app.blocked_between(p_a uuid, p_b uuid)
+create or replace function app.blocked_pair(p_a uuid, p_b uuid)
 returns boolean
 language sql
 stable
@@ -187,8 +187,8 @@ as $$
     when p_owner = p_viewer then true
     when app.is_admin_user(p_viewer) then true
     else app.community_ok(p_viewer)
-      and app.is_member(p_owner)
-      and not app.blocked_between(p_viewer, p_owner)
+      and app.member_raw(p_owner)
+      and not app.blocked_pair(p_viewer, p_owner)
   end
 $$;
 
@@ -228,7 +228,7 @@ as $$
   end
 $$;
 
-create or replace function app.is_group_member(p_group uuid, p_user uuid)
+create or replace function app.group_member_raw(p_group uuid, p_user uuid)
 returns boolean
 language sql
 stable
@@ -240,7 +240,7 @@ as $$
   )
 $$;
 
-create or replace function app.is_group_owner(p_group uuid, p_user uuid)
+create or replace function app.group_owner_raw(p_group uuid, p_user uuid)
 returns boolean
 language sql
 stable
@@ -264,8 +264,8 @@ as $$
       and exists (
         select 1 from public.groups g
         where g.id = p_group
-          and (g.visibility = 'public' or app.is_group_member(g.id, app.uid()))
-          and not app.blocked_between(app.uid(), g.owner_id)
+          and (g.visibility = 'public' or app.group_member_raw(g.id, app.uid()))
+          and not app.blocked_pair(app.uid(), g.owner_id)
       )
     )
 $$;
@@ -291,10 +291,10 @@ as $$
     when not app.can_use_community('feed_posts') then false
     when p_author = app.uid() then true
     when p_removed_at is not null then false
-    when not app.is_member(p_author) then false
-    when app.blocked_between(app.uid(), p_author) then false
+    when not app.member_raw(p_author) then false
+    when app.blocked_pair(app.uid(), p_author) then false
     when p_group is not null then
-      app.can_use_community('groups') and app.is_group_member(p_group, app.uid())
+      app.can_use_community('groups') and app.group_member_raw(p_group, app.uid())
     when p_visibility = 'public' then true
     else app.follows_accepted(app.uid(), p_author)
   end
@@ -321,7 +321,9 @@ stable
 security definer
 set search_path = ''
 as $$
-  select p.author_id from public.posts p where p.id = p_post
+  -- Told only to someone who may see the post.
+  select case when app.post_visible(p_post) then
+    (select p.author_id from public.posts p where p.id = p_post) end
 $$;
 
 create or replace function app.comment_visible(p_comment uuid)
@@ -337,8 +339,8 @@ as $$
           c.author_id = app.uid()
           or app.is_staff()
           or (c.removed_at is null
-              and app.is_member(c.author_id)
-              and not app.blocked_between(app.uid(), c.author_id))
+              and app.member_raw(c.author_id)
+              and not app.blocked_pair(app.uid(), c.author_id))
         )
        from public.comments c where c.id = p_comment),
     false
@@ -352,7 +354,9 @@ stable
 security definer
 set search_path = ''
 as $$
-  select c.author_id from public.comments c where c.id = p_comment
+  -- Told only to someone who may see the comment.
+  select case when app.comment_visible(p_comment) then
+    (select c.author_id from public.comments c where c.id = p_comment) end
 $$;
 
 -- Does the ticker show this account's events to the viewer (9.4)? Only
@@ -368,8 +372,8 @@ as $$
     when app.uid() is null then false
     when not app.can_use_community('activity_ticker') then false
     when p_user = app.uid() then true
-    else app.is_member(p_user)
-      and not app.blocked_between(app.uid(), p_user)
+    else app.member_raw(p_user)
+      and not app.blocked_pair(app.uid(), p_user)
       and exists (select 1 from public.profiles p where p.user_id = p_user and p.ticker_opt_in)
   end
 $$;
@@ -391,8 +395,8 @@ as $$
       when f.owner_id = p_viewer then true
       when f.mode <> 'daily' or f.owner_id is null then false
       when not app.community_ok(p_viewer, 'farm_viewing') then false
-      when not app.is_member(f.owner_id) then false
-      when app.blocked_between(p_viewer, f.owner_id) then false
+      when not app.member_raw(f.owner_id) then false
+      when app.blocked_pair(p_viewer, f.owner_id) then false
       when p.privacy_farm_view = 'public' then true
       when p.privacy_farm_view = 'followers' then app.follows_accepted(p_viewer, f.owner_id)
       else false
@@ -539,3 +543,90 @@ end;
 $$;
 
 -- Who may call which helper is set once, at the end (20261114001500_app_grants.sql).
+
+-- ------------------------------------------------ caller-bound helpers
+--
+-- Row level security policies run their helpers with the caller's rights,
+-- so the browser roles must be able to run these. Each one that takes another
+-- person's id answers only what the caller is allowed to know. The raw forms
+-- above (member_raw, blocked_pair, group_member_raw, group_owner_raw) answer
+-- about anyone and are for the server and other security definer helpers only.
+
+-- Is this account a community member? Told to the account itself, staff and
+-- other community members; a visitor or an under-16 account is told nothing.
+create or replace function app.is_member(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_user is null then false
+    when p_user = app.uid() then app.member_raw(p_user)
+    when app.is_staff() or app.can_use_community() then app.member_raw(p_user)
+    else false
+  end
+$$;
+
+-- Is there a block between these two? Answered only when the caller is one of them.
+create or replace function app.blocked_between(p_a uuid, p_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(app.uid() in (p_a, p_b), false) and app.blocked_pair(p_a, p_b)
+$$;
+
+-- Is the caller a member, or the owner, of this group? Only about the caller.
+create or replace function app.is_group_member(p_group uuid, p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(p_user = app.uid(), false) and app.group_member_raw(p_group, p_user)
+$$;
+
+create or replace function app.is_group_owner(p_group uuid, p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(p_user = app.uid(), false) and app.group_owner_raw(p_group, p_user)
+$$;
+
+-- For leaderboard_rows: the name a board shows for an account, and whether
+-- it shows the account's id, photo and farm name. A board row already says
+-- this much to anyone reading the board.
+create or replace function app.board_username(p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_user is null or app.is_restricted(p_user) then 'Former player'
+    else coalesce((select p.username from public.profiles p where p.user_id = p_user), 'Former player')
+  end
+$$;
+
+create or replace function app.board_shows_owner(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_user is not null and (
+    p_user = app.uid()
+    or (app.member_raw(p_user) and exists (
+      select 1 from public.profiles p where p.user_id = p_user and p.privacy_profile <> 'private'))
+  )
+$$;

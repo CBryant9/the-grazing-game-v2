@@ -16,7 +16,9 @@
 -- profile, the private row, the status row and default notification settings,
 -- and returns 'signed_up'. Under 14 it returns 'too_young' and records the
 -- refusal against this sign-in, so trying again with an older date of birth
--- is refused too. An email with a ban still running (ban_records) is refused.
+-- is refused too. The server must first record the sign-in email's ban hash
+-- (record_signup_email); a sign-in with none is refused, and one whose hash
+-- is on the ban list with the ban still running is refused.
 create or replace function public.complete_sign_up(
   p_username text,
   p_date_of_birth date,
@@ -29,7 +31,7 @@ set search_path = ''
 as $$
 declare
   v_user uuid := app.uid();
-  v_email text;
+  v_hash text;
 begin
   if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
     raise exception 'An anonymous session can not make an account.' using errcode = '42501';
@@ -40,10 +42,14 @@ begin
   if exists (select 1 from public.signup_refusals r where r.user_id = v_user) then
     return 'too_young';
   end if;
-  select u.email into v_email from auth.users u where u.id = v_user;
-  if v_email is not null and exists (
+  select c.email_hash into v_hash from public.signup_email_checks c where c.user_id = v_user;
+  if v_hash is null then
+    raise exception 'email_not_checked: the server has not checked this sign-in yet'
+      using errcode = 'P0001', hint = 'email_not_checked';
+  end if;
+  if exists (
     select 1 from public.ban_records b
-    where b.email_hash = app.email_hash(v_email) and (b.banned_until is null or b.banned_until > now())
+    where b.email_hash = v_hash and (b.banned_until is null or b.banned_until > now())
   ) then
     raise exception 'banned' using errcode = 'P0001', hint = 'banned';
   end if;
@@ -112,7 +118,7 @@ begin
   if not found then
     raise exception 'No such group.' using errcode = 'P0002';
   end if;
-  if app.blocked_between(app.uid(), g.owner_id) then
+  if app.blocked_pair(app.uid(), g.owner_id) then
     raise exception 'No such group.' using errcode = 'P0002';
   end if;
   if g.visibility = 'private' and (p_code is null or p_code <> g.invite_code) then
@@ -150,10 +156,10 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not (app.can_use_community('groups') and app.is_group_owner(p_group, app.uid())) then
+  if not (app.can_use_community('groups') and app.group_owner_raw(p_group, app.uid())) then
     raise exception 'Only the owner can hand over a group.' using errcode = '42501';
   end if;
-  if not app.is_group_member(p_group, p_new_owner) or not app.is_member(p_new_owner) then
+  if not app.group_member_raw(p_group, p_new_owner) or not app.member_raw(p_new_owner) then
     raise exception 'The new owner must be a member of the group.' using errcode = '42501';
   end if;
   update public.group_members set role = 'member' where group_id = p_group and role = 'owner';
@@ -464,6 +470,156 @@ begin
 end;
 $$;
 
+-- The server records the ban hash of a sign-in's email before sign-up. It
+-- works the hash out itself: an HMAC with BAN_HASH_PEPPER of the normalised
+-- address (docs/DATABASE.md). The database never sees the email or the pepper.
+create or replace function public.record_signup_email(p_user uuid, p_email_hash text)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.signup_email_checks (user_id, email_hash) values (p_user, p_email_hash)
+  on conflict (user_id) do update set email_hash = excluded.email_hash
+$$;
+
+-- Before deleting an account: if a ban or suspension is still running, keep
+-- its record (only the peppered hash and the end), then allow the delete.
+create or replace function public.prepare_account_deletion(p_user uuid, p_email_hash text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_banned timestamptz;
+  v_until timestamptz;
+begin
+  select s.banned_at, s.suspended_until into v_banned, v_until
+    from public.account_status s where s.user_id = p_user;
+  if v_banned is not null or v_until > now() then
+    if p_email_hash is null or p_email_hash !~ '^[0-9a-f]{64}$' then
+      raise exception 'ban_hash_required: a running ban needs the email hash' using errcode = 'P0001';
+    end if;
+    insert into public.ban_records (email_hash, banned_until)
+      values (p_email_hash, case when v_banned is not null then null else v_until end);
+  end if;
+  insert into public.deletion_tokens (user_id) values (p_user) on conflict (user_id) do nothing;
+end;
+$$;
+
+-- The image check approves one exact file: the one it read. The server
+-- passes the id, change time and (where Storage keeps one) version of that
+-- file; if the file at the row's path is not that file now, nothing is
+-- approved. Kinds: post_photo, showcase (row id), avatar (account id),
+-- group (group id).
+create or replace function public.approve_photo(
+  p_kind text,
+  p_row uuid,
+  p_object_id uuid,
+  p_object_updated_at timestamptz,
+  p_object_version text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_bucket text;
+  v_path text;
+  v_obj jsonb;
+begin
+  if p_kind = 'post_photo' then
+    select 'post-photos', storage_path into v_bucket, v_path from public.post_photos where id = p_row;
+  elsif p_kind = 'showcase' then
+    select 'post-photos', storage_path into v_bucket, v_path
+      from public.farm_showcase_photos where id = p_row;
+  elsif p_kind = 'avatar' then
+    select 'avatars', avatar_path into v_bucket, v_path from public.profiles where user_id = p_row;
+  elsif p_kind = 'group' then
+    select 'group-photos', photo_path into v_bucket, v_path from public.groups where id = p_row;
+  else
+    raise exception 'Unknown photo kind: %', p_kind using errcode = '22023';
+  end if;
+  if v_path is null then
+    raise exception 'photo_missing: no photo row or path to approve' using errcode = 'P0002';
+  end if;
+
+  select to_jsonb(o) into v_obj from storage.objects o
+    where o.bucket_id = v_bucket and o.name = v_path
+    for share;
+  if v_obj is null
+     or (v_obj ->> 'id')::uuid is distinct from p_object_id
+     or (v_obj ->> 'updated_at')::timestamptz is distinct from p_object_updated_at
+     or (p_object_version is not null and (v_obj ->> 'version') is distinct from p_object_version) then
+    raise exception 'photo_file_changed: the file at % is not the one the check read', v_path
+      using errcode = 'P0001', hint = 'photo_file_changed';
+  end if;
+
+  perform set_config('gg.approve_object', p_object_id::text, true);
+  if p_kind = 'post_photo' then
+    update public.post_photos set moderation_status = 'approved', storage_object_id = p_object_id,
+      storage_object_updated_at = p_object_updated_at, checked_at = now() where id = p_row;
+  elsif p_kind = 'showcase' then
+    update public.farm_showcase_photos set moderation_status = 'approved', storage_object_id = p_object_id,
+      storage_object_updated_at = p_object_updated_at, checked_at = now() where id = p_row;
+  elsif p_kind = 'avatar' then
+    update public.profiles set avatar_status = 'approved', avatar_object_id = p_object_id,
+      avatar_object_updated_at = p_object_updated_at, avatar_checked_at = now() where user_id = p_row;
+  else
+    update public.groups set photo_status = 'approved', photo_object_id = p_object_id,
+      photo_object_updated_at = p_object_updated_at, photo_checked_at = now() where id = p_row;
+  end if;
+  perform set_config('gg.approve_object', '', true);
+end;
+$$;
+
+-- An admin gives an ownerless group an owner (after its owner's account was
+-- deleted and no member could take over). Logged.
+create or replace function public.assign_group_owner(p_admin uuid, p_group uuid, p_new_owner uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not app.is_admin_user(p_admin) then
+    raise exception 'Only an admin can give a group an owner.' using errcode = '42501';
+  end if;
+  if not app.member_raw(p_new_owner) then
+    raise exception 'The new owner must be a community member, 16 or over, in good standing.'
+      using errcode = '42501';
+  end if;
+  insert into public.group_members (group_id, user_id, role) values (p_group, p_new_owner, 'member')
+    on conflict (group_id, user_id) do nothing;
+  update public.group_members set role = 'member' where group_id = p_group and role = 'owner';
+  update public.group_members set role = 'owner' where group_id = p_group and user_id = p_new_owner;
+  update public.groups set owner_id = p_new_owner where id = p_group;
+  insert into public.admin_audit_log (admin_id, action, target_type, target_id, details)
+    values (p_admin, 'assign_group_owner', 'group', p_group::text,
+            jsonb_build_object('ids', jsonb_build_array(p_new_owner::text)));
+end;
+$$;
+
+-- The way back for an adult who mistyped their date of birth at sign-up: an
+-- admin clears the under-14 refusal for that sign-in. Logged.
+create or replace function public.clear_signup_refusal(p_admin uuid, p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not app.is_admin_user(p_admin) then
+    raise exception 'Only an admin can clear a sign-up refusal.' using errcode = '42501';
+  end if;
+  delete from public.signup_refusals where user_id = p_user;
+  insert into public.admin_audit_log (admin_id, action, target_type, target_id)
+    values (p_admin, 'clear_signup_refusal', 'account', p_user::text);
+end;
+$$;
+
 -- Who may call what. Postgres lets PUBLIC run every new function, and a
 -- per-schema default can't take that away, so it is taken away here, then
 -- each function is granted to the one role that needs it.
@@ -487,5 +643,10 @@ grant execute on function
   public.can_view_farm(uuid, uuid),
   public.account_storage_paths(uuid),
   public.rollup_ad_events(date),
-  public.prune_housekeeping(timestamptz)
+  public.prune_housekeeping(timestamptz),
+  public.record_signup_email(uuid, text),
+  public.prepare_account_deletion(uuid, text),
+  public.approve_photo(text, uuid, uuid, timestamptz, text),
+  public.assign_group_owner(uuid, uuid, uuid),
+  public.clear_signup_refusal(uuid, uuid)
 to service_role;

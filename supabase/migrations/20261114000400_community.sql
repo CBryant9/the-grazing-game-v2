@@ -43,7 +43,11 @@ create table public.groups (
   photo_checked_at timestamptz,
   description text check (char_length(description) <= 1000),
   visibility text not null default 'private' check (visibility in ('public', 'private')),
-  owner_id uuid not null references public.profiles (user_id) on delete cascade,
+  -- Null when the owner's account was deleted and no member could take over
+  -- (16 or over, in good standing): an ownerless group can be read and posted
+  -- in by its members, but nobody can change it, invite or remove members
+  -- until an admin gives it an owner (assign_group_owner).
+  owner_id uuid references public.profiles (user_id) on delete set null,
   -- Shown only to the owner, through group_invite_code(). Column grants leave it out.
   invite_code text not null unique default replace(gen_random_uuid()::text, '-', '')
     check (invite_code ~ '^[0-9a-f]{12,32}$'),

@@ -3,10 +3,11 @@
 
 -- ---------------------------------------------- photos: approve the file
 
--- A path is not an identity. The image check approves one exact file: when
--- a row is set to 'approved' this finds the file by bucket and path, refuses
--- if it is not there yet, and records its storage id and change time. Any
--- change of path sends the row back to unchecked. The read rules on Storage
+-- A path is not an identity. The image check approves one exact file, only
+-- through approve_photo() (server only), which is given the id, change time
+-- and version of the file the check actually read and refuses if the file at
+-- the path is not that file now. A bare change of status to 'approved' is
+-- refused for every role. Any change of path sends the row back to unchecked. The read rules on Storage
 -- match on that id and time (app.photo_file_visible), and the trigger on
 -- storage.objects below sends a row back to pending when its file changes.
 -- Arguments: bucket, path column, status column, id column, file-time column,
@@ -41,14 +42,14 @@ begin
   end if;
 
   if v_status = 'approved' then
+    -- Only approve_photo() may approve, and only the file the check saw: it
+    -- names that file's id in gg.approve_object for this one update.
     if tg_op = 'INSERT' or (v_old ->> sc) is distinct from 'approved' then
-      select o.id, o.updated_at into v_id, v_updated
-        from storage.objects o where o.bucket_id = v_bucket and o.name = v_path;
-      if v_id is null then
-        raise exception 'photo_file_missing: there is no file at % to approve', v_path
-          using errcode = 'P0001', hint = 'photo_file_missing';
+      if coalesce(current_setting('gg.approve_object', true), '') = ''
+         or current_setting('gg.approve_object', true) is distinct from (j ->> ic) then
+        raise exception 'Use approve_photo() to approve a photo, with the file the check saw.'
+          using errcode = '42501', hint = 'use_approve_photo';
       end if;
-      j := j || jsonb_build_object(sc, v_status, ic, v_id, uc, v_updated, cc, now());
     end if;
   else
     j := j || jsonb_build_object(sc, v_status, ic, null, uc, null);
@@ -144,23 +145,6 @@ $$;
 create trigger farm_actions_append_only before update or delete on public.farm_actions
   for each row execute function app.farm_actions_append_only();
 
--- The audit log holds ids and action names, never personal details.
-create or replace function app.audit_log_no_personal()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-  if new.details::text ~* '[^@\s"]+@[^@\s"]+\.[a-z]{2,}' then
-    raise exception 'The audit log takes ids and action names only, never an email address.'
-      using errcode = '22023';
-  end if;
-  return new;
-end;
-$$;
-create trigger admin_audit_log_no_personal before insert on public.admin_audit_log
-  for each row execute function app.audit_log_no_personal();
-
 -- ------------------------------------------------------------ push hosts
 
 -- A subscription must point at a known web push service (push_service_hosts).
@@ -188,21 +172,20 @@ create trigger push_subscriptions_host before insert or update of endpoint on pu
 
 -- ------------------------------------------------- deleting an account
 
-create or replace function app.email_hash(p_email text)
-returns text
-language sql
-immutable
-set search_path = ''
-as $$
-  select encode(pg_catalog.sha256(convert_to(lower(trim(p_email)), 'UTF8')), 'hex')
-$$;
-
 -- Runs as the Auth user is deleted, before the cascades:
 --   * each group the player owns goes to its longest-standing other member
---     (a community member first); a group goes only when they are its only member;
+--     who is a community member in good standing (16 or over, not banned or
+--     suspended). If there are other members but none qualifies, the group
+--     stays with no owner (the foreign key clears it) and an admin can give it
+--     one (assign_group_owner). A group goes only when the player was its
+--     only member;
 --   * what they wrote in reports is cleared (the reporter is already cleared);
---   * a ban or suspension still running leaves a record with only a hash of
---     the sign-in email, so the same email can't sign up again until it ends.
+--   * their Stripe customer id is cleared from Stripe events, and their farm
+--     names from leaderboard rows;
+--   * a ban or suspension still running needs its record first: the server
+--     calls prepare_account_deletion() with the peppered hash of the sign-in
+--     email (the database never sees the email or the pepper), or the delete
+--     is refused.
 create or replace function app.before_account_delete()
 returns trigger
 language plpgsql
@@ -215,11 +198,23 @@ declare
   v_banned timestamptz;
   v_until timestamptz;
 begin
+  select s.banned_at, s.suspended_until into v_banned, v_until
+    from public.account_status s where s.user_id = old.id;
+  if (v_banned is not null or v_until > now())
+     and not exists (select 1 from public.deletion_tokens t where t.user_id = old.id) then
+    raise exception 'ban_hash_required: call prepare_account_deletion() with the ban hash first'
+      using errcode = 'P0001', hint = 'ban_hash_required';
+  end if;
+
   for g in select id from public.groups where owner_id = old.id loop
+    if not exists (select 1 from public.group_members m where m.group_id = g.id and m.user_id <> old.id) then
+      delete from public.groups where id = g.id;
+      continue;
+    end if;
     v_new := null;
     select m.user_id into v_new from public.group_members m
-      where m.group_id = g.id and m.user_id <> old.id
-      order by app.is_member(m.user_id) desc, m.joined_at, m.user_id
+      where m.group_id = g.id and m.user_id <> old.id and app.member_raw(m.user_id)
+      order by m.joined_at, m.user_id
       limit 1;
     if v_new is not null then
       update public.group_members set role = 'member' where group_id = g.id and role = 'owner';
@@ -229,13 +224,9 @@ begin
   end loop;
 
   update public.reports set details = null where reporter_id = old.id;
-
-  select s.banned_at, s.suspended_until into v_banned, v_until
-    from public.account_status s where s.user_id = old.id;
-  if old.email is not null and (v_banned is not null or v_until > now()) then
-    insert into public.ban_records (email_hash, banned_until)
-      values (app.email_hash(old.email), case when v_banned is not null then null else v_until end);
-  end if;
+  update public.stripe_events set stripe_customer_id = null
+    where stripe_customer_id in (select c.stripe_customer_id from public.stripe_customers c where c.user_id = old.id);
+  update public.leaderboard_entries set farm_name = null where user_id = old.id;
   return old;
 end;
 $$;
