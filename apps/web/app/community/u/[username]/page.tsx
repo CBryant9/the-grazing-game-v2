@@ -15,6 +15,7 @@ import {
   type Profile,
 } from '@/server/community/data';
 import { requireMember } from '@/server/community/page';
+import { farmsToView } from '@/server/community/farmview';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,13 +89,15 @@ export default async function Page({
       relation: mine ? null : await relationTo(tx, me.userId, p.id),
       extras: detailsVisible ? await extrasOf(tx, p.id) : null,
       count: detailsVisible ? await counts(tx, p.id) : null,
+      // The owner's farms this member may look at (the database's own view says which).
+      farms: detailsVisible && !mine ? await farmsToView(tx, p.id) : [],
       posts: detailsVisible
         ? await postsBy(tx, me.userId, p.id, q.cursor ?? null, asStranger)
         : null,
     };
   });
   if (!data) notFound();
-  const { p, mine, asStranger, detailsVisible, relation, extras, count, posts } = data;
+  const { p, mine, asStranger, detailsVisible, relation, extras, count, posts, farms } = data;
   const showFeed = (await featureSwitches(deps.sql)).feed_posts;
   return (
     <>
@@ -133,6 +136,15 @@ export default async function Page({
             <Link href={`/community/u/${p.username}/following`} className="btn ghost">
               {count.following} following
             </Link>
+          </p>
+        )}
+        {farms.length > 0 && (
+          <p className={styles.row}>
+            {farms.map((f) => (
+              <Link key={f.id} href={`/community/farm/${f.id}`} className="btn ghost">
+                Their farm today
+              </Link>
+            ))}
           </p>
         )}
         {mine && !asStranger && (

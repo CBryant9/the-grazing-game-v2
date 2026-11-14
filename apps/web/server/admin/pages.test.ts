@@ -109,6 +109,7 @@ describe('every admin page', () => {
         '/switches',
         '/users',
         '/users/[id]',
+        '/words',
       ].sort(),
     );
   });
@@ -172,7 +173,7 @@ describe('every admin page', () => {
 
   it('the placeholders say plainly that they are built in a later milestone', async () => {
     state.cookie = cookies.admin!;
-    for (const name of ['moderation', 'ads', 'purchases', 'challenges']) {
+    for (const name of ['ads', 'purchases', 'challenges']) {
       const Page = (
         (await pageModules[`../../app/admin/${name}/page.tsx`]!()) as {
           default: () => Promise<unknown>;

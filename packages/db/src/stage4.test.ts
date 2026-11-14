@@ -126,3 +126,25 @@ describe('review 4: a database limit on photos', () => {
     expect(viaServer.ok).toBe(true);
   });
 });
+
+describe('the word filter checks text only when it changes', () => {
+  it('a moderator can remove a post written before its word was blocked', async () => {
+    // Ava's seed post says "Good rain overnight".
+    const prep = `insert into public.word_filter (term) values ('rain');`;
+    const o = await as(
+      db,
+      'service',
+      `update public.posts set removed_at = now() where id = '${ID.postA}' returning 1`,
+      prep,
+    );
+    expect(o.ok).toBe(true);
+    // Writing the word again is still refused.
+    const edit = await as(
+      db,
+      'a',
+      `update public.posts set body = 'more rain' where id = '${ID.postA}'`,
+      prep,
+    );
+    expect(edit.ok).toBe(false);
+  });
+});

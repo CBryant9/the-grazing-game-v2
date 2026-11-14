@@ -85,6 +85,7 @@ function pretend(
     'community/post/[id]',
     'community/u/[username]',
     'community/u/[username]/[list]',
+    'community/farm/[id]',
   ]) {
     mkdirSync(join(app, rel, 'page'), { recursive: true });
     writeFileSync(
@@ -157,6 +158,14 @@ describe('the JavaScript budget check', () => {
     const over = run(pretend(0, 100, false, 20, 20, 200));
     expect(over.status).toBe(1);
     expect(over.stdout).toMatch(/OVER\s+\/community\s/);
+  });
+
+  it("measures the ticker's own script and says what it sends when on", () => {
+    const r = run(pretend(0, 100));
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(
+      /ok\s+\/ticker\.js\s+\d+ bytes compressed in 1 script when the ticker is on, 0 when off/,
+    );
   });
 
   it('does not count the polyfills for old browsers (nomodule)', () => {

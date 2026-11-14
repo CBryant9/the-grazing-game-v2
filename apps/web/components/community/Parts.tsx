@@ -150,6 +150,11 @@ export function PostCard({ post, detail = false }: { post: PostView; detail?: bo
         <>
           {post.body && <p className={styles.body}>{post.body}</p>}
           {post.card && <FactCard card={post.card} />}
+          {post.farmId && (
+            <p className={styles.linkline}>
+              <Link href={`/community/farm/${post.farmId}`}>Their farm today</Link>
+            </p>
+          )}
           {post.linkUrl &&
             (post.linkHref ? (
               <p className={styles.linkline}>

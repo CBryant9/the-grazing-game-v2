@@ -33,6 +33,8 @@ export interface PostView {
   linkHref: string | null;
   card: Card | null;
   farmDay: number | null;
+  /** A day card's farm, set only when the viewer may look at it (PRD 9.5). */
+  farmId?: string;
   visibility: 'public' | 'followers';
   groupId: string | null;
   createdAt: string;

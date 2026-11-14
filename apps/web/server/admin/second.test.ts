@@ -45,7 +45,9 @@ function walk(dir: string, match: RegExp): string[] {
 // `photos` needs a real photo waiting in the queue to say yes, so its gate, CSRF, no keys, rollback
 // and pass checks are in community/community.test.ts ("the manual photo queue"), not in this walk.
 // `photo-preview` is a read (GET only): its gate is tested in community/review.test.ts.
-const OWN_TESTS = new Set(['photos', 'photo-preview']);
+// `moderation` acts on an open report about real content, which needs a post and a report made first,
+// so its gate, CSRF, rollback and pass checks are in admin/moderation.test.ts.
+const OWN_TESTS = new Set(['photos', 'photo-preview', 'moderation']);
 const adminRouteNames = walk('app/api/admin', /^route\.ts$/)
   .map((f) => f.replace('app/api/admin/', '').replace('/route.ts', ''))
   .filter((n) => !OWN_TESTS.has(n));
@@ -115,6 +117,7 @@ beforeEach(async () => {
      delete from public.farms; delete from public.guest_sessions; delete from auth.users;
      delete from public.ban_records; delete from public.signup_refusals;
      delete from public.site_settings; delete from public.moderation_actions;
+     delete from public.word_filter;
      update public.feature_switches set enabled = false, updated_by = null;`,
   );
   resetRateLimits();
@@ -588,6 +591,7 @@ const BODIES: Record<string, (p: Record<string, Person>) => unknown> = {
   switches: () => ({ key: 'community', enabled: true }),
   settings: () => ({ key: 'announcement', value: { text: 'Hello', link: null } }),
   users: (p) => ({ userId: p.pat!.id, action: 'ban' }),
+  words: () => ({ action: 'add', term: 'badword', kind: 'block' }),
 };
 
 describe('8. every admin route gets the gate, CSRF and rollback checks', () => {
@@ -606,7 +610,10 @@ describe('8. every admin route gets the gate, CSRF and rollback checks', () => {
                   (select jsonb_agg(to_jsonb(t) order by user_id) from public.account_status t) c,
                   (select count(*) from public.moderation_actions) d,
                   (select count(*) from public.ban_records) e,
-                  (select count(*) from public.admin_audit_log) f`,
+                  (select count(*) from public.admin_audit_log) f,
+                  (select jsonb_agg(to_jsonb(t) order by id) from public.reports t) g,
+                  (select count(*) from public.word_filter) h,
+                  (select count(*) from public.notifications) i`,
         )
       ).rows,
     );

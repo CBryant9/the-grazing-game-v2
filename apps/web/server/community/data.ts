@@ -74,6 +74,8 @@ interface PostRow {
   link_url: string | null;
   card: unknown;
   farm_day: number | null;
+  /* m4.2 farm view: set only when the viewer may look at the farm. */
+  view_farm_id: string | null;
   visibility: PostView['visibility'];
   group_id: string | null;
   edited_at: string | null;
@@ -89,6 +91,8 @@ interface PostRow {
 
 const POST_SELECT = `
   p.id, p.author_id, p.kind, p.body, p.link_url, p.card, p.farm_day, p.visibility, p.group_id,
+  /* m4.2 farm view: the farm id only for a day card the viewer may look at (app.can_view_farm, as the viewer). */
+  case when p.kind = 'day_card' and p.farm_id is not null and app.can_view_farm(p.farm_id) then p.farm_id end as view_farm_id,
   ${ts('p.edited_at')} as edited_at, p.removed_at, ${ts('p.created_at')} as created_ts,
   pp.username, pp.display_name, (pp.avatar_path is not null) as has_avatar,
   app.like_count_post(p.id) as likes,
@@ -160,6 +164,7 @@ function toPost(row: PostRow, me: string): PostView {
     linkHref: removed ? null : safeHref(row.link_url),
     card: removed ? null : readCard(row.card),
     farmDay: row.farm_day,
+    farmId: row.view_farm_id ?? undefined, // m4.2 farm view
     visibility: row.visibility,
     groupId: row.group_id,
     createdAt: row.created_ts,

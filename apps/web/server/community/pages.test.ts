@@ -132,6 +132,7 @@ describe('every community page', () => {
     ).toEqual(
       [
         '/',
+        '/farm/[id]',
         '/me',
         '/people',
         '/post/[id]',
@@ -199,6 +200,8 @@ describe('every community page', () => {
   it('renders for a member', async () => {
     state.cookie = cookies.alice!;
     for (const path of Object.keys(pageModules)) {
+      // The farm page needs a farm the member may look at: farmview.test.ts renders it.
+      if (path.includes('/farm/')) continue;
       const Page = await load(path);
       const out = await Page(props());
       const html = renderToStaticMarkup(out as never);

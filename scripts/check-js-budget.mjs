@@ -196,6 +196,7 @@ const COMMUNITY_PAGES = [
   'community/post/[id]',
   'community/u/[username]',
   'community/u/[username]/[list]',
+  'community/farm/[id]',
 ];
 const COMMUNITY_LIMIT_KB = Number(arg('--limit-community', '150'));
 for (const rel of COMMUNITY_PAGES) {
@@ -221,6 +222,23 @@ for (const rel of COMMUNITY_PAGES) {
   if (ok && kb >= 100) {
     console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');
   }
+  if (!ok) failed = true;
+}
+// ---- The live ticker's own script (PRD 9.4): hand written, in `public`. Where the ticker is on
+// (the landing page when its switch is on at build, the community pages from the live switches)
+// this is all it sends, besides the page's own scripts, and nothing at all when it is off.
+{
+  const file = join(ROOT, 'apps/web/public/ticker.js');
+  const limitBytes = Number(arg('--limit-ticker', '2')) * 1024;
+  if (!existsSync(file)) {
+    console.error('Missing apps/web/public/ticker.js.');
+    process.exit(1);
+  }
+  const bytes = gzipSync(readFileSync(file), { level: 9 }).length;
+  const ok = bytes < limitBytes;
+  console.log(
+    `${ok ? 'ok  ' : 'OVER'} ${'/ticker.js'.padEnd(20)} ${bytes} bytes compressed in 1 script when the ticker is on, 0 when off (limit ${limitBytes / 1024} KB)`,
+  );
   if (!ok) failed = true;
 }
 if (failed) {
