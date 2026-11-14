@@ -351,6 +351,15 @@ describe('selling', () => {
     const more = work(sold.farm, { type: 'sellGroup', mob, group: 'steer', qty: 10 }).farm;
     expect(marketView(more).booked[0]!.head).toBe(20);
     expect(more.saleBookings.length).toBe(1);
+    // Booking the same animals by tag number is refused, with the sale named.
+    const again = turnedDown(sold.farm, {
+      type: 'sellAnimals',
+      ids: [...sold.farm.saleBookings[0]!.animalIds],
+    });
+    expect(again.reason).toBe('nothing-to-sell');
+    expect(again.message).toBe(
+      'Those cattle are already booked onto the sale on Thursday 7 September, in 6 days.',
+    );
   });
 
   it('at first light on the sale day booked stock sells at that day’s price, less the usual costs', () => {

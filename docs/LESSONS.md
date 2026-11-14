@@ -144,6 +144,12 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | D13 | A new test said 7.2 km of tape takes 72 minutes. It takes 144 | Worked out in the head | Same rule as Y1 and RF3: look at the number before writing it down |
 | D14 | `startDay` was exported from the engine index. It resets the day's used light, so a caller could switch the daylight limit off. Found in the second review | The lint guard and the read-only test named the functions already thought of (`applyInstant`), and no one asked what the other public functions could change | `startDay` is no longer exported, and a test checks the index leaves out `startDay`, `applyInstant`, `tryAction` and `recordAction`. **Rule: check what each public function can change, not only the ones named in a guard.** |
 | D15 | The things-to-do list had "calves to wean" from 90 days old, the youngest age the model allows. It showed on every farm for months | The item used the earliest age the model allows, not the age at which the model weans a drop by itself (about 280 days) | The item is removed. Weaning earlier is the player's choice, offered on the mob card. **Rule: a prompt to act uses the point the model itself acts at, or is left out.** |
+| S1 | The first break-it run left one change alive: booking animals that were already booked did nothing wrong in any test | Selling a group or a class leaves out the animals already booked, so only a booking by tag number reaches that check, and no test booked by tag number twice | A test for it (the refusal names the sale). Rule: when a check is reached by one route only, test that route |
+| S2 | Seven existing tests that bought or sold on the clock failed on the first run | They did it on day 0 of a farm, which is not a sale day, so buying was refused and selling was booked | They now do it on a sale day (`toSaleDay` in test support). Nothing in the calibration or comparison suites needed a change, because they buy by the instant path. Rule: when a rule is added to the clock path, list the tests that use it first |
+| S3 | A patch script run from Python on Windows turned every file it touched from LF to CRLF | Text mode writes `
+` as `
+` on Windows | Open files for writing with `newline='
+'`, and check for `` before committing. Prettier would have caught it, but only at the end |
 
 ## Process lessons
 
