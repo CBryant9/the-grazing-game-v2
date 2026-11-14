@@ -15,6 +15,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { MOST_LOSS_MJ } from '../src/cattle/gains';
+import { MILK, YOUNG_GAIN_COST } from '../src/data/cattle';
 
 const MVP_PATH = fileURLToPath(
   new URL('../../../reference/mvp/grazing-game.html', import.meta.url),
@@ -254,6 +256,79 @@ export const REBUILD_TUNES: readonly {
   { district: 'cw', key: 'dmdMax', mvp: 0.7, rebuild: 0.68 },
 ];
 
+/**
+ * Formulas the rebuild has changed on purpose because the MVP's was wrong
+ * (BUILD_PLAN 2.4: MVP bugs are fixed, not copied; docs/CALIBRATION.md, the
+ * m2.5 entry). Each loaded copy of the MVP has `mvp` replaced by `rebuild`,
+ * in memory, so every comparison checks the rebuild's documented rule
+ * line for line. `mvp` is the MVP file's own text, kept here as the record
+ * of what the MVP did: loading stops if that text is no longer in the file.
+ * `helpers` is script added before the MVP's own, for the rebuilt lines to
+ * call; it must do the same arithmetic in the same order as the engine.
+ */
+/** The rebuild's milk fall with condition, as MVP script text (milkMJ). */
+const MILK_FALL = `clamp((a.cond-${MILK.stopCS})/(${MILK.fullCS}-${MILK.stopCS}),0,1)`;
+
+export const REBUILD_RULES: readonly {
+  name: string;
+  why: string;
+  mvp: string;
+  rebuild: string;
+}[] = [
+  {
+    name: 'calf cost of gain, daily step',
+    why: 'The MVP charged every animal 20 + 0.045 x LW MJ a kg of gain: about twice the measured cost for a 60 kg calf (Sekine and Asahida 1990). Engine: mjPerKgGain.',
+    mvp: 'let gain=bal>0?bal/(20+.045*W_):bal/22;',
+    rebuild: 'let gain=bal>0?bal/__ggGainCost(W_):bal/22;',
+  },
+  {
+    name: 'no milk past what the cow can pay for',
+    why: 'The MVP made full milk even when the cow could not pay for it: her loss stops at 1.5 kg a day, so the rest came from nothing. Engine: unpaidMilk.',
+    mvp: 'if(dam&&!dam.dead)mei+=dam.milk;}',
+    rebuild:
+      'if(dam&&!dam.dead)mei+=dam.milk;}' +
+      `if(a.milk>0&&mei-req<${MOST_LOSS_MJ}){const cut=Math.min(a.milk,(${MOST_LOSS_MJ}-(mei-req))*.65);` +
+      'if(cut>0){a.milk=a.milk-cut;req=req-cut/.65;}}',
+  },
+  {
+    name: 'calf cost of gain, expected gain',
+    why: 'The same rule in gainOn.',
+    mvp: 'return clamp(bal>0?bal/(20+.045*a.wt):bal/22,-1.5,cap);',
+    rebuild: 'return clamp(bal>0?bal/__ggGainCost(a.wt):bal/22,-1.5,cap);',
+  },
+  {
+    name: 'milk falls with condition, daily step',
+    why: 'The MVP cut milk by the feed ME, to 45% at ME 7.35 or less, which left calves near 80 kg at weaning. Milk now falls only as the cow gets thin (MILK). Engine: milkMJ.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((me-6)/3,.45,1);',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL};`,
+  },
+  {
+    name: 'milk falls with condition, expected gain',
+    why: 'The same rule in gainOn.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((ME(diet.dmd)-6)/3,.45,1)/.65;',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL}/.65;`,
+  },
+  {
+    name: 'milk falls with condition, reasons',
+    why: 'The same rule in gainWhy.',
+    mvp: 'clamp(.55+.15*a.cond,.6,1.2)*clamp((meF-6)/3,.45,1);',
+    rebuild: `clamp(.55+.15*a.cond,.6,1.2)*${MILK_FALL};`,
+  },
+];
+
+/** Script put before the MVP's own for the rebuilt lines (REBUILD_RULES). Mirrors the engine. */
+const G = YOUNG_GAIN_COST;
+const REBUILD_HELPERS = `
+function __ggGainCost(wt){
+  const grown=20+0.045*wt;
+  if(wt>=${G.grownFromKg})return grown;
+  const young=${G.mjPerKg075}*Math.pow(wt,0.75);
+  if(wt<=${G.youngToKg})return young;
+  const t=(wt-${G.youngToKg})/(${G.grownFromKg}-${G.youngToKg});
+  return young+(grown-young)*t;
+}
+`;
+
 /** The MVP script text, straight from the HTML file. */
 export function readMvpScript(): string {
   const html = readFileSync(MVP_PATH, 'utf8');
@@ -269,7 +344,15 @@ export function readMvpScript(): string {
  * a test-support file that needs to reach more of the MVP (see mvpFarm.ts).
  */
 export function loadMvp(extraHook = ''): LoadedMvp {
-  const script = readMvpScript();
+  let script = readMvpScript();
+  for (const r of REBUILD_RULES) {
+    const parts = script.split(r.mvp);
+    if (parts.length !== 2) {
+      throw new Error(`MVP file: the line for "${r.name}" is not there exactly once any more`);
+    }
+    script = parts.join(r.rebuild);
+  }
+  script = REBUILD_HELPERS + script;
   // The whole script sits inside one function that ends with `})();`.
   const end = script.lastIndexOf('})();');
   if (end < 0) throw new Error('MVP file: could not find the end of its script');

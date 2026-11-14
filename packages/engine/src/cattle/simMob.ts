@@ -17,7 +17,11 @@
  * and after the last mob: settleDeaths(mobs, deaths, byId, totals).
  *
  * MVP faults fixed here (BUILD_PLAN 2.4): the no-water count clears in the
- * feedlot, and a cow whose calf dies is dried off.
+ * feedlot, a cow whose calf dies is dried off, and stock under 200 kg pay
+ * the measured cost for a kg of gain, not the grown animal's
+ * (`mjPerKgGain`, engine 0.14.0), and a cow's milk falls with her
+ * condition, not with the feed's ME (`milkMJ`, engine 0.14.0), and no
+ * milk is made past what her loss for the day can pay for (`unpaidMilk`).
  */
 
 import type { Supplement } from '../data/feed';
@@ -35,7 +39,7 @@ import {
   cycling,
   weanOne,
 } from './breeding';
-import { milkMJ, predictGains } from './gains';
+import { MOST_LOSS_KG, milkMJ, mjPerKgGain, predictGains, unpaidMilk } from './gains';
 import { LOT_DIET, dietOf, grazeAlloc, intakeOf, type Diet, type PlantingGraze } from './graze';
 import type { CattleNote } from './notes';
 import type {
@@ -255,17 +259,27 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
     let req = 0.45 * m75 * (1 + walk);
     if (a.preg > 190) req += (0.13 * m75 * (a.preg - 190)) / 93;
     if (a.lact >= 0 && a.calf) {
-      a.milk = milkMJ(a, me);
+      a.milk = milkMJ(a);
       req += a.milk / 0.65;
     } else a.milk = 0;
     if (a.kind === 'calf') {
       const dam = byId.get(a.dam);
       if (dam && !dam.dead) mei += dam.milk;
     }
+    // A cow pays for all her milk: what her loss can't pay for is not made.
+    // Dams go before calves, so the calf drinks only what was made.
+    if (a.milk > 0) {
+      const cut = unpaidMilk(a.milk, mei - req);
+      if (cut > 0) {
+        a.milk = a.milk - cut;
+        req = req - cut / 0.65;
+      }
+    }
     const bal = mei - req;
-    let gain = bal > 0 ? bal / (20 + 0.045 * W_) : bal / 22;
+    // Light stock pay the measured calf cost for a kg of gain (mjPerKgGain).
+    let gain = bal > 0 ? bal / mjPerKgGain(W_) : bal / 22;
     const cap = a.kind === 'steer' ? 1.6 : a.kind === 'bull' ? 1.4 : a.kind === 'calf' ? 1.15 : 1.1;
-    gain = clamp(gain, -1.5, cap);
+    gain = clamp(gain, -MOST_LOSS_KG, cap);
     // No water: fast weight loss.
     if (m.dry > 0) gain = -W_ * 0.04;
     a.wt = Math.max(25, W_ + gain);

@@ -76,8 +76,27 @@
  * the cattle, sheep or mix choice at setup; one DSE figure (8.4) for every
  * display. No grass, cattle, crop, season or price formula changed. A farm
  * with no sheep plays exactly as it did on 0.13.0 (a test holds its digest).
+ *
+ * m2.5, calf growth (numbered 0.14.0 on its own branch, cut from 0.13.0;
+ * shipped in 0.16.0 below): stock under 200 kg pay the measured energy
+ * cost for a kg of gain (Sekine and Asahida 1990), moving to the grown
+ * animal's cost in a straight line from 100 to 200 kg (`mjPerKgGain`); and
+ * a cow's milk falls with her condition (to none at CS 1.5), not with the
+ * feed's ME (`milkMJ`, `MILK`); and no milk is made past what her loss
+ * for the day can pay for (`unpaidMilk`). Deliberate cattle model changes:
+ * calves grow faster. Logged in
+ * docs/CALIBRATION.md (the m2.5 entry); the no-hands digests were taken
+ * again. No stored field changed, so the save format stays 9.
+ *
+ * 0.16.0 (m2.7, the engine join): the sheep line (0.15.0) and the calf
+ * growth change joined. Both sets of rules are in; nothing else changed.
+ * The calf rules move cattle only: every cattle figure equals the calf
+ * branch's and every sheep figure the sheep branch's (docs/CALIBRATION.md,
+ * the m2.7 entry). A farm with no sheep plays as the calf branch did (the
+ * no-hands digests hold). No stored field changed, so the save format
+ * stays 11.
  */
-export const ENGINE_VERSION = '0.15.0';
+export const ENGINE_VERSION = '0.16.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.

@@ -20,7 +20,7 @@ import { makeScenario } from '../../test-support/farms';
 import type { Mvp } from '../../test-support/mvp';
 import { CLASS_LABELS } from '../data/cattle';
 import { SUPPLEMENTS } from '../data/feed';
-import { gainOn, gainWhy, predictGains } from './gains';
+import { MOST_LOSS_MJ, gainOn, gainWhy, predictGains, unpaidMilk } from './gains';
 import type { Diet } from './graze';
 import { createCattleMob } from './types';
 
@@ -160,6 +160,25 @@ describe('expected gains, against the MVP', () => {
           expect(Object.is(g.gain, t.gain), `${where}: ${g.gain} / ${t.gain}`).toBe(true);
           expect(whyText(g.why), where).toBe(t.why);
         });
+      }
+    }
+  });
+});
+
+describe('a cow pays for all her milk (engine 0.14.0)', () => {
+  it('cuts only the milk her loss for the day cannot pay for, and keeps energy in equal to energy out', () => {
+    for (const milk of [0, 3, 12, 24, 28.8]) {
+      for (const bal of [10, 0, -20, -33, -33.5, -40, -60, -120]) {
+        const cut = unpaidMilk(milk, bal);
+        const after = { milk: milk - cut, bal: bal + cut / 0.65 };
+        // What she has to share between herself and her milk is unchanged.
+        expect(after.bal + after.milk / 0.65).toBeCloseTo(bal + milk / 0.65, 9);
+        expect(cut).toBeGreaterThanOrEqual(0);
+        expect(after.milk).toBeGreaterThanOrEqual(0);
+        if (bal >= MOST_LOSS_MJ) expect(cut).toBe(0);
+        // Either her loss is now one she can pay for, or she has no milk left to cut.
+        if (after.milk > 0) expect(after.bal).toBeGreaterThanOrEqual(MOST_LOSS_MJ - 1e-9);
+        else expect(cut).toBe(milk);
       }
     }
   });
