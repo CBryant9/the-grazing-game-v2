@@ -245,9 +245,17 @@ describe('looking is free', () => {
       workforceView: (f) => engine.workforceView(f),
       contractView: (f) => engine.contractView(f),
       workerReport: (f) => engine.workerReport(f),
+      // Sheep (milestone 2.3).
+      occupiedAreas: (f) => engine.occupiedAreas(f, engine.surveyOf(f)),
+      sheepAreas: (f) => engine.sheepAreas(f, engine.surveyOf(f)),
+      sheepMobsOf: (f) => engine.sheepMobsOf(f),
+      sheepMobsRead: (f) => engine.sheepMobsRead(f, 0),
+      stockingRead: (f) => engine.stockingRead(f),
     };
     // These change the farm they are given. That is their job: the tick, and its helpers.
     const CHANGES = [
+      'addSheepMob',
+      'ensureSheepState',
       'closeYear',
       'mergeShared',
       'newMob',
