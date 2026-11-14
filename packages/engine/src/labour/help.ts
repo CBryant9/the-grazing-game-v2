@@ -73,6 +73,8 @@ export function newLabour(farm: Pick<FarmState, 'seed' | 'day'>): LabourState {
     nextRunId: 1,
     help: { day: farm.day, used: {}, fenced: {} },
     rng: rngStream(farm.seed, 'labour:injury').state(),
+    wagesOwed: 0,
+    planMoves: [],
   };
 }
 
@@ -156,4 +158,15 @@ export function useHands(
     rest -= take;
   }
   return parts;
+}
+
+/** A hand's weekly wage before super, dollars: the salary, or five days at the day rate. */
+export const weeklyWage = (hand: Pick<Hand, 'kind' | 'rate'>): number =>
+  hand.kind === 'salaried' ? hand.rate : hand.rate * LABOUR.daysPerWeek.value;
+
+/** Wages and super a hand earns on a farm day, dollars: nothing on a day off for a day-rate hand, or while off injured. */
+export function earnedOn(farm: FarmState, hand: Hand, day: number): number {
+  if (!onDuty(hand, day)) return 0;
+  const wage = hand.kind === 'salaried' ? hand.rate / 7 : worksOn(farm, hand, day) ? hand.rate : 0;
+  return wage * (1 + LABOUR.superRate.value);
 }

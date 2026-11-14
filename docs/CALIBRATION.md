@@ -1125,6 +1125,14 @@ Only these reasons are supported by the runs, and whether they matter is for Cla
 
 A longer run that goes through a dry season, with more seeds, would test it harder.
 
+### 14 Nov 2026, milestones 2.1 and 2.2 (farm hands and contractor fencing): engine 0.13.0
+
+No grass, cattle, crop, season or price formula changed, and the daily tick (`stepDay`) is untouched. The workforce runs at first light only on a farm that has hired a hand or ordered contract fencing.
+
+- **Evidence that cattle and grass did not move:** `packages/engine/src/labour/noHands.test.ts` runs a running farm for a year on random seasons (seed 11, NSW, with a fence job) and for half a year on real years (seed 5, Central West from 2006, with a tape job), and hashes the whole farm (engine version, save format and labour state left out). Both digests were taken on engine 0.12.1 (commit cb9cba4, before any labour code) and both still match: `119de6c1e6862bb2` and `a52568e82c5f4cdf`.
+- **Real-year calibration:** the herd and steer files (`calibration/realYearHerds.{cq,nsw,cw,wv}.test.ts`, `calibration/realYearSteers.{cqLick,cqNoLick,nsw,cw,wv}.test.ts`) were run on this branch: 9 files, 55 tests, all pass, with no band changed.
+- The whole suite (`pnpm test`) passes, with no `*.mvp.test.ts` file or calibration band changed.
+
 ### 15 Nov 2026, milestone 2.3 (the sheep model): engine 0.14.0
 
 The first run of the sheep benchmarks (the table in [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md), section "Sheep benchmarks" above). No cattle or grass figure changed: every cattle band, every `*.mvp.test.ts` and the no-hands digest (engine 0.12.1) pass as they did. 70 rows: **61 pass in full; 4 pass in Western Victoria (or the Central West) with their Tablelands and Central West parts skipped** (SB-40, SB-41, SB-43, SB-47); **5 are skipped** (SB-59 to SB-62 for C18, SB-65 for C26). The reasons follow the table. Each figure is the model's on the run in the test.

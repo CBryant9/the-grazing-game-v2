@@ -658,14 +658,16 @@ export type { ClockView, ThingToDo } from './day/look';
 // of any job. The reads below never change the farm. A screen shows the
 // facts they give; it never shows a chance or a formula (rule 14), and its
 // words state facts only.
-export { LABOUR, awardHourly, casualDayRate } from './data/labour';
+// LABOUR and the rate helpers are for the server and tests only: never send them to the browser.
+export { LABOUR, awardHourly, casualDayRate, contractDayRate } from './data/labour';
 export type { AwardLevel, LabourFigureSource } from './data/labour';
-export { labourPool, standingOf } from './labour/pool';
-export type { Listed } from './labour/pool';
-export { contractView, workerReport, workforceView } from './labour/reads';
+export { standingOf } from './labour/pool';
+// The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
+export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
 export type {
   ContractRunView,
   HandStatus,
+  JobSeeker,
   HandView,
   WorkerReportItem,
   WorkforceView,

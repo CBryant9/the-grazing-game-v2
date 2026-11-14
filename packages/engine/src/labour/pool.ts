@@ -11,7 +11,14 @@
  * asks more above the award.
  */
 
-import { FAMILY_NAMES, FIRST_NAMES, LABOUR, casualDayRate, type AwardLevel } from '../data/labour';
+import {
+  FAMILY_NAMES,
+  FIRST_NAMES,
+  LABOUR,
+  casualDayRate,
+  contractDayRate,
+  type AwardLevel,
+} from '../data/labour';
 import { rngStream, type Rng } from '../rng';
 import type { FarmState } from '../sim/state';
 import type { HandKind, Person } from './types';
@@ -45,8 +52,14 @@ function weekOf(seed: number, week: number): Listed[] {
     const days = weekends ? [0, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
     const from = week * 7 + rng.int(0, 6);
     const until = from + rng.int(LABOUR.listedDays.value.lo, LABOUR.listedDays.value.hi) - 1;
+    // Salaried: the weekly rate. Contract (fixed term, not casual): the weekly rate over 5 days.
+    // Casual: the casual day rate, with the 25% loading.
     const awardRate =
-      kind === 'salaried' ? LABOUR.awardWeekly.value[level - 1]! : casualDayRate(level);
+      kind === 'salaried'
+        ? LABOUR.awardWeekly.value[level - 1]!
+        : kind === 'contract'
+          ? contractDayRate(level)
+          : casualDayRate(level);
     out.push({
       id: week * 16 + k + 1_000_000,
       name: `${rng.pick(FIRST_NAMES)} ${rng.pick(FAMILY_NAMES)}`,

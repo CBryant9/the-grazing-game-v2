@@ -240,7 +240,7 @@ describe('looking is free', () => {
       // The numbers the map is drawn from. Looking at the map is free.
       farmView: (f, env) => engine.farmView(f, env),
       // The workforce (milestones 2.1 and 2.2).
-      labourPool: (f) => engine.labourPool(f),
+      jobSeekers: (f) => engine.jobSeekers(f),
       standingOf: (f) => engine.standingOf(f),
       workforceView: (f) => engine.workforceView(f),
       contractView: (f) => engine.contractView(f),

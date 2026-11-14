@@ -13,8 +13,8 @@ import type { RngState } from '../rng';
 
 /**
  * How a person is employed. `casual`: paid the casual day rate for each day
- * worked, and can be let go any day. `contract`: a short contract at the
- * casual day rate that ends by itself. `salaried`: the full-time weekly rate,
+ * worked, and can be let go any day. `contract`: a short fixed-term contract at a
+ * day rate (the weekly rate over 5 days, no casual loading) that ends by itself. `salaried`: the full-time weekly rate,
  * paid for every week whatever the days.
  */
 export type HandKind = 'casual' | 'contract' | 'salaried';
@@ -105,4 +105,12 @@ export interface LabourState {
   help: { day: number; used: Record<string, number>; fenced: Record<string, boolean> };
   /** The stream injuries are drawn from. */
   rng: RngState;
+  /**
+   * Wages, super and claim costs the farm could not pay when they were due,
+   * dollars. Never forgiven: paid by itself at first light as soon as the
+   * bank can cover it all. 0 when nothing is owed.
+   */
+  wagesOwed: number;
+  /** Grazing plan moves credited to the hand who worked that day, by inbox message number. The worker report reads them. */
+  planMoves: { seq: number; hand: number; name: string }[];
 }
