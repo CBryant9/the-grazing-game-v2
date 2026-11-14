@@ -74,30 +74,49 @@ export function arrivalsWorth(farm: Pick<FarmState, 'arrivals'>): number {
 }
 
 /**
+ * Wages and super the farm owes, dollars: to its hands, earned up to the
+ * start of today and not yet paid (they are added at first light and paid
+ * on pay day), plus wages it could not pay when due (milestone 2.1). 0 on a
+ * farm with no labour state.
+ */
+export function wagesOwedOf(farm: Pick<FarmState, 'labour'>): number {
+  const labour = farm.labour;
+  if (!labour) return 0;
+  let v = labour.wagesOwed ?? 0;
+  for (const h of labour.hands) v += h.owed;
+  return v;
+}
+
+/**
  * Net worth: cash, plus 80% of what has been spent on infrastructure still
  * in place, plus the cattle at net sale value, plus what was paid for
- * cattle on their way to the yards. The cattle's value carries the
+ * cattle on their way to the yards, less the wages and super owed. The cattle's value carries the
  * pregnancy premium from a female's 50th day in calf, the day she goes on
  * the record as PTIC (docs/MODEL.md, section 3, "The herd record").
  */
 export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): number {
-  let v = farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm);
+  let v =
+    farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm) - wagesOwedOf(farm);
   for (const m of farm.mobs) for (const a of m.animals) v += Math.max(0, netSaleValue(a, prices));
   return v;
 }
 
-/** Net worth in its three parts, for the Scores screen. */
+/** Net worth in its parts (wages owed are taken off), for the Scores screen. */
 export function netWorthParts(farm: FarmState): {
   cash: number;
   stock: number;
   infrastructure: number;
+  /** Wages and super owed, dollars: taken off the total. Left out when nothing is owed, so a farm with no hands keeps its old shape. */
+  wagesOwed?: number;
   total: number;
 } {
   const prices = pricesOf(farm);
+  const owed = wagesOwedOf(farm);
   return {
     cash: farm.cash,
     stock: stockWorth(farm, prices) + arrivalsWorth(farm),
     infrastructure: infraInPlace(farm) * INFRA_WORTH_SHARE,
+    ...(owed > 0 ? { wagesOwed: owed } : {}),
     total: netWorth(farm, prices),
   };
 }

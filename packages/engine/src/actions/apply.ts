@@ -114,6 +114,7 @@ import {
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
 import { recordClassOf, recordGroupOf } from '../sim/told';
+import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
@@ -1660,6 +1661,15 @@ function run(j: Job, a: Action): Out {
       return doSow(j, a);
     case 'harvest':
       return doHarvest(j, a);
+    // ---- The workforce (milestone 2.1 and 2.2). Decisions: they take none of the day.
+    case 'hireHand':
+      return hireHand(j.farm, j.events, a);
+    case 'letHandGo':
+      return letHandGo(j.farm, j.events, a);
+    case 'orderContractFence':
+      return orderContractFence(j.farm, j.events, a);
+    case 'cancelContractFence':
+      return cancelContractFence(j.farm, j.events, a);
     default:
       return refuse('bad-request', 'That is not something that can be done on a farm.');
   }
@@ -1711,6 +1721,26 @@ export function tryAction(
   const no = run(job, action);
   if (no) return no;
   return { ok: true, farm: next, events: job.events };
+}
+
+/**
+ * A job done by a farm hand or a contractor in their own time, not the
+ * player's: the same rules and the same money as the player doing it, with
+ * no daylight. It is not the player's action, so it is not put in the action
+ * log; the caller reports its events. Only the jobs others do by themselves
+ * are allowed: contract fencing (permanent fence), refilling a portable
+ * trough and putting a knocked-down fence back up. The farm passed in is
+ * never changed.
+ */
+export function workByOthers(
+  farm: FarmState,
+  action: Extract<Action, { type: 'buildFence' | 'refillPortable' | 'fixFence' }>,
+  env: ActionEnv = {},
+): ActionResult {
+  if (action.type === 'buildFence' && action.fence !== 'permanent') {
+    return refuse('bad-request', 'Contractors build permanent fence only.');
+  }
+  return tryAction(farm, action, env, { label: action.type });
 }
 
 /** Put an action in the farm's action log and its events in the inbox. */

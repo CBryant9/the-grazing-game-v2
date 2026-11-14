@@ -23,6 +23,7 @@ import type { RngState } from '../rng';
 import type { YearOrder } from '../season/realYears';
 import type { Action } from '../actions/types';
 import type { FarmEvent } from './events';
+import type { LabourState } from '../labour/types';
 
 /** Where a mob is. */
 export type MobWhere =
@@ -428,6 +429,13 @@ export interface FarmState {
 
   /** The farm clock: how far through today the player is. */
   clock: FarmClock;
+
+  /**
+   * Farm hands and contractor fencing (milestones 2.1 and 2.2). Left out on
+   * a farm that has never hired a hand or ordered contract fencing, which
+   * then saves and plays exactly as it did before hands existed.
+   */
+  labour?: LabourState;
 }
 
 /** The MVP's price chart kept 31 days. */

@@ -649,3 +649,28 @@ export type {
   SaleDayView,
 } from './day/look';
 export type { ClockView, ThingToDo } from './day/look';
+
+// Milestones 2.1 and 2.2: farm hands and contractor fencing (docs/MODEL.md,
+// section 11). Hiring, letting go and ordering or cancelling contract
+// fencing are actions (`hireHand`, `letHandGo`, `orderContractFence`,
+// `cancelContractFence`) sent through `applyAction`; `previewAction` gives
+// the job card, with `contract` for a quote and `hands` for a hand's share
+// of any job. The reads below never change the farm. A screen shows the
+// facts they give; it never shows a chance or a formula (rule 14), and its
+// words state facts only.
+// LABOUR and the rate helpers are for the server and tests only: never send them to the browser.
+export { LABOUR, awardHourly, casualDayRate, contractDayRate } from './data/labour';
+export type { AwardLevel, LabourFigureSource } from './data/labour';
+export { standingOf } from './labour/pool';
+// The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
+export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
+export type {
+  ContractRunView,
+  HandStatus,
+  JobSeeker,
+  HandView,
+  WorkerReportItem,
+  WorkforceView,
+} from './labour/reads';
+export type { ContractRun, Hand, HandKind, HandSkills, LabourState, Person } from './labour/types';
+export type { ContractStopWhy, HandDuty, HandLeftWhy, LabourEvent } from './sim/events';
