@@ -293,6 +293,13 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
 - [ ] **Daily Farm:** supplements are stock on hand. "Each supplement has a capacity like 100 animals for 5 days for lick (find realistic)", "they would feed grain each day as part of their tasks", with "a warning if things needed filling". There is "a lick block with an amount used or a feeder and we could see if it's empty", "you tap on it to replenish it on that day and it has a cost obviously and uses some of their daylight". A notification like "Paddock X is out of lick block or feed". Levels keep falling on days the player misses. The player can "put a different ration in the feeder" or put out a new lick block, and can "remove the feeder" to stop the empty warning. "I'm happy for them to not have to buy a feeder."
 - *(Changes: "supplements are stock you hold" now holds for Daily Farm only. Loading at a shed or silo and driving out is reversed.)*
 
+### Fences and water (after the screens review)
+
+- [ ] **Fence materials are kept, and reused fence is half price.** "If they remove a fence, they can have so many discounted fence fees because they would already have some of the materials, but they still don't get the full amount. They would get some discount on fencing for using stuff that they already had." On the figure: "half price is fine." *(Built in the engine: permanent and electric fence taken down is kept by the metre and by kind, and fence of that kind uses it first at half price. MODEL section 5 and 8, DATA "Fence materials kept and reused".)*
+- [ ] **Water hubs can be removed and moved.** "Water hub can be removed or moved." Both kinds: the hub on a fence line or corner, and the hub on a square. *(Built in the engine.)*
+- [ ] **The default fence is the permanent one.** "They have to specifically choose electrical." *(For the screens: the fence tool starts on permanent fence.)*
+- [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)*
+
 ### For the game screens milestone
 
 - [ ] An information panel explains how the day works.

@@ -146,6 +146,13 @@ export interface FarmViewWater {
   troughs: FarmViewTrough[];
   /** Water hubs on a fence line or corner, by grid corner: row line times 41, plus the column line. */
   hubs: number[];
+  /**
+   * Water hubs on a square, by square: a fixed trough with a gate on every
+   * side that is not the boundary. Each is in `troughs` too, as a fixed
+   * trough. The engine always fills this in. It is optional here only so a
+   * view made before it existed still type-checks.
+   */
+  squareHubs?: number[];
 }
 
 /**
@@ -274,7 +281,11 @@ export interface FarmViewMob {
   calves: number;
   /** Adult equivalents. */
   ae: number;
-  /** Head in each class, by the class's id. */
+  /**
+   * Head in each class, by the class's id, as the player knows it: a female
+   * counts as PTIC only when a preg test or the saleyard has said she is in
+   * calf (14 Nov 2026). Before that she is counted as if empty.
+   */
   classes: Record<string, number>;
   /** The mob by kind, for the map to draw. */
   cattle: FarmViewCattle[];

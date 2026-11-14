@@ -32,6 +32,9 @@ import type { FarmState } from './state';
  *     (the MVP's sum is given the engine's figure for infrastructure);
  *   - tape costs: no energiser, and no $10 fee on all-new tape (checked,
  *     then the MVP's cash is set level);
+ *   - fence taken down keeps its materials, and fence built from them is
+ *     half price (Claudia, 14 Nov 2026; checked, then the MVP's cash and
+ *     the year's infrastructure spending are set level);
  *   - a fence through a mob shares it out by a seeded rule (never done here;
  *     see mobs.test.ts).
  */
@@ -285,6 +288,54 @@ describe.each([
       [...fences.hE, ...fences.vE].filter((v) => v === code).length;
     expect(count(7)).toBeGreaterThan(0);
     expect(count(3) + count(7)).toBe(12);
+  });
+});
+
+describe('fence taken down and built again, side by side with the MVP', () => {
+  it('the materials kept make the new fence half price, and nothing else differs', () => {
+    const farm = scratchFarm('nsw', 2022, 3);
+    const bore = farm.layout.water.bore;
+    const run = new WholeFarmRun(loaded, farm, 8111);
+    const mvpF = run.mvp as unknown as MvpFarm;
+    run.act({ type: 'buyCattle', cls: 'weanerSteer', qty: 20, to: { cell: bore } }, (m) =>
+      m.buyCattle('weanerSteer', 20, 'pad:' + m.ROF[bore]),
+    );
+    run.days(10);
+    // Two short runs of permanent fence along the top of the farm, loose at both ends, so
+    // no paddock is closed off and no mob is divided.
+    const runA = [2, 3, 4, 5, 6].map((x) => hEdge(2, x));
+    const runB = [10, 11, 12, 13, 14, 15, 16].map((x) => hEdge(2, x));
+    const each = segmentCost('permanent', run.farm.layout.scale.sideM);
+    // Built new, the two agree to the cent.
+    run.act({ type: 'buildFence', edges: runA, fence: 'permanent' }, () =>
+      mvpF.buildFence({ edges: runA.map(toMvpEdge) }, 1),
+    );
+    // Taken down: free in both. The rebuild keeps the materials.
+    run.act({ type: 'removeFence', edges: runA }, () =>
+      mvpF.removeFence({ edges: runA.map(toMvpEdge) }),
+    );
+    expect(run.farm.layout.fenceOnHand).toEqual({ permanent: 5, electric: 0 });
+    run.days(5);
+    const cashBefore = run.farm.cash;
+    const infraBefore = run.farm.year.infra;
+    run.act(
+      { type: 'buildFence', edges: runB, fence: 'permanent' },
+      () => mvpF.buildFence({ edges: runB.map(toMvpEdge) }, 1),
+      (f, m: MvpWhole) => {
+        // On purpose: five of the seven segments come from materials on hand, at half price.
+        // The MVP kept nothing and charged all seven new.
+        expect(cashBefore - f.cash).toBe(5 * each * 0.5 + 2 * each);
+        expect(f.cash - m.S.cash).toBe(5 * each * 0.5);
+        expect(m.S.yr.infra - f.year.infra).toBe(5 * each * 0.5);
+        expect(f.year.infra - infraBefore).toBe(5 * each * 0.5 + 2 * each);
+        expect(f.layout.fenceOnHand).toEqual({ permanent: 0, electric: 0 });
+        m.S.cash = f.cash;
+        m.S.yr.infra = f.year.infra;
+      },
+    );
+    // From here every figure is equal again, day by day.
+    run.days(20);
+    expect(run.farm.day).toBe(35);
   });
 });
 

@@ -38,6 +38,7 @@ import {
 import { fieldProgress } from '../crops/fields';
 import { DISTRICTS } from '../data/districts';
 import { SPECIES } from '../data/species';
+import { squareHubs } from '../farm/layout';
 import { EDGE, labelSquare } from '../farm/topology';
 import { NO_WATER_DISTANCE, PORTABLE_CAPACITY_L, pipeReach } from '../farm/water';
 import { GRID_N } from '../grid';
@@ -49,6 +50,7 @@ import { lightOn } from './clock';
 import { dateOn, plantingsNow, surveyOf, type SourceEnv } from './derived';
 import type { FarmState } from './state';
 import { mobSummaries, paddockSummaries } from './summary';
+import { knownClassOf, knownInCalfSet } from './told';
 
 /** Green leaf looks old by this age, days (docs/VISUALS.md, green leaf colour). */
 export const VIEW_OLD_LEAF_DAYS = 80;
@@ -307,6 +309,8 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
 
   // ---- Mobs
   const mobSums = mobSummaries(farm);
+  // The classes as the player knows them: PTIC only when a preg test or the saleyard said so.
+  const known = knownInCalfSet(farm);
   const mobs: FarmViewMob[] = farm.mobs.map((m, k) => {
     const sum = mobSums[k]!;
     const tally = new Map<ViewCattleKind, FarmViewCattle>();
@@ -320,10 +324,13 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
       if (a.sex === 'M' && (a.kind === 'calf' || a.young)) toMark++;
     }
     const anchor = m.where.kind === 'paddock' ? m.where.anchor : -1;
-    const classes: Record<string, number> = {};
-    for (const key of Object.keys(sum.classes).sort()) {
-      classes[key] = sum.classes[key as keyof typeof sum.classes]!;
+    const counts: Record<string, number> = {};
+    for (const a of m.animals) {
+      const c = knownClassOf(a, known);
+      counts[c] = (counts[c] ?? 0) + 1;
     }
+    const classes: Record<string, number> = {};
+    for (const key of Object.keys(counts).sort()) classes[key] = counts[key]!;
     return {
       id: m.id,
       name: m.name,
@@ -359,7 +366,14 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     squares: sq,
     fences: viewFences,
     gates,
-    water: { bore: water.bore, pipe, pipeDry, troughs, hubs: water.hubs.slice() },
+    water: {
+      bore: water.bore,
+      pipe,
+      pipeDry,
+      troughs,
+      hubs: water.hubs.slice(),
+      squareHubs: squareHubs(layout),
+    },
     // The model has no trees. The MVP's 16 trees were decoration only.
     trees: [],
     buildings,

@@ -428,7 +428,13 @@ export function generateFarm(o: FarmOptions): GeneratedFarm {
   const buildings = placeBuildings(stream('buildings'), laid.water);
 
   return {
-    layout: { scale, fences: laid.fences, water: laid.water, tapeOnRoll: 0 },
+    layout: {
+      scale,
+      fences: laid.fences,
+      water: laid.water,
+      tapeOnRoll: 0,
+      fenceOnHand: { permanent: 0, electric: 0 },
+    },
     pasture,
     crops,
     cropContext,

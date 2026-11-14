@@ -38,7 +38,11 @@ export interface Animal {
   paid: number;
   /** Running cost of the animal for the stock book, dollars: purchase, feed, health, marking. */
   cost: number;
-  /** Days pregnant. -1 means not in calf. */
+  /**
+   * Days pregnant. -1 means not in calf. NOT FOR THE PLAYER'S SCREENS: the
+   * player knows only what a joining report or preg test has said
+   * (`breedingReports`).
+   */
   preg: number;
   /** Days since calving while she has a calf on her. -1 means dry. */
   lact: number;

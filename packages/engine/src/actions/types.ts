@@ -95,9 +95,20 @@ export type Action =
   | { type: 'removeTrough'; cell: number }
   /** A water hub on a fence line or corner, by grid corner (see vertexId). */
   | { type: 'placeFenceHub'; vertex: number }
+  /** Take out a fence-line or corner hub. No refund. */
   | { type: 'removeHub'; vertex: number }
+  /** Move a fence-line or corner hub to another grid corner. It costs what moving a trough costs. */
+  | { type: 'moveHub'; from: number; to: number }
   /** A water hub on a square: a trough with an open gate on every side. */
   | { type: 'placeSquareHub'; cell: number }
+  /** Take out a water hub on a square: the trough comes out and the gates stay. No refund. */
+  | { type: 'removeSquareHub'; cell: number }
+  /**
+   * Move a water hub on a square to another square: the trough moves, at
+   * what moving a trough costs, and the new square gets its open gates. The
+   * old square keeps its gates.
+   */
+  | { type: 'moveSquareHub'; from: number; to: number }
   | { type: 'placePortable'; cell: number }
   | { type: 'movePortable'; port: number; cell: number }
   | { type: 'refillPortable'; port: number }
@@ -284,6 +295,36 @@ export interface JobCard {
    * words. It is not remembered. The player draws it again another day.
    */
   notToday?: { reason: 'not-enough-daylight'; message: string };
+  /**
+   * Permanent or electric fence: the materials on hand it uses. They are
+   * used first, along the line in the order drawn, and a metre built from
+   * them is half price. For a line cut short, "today" is the part built
+   * today. Left out for other jobs.
+   */
+  fenceMaterials?: {
+    fence: 'permanent' | 'electric';
+    /** Metres of this kind on hand before the job. */
+    onHandM: number;
+    /** The whole line as drawn: metres built from materials on hand, and the dollars that saves. */
+    fromStockM: number;
+    saving: number;
+    /** The part built today. The same as the whole line when it all fits. */
+    fromStockTodayM: number;
+    savingToday: number;
+    /** Metres of this kind left on hand after today's part. */
+    onHandAfterM: number;
+  };
+  /**
+   * Taking fence down: the permanent and electric fence materials kept from
+   * the part done today, and what is on hand of each kind after it. Left out
+   * for other jobs.
+   */
+  materialsKept?: {
+    permanentM: number;
+    electricM: number;
+    permanentOnHandM: number;
+    electricOnHandM: number;
+  };
 }
 
 /** What `previewAction` returns: the job card, or why the job can't be done. Nothing changes. */

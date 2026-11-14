@@ -58,6 +58,7 @@ import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { runPlans, stopsToday } from './plans';
+import { forgetStale, toldNotes } from './told';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -105,7 +106,8 @@ export interface DayResult {
   births: { id: number; mob: number }[];
 }
 
-function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace {
+/** Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its area and the day's stops. */
+export function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace {
   if (m.where.kind === 'lot') return { kind: 'lot' };
   if (m.where.kind === 'yards') {
     // A stand-in until yard work is built (milestone 1.5): the yards have
@@ -128,37 +130,25 @@ function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace {
   };
 }
 
-/** Run one day. Changes the farm in place. */
-export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
-  // A real-year farm needs its real data. Without it this stops here,
-  // before anything on the farm has changed.
-  const real = realSourcesOf(farm, env);
-  const day = farm.day;
-  // The farm's own calendar. The grass, the crops and the water read their
-  // month and day from it. On a real-year farm it has the real date's
-  // month and day (docs/MODEL.md, section 1A, "The calendar").
-  const date = dateAt(farm.start, day);
-  const events: TickEvent[] = [];
-  const result: DayResult = {
-    day,
-    date: real ? real.plan.realDateOn(day) : date,
-    ran: false,
-    events,
-    deaths: [],
-    births: [],
-  };
-  if (farm.over) return result;
-  result.ran = true;
+/** What the start of a day worked out, for the rest of the day. */
+export interface DayStart {
+  /** The farm's own calendar date for the day. */
+  date: CalendarDate;
+  factors: ReturnType<ReturnType<typeof seasonsOf>['factorsOn']>;
+  /** Sown pastures and crops as they stand today, or null. */
+  plantings: ReturnType<typeof plantingsOn>;
+}
 
-  const stream = (name: PlayStream): Rng => env.rng?.[name] ?? rngFromState(farm.rng[name]);
-  const rng = {
-    breeding: stream('breeding'),
-    deaths: stream('deaths'),
-    breakouts: stream('breakouts'),
-    market: stream('market'),
-  };
+/**
+ * Steps 1 to 3 of the day: the season and month factor (and the ground
+ * cover on the 1st of a month), crop events, and grass growth. Changes the
+ * farm in place and adds the day's events. The supplement price read runs
+ * this on a copy, so it prices the day on the feed the cattle will graze.
+ */
+export function startOfDay(farm: FarmState, env: SourceEnv, events: TickEvent[]): DayStart {
+  const day = farm.day;
+  const date = dateAt(farm.start, day);
   const district = DISTRICTS[farm.district];
-  const scale = farm.layout.scale;
 
   // 1. Season and month factor.
   const factors = seasonsOf(farm, env).factorsOn(day);
@@ -190,8 +180,44 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     seasonF: factors.seasonF,
     monthF: factors.monthF,
     plantings,
-    haPerSquare: scale.haPerSquare,
+    haPerSquare: farm.layout.scale.haPerSquare,
   });
+  return { date, factors, plantings };
+}
+
+/** Run one day. Changes the farm in place. */
+export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
+  // A real-year farm needs its real data. Without it this stops here,
+  // before anything on the farm has changed.
+  const real = realSourcesOf(farm, env);
+  const day = farm.day;
+  // The farm's own calendar. The grass, the crops and the water read their
+  // month and day from it. On a real-year farm it has the real date's
+  // month and day (docs/MODEL.md, section 1A, "The calendar").
+  const date = dateAt(farm.start, day);
+  const events: TickEvent[] = [];
+  const result: DayResult = {
+    day,
+    date: real ? real.plan.realDateOn(day) : date,
+    ran: false,
+    events,
+    deaths: [],
+    births: [],
+  };
+  if (farm.over) return result;
+  result.ran = true;
+
+  const stream = (name: PlayStream): Rng => env.rng?.[name] ?? rngFromState(farm.rng[name]);
+  const rng = {
+    breeding: stream('breeding'),
+    deaths: stream('deaths'),
+    breakouts: stream('breakouts'),
+    market: stream('market'),
+  };
+  const scale = farm.layout.scale;
+
+  // 1 to 3. Season and month factor, crop events, grass growth.
+  const { plantings } = startOfDay(farm, env, events);
 
   // 4. Each mob's day.
   let survey = surveyOf(farm);
@@ -270,6 +296,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     for (const note of res.notes) {
       events.push({ type: 'cattle', mob: m.id, mobName: m.name, area, note });
     }
+    // What the player is told: the latest joining report and preg test, and who was found in calf.
+    toldNotes(farm, m, res.notes, day);
     for (const g of res.plantingGrazes) {
       const event = squareGrazed(farm.crops, g.square, g.eaten, g.greenEaten, g.greenBefore, day);
       if (event) events.push({ type: 'crop-grazed', mob: m.id, mobName: m.name, event });
@@ -293,6 +321,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 5. Deaths are settled.
   settleDeaths(farm.mobs, deaths, byId, farm.year);
+  // A cow known to be in calf that calved, slipped her calf or died comes off the known list.
+  forgetStale(farm);
 
   // 6. Water use, breakouts and mobs joining.
   if (farm.layout.water.ports.length) {

@@ -378,6 +378,24 @@ Details from the code (milestone 1.2a):
 - A calf is a bull calf or a heifer calf, 50:50. About 4% of heifer calves are barren.
 - Joining reports every 3 weeks; a preg test at 9 weeks compares against the expected rate and leaves out recently calved cows.
 
+### What the player is told (rebuild, 14 Nov 2026)
+
+A grazier can't see which cows are in calf. The engine tells the player, as notes in the day's events:
+
+- **When a joining starts** (a bull with the females): the adult bulls, the females ready to get in calf, and females per bull.
+- **A joining report at 3 and 6 weeks** (`JOINING_REPORT_DAYS = 21`), when any female got in calf in those 3 weeks: the weeks, the head that got in calf in the 3 weeks, the head in calf now, and the females old and heavy enough to join.
+- **The preg test** at the end of the joining (`JOINING_DAYS = 63`, 9 weeks), or when the bull comes out after 3 weeks or more: in calf, females counted, the rate, the rate expected at their condition, the dry, their average condition and the recently calved left out as too soon to tell. While the bull stays, the next joining starts the same day.
+- **A slipped calf** (no cow named), a calf lost at birth, calving starting, and births.
+- **Cattle bought PTIC** (pregnancy-tested in calf), including the PTIC cows a running farm starts with, are in calf by what the saleyard says. A cow with a calf at foot can be seen.
+
+`breedingReports(farm)` is the one read of pregnancy for the player's screens. For each mob it gives the latest joining report and the latest preg test, each with the farm day it was made, the head **known** in calf (cows and heifers: bought PTIC, or in calf at a preg test since, until they calve, slip the calf, die or are sold), and the class table as the player knows it (a female counts as PTIC only when known). On a day with no report or test it changes only by calving, a slip (reported), death, sale or a move of stock. Screens say how long a joining runs from `JOINING_DAYS` and `JOINING_REPORT_DAYS`. The farm view's `classes` for each mob are the same known classes.
+
+What is kept for this is display state only: the tag numbers known in calf (`farm.knownInCalf`) and each mob's latest reports (`mob.reports`). No formula, price or chance reads either; a test runs a farm with both wiped every day and gets the same farm. A mob that joins another keeps the bigger mob's reports, or takes the other's if it has none (as a plan does); strays keep the mob's reports; a new mob made by weaning or by moving part of a mob starts with none. A save from before this loads with no female known in calf and each mob's latest reports read back from the inbox.
+
+**Fields that show live pregnancy, kept for tests and calibration and marked "not for the player's screens":** `mobSummaries(...).classes` and `.saleValue`, `classOf`, `label`, `groupKey`, and an animal's `preg`.
+
+**The pregnancy premium (not changed; a question for Claudia).** An animal's sale value adds $320 at an indicator of 400c/kg (scaled with the indicator) from a female's **50th day in calf**, tested or not. It does not move on the day she conceives. But on her 50th day it lifts her net sale value by about $304 at 400c (after 5% commission), and with it her mob's `saleValue` in the mob summaries, the stock part of net worth (`netWorth`, `netWorthParts`, `farmTotals`) and the year's running score. A player who watches the mob's sale value or net worth from one day to the next can see a step that weight and price don't explain, and count the cows that reached 50 days in calf: for a cow that conceived on the first day of a joining that is 13 days before the preg test. Late pregnancy shows the same way at 190 days in AE (× 1.1), well after the test. The options: leave it, or apply the premium only to cows known to be PTIC. Selling the "Cows (PTIC)" group by `sellGroup` also picks cows by live pregnancy.
+
 ### Deaths
 
 - Base 0.004% a day.
@@ -485,9 +503,12 @@ The rebuild's code is in `packages/engine/src/farm/`. Paddock ids, grazing area 
 - **Where a trough can go.** On the bore, or on any square water reaches from the bore through pipe, troughs and hubs, moving square to square. A fence hub links all the squares it touches, so pipe can carry on from its far side.
 - **A hub on a square** puts a trough there (if there is none) and turns every side of the square that is not the boundary or already a gate into an **open gate**, whether or not a fence was there. The square becomes its own small paddock, joined to its neighbours for grazing until gates are shut.
 - **A hub on a fence line or corner** needs a fence or gate at that corner, and water reaching one of the squares it touches. It waters every square that touches it: four in the open, two on the boundary, one in a farm corner.
+- **Hubs can be removed and moved (Claudia, 14 Nov 2026).** A hub on a fence line or corner moves to another corner with the checks for building one: a fence or gate there, and water reaching one of its squares. A hub on a square is a fixed trough with a gate on every side that is not the boundary (`isSquareHub`; this is what building one makes, so nothing new is kept). It moves to a square with no trough that water reaches; the trough goes with it and the new square gets its open gates, while the old square keeps its gates. Taking a hub on a square out takes its trough out and leaves the gates as they are, so no paddock or grazing area changes. Moving costs what moving a trough costs ($300), plus the gates a hub on a square needs at its new square.
+- **What depended on a hub or trough that moves or comes out** follows the rule troughs already follow: water is checked where a trough or hub goes, when it goes, against the water as it stands. Once placed, a trough or hub waters its squares whether or not water still reaches it, so a trough placed past a hub keeps watering when the hub moves or comes out. Pipe that no longer reaches the bore shows as dry on the map, and nothing new can be placed past it. (This is the MVP's rule, kept.)
+- The farm view carries both kinds of hub: `water.hubs` (grid corners) and `water.squareHubs` (squares; each also in `water.troughs` as a fixed trough).
 - **Portable troughs** hold 6,000 L. Each day the stock in the grazing area need 10% of live weight in litres (× 1.3 December to February, × 0.8 June to August), added up beast by beast. That need is shared evenly over every watered square in the area, and each portable trough gives up one share. So a portable trough that shares an area with one fixed trough drains at half the rate. Under 25% a warning goes out once, with the days left at the day's rate. At empty it stops being a watered square and the clock stops. Fixed troughs and hubs never run dry.
-- **Building a fence run** changes every edge in the run to the new type except gates and the boundary. Only edges that were not already that type count as built. Tape comes off the roll first. Fence under a new run is gone, tape included (it does not go back on the roll).
-- **Pulling down** takes out every fence and gate in the run. Tape, standing or knocked down, goes back on the roll.
+- **Building a fence run** changes every edge in the run to the new type except gates and the boundary. Only edges that were not already that type count as built. Tape comes off the roll first. Permanent and electric fence use the materials of that kind on hand first, along the line in the order drawn (14 Nov 2026). Fence under a new run is gone, tape included (it does not go back on the roll and its materials are not kept).
+- **Pulling down** takes out every fence and gate in the run. Tape, standing or knocked down, goes back on the roll. **Permanent and electric fence materials are kept**, by the metre and by kind (knocked-down electric counts as electric), in `layout.fenceOnHand`. Gates are not kept. `materialsOnHand(farm)` gives the metres of each kind on hand, tape on the roll included.
 - **Gates** go only in a standing fence, never in the boundary, and start shut. A gate takes the place of one fence segment.
 - **Strays.** The MVP decided which side of a new fence each beast was on from where it was drawn. The rebuild does not. A change to the fences reports which grazing areas were split, and into which new areas, and which were joined. The mob is shared out by a seeded rule (section 8, "A fence through a mob").
 - **Money is left out of these rules.** Each job reports what was built or removed (segments, metres, gates, troughs, tape off the roll and tape bought) and the caller applies the costs. The energiser is charged for electric fence only.
@@ -631,6 +652,7 @@ Costs are the MVP's (DATA.md, Infrastructure and running costs). Each layout job
 
 - The **energiser** is bought once, with the first electric fence. Permanent fence and tape never buy one. (The MVP also charged it on the first tape.) A farm that comes with electric fence comes with an energiser.
 - **Tape**: new tape is paid for by the metre. Rolling tape up costs $10. Running out tape that was on the roll costs $10. All-new tape pays no fee. (The MVP charged the $10 on every tape job.)
+- **Fence materials kept (Claudia, 14 Nov 2026).** A segment of permanent or electric fence built from materials on hand costs half a new one (`REUSED_FENCE_SHARE`). The rest of the line is full price. The ledger records each segment at what it cost, so a reused segment is in it at half. The result of building says the metres from materials on hand, what that saved and what is left on hand; the result of taking fence down says the metres kept and what is on hand. The job card has the same (`fenceMaterials`, `materialsKept`), for the whole line and for the part built today. The time to take fence down and to put it up is unchanged. The MVP kept nothing, so the comparison run that takes a fence down and builds again checks the difference and then sets the MVP's cash level.
 - The bank is asked (`spend`) wherever the MVP asked: buying cattle, building, sowing, harvest costs, repairs, moving and refilling troughs. If the cost would take the account past the overdraft limit the action is refused and nothing changes. Feed, running costs, interest, marking and the $10 to roll tape up come straight off the account, as in the MVP, and can take it past the limit.
 
 ### Net worth (the rebuild's rule)
@@ -645,6 +667,7 @@ The farm keeps a ledger of that spending, item by item: each fence segment and g
 - A sown perennial pasture: half its establishment cost, for the squares still in that planting. Sowing over it takes those squares off.
 - The energiser: $900, once bought.
 - **Fences, gates, troughs and pipe that came with the farm count for nothing**, because nothing was spent on them.
+- **Fence materials on hand count for nothing** (a builder's choice, for Claudia). Taking a fence down takes its entry off; building from the materials adds the half that was paid.
 
 The MVP counted the improvements a farm came with at full price, and never took anything off when it was removed.
 
@@ -659,6 +682,16 @@ The actions: buy cattle (on the clock, only on a sale day, arriving in the yards
 Moving cattle onto ground with no water, or onto a crop that is not ready to graze, is allowed. The events say so as data (`no-water`, `crop-risks`), and the screen asks first.
 
 Rules that were screen code in the MVP are actions here: buying a sowing, removing troughs, hubs and portable troughs, and changing a supplement.
+
+### Reads for the web server (14 Nov 2026)
+
+The web server had copied some engine logic because it could not ask the engine. Each of these reuses the engine's own code, returns plain facts, and is in the "looking is free" test:
+
+- `supplementCosts(farm, env)`: for each mob, dollars a day for each supplement as today's tick would charge it. It runs the start of the day (season, crop events, growth: `startOfDay`, the tick's own steps 1 to 3) on a copy, finds where the mob spends the day as the cattle step does (`placeFor`), and takes the day's diet from `dayDiet`, the function the cattle step uses. So a mob on a plan that moves it more than once a day is priced on the average of the day's stops with water, not on the paddock it stands in. In the feedlot every option is the ration's price. It prices the cattle in the mob now: a drop weaned at the start of the tick would be priced at the calf's share.
+- `husbandryNow(farm, env)`: for each mob, how many calves `markCalves` would mark and `wean` would wean (the actions' own lists, `markable` and `weanable`), and whether each can be done now with the job's own reason if not (from `previewAction`).
+- `portableRefund(farm, port)`: what removing a portable trough pays back ($300), or null if there is no such trough.
+- Whether a grazing area has water: `areaWatered(points, areaId)`, already exported.
+- `materialsOnHand(farm)` (fence materials) and `breedingReports(farm)` (what the player has been told) are in sections 5 and 3.
 
 ### Stock yards (a stand-in)
 

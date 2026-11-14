@@ -153,6 +153,8 @@ export {
   CYCLE_DAYS,
   FEMALES_PER_BULL,
   GESTATION_DAYS,
+  JOINING_DAYS,
+  JOINING_REPORT_DAYS,
   LACTATING_CONCEPTION,
   PUBERTY,
   WEAN_MIN_AGE,
@@ -166,16 +168,26 @@ export {
   cycling,
   expectedRate,
   joinReport,
+  joiningFemales,
   markCalves,
+  markable,
   weanMob,
+  weanable,
   weanOne,
   weaningDue,
 } from './cattle/breeding';
 export type { CalveInputs, MarkResult } from './cattle/breeding';
 export { gainOn, gainWhy, milkMJ, predictGains } from './cattle/gains';
 export type { CattleNote, GainForecast, GainReason } from './cattle/notes';
-export { settleDeaths, simMob } from './cattle/simMob';
-export type { Death, DeathCause, MobDayResult, MobPlace, SimMobInputs } from './cattle/simMob';
+export { dayDiet, settleDeaths, simMob } from './cattle/simMob';
+export type {
+  DayDiet,
+  Death,
+  DeathCause,
+  MobDayResult,
+  MobPlace,
+  SimMobInputs,
+} from './cattle/simMob';
 // Milestone 1.2b: the farm (paddocks, fences, water, crops and farm layout).
 export { FARM_SIZES, farmScale } from './data/farms';
 export type { FarmScale } from './data/farms';
@@ -246,9 +258,13 @@ export {
   canTrough,
   fenceLine,
   fixFence,
+  isSquareHub,
   knockDownTape,
   layPipe,
+  noFenceOnHand,
+  moveHub,
   movePortable,
+  moveSquareHub,
   moveTrough,
   pipeLine,
   placeFenceHub,
@@ -261,8 +277,10 @@ export {
   removeGate,
   removeHub,
   removePortable,
+  removeSquareHub,
   removeTrough,
   setGate,
+  squareHubs,
   surveyLayout,
   tapeRun,
   toggleGate,
@@ -278,10 +296,12 @@ export type {
   FenceFixed,
   FenceHubPlaced,
   FenceLine,
+  FenceOnHand,
   FenceRemoved,
   GatePlaced,
   GateRemoved,
   GateSet,
+  HubMoved,
   HubRemoved,
   Outcome,
   PipeLaid,
@@ -291,7 +311,9 @@ export type {
   PortableRemoved,
   Refusal,
   RefusalReason,
+  SquareHubMoved,
   SquareHubPlaced,
+  SquareHubRemoved,
   Survey,
   TroughMoved,
   TroughPlaced,
@@ -376,10 +398,13 @@ export {
   OVERHEADS,
   PASTURE_ASSET_SHARE,
   PORTABLE_RESALE_SHARE,
+  REUSED_FENCE_SHARE,
   SELL_COMMISSION,
   carryingCapacityAE,
   cashBase,
   overheadsPerYear,
+  portableResale,
+  reusedSegmentCost,
   segmentCost,
   startMoney,
 } from './money/costs';
@@ -479,8 +504,10 @@ export type {
   GameOverReason,
   InboxMessage,
   InfraLedger,
+  JoiningReport,
   LoggedAction,
   MarketState,
+  MobReports,
   MobWhere,
   PlanLeg,
   PlanRule,
@@ -488,6 +515,7 @@ export type {
   PlanTemplate,
   PlanWaitReason,
   PlayStream,
+  PregTestReport,
   PriceDay,
   RealYearsSpec,
   SaleBooking,
@@ -524,6 +552,11 @@ export {
 } from './sim/derived';
 export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
 export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
+// What the player has been told about breeding (14 Nov 2026). Display state only.
+export { knownClassOf } from './sim/told';
+// Reads the web server needs, so it never copies a rule (14 Nov 2026).
+export { portableRefund, supplementCosts } from './sim/reads';
+export type { SupplementCost } from './sim/reads';
 export { perDay, plansView, positionOf, stepOf, stepsIn, stopsToday } from './sim/plans';
 export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
 export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
@@ -539,8 +572,10 @@ export {
 } from './sim/tick';
 export type { DayResult, TickEnv } from './sim/tick';
 export {
+  breedingReports,
   calibrationView,
   farmTotals,
+  materialsOnHand,
   mobSummaries,
   paddockSummaries,
   pregTests,
@@ -548,6 +583,8 @@ export {
 export type {
   CalibrationView,
   FarmTotals,
+  MobBreedingReport,
+  MaterialsOnHand,
   MobSummary,
   PaddockView,
   PregTestResult,
@@ -598,6 +635,20 @@ export type {
   SkipResult,
   SkipStop,
 } from './day/days';
-export { SHORTEST_JOB_MIN, clockView, jobsToday, marketView, thingsToDo } from './day/look';
-export type { BookedView, MarketView, OnTheWayView, SaleDayView } from './day/look';
+export {
+  SHORTEST_JOB_MIN,
+  clockView,
+  husbandryNow,
+  jobsToday,
+  marketView,
+  thingsToDo,
+} from './day/look';
+export type {
+  BookedView,
+  HusbandryJob,
+  MarketView,
+  MobHusbandry,
+  OnTheWayView,
+  SaleDayView,
+} from './day/look';
 export type { ClockView, ThingToDo } from './day/look';

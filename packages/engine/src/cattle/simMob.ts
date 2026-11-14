@@ -112,6 +112,46 @@ export interface MobDayResult {
   plantingGrazes: PlantingGraze[];
 }
 
+/** The diet a mob gets for the day where it is, and the ground it grazes. */
+export interface DayDiet {
+  diet: Diet;
+  /** The area whose water counts for the day: the mob's area, or the first of the day's stops. Null in the feedlot. */
+  reg: GrazingArea | null;
+  /** Where the mob grazes in its area, for one area. Null for the feedlot or a day of shifts. */
+  weights: Float32Array | null;
+  /** The day's stops with water, for a plan that moves the mob more than once a day. */
+  subs: GrazingArea[];
+}
+
+/**
+ * The day's diet for a mob in a place: the ration in the feedlot; the
+ * average of the day's stops with water for a plan that moves it more than
+ * once a day; otherwise its area's. `simMob` and the supplement price read
+ * both use this, so the price is what the day really charges.
+ */
+export function dayDiet(place: MobPlace, land: GrazingLand): DayDiet {
+  if (place.kind === 'lot') return { diet: LOT_DIET, reg: null, weights: null, subs: [] };
+  const subs = (place.shifts ?? []).filter((r) => r.hasWater);
+  if (subs.length > 1) {
+    const ds = subs.map((r) => dietOf(land, r).diet);
+    const av = (k: keyof Diet): number => ds.reduce((t, x) => t + x[k], 0) / ds.length;
+    return {
+      diet: {
+        dmd: av('dmd'),
+        cp: av('cp'),
+        mass: av('mass'),
+        avail: av('avail'),
+        dist: av('dist'),
+      },
+      reg: subs[0]!,
+      weights: null,
+      subs,
+    };
+  }
+  const r = dietOf(land, place.area);
+  return { diet: r.diet, reg: place.area, weights: r.weights, subs };
+}
+
 /** Run one mob's day. Changes the mob, its animals and the pasture in place. */
 export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
   const { place, land, day, byId, totals } = inp;
@@ -122,34 +162,16 @@ export function simMob(m: CattleMob, inp: SimMobInputs): MobDayResult {
   const weaned: Animal[] = [];
   const plantingGrazes: PlantingGraze[] = [];
 
-  let diet: Diet;
-  let reg: GrazingArea | null = null;
-  let weights: Float32Array | null = null;
-  let subs: GrazingArea[] = [];
+  const dd = dayDiet(place, land);
+  const diet: Diet = dd.diet;
+  const reg: GrazingArea | null = dd.reg;
+  const weights: Float32Array | null = dd.weights;
+  const subs: GrazingArea[] = dd.subs;
   if (place.kind === 'lot') {
-    diet = LOT_DIET;
     // The lot has water. (The MVP left the count running in the lot.)
     m.dry = 0;
   } else {
-    subs = (place.shifts ?? []).filter((r) => r.hasWater);
-    if (subs.length > 1) {
-      const ds = subs.map((r) => dietOf(land, r).diet);
-      const av = (k: keyof Diet): number => ds.reduce((t, x) => t + x[k], 0) / ds.length;
-      diet = {
-        dmd: av('dmd'),
-        cp: av('cp'),
-        mass: av('mass'),
-        avail: av('avail'),
-        dist: av('dist'),
-      };
-      reg = subs[0]!;
-    } else {
-      reg = place.area;
-      const r = dietOf(land, reg);
-      diet = r.diet;
-      weights = r.weights;
-    }
-    m.dry = reg.hasWater ? 0 : m.dry + 1;
+    m.dry = reg!.hasWater ? 0 : m.dry + 1;
     if (m.dry === 1) notes.push({ type: 'noWater', days: 1 });
     if (m.dry === 3) notes.push({ type: 'noWater', days: 3 });
   }

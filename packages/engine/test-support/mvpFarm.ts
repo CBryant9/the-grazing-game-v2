@@ -299,6 +299,8 @@ export function layoutFromMvp(mvp: MvpFarm): FarmLayout {
       nextPortId: S.nid,
     },
     tapeOnRoll: S.tape || 0,
+    // The MVP kept no fence materials.
+    fenceOnHand: { permanent: 0, electric: 0 },
   };
 }
 

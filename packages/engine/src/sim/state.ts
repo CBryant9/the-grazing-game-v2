@@ -103,6 +103,52 @@ export interface PlanRun {
   gainKg: number;
 }
 
+/**
+ * The latest three-weekly joining report a mob gave, as the player was told
+ * it (the `joiningProgress` note). Display state only: no formula, price or
+ * chance reads it.
+ */
+export interface JoiningReport {
+  /** The farm day it was made. */
+  day: number;
+  /** Weeks into the joining: 3 or 6. */
+  weeks: number;
+  /** Females that got in calf in the 3 weeks before it. */
+  conceived: number;
+  /** Females in calf when it was made. */
+  inCalf: number;
+  /** Females old and heavy enough to join. */
+  females: number;
+}
+
+/**
+ * The latest preg test a mob had, as the player was told it (the `pregTest`
+ * note). Display state only: no formula, price or chance reads it.
+ */
+export interface PregTestReport {
+  /** The farm day it was made. */
+  day: number;
+  inCalf: number;
+  /** Females counted: in calf, or had the full 9 weeks with the bull and did not take. */
+  females: number;
+  /** inCalf over females, 0 to 1. */
+  rate: number;
+  /** The share expected in calf at the females' condition, 0 to 1. */
+  expected: number;
+  /** Females counted that are not in calf. */
+  dry: number;
+  /** Average condition score of the females counted. */
+  cs: number;
+  /** Recently calved, too soon to tell. */
+  tooSoon: number;
+}
+
+/** What a mob's joining has told the player so far. Display state only. */
+export interface MobReports {
+  joining: JoiningReport | null;
+  pregTest: PregTestReport | null;
+}
+
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
 export interface FarmMob extends CattleMob {
   /** Unique on the farm. Never reused. */
@@ -113,6 +159,12 @@ export interface FarmMob extends CattleMob {
   lastBreak: number | null;
   /** The grazing plan the mob is running. Left out when it has none. */
   plan?: PlanRun;
+  /**
+   * The latest joining report and preg test the player was told about for
+   * this mob. Left out until there is one. Display state only: no formula,
+   * price or chance reads it.
+   */
+  reports?: MobReports;
 }
 
 /**
@@ -402,6 +454,14 @@ export interface FarmState {
   plans: PlanTemplate[];
   /** The id the next plan template gets. */
   nextPlanId: number;
+  /**
+   * Tag numbers of the females the player knows are in calf: bought PTIC,
+   * or in calf at a preg test since. Smallest first. A tag comes off when
+   * she calves, slips her calf, dies or is sold. Display state only: no
+   * formula, price or chance reads it (docs/MODEL.md, section 3, "What the
+   * player is told").
+   */
+  knownInCalf: Int32Array;
 
   seasons: SeasonSpec;
   market: MarketState;

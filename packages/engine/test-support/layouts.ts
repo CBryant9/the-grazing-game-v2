@@ -30,6 +30,7 @@ export function bareLayout(farmHa = 2000, bore = cell(20, 13)): FarmLayout {
     fences: createFences(),
     water: createWater(bore),
     tapeOnRoll: 0,
+    fenceOnHand: { permanent: 0, electric: 0 },
   };
 }
 

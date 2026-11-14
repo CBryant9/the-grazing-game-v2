@@ -294,8 +294,20 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'moveTrough':
     case 'placeFenceHub':
     case 'removeHub':
-      // Builder's rules: taking a trough or hub out, or moving a trough, takes as long as fitting one.
+    case 'moveHub':
+    case 'removeSquareHub':
+      // Builder's rules: taking a trough or hub out, or moving a trough or a fence-line hub,
+      // takes as long as fitting one.
       return whole([part('trough', T.troughMin.value)]);
+    case 'moveSquareHub': {
+      // The trough moved, as long as fitting one, and a swing gate on each side that got one.
+      const built = trial.events.find((e) => e.type === 'layout-job');
+      const detail = built && built.type === 'layout-job' ? built.detail : {};
+      return whole([
+        part('trough', T.troughMin.value),
+        part('gate', Number(detail.gates ?? 0) * T.gateMin.value),
+      ]);
+    }
     case 'placeSquareHub': {
       // A trough, if the square had none, and a swing gate on each side that got one.
       const built = trial.events.find((e) => e.type === 'layout-job');
