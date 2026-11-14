@@ -10,10 +10,11 @@ import type { SqlRunner } from '../db/sql';
 
 /**
  * Buying is for accounts of this age and over. PRD 10.3 does not set an age for purchases, it
- * only says to check "purchases by under 18s" with a lawyer. Sixteen is the call made here (the
- * age the community opens at, PRD 8.3), kept in one place so it is easy to change.
+ * only says to check "purchases by under 18s" with a lawyer. Until the lawyer advises, the safe
+ * default is 18 (the whole of "under 18s" is kept out). Every message that names the age is built
+ * from this one number, so changing it here changes the words too.
  */
-export const MIN_PURCHASE_AGE = 16;
+export const MIN_PURCHASE_AGE = 18;
 
 /**
  * Products whose price the PRD marks Open. They can not be switched on, and no screen shows a

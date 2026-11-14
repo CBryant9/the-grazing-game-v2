@@ -28,6 +28,7 @@ export interface PaidFacts {
   customer: string | null;
   metaProductId: string | null;
   metaPurchaseId: string | null;
+  metaUserId: string | null;
 }
 
 export const factsFromSession = (s: CheckoutSession): PaidFacts => ({
@@ -39,6 +40,7 @@ export const factsFromSession = (s: CheckoutSession): PaidFacts => ({
   customer: s.customer,
   metaProductId: s.metadata.product_id ?? null,
   metaPurchaseId: s.metadata.purchase_id ?? null,
+  metaUserId: s.metadata.user_id ?? null,
 });
 
 export interface PurchaseLock {
@@ -50,12 +52,13 @@ export interface PurchaseLock {
   amount_cents: number;
   currency: string;
   stripe_payment_intent_id: string | null;
+  stripe_checkout_session_id: string | null;
   kind: 'pack' | 'upgrade' | 'keep_going';
   grants: string[];
 }
 
 const COLUMNS = `p.id, p.user_id, p.product_id, p.farm_id, p.status, p.amount_cents, p.currency,
-  p.stripe_payment_intent_id, pr.kind, pr.grants`;
+  p.stripe_payment_intent_id, p.stripe_checkout_session_id, pr.kind, pr.grants`;
 
 export async function lockBySession(
   tx: SqlRunner,
@@ -98,11 +101,47 @@ export type PaidOutcome =
 
 /** Take away what a purchase gave. The rows stay, marked revoked, so a won dispute can restore them. */
 async function revoke(tx: SqlRunner, purchaseId: string): Promise<void> {
-  await tx.query(
-    `update public.account_entitlements set revoked_at = now()
+  const held = await tx.query<{ user_id: string; entitlement: string }>(
+    `select user_id, entitlement from public.account_entitlements
       where purchase_id = $1 and revoked_at is null`,
     [purchaseId],
   );
+  for (const e of held.rows) {
+    // Another paid purchase of the same account that also gives this keeps it: the account paid
+    // for it twice over, and one refund must not take away what the other still covers.
+    const other = await tx.query<{ id: string }>(
+      `select p.id from public.purchases p join public.products pr on pr.id = p.product_id
+        where p.user_id = $1 and p.id <> $2 and p.status = 'paid' and $3 = any(pr.grants)
+        order by p.paid_at limit 1`,
+      [e.user_id, purchaseId, e.entitlement],
+    );
+    if (other.rows[0]) {
+      await tx.query(
+        `update public.account_entitlements set purchase_id = $3
+          where user_id = $1 and entitlement = $2`,
+        [e.user_id, e.entitlement, other.rows[0].id],
+      );
+    } else {
+      await tx.query(
+        `update public.account_entitlements set revoked_at = now()
+          where user_id = $1 and entitlement = $2`,
+        [e.user_id, e.entitlement],
+      );
+    }
+  }
+}
+
+/** True when every entitlement this purchase gives is already given by another paid purchase of the account. */
+async function alreadyCovered(tx: SqlRunner, p: PurchaseLock): Promise<boolean> {
+  if (!p.user_id || p.kind === 'keep_going' || p.grants.length === 0) return false;
+  const r = await tx.query<{ missing: number }>(
+    `select count(*)::int as missing from unnest($2::text[]) g
+      where not exists (
+        select 1 from public.purchases q join public.products qr on qr.id = q.product_id
+         where q.user_id = $1 and q.id <> $3 and q.status = 'paid' and g = any(qr.grants))`,
+    [p.user_id, p.grants, p.id],
+  );
+  return (r.rows[0]?.missing ?? 1) === 0;
 }
 
 async function grant(tx: SqlRunner, p: PurchaseLock): Promise<void> {
@@ -119,7 +158,9 @@ async function grant(tx: SqlRunner, p: PurchaseLock): Promise<void> {
 }
 
 export async function applyRefund(tx: SqlRunner, p: PurchaseLock): Promise<boolean> {
-  if (p.status !== 'paid' && p.status !== 'disputed') return false;
+  // A failed purchase that has a payment (it failed the amount check) can be refunded too.
+  const failedWithPayment = p.status === 'failed' && p.stripe_payment_intent_id !== null;
+  if (p.status !== 'paid' && p.status !== 'disputed' && !failedWithPayment) return false;
   await tx.query(`update public.purchases set status = 'refunded' where id = $1`, [p.id]);
   await revoke(tx, p.id);
   return true;
@@ -156,7 +197,22 @@ export async function settlePaid(
   f: PaidFacts,
   later: PaymentState | null,
 ): Promise<{ outcome: PaidOutcome; purchaseId: string | null; becamePaid: boolean }> {
-  const p = await lockBySession(tx, f.sessionId);
+  let p = await lockBySession(tx, f.sessionId);
+  if (!p && f.metaPurchaseId && PURCHASE_ID.test(f.metaPurchaseId)) {
+    // The server made the session but never saved its id (the save failed and the buyer paid
+    // anyway). Find our row by the purchase id the session carries, and only take it when it has
+    // no session yet and the account in the metadata is the row's account. Amount, currency and
+    // product are then checked against the row below, as for any other event.
+    const q = await lockById(tx, f.metaPurchaseId);
+    if (q && q.stripe_checkout_session_id === null && q.user_id && f.metaUserId === q.user_id) {
+      await tx.query(
+        `update public.purchases set stripe_checkout_session_id = $2
+          where id = $1 and stripe_checkout_session_id is null`,
+        [q.id, f.sessionId],
+      );
+      p = { ...q, stripe_checkout_session_id: f.sessionId };
+    }
+  }
   if (!p) return { outcome: 'unknown_session', purchaseId: null, becamePaid: false };
   if (f.paymentStatus !== 'paid')
     return { outcome: 'not_paid_yet', purchaseId: p.id, becamePaid: false };
@@ -184,11 +240,15 @@ export async function settlePaid(
     );
     return { outcome: wrong, purchaseId: p.id, becamePaid: false };
   }
+  // A pack paid for that the account already owns (two pack checkouts both paid): kept as paid
+  // (the money was taken) and marked so the admin page lists it for a refund.
+  const duplicate = await alreadyCovered(tx, p);
   await tx.query(
     `update public.purchases set status = 'paid', paid_at = coalesce(paid_at, now()),
-            stripe_payment_intent_id = coalesce($2, stripe_payment_intent_id)
+            stripe_payment_intent_id = coalesce($2, stripe_payment_intent_id),
+            needs_refund = $3
       where id = $1`,
-    [p.id, f.paymentIntent],
+    [p.id, f.paymentIntent, duplicate],
   );
   await grant(tx, p);
   if (f.customer && p.user_id) {
@@ -204,6 +264,40 @@ export async function settlePaid(
     else if (later.disputed) await applyDispute(tx, now, 'open');
   }
   return { outcome: 'paid', purchaseId: p.id, becamePaid: !later?.fullyRefunded };
+}
+
+const PURCHASE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Settle refund and dispute events that were left waiting for their purchase, using Stripe's own
+ * answer for the payment. Run after a paid write commits (a refund can land while it is being
+ * written, after the check made before it) and by the admin's reconcile. Returns true if any
+ * waiting event was found.
+ */
+export async function settleWaiting(
+  sql: { query: SqlRunner['query']; transaction<T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> },
+  payments: { paymentState(intent: string): Promise<PaymentState> },
+  intent: string,
+): Promise<boolean> {
+  const waiting = await sql.query<{ id: string }>(
+    `select id from public.stripe_events
+      where payment_intent_id = $1 and error = 'waiting_for_purchase' and processed_at is null`,
+    [intent],
+  );
+  if (waiting.rows.length === 0) return false;
+  const state = await payments.paymentState(intent);
+  await sql.transaction(async (tx) => {
+    const p = await lockByIntent(tx, intent);
+    if (!p) return;
+    if (state.fullyRefunded) await applyRefund(tx, p);
+    else if (state.disputed) await applyDispute(tx, p, 'open');
+    await tx.query(
+      `update public.stripe_events set processed_at = now(), error = null
+        where payment_intent_id = $1 and error = 'waiting_for_purchase' and processed_at is null`,
+      [intent],
+    );
+  });
+  return true;
 }
 
 /** An expired or failed checkout. Never touches a purchase that was paid. */

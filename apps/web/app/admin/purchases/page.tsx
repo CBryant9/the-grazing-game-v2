@@ -74,6 +74,10 @@ export default async function Page() {
           <span>Rescues paid, not applied</span>
           <b>{o.rescuesWaiting}</b>
         </div>
+        <div className={styles.kpi}>
+          <span>Paid twice over, to refund</span>
+          <b>{o.refundsNeeded}</b>
+        </div>
       </div>
 
       <h2 className={styles.h2}>Products</h2>
@@ -140,6 +144,10 @@ export default async function Page() {
                   <td>
                     {STATUS_WORDS[r.status] ?? r.status}
                     {r.rescueWaiting ? ', rescue not applied' : ''}
+                    {r.needsRefund ? ', paid for something the account already had: refund it' : ''}
+                    {r.status === 'failed' && r.hasPayment
+                      ? ', payment taken but nothing given: refund it'
+                      : ''}
                   </td>
                   <td>{when(r.createdAt)}</td>
                   <td>
@@ -152,7 +160,7 @@ export default async function Page() {
                         explain="Ask Stripe what really happened to this purchase and settle it the way the webhook would have. It also retries a rescue that did not reach its farm. This is recorded in the audit log."
                       />
                     )}
-                    {r.status === 'paid' && r.hasPayment && (
+                    {(r.status === 'paid' || r.status === 'failed') && r.hasPayment && (
                       <ConfirmAction
                         label="Refund"
                         endpoint="/api/admin/purchases"

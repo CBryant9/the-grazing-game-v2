@@ -147,8 +147,9 @@ export class StripePayments implements PaymentsProvider {
         payment_intent_data: { metadata: req.metadata },
         customer: req.customerId ?? undefined,
         customer_creation: req.customerId ? undefined : 'always',
-        // Stripe allows 30 minutes to 24 hours. The server treats an open checkout older than this as finished.
-        expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
+        // From the purchase row (checkout.ts), never from the clock: a repeat of this call with the
+        // same idempotency key must carry the same details or Stripe refuses it.
+        expires_at: req.expiresAt,
       },
       req.idempotencyKey,
     );

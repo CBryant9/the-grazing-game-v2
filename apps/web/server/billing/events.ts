@@ -20,6 +20,7 @@ export type BillingEvent =
       customer: string | null;
       metaProductId: string | null;
       metaPurchaseId: string | null;
+      metaUserId: string | null;
     }
   | { kind: 'failed'; eventId: string; type: string; sessionId: string }
   | {
@@ -93,6 +94,7 @@ export function parseEvent(body: unknown): BillingEvent | null {
         customer: pick(CUS, idOf(o.customer)),
         metaProductId: str(meta.product_id),
         metaPurchaseId: str(meta.purchase_id),
+        metaUserId: str(meta.user_id),
       };
     }
     case 'checkout.session.expired':
@@ -120,9 +122,11 @@ export function parseEvent(body: unknown): BillingEvent | null {
     case 'charge.dispute.created':
     case 'charge.dispute.closed': {
       const status = str(o.status);
-      // Only a dispute that is closed in our favour gives the entitlement back. Every other
-      // state (open, under review, lost, a warning) keeps it away.
-      const won = type === 'charge.dispute.closed' && status === 'won';
+      // A dispute closed in our favour gives the entitlement back. So does an inquiry closed
+      // without becoming a dispute (`warning_closed`): there is nothing left to hold it for, and
+      // it must never take anything away. Every other state (open, under review, lost) keeps it away.
+      const won =
+        type === 'charge.dispute.closed' && (status === 'won' || status === 'warning_closed');
       return {
         kind: 'dispute',
         eventId,

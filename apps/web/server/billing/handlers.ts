@@ -2,7 +2,7 @@ import 'server-only';
 import { GameError } from '../game/game';
 import { readJson } from '../game/http';
 import { requireUser } from '../auth/route';
-import { buyerStanding, startCheckout } from './checkout';
+import { STANDING_WORDS, buyerStanding, startCheckout } from './checkout';
 import { myPurchases, purchaseStatus, receiptFor } from './mine';
 import { accountOwns, dollars, forSale, givesWords, listProducts, type Owned } from './products';
 import { offerFor, type Offer } from './rescue';
@@ -21,13 +21,6 @@ export function farmUuid(v: unknown): string | null {
 }
 
 /** The work of each billing route, kept out of the route files so the tests can call it directly. */
-
-const STANDING: Record<string, string> = {
-  no_account: 'Finish setting up your account before you buy.',
-  banned: 'This account can not buy anything.',
-  suspended: 'This account can not buy anything while it is suspended.',
-  too_young: 'Buying is for accounts of 16 and over.',
-};
 
 export interface StoreItem {
   id: string;
@@ -66,7 +59,7 @@ export async function storeHandler(ctx: BillingContext): Promise<StoreAnswer> {
   let cannotBuy: string | null = signedIn ? null : 'Sign in to buy.';
   if (signedIn && user) {
     const s = await buyerStanding(deps.sql, user.id);
-    if (s !== 'ok') cannotBuy = STANDING[s] ?? 'This account can not buy right now.';
+    if (s !== 'ok') cannotBuy = STANDING_WORDS[s] ?? 'This account can not buy right now.';
   }
   const products = forSale(await listProducts(deps.sql), owned);
   return {

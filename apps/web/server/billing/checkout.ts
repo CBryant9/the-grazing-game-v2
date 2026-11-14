@@ -14,8 +14,12 @@ import {
 import { isUuid } from '../admin/store';
 import { rescueFarm, rescueProductId, rescueReady } from './rescue';
 
-/** An open checkout older than this is treated as finished (Stripe's own session lasts 31 minutes). */
-const OPEN_MINUTES = 31;
+/** How long a Checkout Session lasts, from the moment the purchase row was made. Stripe allows 30 minutes to 24 hours. */
+const SESSION_MINUTES = 60;
+/** An open checkout with a session older than this is treated as finished (it has ended at Stripe). */
+const OPEN_MINUTES = SESSION_MINUTES;
+/** A purchase with no session saved is not retried after this: Stripe needs the end 30 minutes ahead. */
+const UNSAVED_MINUTES = 25;
 
 export type Standing = 'ok' | 'no_account' | 'banned' | 'suspended' | 'too_young';
 
@@ -39,7 +43,7 @@ export async function buyerStanding(sql: AuthDeps['sql'], userId: string): Promi
   return 'ok';
 }
 
-const STANDING_WORDS: Record<Exclude<Standing, 'ok'>, string> = {
+export const STANDING_WORDS: Record<Exclude<Standing, 'ok'>, string> = {
   no_account: 'Finish setting up your account before you buy.',
   banned: 'This account can not buy anything.',
   suspended: 'This account can not buy anything while it is suspended.',
@@ -57,6 +61,8 @@ interface Pending {
   id: string;
   sessionId: string | null;
   fresh: boolean;
+  /** When the purchase row was made, in epoch seconds. Everything Stripe is told that depends on time comes from it. */
+  createdAt: number;
 }
 
 /**
@@ -102,23 +108,55 @@ export async function startCheckout(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const pending = await deps.sql.transaction<Pending>(async (tx) => {
+      // An open checkout that is old is finished. One that never got a session is finished sooner:
+      // Stripe will not take a session that ends less than 30 minutes ahead, and the session's
+      // end is worked out from this row, so a very late retry could not be made.
       await tx.query(
         `update public.purchases set status = 'failed'
           where user_id = $1 and status = 'pending'
-            and created_at < now() - make_interval(mins => $2)`,
-        [userId, OPEN_MINUTES],
+            and ((stripe_checkout_session_id is not null
+                  and created_at < now() - make_interval(mins => $2))
+              or (stripe_checkout_session_id is null
+                  and created_at < now() - make_interval(mins => $3)))`,
+        [userId, OPEN_MINUTES, UNSAVED_MINUTES],
       );
-      const ins = await tx.query<{ id: string }>(
+      if (product.kind === 'pack') {
+        // One pack checkout at a time. Starting this one finishes the account's other open pack
+        // checkouts, so two tabs can not end up with two packs to pay for. (A session the buyer
+        // already has open can still be paid: the webhook takes it, and marks a pack the account
+        // already owns for a refund.)
+        await tx.query(
+          `update public.purchases p set status = 'failed'
+             from public.products pr
+            where pr.id = p.product_id and pr.kind = 'pack'
+              and p.user_id = $1 and p.status = 'pending' and p.product_id <> $2`,
+          [userId, product.id],
+        );
+      }
+      const ins = await tx.query<{ id: string; created: string }>(
         `insert into public.purchases (user_id, product_id, farm_id, amount_cents, currency)
          values ($1, $2, $3, $4, $5)
          on conflict (user_id, product_id, (coalesce(farm_id, '00000000-0000-0000-0000-000000000000'::uuid)))
            where status = 'pending' do nothing
-         returning id`,
+         returning id, extract(epoch from created_at)::bigint as created`,
         [userId, product.id, farmId, product.priceCents, product.currency],
       );
-      if (ins.rows[0]) return { id: ins.rows[0].id, sessionId: null, fresh: true };
-      const open = await tx.query<{ id: string; stripe_checkout_session_id: string | null }>(
-        `select id, stripe_checkout_session_id from public.purchases
+      if (ins.rows[0]) {
+        return {
+          id: ins.rows[0].id,
+          sessionId: null,
+          fresh: true,
+          createdAt: Number(ins.rows[0].created),
+        };
+      }
+      const open = await tx.query<{
+        id: string;
+        stripe_checkout_session_id: string | null;
+        created: string;
+      }>(
+        `select id, stripe_checkout_session_id,
+                extract(epoch from created_at)::bigint as created
+           from public.purchases
           where user_id = $1 and product_id = $2 and status = 'pending'
             and coalesce(farm_id, '00000000-0000-0000-0000-000000000000'::uuid)
               = coalesce($3::uuid, '00000000-0000-0000-0000-000000000000'::uuid)`,
@@ -126,7 +164,12 @@ export async function startCheckout(
       );
       const row = open.rows[0];
       if (!row) throw new GameError(409, 'Another purchase is being made. Try again in a moment.');
-      return { id: row.id, sessionId: row.stripe_checkout_session_id, fresh: false };
+      return {
+        id: row.id,
+        sessionId: row.stripe_checkout_session_id,
+        fresh: false,
+        createdAt: Number(row.created),
+      };
     });
 
     try {
@@ -166,7 +209,11 @@ export async function startCheckout(
         successUrl: `${origin}/purchase/success?purchase=${pending.id}`,
         cancelUrl: `${origin}/purchase/cancelled?purchase=${pending.id}`,
         customerId: customer.rows[0]?.stripe_customer_id ?? null,
-        metadata: { purchase_id: pending.id, product_id: product.id },
+        // A session the server could not save the id of is found again by these (settle.ts).
+        metadata: { purchase_id: pending.id, product_id: product.id, user_id: userId },
+        // From the purchase row, so a repeat of this call (a double click, a retry) is identical
+        // and Stripe returns the same session for the same idempotency key.
+        expiresAt: pending.createdAt + SESSION_MINUTES * 60,
         idempotencyKey: `purchase-${pending.id}`,
       });
       if (!session.url) throw new Error('no_checkout_url');

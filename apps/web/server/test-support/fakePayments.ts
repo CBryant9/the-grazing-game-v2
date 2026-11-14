@@ -19,6 +19,7 @@ export class FakePayments implements PaymentsProvider {
   readonly webhookSecret = 'whsec_faketestsecretforthetests';
   readonly sessions = new Map<string, CheckoutSession & { req: CheckoutRequest }>();
   readonly byKey = new Map<string, string>();
+  private readonly keyDetails = new Map<string, string>();
   readonly refundCalls: { intent: string; key: string }[] = [];
   readonly states = new Map<string, PaymentState>();
   /** For tests: make the next call of this kind throw. */
@@ -32,7 +33,24 @@ export class FakePayments implements PaymentsProvider {
     this.createCalls++;
     if (this.fail.create) throw new Error('stripe is down');
     const known = this.byKey.get(req.idempotencyKey);
-    if (known) return this.sessions.get(known)!;
+    // Like Stripe: a key used again with different details is an error, not the old session.
+    const details = JSON.stringify([
+      req.amountCents,
+      req.currency,
+      req.successUrl,
+      req.cancelUrl,
+      req.customerId,
+      req.metadata,
+      req.productName,
+      req.expiresAt,
+    ]);
+    if (known) {
+      if (this.keyDetails.get(req.idempotencyKey) !== details) {
+        throw new Error('idempotency_error');
+      }
+      return this.sessions.get(known)!;
+    }
+    this.keyDetails.set(req.idempotencyKey, details);
     const id = `cs_test_${randomBytes(8).toString('hex')}`;
     const s = {
       id,

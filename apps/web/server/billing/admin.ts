@@ -13,6 +13,7 @@ import {
   lockById,
   settleFailed,
   settlePaid,
+  settleWaiting,
 } from './settle';
 
 /**
@@ -32,6 +33,8 @@ export interface PurchaseListRow {
   rescueWaiting: boolean;
   /** Has a Stripe payment, so it can be refunded or checked. */
   hasPayment: boolean;
+  /** Paid for something the account already owned: it should be refunded. */
+  needsRefund: boolean;
   farmId: string | null;
 }
 
@@ -41,6 +44,8 @@ export interface PurchasesOverview {
   /** Total of paid purchases, in cents. */
   paidCents: number;
   rescuesWaiting: number;
+  /** Paid purchases that doubled up on what the account already owned. */
+  refundsNeeded: number;
   products: ProductRow[];
   recent: PurchaseListRow[];
   events: { total: number; lastAt: string | null; waiting: number; failed: number };
@@ -65,16 +70,17 @@ export async function purchasesOverview(sql: AuthDeps['sql']): Promise<Purchases
       applied_at: string | null;
       pi: string | null;
       farm_id: string | null;
+      needs_refund: boolean;
     }>(
       `select p.id, pr.name, p.amount_cents, p.status, p.created_at, p.paid_at, pr.kind, p.applied_at,
-              p.stripe_payment_intent_id as pi, p.farm_id
+              p.stripe_payment_intent_id as pi, p.farm_id, p.needs_refund
          from public.purchases p join public.products pr on pr.id = p.product_id
         order by p.created_at desc limit 30`,
     ),
     sql.query<{ total: number; last_at: string | null; waiting: number; failed: number }>(
       `select count(*)::int as total, max(received_at) as last_at,
               count(*) filter (where processed_at is null and error = 'waiting_for_purchase')::int as waiting,
-              count(*) filter (where error is not null and error <> 'waiting_for_purchase')::int as failed
+              count(*) filter (where error is not null and error not in ('waiting_for_purchase', 'dispute_won'))::int as failed
          from public.stripe_events`,
     ),
     listProducts(sql),
@@ -84,6 +90,9 @@ export async function purchasesOverview(sql: AuthDeps['sql']): Promise<Purchases
   const waiting = await sql.query<{ n: number }>(
     `select count(*)::int as n from public.purchases p join public.products pr on pr.id = p.product_id
       where pr.kind = 'keep_going' and p.status = 'paid' and p.applied_at is null`,
+  );
+  const refunds = await sql.query<{ n: number }>(
+    `select count(*)::int as n from public.purchases where needs_refund and status = 'paid'`,
   );
   return {
     asAt: new Date(now.rows[0]!.now).toISOString(),
@@ -96,6 +105,7 @@ export async function purchasesOverview(sql: AuthDeps['sql']): Promise<Purchases
     },
     paidCents: sums.rows[0]?.cents ?? 0,
     rescuesWaiting: waiting.rows[0]?.n ?? 0,
+    refundsNeeded: refunds.rows[0]?.n ?? 0,
     products,
     recent: rows.rows.map((r) => ({
       id: r.id,
@@ -106,6 +116,7 @@ export async function purchasesOverview(sql: AuthDeps['sql']): Promise<Purchases
       paidAt: r.paid_at ? new Date(r.paid_at).toISOString() : null,
       rescueWaiting: r.kind === 'keep_going' && r.status === 'paid' && !r.applied_at,
       hasPayment: r.pi !== null,
+      needsRefund: r.needs_refund && r.status === 'paid',
       farmId: r.farm_id,
     })),
     events: {
@@ -159,7 +170,10 @@ export async function refundPurchase(
   if (!isUuid(id)) throw new AdminError(400, 'Choose a purchase.');
   const before = await deps.sql.transaction((tx) => lockById(tx, id));
   if (!before) throw new AdminError(404, 'That purchase was not found.');
-  if (before.status !== 'paid') throw new AdminError(409, 'Only a paid purchase can be refunded.');
+  // A purchase that failed the amount check has money taken and nothing given: it is refundable.
+  if (before.status !== 'paid' && before.status !== 'failed') {
+    throw new AdminError(409, 'Only a paid purchase can be refunded.');
+  }
   if (!before.stripe_payment_intent_id) {
     throw new AdminError(409, 'That purchase has no payment to refund.');
   }
@@ -233,6 +247,12 @@ export async function reconcilePurchase(
     await audit(tx, adminId, 'purchase_reconcile', 'purchase', id, {});
     return (await lockById(tx, id))?.status ?? row.status;
   });
+  if (intent) {
+    // Refund and dispute events still waiting for this purchase are settled from Stripe's answer.
+    await settleWaiting(deps.sql, payments, intent).catch((e: unknown) =>
+      logFailure({ route: 'admin-purchases', reason: 'waiting_settle_failed' }, e),
+    );
+  }
   let rescue: string | null = null;
   if (status === 'paid') {
     rescue = await applyRescue(deps, id).catch((e: unknown) => {

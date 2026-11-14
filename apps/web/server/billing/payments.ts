@@ -21,6 +21,8 @@ export interface CheckoutRequest {
   cancelUrl: string;
   /** An existing Stripe customer for this account, if the server has one. */
   customerId: string | null;
+  /** When the session ends, in epoch seconds, worked out from the purchase row so a repeat is identical. */
+  expiresAt: number;
   metadata: Record<string, string>;
   idempotencyKey: string;
 }

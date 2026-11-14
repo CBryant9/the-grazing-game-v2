@@ -11,6 +11,7 @@ import {
   lockByIntent,
   settleFailed,
   settlePaid,
+  settleWaiting,
   type PaidOutcome,
 } from './settle';
 import { verifyStripeSignature } from './verify';
@@ -37,6 +38,8 @@ export interface WebhookAnswer {
 }
 
 const WAITING = 'waiting_for_purchase';
+/** Left on a closed-in-our-favour dispute event, which is not a fault. */
+export const DISPUTE_WON = 'dispute_won';
 
 function idsOf(ev: BillingEvent): {
   objectId: string | null;
@@ -98,7 +101,7 @@ async function act(
         'unknown_session',
       ];
       // Whether a waiting refund or dispute is now settled too.
-      if (r.outcome === 'paid' || r.outcome === 'already') {
+      if (later && (r.outcome === 'paid' || r.outcome === 'already')) {
         await tx.query(
           `update public.stripe_events set processed_at = now(), error = null
             where payment_intent_id = $1 and error = $2 and processed_at is null`,
@@ -125,10 +128,23 @@ async function act(
     case 'dispute': {
       const p = ev.paymentIntent ? await lockByIntent(tx, ev.paymentIntent) : null;
       if (!p) return { result: 'waiting', error: WAITING, rescue: null };
+      if (ev.state === 'open' && ev.type === 'charge.dispute.created') {
+        // The "won" (or inquiry closed) event can arrive before the "raised" one. If it did, the
+        // raised event is old news and must not take the entitlement away for good.
+        const won = await tx.query(
+          `select 1 from public.stripe_events
+            where payment_intent_id = $1 and type = 'charge.dispute.closed'
+              and error = $2 and id <> $3 limit 1`,
+          [ev.paymentIntent, DISPUTE_WON, ev.eventId],
+        );
+        if (won.rows.length > 0)
+          return { result: 'dispute_already_won', error: null, rescue: null };
+      }
       const changed = await applyDispute(tx, p, ev.state);
       return {
         result: changed ? (ev.state === 'won' ? 'dispute_won' : 'disputed') : 'already',
-        error: null,
+        // Kept on the event, so a raised event that comes after it can see it.
+        error: ev.state === 'won' ? DISPUTE_WON : null,
         rescue: null,
       };
     }
@@ -176,6 +192,13 @@ export async function handleWebhook(
       await finish(tx, ev.eventId, r.error === WAITING ? WAITING : r.error);
       return { result: r.result, rescue: r.rescue };
     });
+    if (ev.kind === 'paid' && ev.paymentIntent) {
+      // A refund or dispute can land while the paid write is being made, after the check above.
+      // Look again now that it is committed.
+      await settleWaiting(deps.sql, payments, ev.paymentIntent).catch((e: unknown) =>
+        logFailure({ route: 'billing-webhook', reason: 'waiting_settle_failed' }, e),
+      );
+    }
     if (done.rescue) {
       // After the commit: the purchase is paid whatever happens here. A failure leaves it paid
       // and not applied, which the admin page lists and the reconcile action retries.

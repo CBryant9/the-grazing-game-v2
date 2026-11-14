@@ -15,8 +15,8 @@ import { setAuthDeps } from '../auth/deps';
 import { setPaymentsProvider } from './payments';
 import { setRescueEngine, type RescueEngine, type RescueFarm } from './rescue';
 import { handleWebhook } from './webhook';
-import { reconcilePurchase, refundPurchase, setProductActive } from './admin';
-import { hasNoAds } from './products';
+import { purchasesOverview, reconcilePurchase, refundPurchase, setProductActive } from './admin';
+import { MIN_PURCHASE_AGE, hasNoAds } from './products';
 import { signStripePayload, verifyStripeSignature } from './verify';
 import { parseEvent } from './events';
 import { encodeForm } from './stripe';
@@ -370,15 +370,22 @@ describe('who can buy, and when', () => {
     }
     expect(pay.createCalls).toBe(0);
     const store = (await (await get('store', kid)).json()) as { cannotBuy: string };
-    expect(store.cannotBuy).toMatch(/16 and over/);
+    expect(store.cannotBuy).toMatch(/18 and over/);
     const rows = await db.query('select 1 from public.purchases');
     expect(rows.rows).toHaveLength(0);
   });
 
-  it('a 16 year old can buy', async () => {
+  it('buying is for 18 and over until a lawyer says otherwise: 17 is refused with the age in the words, 18 can buy', async () => {
     await sell(true);
-    const teen = await person('teen', { ageYears: 16 });
-    expect((await post('checkout', teen, { product: 'farm_pack' })).status).toBe(200);
+    const teen = await person('teen', { ageYears: 17 });
+    const no = await post('checkout', teen, { product: 'farm_pack' });
+    expect(no.status).toBe(403);
+    expect(((await no.json()) as { error: string }).error).toBe(
+      `Buying is for accounts of ${MIN_PURCHASE_AGE} and over.`,
+    );
+    expect(MIN_PURCHASE_AGE).toBe(18);
+    const adult = await person('adult18', { ageYears: 18 });
+    expect((await post('checkout', adult, { product: 'farm_pack' })).status).toBe(200);
   });
 
   it('switch off: nothing is for sale, no item is listed, and checkout refuses with a plain 404', async () => {
@@ -1220,6 +1227,226 @@ describe('your purchases and your data', () => {
       'select stripe_customer_id from public.stripe_events',
     );
     expect(events.rows.every((e) => e.stripe_customer_id === null)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- second pass (security review)
+
+describe('second pass: the review of m5.2', () => {
+  const sidOf = (b: { row: { stripe_checkout_session_id: string | null } | undefined }) =>
+    b.row!.stripe_checkout_session_id!;
+  const payEvent = async (sid: string) => {
+    pay.pay(sid);
+    return hook(pay.completed(sid));
+  };
+
+  it('two pack checkouts both paid, then one refunded: the account keeps what the other covers', async () => {
+    await sell(true);
+    const admin = await person('admin', { role: 'admin' });
+    const pat = await person('pat');
+    const a = await buy(pat, 'farm_pack');
+    const b = await buy(pat, 'farm_pack_no_ads');
+    // Starting the second pack checkout finishes the first one that was still open.
+    expect(await status(a.row!.id)).toBe('failed');
+    await payEvent(sidOf(a));
+    await payEvent(sidOf(b));
+    expect(await status(a.row!.id)).toBe('paid');
+    expect(await status(b.row!.id)).toBe('paid');
+    expect(await owns(pat.id)).toHaveLength(4);
+    await refundPurchase(deps, pay, admin.id, b.row!.id);
+    expect(await status(b.row!.id)).toBe('refunded');
+    // Only no ads goes: the pack the other purchase paid for stays.
+    expect(await owns(pat.id)).toEqual(['farm_pack', 'full_diary', 'supporter_badge']);
+    // And the other way round: refunding the earlier pack keeps what the later one covers.
+    const sam = await person('sam');
+    const c = await buy(sam, 'farm_pack');
+    const d = await buy(sam, 'farm_pack_no_ads');
+    await payEvent(sidOf(c));
+    await payEvent(sidOf(d));
+    await refundPurchase(deps, pay, admin.id, c.row!.id);
+    expect(await owns(sam.id)).toHaveLength(4);
+    await refundPurchase(deps, pay, admin.id, d.row!.id);
+    expect(await owns(sam.id)).toEqual([]);
+  });
+
+  it('a pack paid that the account already owns is recorded as needing a refund and shown to the admin', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const a = await buy(pat, 'farm_pack');
+    const b = await buy(pat, 'farm_pack_no_ads');
+    await payEvent(sidOf(b));
+    await payEvent(sidOf(a));
+    expect(await status(a.row!.id)).toBe('paid');
+    const flags = await db.query<{ id: string; needs_refund: boolean }>(
+      'select id, needs_refund from public.purchases order by created_at',
+    );
+    expect(flags.rows.find((r) => r.id === a.row!.id)!.needs_refund).toBe(true);
+    expect(flags.rows.find((r) => r.id === b.row!.id)!.needs_refund).toBe(false);
+    const o = await purchasesOverview(deps.sql);
+    expect(o.refundsNeeded).toBe(1);
+    expect(o.recent.find((r) => r.id === a.row!.id)!.needsRefund).toBe(true);
+    // Refunding the duplicate leaves the account with everything the other covers.
+    const admin = await person('admin', { role: 'admin' });
+    await refundPurchase(deps, pay, admin.id, a.row!.id);
+    expect(await owns(pat.id)).toHaveLength(4);
+  });
+
+  it('a payment that failed the amount check can still be refunded from admin', async () => {
+    await sell(true);
+    const admin = await person('admin', { role: 'admin' });
+    const pat = await person('pat');
+    const b = await buy(pat, 'farm_pack');
+    pay.pay(sidOf(b));
+    await hook(pay.completed(sidOf(b), { amount_total: 100 }));
+    expect(await status(b.row!.id)).toBe('failed');
+    await refundPurchase(deps, pay, admin.id, b.row!.id);
+    expect(pay.refundCalls).toHaveLength(1);
+    expect(await status(b.row!.id)).toBe('refunded');
+    expect(await owns(pat.id)).toEqual([]);
+  });
+
+  it('two overlapping checkout calls never reuse the idempotency key with different details', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const [x, y] = await Promise.all([
+      post('checkout', pat, { product: 'farm_pack' }),
+      post('checkout', pat, { product: 'farm_pack' }),
+    ]);
+    expect([x.status, y.status]).toEqual([200, 200]);
+    // A retry a moment later still works, with the same expiry worked out from the purchase row.
+    await new Promise((r) => setTimeout(r, 1100));
+    expect((await post('checkout', pat, { product: 'farm_pack' })).status).toBe(200);
+    expect(pay.sessions.size).toBe(1);
+    const row = await db.query<{ e: string }>(
+      'select extract(epoch from created_at)::bigint as e from public.purchases',
+    );
+    const req = [...pay.sessions.values()][0]!.req;
+    expect(req.expiresAt).toBe(Number(row.rows[0]!.e) + 60 * 60);
+  });
+
+  it('a paid session the server never saved is found by the purchase id, with the same checks', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const other = await person('other');
+    const real = deps.sql;
+    setAuthDeps({
+      ...deps,
+      sql: {
+        query: (t, p) =>
+          /set stripe_checkout_session_id = \$2/.test(t)
+            ? Promise.reject(new Error('disk full'))
+            : real.query(t, p),
+        transaction: real.transaction,
+      },
+    });
+    expect((await post('checkout', pat, { product: 'farm_pack' })).status).toBe(503);
+    setAuthDeps(deps);
+    const row = (
+      await db.query<{ id: string; stripe_checkout_session_id: string | null }>(
+        'select id, stripe_checkout_session_id from public.purchases',
+      )
+    ).rows[0]!;
+    expect(row.stripe_checkout_session_id).toBeNull();
+    const session = [...pay.sessions.values()][0]!;
+    pay.pay(session.id);
+    // Metadata that names another account is not accepted.
+    await hook(pay.completed(session.id, { metadata: { ...session.metadata, user_id: other.id } }));
+    expect(await status(row.id)).toBe('pending');
+    expect(await owns(pat.id)).toEqual([]);
+    // A wrong amount is not accepted either.
+    await hook(pay.completed(session.id, { amount_total: 5 }));
+    expect(await owns(pat.id)).toEqual([]);
+    expect((await hook(pay.completed(session.id))).status).toBe(200);
+    expect(await status(row.id)).toBe('paid');
+    expect(await owns(pat.id)).toHaveLength(3);
+    const saved = await db.query<{ s: string }>(
+      'select stripe_checkout_session_id as s from public.purchases where id = $1',
+      [row.id],
+    );
+    expect(saved.rows[0]!.s).toBe(session.id);
+  });
+
+  const raceSql = (intent: () => string) => {
+    const real = deps.sql;
+    return {
+      query: async (t: string, p?: unknown[]) => {
+        const r = await real.query(t, p);
+        // The refund event lands just after the "is a refund waiting?" check and before the paid write.
+        if (/error = \$2 and processed_at is null limit 1/.test(t)) {
+          await db.query(
+            `insert into public.stripe_events (id, type, object_id, payment_intent_id, error)
+             values ('evt_racing', 'charge.refunded', $1, $1, 'waiting_for_purchase')`,
+            [intent()],
+          );
+        }
+        return r;
+      },
+      transaction: real.transaction,
+    } as typeof deps.sql;
+  };
+
+  it('a refund that lands during the paid write is settled after the paid write commits', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const b = await buy(pat, 'farm_pack');
+    const paid = pay.pay(sidOf(b));
+    pay.states.set(paid.intent, { fullyRefunded: true, disputed: false, receiptUrl: null });
+    const e = pay.completed(sidOf(b));
+    const res = await handleWebhook({ sql: raceSql(() => paid.intent) }, pay, e.body, e.header);
+    expect(res.status).toBe(200);
+    expect(await status(b.row!.id)).toBe('refunded');
+    expect(await owns(pat.id)).toEqual([]);
+    const open = await db.query('select 1 from public.stripe_events where processed_at is null');
+    expect(open.rows).toHaveLength(0);
+  });
+
+  it('reconcile settles events that are still waiting for their purchase', async () => {
+    await sell(true);
+    const admin = await person('admin', { role: 'admin' });
+    const pat = await person('pat');
+    const b = await buyAndPay(pat, 'farm_pack');
+    await db.query(
+      `insert into public.stripe_events (id, type, object_id, payment_intent_id, error)
+       values ('evt_stuck', 'charge.refunded', $1, $1, 'waiting_for_purchase')`,
+      [b.paid.intent],
+    );
+    pay.states.set(b.paid.intent, { fullyRefunded: true, disputed: false, receiptUrl: null });
+    await reconcilePurchase(deps, pay, admin.id, b.row!.id);
+    expect(await status(b.row!.id)).toBe('refunded');
+    const open = await db.query('select 1 from public.stripe_events where processed_at is null');
+    expect(open.rows).toHaveLength(0);
+  });
+
+  it('a dispute won that arrives before its raised event keeps the entitlement', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const b = await buyAndPay(pat, 'farm_pack');
+    await hook(pay.dispute(b.paid.intent, 'charge.dispute.closed', 'won'));
+    await hook(pay.dispute(b.paid.intent, 'charge.dispute.created', 'needs_response'));
+    expect(await status(b.row!.id)).toBe('paid');
+    expect(await owns(pat.id)).toHaveLength(3);
+  });
+
+  it('an inquiry closed without a dispute changes nothing, and restores what its opening took away', async () => {
+    await sell(true);
+    const pat = await person('pat');
+    const b = await buyAndPay(pat, 'farm_pack');
+    await hook(pay.dispute(b.paid.intent, 'charge.dispute.closed', 'warning_closed'));
+    expect(await status(b.row!.id)).toBe('paid');
+    expect(await owns(pat.id)).toHaveLength(3);
+    const sam = await person('sam');
+    const c = await buyAndPay(sam, 'farm_pack');
+    await hook(pay.dispute(c.paid.intent, 'charge.dispute.created', 'warning_needs_response'));
+    expect(await status(c.row!.id)).toBe('disputed');
+    await hook(pay.dispute(c.paid.intent, 'charge.dispute.closed', 'warning_closed'));
+    expect(await status(c.row!.id)).toBe('paid');
+    expect(await owns(sam.id)).toHaveLength(3);
+    // A lost dispute still keeps it away.
+    const lee = await person('lee');
+    const d = await buyAndPay(lee, 'farm_pack');
+    await hook(pay.dispute(d.paid.intent, 'charge.dispute.created', 'needs_response'));
+    await hook(pay.dispute(d.paid.intent, 'charge.dispute.closed', 'lost'));
+    expect(await status(d.row!.id)).toBe('disputed');
   });
 });
 
