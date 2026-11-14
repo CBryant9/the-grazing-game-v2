@@ -1603,6 +1603,68 @@
   height: 22px;
   accent-color: var(--accent);
 }
+/* The inbox and the count on the More tab */
+.inbox {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.msg {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.msg[data-new='true'] {
+  border-color: var(--accent-line);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.msghead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.kind {
+  font-family: var(--font-px);
+  color: var(--text);
+}
+.newtag {
+  font-family: var(--font-px);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.navicon {
+  position: relative;
+  display: inline-flex;
+}
+.navbadge {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--btn);
+  color: #fff;
+  font-family: var(--font-px);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
 /* The order of the paddocks, drawn over the map. It never takes a tap. */
 .badges {
   position: absolute;

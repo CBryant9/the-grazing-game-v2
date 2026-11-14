@@ -14,8 +14,10 @@ let act: { POST: Handler };
 let day: { POST: Handler };
 let skip: { POST: Handler };
 let setup: { GET: Handler };
+let inbox: { POST: Handler };
 
 beforeAll(async () => {
+  inbox = await import('@/app/api/game/inbox/route');
   farm = await import('@/app/api/game/farm/route');
   preview = await import('@/app/api/game/preview/route');
   act = await import('@/app/api/game/act/route');
@@ -146,6 +148,27 @@ describe('the game routes', () => {
     for (const bad of [{}, { action: { type: 'sellClass' } }, { todo: 5 }]) {
       expect((await act.POST(post('act', bad, cookie))).status).toBe(400);
     }
+  });
+
+  it('marks the inbox read, checks the number, and needs a farm', async () => {
+    const none = await inbox.POST(post('inbox', { upTo: 3 }, `gg_session=${'d'.repeat(32)}`));
+    expect(none.status).toBe(404);
+    const cookie = await started();
+    const before = await (
+      await farm.GET(new Request(`${HOST}/api/game/farm`, { headers: { cookie } }))
+    ).json();
+    expect(before.snapshot.inboxUnread).toBeGreaterThan(0);
+    const newest = Math.max(...before.snapshot.inbox.map((m: { seq: number }) => m.seq));
+    for (const bad of [{}, { upTo: 'x' }, { upTo: -1 }, { upTo: 1.5 }, { upTo: 2 ** 40 }, []]) {
+      expect((await inbox.POST(post('inbox', bad, cookie))).status).toBe(400);
+    }
+    const ok = await inbox.POST(post('inbox', { upTo: newest }, cookie));
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).snapshot.inboxUnread).toBe(0);
+    const cross = await inbox.POST(
+      post('inbox', { upTo: 1 }, cookie, { origin: 'https://evil.example' }),
+    );
+    expect(cross.status).toBe(403);
   });
 
   it('refuses a request from another site', async () => {

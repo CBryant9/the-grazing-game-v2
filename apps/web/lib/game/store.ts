@@ -175,6 +175,8 @@ interface GameState {
   /** The card for opening or shutting a gate, from the paddock sheet. */
   openGate: (edge: EdgeWire) => Promise<void>;
   setTab: (tab: Tab) => void;
+  /** The player opened the inbox: tell the server how far they have read. */
+  markInboxRead: () => Promise<void>;
   dismissSummary: () => void;
   dismissNotice: () => void;
 }
@@ -904,6 +906,20 @@ export const useGame = create<GameState>()((set, get) => {
     },
 
     setTab: (tab) => set({ tab }),
+
+    async markInboxRead() {
+      const snap = get().snapshot;
+      if (!snap || snap.inboxUnread === 0) return;
+      const upTo = snap.inbox.reduce((m, x) => Math.max(m, x.seq), 0);
+      try {
+        const { snapshot } = await api.inboxRead(upTo);
+        // Only the read marks change. Keep whatever else the player has open.
+        if (snapshot) set({ snapshot });
+      } catch {
+        // Not marking a message read is not worth a notice. It tries again next time.
+      }
+    },
+
     dismissSummary: () => set({ summary: null }),
     dismissNotice: () => set({ notice: null }),
   };

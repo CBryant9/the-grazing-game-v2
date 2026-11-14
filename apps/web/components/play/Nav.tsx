@@ -1,5 +1,6 @@
 'use client';
 
+import { badgeText, unreadWord } from '@/lib/game/more';
 import { useGame, type Tab } from '@/lib/game/store';
 import { Icon, type IconName } from './Icon';
 import styles from './play.module.css';
@@ -21,6 +22,7 @@ export const TABS: { id: Tab; label: string; icon: IconName }[] = [
 export function Nav() {
   const tab = useGame((s) => s.tab);
   const setTab = useGame((s) => s.setTab);
+  const unread = useGame((s) => s.snapshot?.inboxUnread ?? 0);
   return (
     <nav className={styles.nav} aria-label="Game sections">
       {TABS.map((t) => (
@@ -31,8 +33,16 @@ export function Nav() {
           aria-current={tab === t.id ? 'page' : undefined}
           onClick={() => setTab(t.id)}
         >
-          <Icon name={t.icon} size={20} />
+          <span className={styles.navicon}>
+            <Icon name={t.icon} size={20} />
+            {t.id === 'more' && unread > 0 && (
+              <span className={styles.navbadge} aria-hidden="true">
+                {badgeText(unread)}
+              </span>
+            )}
+          </span>
           <span>{t.label}</span>
+          {t.id === 'more' && unread > 0 && <span className="sr-only">, {unreadWord(unread)}</span>}
         </button>
       ))}
     </nav>

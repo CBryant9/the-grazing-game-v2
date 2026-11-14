@@ -436,6 +436,44 @@ describe('the snapshot keeps the rules hidden', () => {
     expect(Buffer.byteLength(JSON.stringify(day))).toBeLessThan(150 * 1024);
   }, 120_000);
 
+  it('stays small, and hides the rules, with a plan, crops, prices and a full inbox', async () => {
+    const game = server();
+    const first = await game.create(A, {
+      ...choices({ district: 'cw', size: 'large' }),
+      enterprise: 'mixed',
+      arablePct: 40,
+      croppedPct: 50,
+    });
+    const pads = first.paddocks.filter((p) => p.water !== 'none');
+    const mob = first.mobs.find((m) => m.where === 'paddock')!;
+    const set = await game.act(A, {
+      action: {
+        type: 'setPlan',
+        mob: mob.id,
+        stops: pads.map((p) => p.cell),
+        trigger: { mode: 'kg', kg: 1500, maxDays: 14 },
+        rounds: 0,
+        after: 'repeat',
+        step: 0,
+      },
+    });
+    expect(set.ok).toBe(true);
+    let snap = (await game.skip(A, 'year')).snapshot;
+    for (let i = 0; i < 3; i++) snap = (await game.skip(A, 'month')).snapshot;
+    expect(snap.plans).toHaveLength(1);
+    expect(snap.cropping).not.toBeNull();
+    expect(snap.market.chart.classes).toHaveLength(8);
+    expect(snap.inbox).toHaveLength(40);
+    expect(denied(snap)).toEqual([]);
+    const bytes = Buffer.byteLength(JSON.stringify(snap));
+    console.log(`mixed farm with a plan and a full inbox: ${bytes} bytes`);
+    expect(bytes).toBeLessThan(150 * 1024);
+    // The chart is the past only: it ends today, and holds at most a month.
+    const points = snap.market.chart.classes[0]!.points;
+    expect(points.length).toBeLessThanOrEqual(31);
+    expect(snap.market.chart.to).toEqual(snap.date);
+  }, 180_000);
+
   it('builds from a farm directly too', () => {
     const farm = createFarm({
       seed: 1,

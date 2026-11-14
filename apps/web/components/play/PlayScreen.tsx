@@ -15,6 +15,7 @@ import { FarmMap } from './FarmMap';
 import { HerdList, PaddockList } from './Lists';
 import { MarketPanel } from './MarketPanel';
 import { MobCard } from './MobCard';
+import { MorePanel } from './MorePanel';
 import { MoveFlow } from './MoveFlow';
 import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
@@ -120,6 +121,7 @@ function TabPanel({ tab, snapshot }: { tab: Tab; snapshot: Snapshot }) {
   if (tab === 'paddocks') return <PaddockList snapshot={snapshot} />;
   if (tab === 'market') return <MarketPanel snapshot={snapshot} />;
   if (tab === 'plans') return <PlansPanel snapshot={snapshot} />;
+  if (tab === 'more') return <MorePanel snapshot={snapshot} />;
   return <ComingSoon tab={tab} />;
 }
 
