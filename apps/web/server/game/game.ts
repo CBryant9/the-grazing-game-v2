@@ -49,7 +49,6 @@ import type {
   SkipRequestLength,
   Snapshot,
   StaleResponse,
-  TeamOptionWire,
 } from '../../lib/game/types';
 import { parseBuildAction } from './build';
 import { parseLabourAction } from './labour';
