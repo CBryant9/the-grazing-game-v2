@@ -1,10 +1,14 @@
 import type { MetadataRoute } from 'next';
+import { SITE_PAGES, absoluteUrl } from '@/lib/site';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-
+// Every public page, from one list (lib/site.ts), plus the game page.
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    { url: `${siteUrl}/`, changeFrequency: 'weekly', priority: 1 },
-    { url: `${siteUrl}/play`, changeFrequency: 'weekly', priority: 0.8 },
+    ...SITE_PAGES.map((p) => ({
+      url: absoluteUrl(p.path),
+      changeFrequency: p.path === '/' ? ('weekly' as const) : ('monthly' as const),
+      priority: p.path === '/' ? 1 : 0.6,
+    })),
+    { url: absoluteUrl('/play'), changeFrequency: 'weekly' as const, priority: 0.8 },
   ];
 }

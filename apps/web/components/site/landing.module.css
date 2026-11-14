@@ -58,3 +58,14 @@
   border-top: 1px solid var(--line);
   font-size: 0.8125rem;
 }
+
+/* The farm picture, drawn in code. It sits under the title so no text is laid over it. */
+.scene {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 160 / 52;
+  max-height: 460px;
+  min-height: 150px;
+  object-fit: cover;
+  border-bottom: 1px solid var(--line);
+}

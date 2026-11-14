@@ -3,7 +3,16 @@
     "collect": {
       "startServerCommand": "pnpm start",
       "startServerReadyPattern": "Ready in",
-      "url": ["http://localhost:3000/", "http://localhost:3000/play"],
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/pricing",
+        "http://localhost:3000/advertise",
+        "http://localhost:3000/about",
+        "http://localhost:3000/privacy",
+        "http://localhost:3000/terms",
+        "http://localhost:3000/community-rules",
+        "http://localhost:3000/play"
+      ],
       "numberOfRuns": 3,
       "settings": {
         "chromeFlags": "--headless=new --no-sandbox"
@@ -12,12 +21,12 @@
     "assert": {
       "assertMatrix": [
         {
-          "matchingUrlPattern": "^http://localhost:3000/$",
+          "matchingUrlPattern": "^http://localhost:3000/(pricing|advertise|about|privacy|terms|community-rules)?$",
           "assertions": {
             "categories:performance": [
               "error",
               {
-                "minScore": 0.95,
+                "minScore": 1,
                 "aggregationMethod": "median-run"
               }
             ],

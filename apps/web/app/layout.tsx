@@ -1,43 +1,21 @@
 import type { Metadata, Viewport } from 'next';
-import { Anton, JetBrains_Mono, Silkscreen } from 'next/font/google';
 import { SITE } from '@gg/shared';
+import { fontVariables } from '@/lib/fonts';
+import { SITE_URL } from '@/lib/site';
 import { themeScript } from '@/lib/themeScript';
 import './globals.css';
 
-// Fonts are downloaded at build time and served from our own site (PRD 14.10).
-const anton = Anton({
-  weight: '400',
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-anton',
-});
-const silkscreen = Silkscreen({
-  weight: ['400', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-silkscreen',
-});
-const jetbrains = JetBrains_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-jetbrains',
-});
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: { default: `${SITE.name}: ${SITE.tagline}`, template: `%s | ${SITE.name}` },
   description: SITE.description,
   applicationName: SITE.name,
-  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     siteName: SITE.name,
     locale: 'en_AU',
     title: SITE.name,
     description: SITE.description,
-    url: '/',
   },
   twitter: { card: 'summary_large_image', title: SITE.name, description: SITE.description },
   icons: {
@@ -62,11 +40,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en-AU"
-      className={`${anton.variable} ${silkscreen.variable} ${jetbrains.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en-AU" className={fontVariables} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
