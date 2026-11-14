@@ -5,7 +5,8 @@
  * hands the map one draft; the map redraws only the overlay.
  *
  * Styles:
- * - `ok`: the line's own colour (permanent, electric, tape or pipe).
+ * - `ok`: the line's own colour (permanent, electric, tape or pipe). A line a
+ *   contractor will build is `contract`: the contractor's colour.
  * - `late`: red. It does not fit in today's light, so it is not built.
  * - `remove`: what a Remove tool is about to take away.
  */
@@ -13,7 +14,7 @@
 import type { FarmView, ViewEdge } from '@gg/shared';
 import { cornerJoinsFence, edgeKey, type Corner } from './lines';
 
-export type DraftKind = 'permanent' | 'electric' | 'tape' | 'pipe' | 'mark';
+export type DraftKind = 'permanent' | 'contract' | 'electric' | 'tape' | 'pipe' | 'mark';
 export type DraftStyle = 'ok' | 'late' | 'remove';
 
 export interface DraftSegment {
@@ -82,7 +83,7 @@ export function snapDots(view: FarmView, path: readonly Corner[]): DraftDot[] {
 /** A draft of a fence or tape line. */
 export function fenceDraft(
   view: FarmView,
-  kind: 'permanent' | 'electric' | 'tape',
+  kind: 'permanent' | 'contract' | 'electric' | 'tape',
   path: readonly Corner[],
   edges: readonly ViewEdge[],
   notFit: NotFit | 'all' | null,

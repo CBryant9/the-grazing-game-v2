@@ -2,6 +2,7 @@ import 'server-only';
 import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engine';
 import type { TodoWire } from '../../lib/game/types';
 import { layoutWord } from './buildwords';
+import { labourMessage, type DateOf } from './labourwords';
 
 /** Why water matters, as a fact. Said in the things to do and on the paddock sheet: written once, here. */
 export const NO_WATER_WHY = 'Cattle die on the fourth day without water.';
@@ -152,7 +153,7 @@ export function gameOverWord(reason: 'bank' | 'feed'): string {
 }
 
 /** What a done action did, in a sentence, from the events it made. */
-export function doneWord(events: readonly FarmEvent[]): string {
+export function doneWord(events: readonly FarmEvent[], dateOf?: DateOf): string {
   const parts: string[] = [];
   // A move into a paddock that holds a mob is one sentence: it moved and joined.
   const joined = events.find((e) => e.type === 'mobs-joined');
@@ -229,6 +230,13 @@ export function doneWord(events: readonly FarmEvent[]): string {
         break;
       case 'layout-job':
         parts.push(layoutWord(e) ?? 'Done.');
+        break;
+      // The jobs of the workforce say their result in the same words as the inbox.
+      case 'hand-hired':
+      case 'hand-left':
+      case 'contract-ordered':
+      case 'contract-cancelled':
+        if (dateOf) parts.push(labourMessage(e, dateOf));
         break;
       default:
         break;

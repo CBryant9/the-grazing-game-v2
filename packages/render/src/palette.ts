@@ -59,6 +59,12 @@ export const NATURAL = {
   fenceTape: 0xffffff,
   /** A fence that has been knocked down: amber, with its "!" marker. */
   fenceDown: 0xffa62b,
+  /**
+   * Fence a contractor is building (built, and still to build): hot pink.
+   * Not red (red is only "does not fit today"), not purple (no water), not
+   * amber (a fence down), not any of the fence kinds' own colours.
+   */
+  fenceContract: 0xff5cc8,
   /** A job to take something away: a lilac glow round a white line. */
   removeMark: 0xc39bff,
   fencePost: 0x3e2612,

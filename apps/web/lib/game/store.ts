@@ -43,7 +43,7 @@ import type {
 export type Tab = 'farm' | 'market' | 'herd' | 'paddocks' | 'plans' | 'more';
 
 /** What the More tab shows: its menu, or one of its panels. */
-export type MorePage = 'menu' | 'scores' | 'diary';
+export type MorePage = 'menu' | 'scores' | 'diary' | 'workforce';
 
 /** The year that has just closed, shown on a card until the player closes it. */
 export interface YearEndState {
@@ -217,6 +217,8 @@ interface GameState {
   /** Pick a build tool. 'look' goes back to Look. */
   selectTool: (tool: BuildTool | 'look') => void;
   setFence: (fence: FenceKindId) => void;
+  /** Who builds a permanent fence: 0 the player, 1 or 2 a team. Asks for that card. */
+  setTeam: (team: 0 | 1 | 2) => void;
   setHubOn: (on: HubOn) => void;
   /** A drawing drag on the map (a fence or pipe). */
   buildDrag: (e: DragInfo) => void;
@@ -237,6 +239,8 @@ interface GameState {
   setTab: (tab: Tab) => void;
   /** Open one of the More tab's panels, or its menu. Scores and Diary fetch their data. */
   openMore: (page: MorePage) => void;
+  /** Open the Workforce panel from anywhere (a to-do line about wages). */
+  openWorkforce: () => void;
   /** Fetch the Scores and Diary data again. */
   loadRecord: () => Promise<void>;
   /** Fetch the next page of older diary days. */
@@ -312,7 +316,7 @@ export const useGame = create<GameState>()((set, get) => {
   /** After a day or skip: fetch the Scores or Diary again if one is open. */
   const refreshRecord = (): void => {
     const { tab, morePage } = get();
-    if (tab === 'more' && morePage !== 'menu') void get().loadRecord();
+    if (tab === 'more' && (morePage === 'scores' || morePage === 'diary')) void get().loadRecord();
   };
 
   /**
@@ -444,6 +448,8 @@ export const useGame = create<GameState>()((set, get) => {
           message: undefined,
           allLate: false,
           shown: shownOf({ action }, r.version),
+          // The line's own card carries the teams' prices. A team's card keeps the ones already shown.
+          teams: b.team === 0 ? r.card.teams : b.teams,
         });
       } else {
         setBuild({
@@ -452,6 +458,7 @@ export const useGame = create<GameState>()((set, get) => {
           message: r.message,
           allLate: tooLate(r.reason),
           shown: undefined,
+          teams: b.team === 0 ? r.teams : b.teams,
         });
       }
     },
@@ -949,15 +956,33 @@ export const useGame = create<GameState>()((set, get) => {
       lastFence = fence;
       const b = get().build;
       if (!b || b.tool !== 'fence') return;
-      const action = lineAction({ ...b, fence });
+      const action = lineAction({ ...b, fence, team: 0 });
       setBuild({
         fence,
+        team: 0,
+        teams: undefined,
         phase: action ? 'previewing' : 'pick',
         message: undefined,
         card: undefined,
         shown: undefined,
       });
       if (action) lineChecker.flush(action);
+    },
+
+    setTeam(team) {
+      const b = get().build;
+      if (!b || b.tool !== 'fence' || b.phase === 'applying' || b.phase === 'done') return;
+      const action = lineAction({ ...b, team });
+      if (!action) return;
+      setBuild({
+        team,
+        phase: 'previewing',
+        message: undefined,
+        card: undefined,
+        shown: undefined,
+        allLate: false,
+      });
+      lineChecker.flush(action);
     },
 
     setHubOn(on) {
@@ -985,7 +1010,7 @@ export const useGame = create<GameState>()((set, get) => {
         cells =
           e.phase === 'start' ? startSquares(b.cells, e.square) : extendSquares(b.cells, e.square);
       }
-      const next = { ...b, corners, cells };
+      const next: BuildState = { ...b, corners, cells, team: 0, teams: undefined };
       const action = lineAction(next);
       const enough = b.tool === 'fence' ? corners.length > 1 : cells.length > 0;
       set({
@@ -1144,7 +1169,21 @@ export const useGame = create<GameState>()((set, get) => {
 
     openMore(page) {
       set({ morePage: page });
-      if (page !== 'menu') void get().loadRecord();
+      if (page === 'scores' || page === 'diary') void get().loadRecord();
+    },
+
+    openWorkforce() {
+      lineChecker.cancel();
+      set({
+        tab: 'more',
+        morePage: 'workforce',
+        paddockId: null,
+        mobId: null,
+        move: null,
+        plan: null,
+        sow: null,
+        build: null,
+      });
     },
 
     async loadRecord() {

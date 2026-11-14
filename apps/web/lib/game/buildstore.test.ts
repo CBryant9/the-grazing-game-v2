@@ -270,6 +270,124 @@ describe('drawing a fence', () => {
     expect(useGame.getState().build).toBeNull();
   });
 
+  it('a permanent fence can be handed to a team: the card keeps the teams, the line turns the team colour, and confirm orders it', async () => {
+    const teams = [
+      {
+        team: 1 as const,
+        label: '1-man team',
+        price: '$2,340',
+        lines: [
+          'Materials $1,500 plus labour $840.',
+          'Done on Tuesday 3 March.',
+          'Uses none of your day.',
+        ],
+        reason: null,
+      },
+      {
+        team: 2 as const,
+        label: '2-man team',
+        price: '',
+        lines: [],
+        reason: 'The bank will not lend that much.',
+      },
+    ];
+    useGame.getState().selectTool('fence');
+    api.preview.mockResolvedValue(okPreview(card({ teams })));
+    draw([
+      [3, 3],
+      [4, 3],
+    ]);
+    useGame.getState().buildDrag({ phase: 'end', corner: corner(4, 3), square: -1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(build().team).toBe(0);
+    expect(build().teams).toEqual(teams);
+    expect(buildDraft(build(), view)!.kind).toBe('permanent');
+
+    // Pick the 1-man team: the line is asked for as a team's job, and is drawn in the team's colour.
+    api.preview.mockResolvedValue(
+      okPreview(card({ action: 'orderContractFence', summary: ['A 1-man team builds 200 m.'] })),
+    );
+    useGame.getState().setTeam(1);
+    expect(build().phase).toBe('previewing');
+    const asked = api.preview.mock.calls.at(-1)![0];
+    expect(asked.action).toEqual({
+      type: 'orderContractFence',
+      team: 1,
+      edges: [3, 4].map((k) => ({ line: 'h', index: 3 * W + k - 1 })),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(build().phase).toBe('confirm');
+    // The team's card has no teams of its own: the ones already shown stay.
+    expect(build().teams).toEqual(teams);
+    expect(buildDraft(build(), view)!.kind).toBe('contract');
+    expect(buildDraft(build(), view)!.segments.every((s) => s.style === 'ok')).toBe(true);
+
+    api.act.mockResolvedValue({
+      ok: true,
+      message: 'Contract fencing ordered.',
+      card: card(),
+      snapshot: snap(),
+    } satisfies ActResponse);
+    await useGame.getState().buildConfirm();
+    expect(api.act.mock.calls[0]![0].action.type).toBe('orderContractFence');
+    expect(build().phase).toBe('done');
+  });
+
+  it("going back to yourself asks for the player's own card, and a new line drops the team", async () => {
+    useGame.getState().selectTool('fence');
+    api.preview.mockResolvedValue(okPreview(card({ teams: [] })));
+    draw([
+      [3, 3],
+      [4, 3],
+    ]);
+    useGame.getState().buildDrag({ phase: 'end', corner: corner(4, 3), square: -1 });
+    await vi.advanceTimersByTimeAsync(0);
+    useGame.getState().setTeam(2);
+    expect(build().team).toBe(2);
+    useGame.getState().setTeam(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.preview.mock.calls.at(-1)![0].action.type).toBe('buildFence');
+    useGame.getState().setTeam(2);
+    // Drawing again starts a new line by yourself.
+    useGame.getState().buildDrag({ phase: 'start', corner: corner(8, 8), square: -1 });
+    expect(build().team).toBe(0);
+    expect(build().teams).toBeUndefined();
+    // And a team is not asked for on any fence but permanent.
+    useGame.getState().buildDrag({ phase: 'end', corner: corner(9, 8), square: -1 });
+    useGame.getState().setFence('tape');
+    useGame.getState().setTeam(1);
+    expect(api.preview.mock.calls.at(-1)![0].action.type).toBe('buildFence');
+  });
+
+  it('a refusal for the player can still offer the teams, so a team can be ordered with no light left', async () => {
+    const teams = [
+      {
+        team: 1 as const,
+        label: '1-man team',
+        price: '$900',
+        lines: ['a', 'b', 'c'],
+        reason: null,
+      },
+    ];
+    useGame.getState().selectTool('fence');
+    api.preview.mockResolvedValue({
+      ok: false,
+      reason: 'not-enough-daylight',
+      message: 'There is not enough light left to start this today.',
+      version: 'v1',
+      teams,
+    } satisfies PreviewResponse);
+    draw([
+      [3, 3],
+      [4, 3],
+    ]);
+    useGame.getState().buildDrag({ phase: 'end', corner: corner(4, 3), square: -1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(build().phase).toBe('blocked');
+    expect(build().allLate).toBe(true);
+    expect(build().teams).toEqual(teams);
+  });
+
   it('a refusal shows the server reason right there and keeps the line to change', async () => {
     useGame.getState().selectTool('fence');
     api.preview.mockResolvedValue(okPreview(card()));

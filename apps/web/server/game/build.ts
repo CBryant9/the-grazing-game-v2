@@ -34,7 +34,7 @@ function edgeOf(v: unknown): EdgeRef | null {
   return null;
 }
 
-function edgesOf(v: unknown): EdgeRef[] | null {
+export function edgesOf(v: unknown): EdgeRef[] | null {
   if (!Array.isArray(v) || v.length < 1 || v.length > MAX_LINE_PIECES) return null;
   const out: EdgeRef[] = [];
   for (const raw of v as unknown[]) {

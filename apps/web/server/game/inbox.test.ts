@@ -20,6 +20,11 @@ const choices = (over: Partial<SetupChoices> = {}): SetupChoices => ({
 });
 
 const date = { year: 2024, month: 2, date: 14 };
+/** Farm day 0 is 1 September 2026, as in the game. */
+const dateOf = (day: number) => {
+  const d = new Date(Date.UTC(2026, 8, 1) + day * 86_400_000);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate() };
+};
 
 describe('the words for the inbox', () => {
   const events: [string, FarmEvent, RegExp][] = [
@@ -140,7 +145,7 @@ describe('the words for the inbox', () => {
   ];
 
   it.each(events)('says %s', (_name, event, pattern) => {
-    const m = inboxMessage(event)!;
+    const m = inboxMessage(event, dateOf)!;
     expect(m.text).toMatch(pattern);
     expect(m.text).not.toMatch(BANNED);
   });
@@ -195,7 +200,7 @@ describe('the words for the inbox', () => {
 
   it('leaves out the events the inbox does not carry', () => {
     expect(
-      inboxMessage({ type: 'supplement-set', mob: 1, mobName: 'Mob 1', supp: 'lick' }),
+      inboxMessage({ type: 'supplement-set', mob: 1, mobName: 'Mob 1', supp: 'lick' }, dateOf),
     ).toBeNull();
   });
 });

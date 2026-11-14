@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { InstallEntry } from '@/components/shell/InstallEntry';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { num, shortDate } from '@/lib/game/format';
+import { num, plural, shortDate } from '@/lib/game/format';
 import { kindName, setupFacts, unreadSeqs, unreadWord } from '@/lib/game/more';
 import { useGame } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
@@ -13,6 +13,7 @@ import { EmptyState } from './EmptyState';
 import { HelpSection } from './HelpPanel';
 import { Icon } from './Icon';
 import { ScoresPanel } from './ScoresPanel';
+import { WorkforcePanel } from './WorkforcePanel';
 import styles from './play.module.css';
 
 /** The farm's messages, newest first. A message that was new when the inbox opened keeps its New mark until the player leaves. */
@@ -113,6 +114,19 @@ function Rows({ snapshot }: { snapshot: Snapshot }) {
   return (
     <ul className={styles.rows}>
       <li>
+        <button type="button" className={styles.row} onClick={() => open('workforce')}>
+          <span className={styles.rowtop}>
+            <b>Workforce</b>
+            <span aria-hidden="true">›</span>
+          </span>
+          <span className={styles.rowsub}>
+            {snapshot.workforce.hands.length > 0
+              ? plural(snapshot.workforce.hands.length, 'hand')
+              : 'Hire farm hands'}
+          </span>
+        </button>
+      </li>
+      <li>
         <button type="button" className={styles.row} onClick={() => open('scores')}>
           <span className={styles.rowtop}>
             <b>Scores</b>
@@ -157,6 +171,13 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
     return (
       <SubPage title="Scores">
         <ScoresPanel />
+      </SubPage>
+    );
+  }
+  if (page === 'workforce') {
+    return (
+      <SubPage title="Workforce">
+        <WorkforcePanel snapshot={snapshot} />
       </SubPage>
     );
   }

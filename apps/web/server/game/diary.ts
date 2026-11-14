@@ -2,6 +2,7 @@ import 'server-only';
 import { dateOn, type FarmEvent, type FarmState } from '@gg/engine';
 import type { DateParts, DiaryDay, SummaryWire } from '../../lib/game/types';
 import { inboxMessage } from './inboxwords';
+import { DAWN_LABOUR, isLabourEvent, type DateOf } from './labourwords';
 
 /*
  * The diary: a plain list of the days the player has lived, with a few lines
@@ -135,16 +136,25 @@ export function periodFilings(
     if (there) there.push(...lines);
     else byDay.set(day, lines);
   };
+  const dateOf: DateOf = (day) => {
+    const d = dateOn(farm, day);
+    return { year: d.year, month: d.month, date: d.date };
+  };
   for (const d of days) {
     for (const e of d.events) {
-      const words = inboxMessage(e);
+      const words = inboxMessage(e, dateOf);
       if (words) add(d.day, [words.text]);
     }
   }
   for (const m of farm.inbox) {
     if (m.seq < seq0) continue;
-    if (m.event.type !== 'cattle-arrived' && m.event.type !== 'cattle-sold') continue;
-    const words = inboxMessage(m.event);
+    // First light brings cattle in, sells booked stock and does the workforce's pay day, leavings and fencing.
+    const dawn =
+      m.event.type === 'cattle-arrived' ||
+      m.event.type === 'cattle-sold' ||
+      (isLabourEvent(m.event) && DAWN_LABOUR.has(m.event.type));
+    if (!dawn) continue;
+    const words = inboxMessage(m.event, dateOf);
     if (words) add(m.day, [words.text]);
   }
   if (summary.daysRun > 0) add(Math.max(0, farm.day - 1), summaryLines(summary));

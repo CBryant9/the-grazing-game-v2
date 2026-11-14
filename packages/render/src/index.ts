@@ -13,6 +13,7 @@ export { createFarmMap } from './map';
 export type { PickablePaddock } from './pickable';
 export type {
   BenchOptions,
+  ContractorFence,
   FarmMap,
   FarmMapOptions,
   MapDragEvent,

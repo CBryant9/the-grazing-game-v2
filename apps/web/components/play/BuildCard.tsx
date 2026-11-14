@@ -5,8 +5,68 @@ import { isLineTool } from '@/lib/game/build';
 import { cardLines, num } from '@/lib/game/format';
 import { lineFacts } from '@/lib/game/linecard';
 import { useGame } from '@/lib/game/store';
-import type { BuildWire } from '@/lib/game/types';
+import type { BuildWire, TeamOptionWire } from '@/lib/game/types';
 import styles from './play.module.css';
+
+/**
+ * Who builds a permanent fence: yourself, a 1-man team or a 2-man team. Each
+ * says what it costs and when it is done, and that a team uses none of your
+ * day. The pink swatch is the colour the team's fence has on the map while it
+ * is going up. Picking one asks for that card.
+ */
+function TeamChoice({
+  teams,
+  team,
+  disabled,
+  onPick,
+}: {
+  teams: TeamOptionWire[];
+  team: 0 | 1 | 2;
+  disabled: boolean;
+  onPick: (team: 0 | 1 | 2) => void;
+}) {
+  return (
+    <>
+      <div className={styles.teamchoice} role="group" aria-label="Who builds it">
+        <button
+          type="button"
+          className={styles.teambtn}
+          aria-pressed={team === 0}
+          disabled={disabled}
+          onClick={() => onPick(0)}
+        >
+          <b>Yourself</b>
+          <small>Uses your day</small>
+        </button>
+        {teams.map((o) => (
+          <button
+            key={o.team}
+            type="button"
+            className={styles.teambtn}
+            aria-pressed={team === o.team}
+            disabled={disabled || o.reason !== null}
+            onClick={() => onPick(o.team)}
+          >
+            <b>
+              <span className={styles.contractswatch} aria-hidden="true" /> {o.label}
+            </b>
+            <small>{o.reason === null ? o.price : 'Not available'}</small>
+            {o.reason === null && <small>{o.lines[1]}</small>}
+          </button>
+        ))}
+      </div>
+      {teams.map(
+        (o) =>
+          o.reason !== null && (
+            <p key={o.team} className="muted">
+              {o.label}: {o.reason}
+            </p>
+          ),
+      )}
+      <p className="muted">A team uses none of your day.</p>
+    </>
+  );
+}
 
 /**
  * The card beside the line or the thing picked: what it is, how long, what
@@ -30,6 +90,7 @@ export function BuildCard({
   const snapshot = useGame((s) => s.snapshot);
   const confirm = useGame((s) => s.buildConfirm);
   const end = useGame((s) => s.buildEnd);
+  const setTeam = useGame((s) => s.setTeam);
   const ok = useGame((s) => s.buildOk);
   const refill = useGame((s) => s.chooseRefill);
   const remove = useGame((s) => s.chooseRemove);
@@ -110,8 +171,17 @@ export function BuildCard({
   const title = line
     ? b.tool === 'pipe'
       ? 'Pipe'
-      : `${build.fences.find((f) => f.id === b.fence)?.name ?? 'Fence'} fence`
+      : `${build.fences.find((f) => f.id === b.fence)?.name ?? 'Fence'} fence${b.team ? `, ${b.team}-man team` : ''}`
     : b.picked!.title;
+  const choose =
+    line && b.tool === 'fence' && b.teams?.length ? (
+      <TeamChoice
+        teams={b.teams}
+        team={b.team}
+        disabled={b.phase === 'previewing' || b.phase === 'applying'}
+        onPick={setTeam}
+      />
+    ) : null;
 
   if (b.phase === 'previewing') {
     const metres = line
@@ -123,6 +193,7 @@ export function BuildCard({
         <p role="status" className="muted">
           {metres}Checking
         </p>
+        {choose}
         <div className={styles.jobbtns}>
           <button type="button" className="btn sm ghost" onClick={end}>
             Cancel
@@ -153,11 +224,12 @@ export function BuildCard({
       <>
         <h3 className={styles.cardhead}>{title}</h3>
         <p role="alert" className={styles.cardreason}>
-          {line && b.allLate ? build.noneFits : b.message}
+          {line && b.allLate && b.team === 0 ? build.noneFits : b.message}
         </p>
+        {choose}
         <div className={styles.jobbtns}>
           <button type="button" className="btn sm coral" disabled>
-            {line ? 'Build' : b.picked!.confirm}
+            {line ? (b.team ? 'Order the team' : 'Build') : b.picked!.confirm}
           </button>
           {line ? (
             <button type="button" className="btn sm ghost" onClick={end}>
@@ -185,6 +257,7 @@ export function BuildCard({
         {title}
         {facts && <span className={styles.cardlength}>{facts.length}</span>}
       </h3>
+      {choose}
       {card && facts ? (
         <ul className={styles.joblines}>
           <li>{facts.cost}</li>
@@ -213,7 +286,7 @@ export function BuildCard({
           disabled={!canBuild}
           onClick={() => void confirm()}
         >
-          {working ? 'Working' : line ? 'Build' : b.picked!.confirm}
+          {working ? 'Working' : line ? (b.team ? 'Order the team' : 'Build') : b.picked!.confirm}
         </button>
         <button type="button" className="btn sm ghost" disabled={working} onClick={end}>
           Cancel

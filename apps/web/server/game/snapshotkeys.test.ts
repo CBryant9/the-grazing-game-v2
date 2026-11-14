@@ -1,5 +1,13 @@
 import { writeFileSync } from 'node:fs';
-import { applyAction, createFarm, endDay, knockDownTape, saleDayOn, thingsToDo } from '@gg/engine';
+import {
+  applyAction,
+  createFarm,
+  endDay,
+  jobSeekers,
+  knockDownTape,
+  saleDayOn,
+  thingsToDo,
+} from '@gg/engine';
 import { describe, expect, it } from 'vitest';
 import type { FarmState } from '@gg/engine';
 import type { Snapshot } from '../../lib/game/types';
@@ -19,6 +27,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   '': [
     'build',
     'clock',
+    'contracts',
     'cropping',
     'date',
     'day',
@@ -38,6 +47,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'totals',
     'version',
     'view',
+    'workforce',
   ],
   build: ['fences', 'noneFits', 'onHand', 'tools'],
   'build.fences[]': ['id', 'name', 'perM', 'price', 'text'],
@@ -52,6 +62,9 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'now',
     'usedMin',
   ],
+  'contracts[]': ['built', 'detail', 'id', 'left', 'teamText', 'text'],
+  'contracts[].built[]': ['index', 'line'],
+  'contracts[].left[]': ['index', 'line'],
   cropping: ['fields', 'options'],
   'cropping.fields[]': ['ha', 'id', 'name', 'paddocks', 'ready', 'stage'],
   'cropping.options[]': [
@@ -210,6 +223,36 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'todo[]': ['button', 'edge', 'key', 'mob', 'opens', 'text', 'urgent'],
   'todo[].edge': ['index', 'line'],
   totals: ['ae', 'calves', 'cash', 'coverPct', 'dse', 'greenKgHa', 'head', 'massKgHa', 'netWorth'],
+  workforce: ['canHire', 'hands', 'owedText', 'payText', 'seekers', 'seekersText', 'standing'],
+  'workforce.hands[]': [
+    'daysText',
+    'dogs',
+    'dogsText',
+    'endText',
+    'id',
+    'kindText',
+    'name',
+    'owedText',
+    'payText',
+    'rateText',
+    'recent',
+    'skills',
+    'statusText',
+  ],
+  'workforce.hands[].skills[]': ['label', 'rating', 'text'],
+  'workforce.seekers[]': [
+    'daysText',
+    'dogs',
+    'dogsText',
+    'id',
+    'kindText',
+    'name',
+    'payText',
+    'rateText',
+    'skills',
+  ],
+  'workforce.seekers[].skills[]': ['label', 'rating', 'text'],
+  'workforce.standing': ['effect', 'fact', 'level'],
 };
 
 /**
@@ -249,12 +292,14 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'from',
     'gainKg',
     'greenKgHa',
+    'growth',
     'head',
     'kind',
     'liveWeightKg',
     'massKgHa',
     'money',
     'planMoves',
+    'report',
     'stops',
     'to',
   ],
@@ -270,8 +315,11 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'day.summary.liveWeightKg': ['after', 'before'],
   'day.summary.massKgHa': ['after', 'before'],
   'day.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
+  'day.summary.report[]': ['date', 'seq', 'text', 'who'],
+  'day.summary.report[].date': ['date', 'month', 'year'],
   'day.summary.to': ['date', 'month', 'year'],
-  preview: ['card', 'message', 'ok', 'reason', 'version'],
+  preview: ['card', 'message', 'ok', 'reason', 'teams', 'version'],
+  'preview.teams[]': ['label', 'lines', 'price', 'reason', 'team'],
   'preview.card': [
     'action',
     'cost',
@@ -283,9 +331,11 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'outcome',
     'perDay',
     'summary',
+    'teams',
     'usesRestOfDay',
     'workMin',
   ],
+  'preview.card.teams[]': ['label', 'lines', 'price', 'reason', 'team'],
   'preview.card.line': ['doesNotFit', 'fits', 'words'],
   'preview.card.line.doesNotFit': ['cells', 'edges', 'metres'],
   'preview.card.line.fits': ['cells', 'edges', 'metres'],
@@ -318,12 +368,14 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'from',
     'gainKg',
     'greenKgHa',
+    'growth',
     'head',
     'kind',
     'liveWeightKg',
     'massKgHa',
     'money',
     'planMoves',
+    'report',
     'stops',
     'to',
   ],
@@ -339,6 +391,8 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'skip.summary.liveWeightKg': ['after', 'before'],
   'skip.summary.massKgHa': ['after', 'before'],
   'skip.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
+  'skip.summary.report[]': ['date', 'seq', 'text', 'who'],
+  'skip.summary.report[].date': ['date', 'month', 'year'],
   'skip.summary.to': ['date', 'month', 'year'],
 };
 
@@ -465,6 +519,45 @@ async function serverFixtures(): Promise<{
     replies.skip!.push(more);
     if (more.yearEnd) break;
   }
+  // A hand and a fencing team: the Workforce panel, the contract line, the teams' prices and the worker report.
+  snap = (await game.endDay(A)).snapshot;
+  for (let i = 0; i < 14 && snap.workforce.seekers.length === 0; i++) {
+    snap = (await game.endDay(A)).snapshot;
+  }
+  const person = snap.workforce.seekers[0]!;
+  replies.preview!.push(await game.preview(A, { action: { type: 'hireHand', person: person.id } }));
+  replies.act!.push(await game.act(A, { action: { type: 'hireHand', person: person.id } }));
+  const twelve = Array.from({ length: 12 }, (_, i) => ({
+    line: 'h' as const,
+    index: 20 * W + 5 + i,
+  }));
+  const order = {
+    action: { type: 'orderContractFence' as const, edges: twelve, team: 1 as const },
+  };
+  replies.preview!.push(await game.preview(A, order));
+  const ordered = await game.act(A, order);
+  replies.act!.push(ordered);
+  // A line too dear for the bank: refused, with each team's refusal in its place.
+  const everything = Array.from({ length: 400 }, (_, i) => ({
+    line: 'h' as const,
+    index: 4 * W + i,
+  }));
+  replies.preview!.push(
+    await game.preview(A, {
+      action: { type: 'buildFence', edges: everything, fence: 'permanent' },
+    }),
+  );
+  // A day or two on, the team has built some and has some to build: both are on the map.
+  let under = ordered.snapshot;
+  for (let i = 0; i < 4 && !under.contracts[0]?.built.length; i++) {
+    const d = await game.endDay(A);
+    replies.day!.push(d);
+    under = d.snapshot;
+  }
+  if (under.contracts[0]) {
+    const run = under.contracts[0].id;
+    replies.preview!.push(await game.preview(A, { action: { type: 'cancelContractFence', run } }));
+  }
   const week = await game.skip(A, 'week');
   replies.skip!.push(week);
   snap = week.snapshot;
@@ -519,6 +612,7 @@ const engineFarm = (): FarmState =>
  * over on the other (bought on a sale day, so no sale can be booked that day).
  */
 function engineFixtures(): Snapshot[] {
+  const env0 = {};
   const env = {};
   let farm = engineFarm();
   // Tape, one length knocked down: a to-do with an edge.
@@ -544,25 +638,37 @@ function engineFixtures(): Snapshot[] {
   // A game over (it clears the things to do, so it is on this farm, not the first).
   other = { ...other, over: { reason: 'bank', day: other.day } };
   const stored = { name: 'Engine', setup: SETUP, version: 'v1' };
-  return [buildSnapshot(farm, stored, env), buildSnapshot(other, stored, env)];
+  // Wages the farm owes from before: a line in the things to do that opens the Workforce panel.
+  let owing = engineFarm();
+  while (jobSeekers(owing).length === 0) owing = endDay(owing, env0).farm;
+  const hired = applyAction(owing, { type: 'hireHand', person: jobSeekers(owing)[0]!.id }, env0);
+  expect(hired.ok ? 'ok' : hired.message).toBe('ok');
+  if (hired.ok) owing = { ...hired.farm, labour: { ...hired.farm.labour!, wagesOwed: 1500 } };
+  return [
+    buildSnapshot(farm, stored, env),
+    buildSnapshot(other, stored, env),
+    buildSnapshot(owing, { ...stored, missedWages: [owing.day - 3] }, env0),
+  ];
 }
 
 describe('what the game routes send holds only the keys on the lists', () => {
   it('snapshots and replies over several farms: nothing unlisted, and every listed key seen', async () => {
     const { snaps, replies } = await serverFixtures();
-    const [engine, onWay] = engineFixtures();
+    const [engine, onWay, owing] = engineFixtures();
     expect(engine!.market.booked.length).toBeGreaterThan(0);
     expect(engine!.mobs.some((m) => m.bookedDate !== null)).toBe(true);
     expect(onWay!.market.onTheWay.length).toBeGreaterThan(0);
     expect(onWay!.over).not.toBeNull();
     expect(engine!.todo.some((t) => t.edge !== null)).toBe(true);
+    expect(owing!.todo.some((t) => t.opens === 'workforce')).toBe(true);
+    expect(owing!.workforce.standing.fact).toBe('Wages missed once in the last year.');
     const inner: unknown[] = [];
     const replySeen: Seen = new Map();
     for (const [kind, list] of Object.entries(replies)) {
       for (const r of list) shape(r, kind, replySeen, inner);
     }
     const snapSeen: Seen = new Map();
-    for (const s of [...snaps, engine, onWay, ...inner]) shape(s, '', snapSeen, []);
+    for (const s of [...snaps, engine, onWay, owing, ...inner]) shape(s, '', snapSeen, []);
     if (process.env.KEYS_DUMP) {
       const dump = (m: Seen) =>
         Object.fromEntries([...m].map(([k, v]) => [k, [...v].sort()]).sort());

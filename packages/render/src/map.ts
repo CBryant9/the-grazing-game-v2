@@ -251,6 +251,11 @@ export interface FarmMap {
   setTool(tool: MapTool): void;
   /** Draw a draft on top of the map (a line about to be built), or null to clear it. Only the overlay is redrawn. */
   setDraft(draft: MapDraft | null): void;
+  /**
+   * Contract fencing under way: the segments the contractor has built and
+   * the ones still to build, drawn in the contractor's colour. Null clears it.
+   */
+  setContractor(fence: ContractorFence | null): void;
   /** Where a point on the ground is on screen, in CSS pixels. For placing a card beside a line. */
   groundToScreen(gx: number, gy: number): Point;
   setAmbient(on: boolean): void;
@@ -274,6 +279,18 @@ export interface FarmMap {
   destroy(): void;
 }
 
+/** A contractor's fence under way, as segments. */
+export interface ContractorFence {
+  built: readonly ViewEdge[];
+  left: readonly ViewEdge[];
+}
+
+const sameEdges = (a: readonly ViewEdge[], b: readonly ViewEdge[]): boolean =>
+  a.length === b.length && a.every((e, i) => e.line === b[i]!.line && e.index === b[i]!.index);
+
+const sameContractor = (a: ContractorFence, b: ContractorFence): boolean =>
+  sameEdges(a.built, b.built) && sameEdges(a.left, b.left);
+
 type HoverTarget =
   | { kind: 'edge'; edge: ViewEdge }
   | { kind: 'square'; square: number }
@@ -282,6 +299,7 @@ type HoverTarget =
 /** The line colour a draft is drawn in: the same as the fence or pipe it will become. */
 const DRAFT_COLOUR: Record<DraftKind, number> = {
   permanent: NATURAL.fencePermanent,
+  contract: NATURAL.fenceContract,
   electric: NATURAL.fenceElectric,
   tape: NATURAL.fenceTape,
   pipe: NATURAL.pipe,
@@ -413,6 +431,9 @@ class PixiFarmMap implements FarmMap {
   /** The draft of a line about to be built, and what the mouse is over in a tool. Each redraws on its own. */
   private draftG = new Graphics();
   private hoverG = new Graphics();
+  /** The contractor's fence under way: built (solid) and still to build (dashed), in the contractor's own colour. */
+  private contractG = new Graphics();
+  private contractor: ContractorFence | null = null;
   private tool: MapTool = 'look';
   private draft: MapDraft | null = null;
   private hoverTool: HoverTarget | null = null;
@@ -656,7 +677,7 @@ class PixiFarmMap implements FarmMap {
     }
 
     // The draft and the hover sit on top of everything standing on the farm.
-    world.addChild(this.draftG, this.hoverG);
+    world.addChild(this.contractG, this.draftG, this.hoverG);
     this.rain.boundsArea = new Rectangle(0, 0, 4096, 4096);
     this.rain.visible = false;
     this.ui.addChild(this.labelLayer, this.rain);
@@ -793,7 +814,9 @@ class PixiFarmMap implements FarmMap {
       this.drawRing();
     }
     // The build overlay is sized in screen pixels, so it follows the zoom (only the overlay is redrawn).
-    if (this.overlayZoom !== cam.zoom && (this.draft || this.hoverTool)) this.drawOverlays();
+    if (this.overlayZoom !== cam.zoom && (this.draft || this.hoverTool || this.contractor)) {
+      this.drawOverlays();
+    }
     this.invalidate();
   }
 
@@ -1862,12 +1885,72 @@ class PixiFarmMap implements FarmMap {
     this.drawDraft();
   }
 
+  setContractor(fence: ContractorFence | null): void {
+    const empty = !fence || (fence.built.length === 0 && fence.left.length === 0);
+    const next = empty ? null : fence;
+    if (!next && !this.contractor) return;
+    if (next && this.contractor && sameContractor(next, this.contractor)) return;
+    this.contractor = next;
+    this.drawContractor();
+  }
+
+  /**
+   * The contractor's fence under way, drawn over the fence beneath it: what is
+   * built in a solid line, what is still to build dashed, both in the
+   * contractor's colour (never red: red is only for what does not fit today).
+   */
+  private drawContractor(): void {
+    const g = this.contractG.clear();
+    this.overlayZoom = this.cam.zoom;
+    const c = this.contractor;
+    if (!c) {
+      this.invalidate();
+      return;
+    }
+    const u = 1 / this.cam.zoom;
+    const trace = (edges: readonly ViewEdge[], dashed: boolean): void => {
+      for (const e of edges) {
+        const [x0, y0, x1, y1] = edgeEnds(e);
+        if (!dashed) {
+          g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+          continue;
+        }
+        const len = Math.hypot(x1 - x0, (y1 - y0) * K);
+        const dash = 7 * u;
+        const gap = 5 * u;
+        for (let s = 0; s < len; s += dash + gap) {
+          const a = s / len;
+          const b = Math.min(1, (s + dash) / len);
+          g.moveTo(x0 + (x1 - x0) * a, (y0 + (y1 - y0) * a) * K).lineTo(
+            x0 + (x1 - x0) * b,
+            (y0 + (y1 - y0) * b) * K,
+          );
+        }
+      }
+    };
+    const colour = NATURAL.fenceContract;
+    if (c.left.length) {
+      trace(c.left, true);
+      g.stroke({ color: NATURAL.fenceCasing, width: 6 * u, alpha: 0.75, cap: 'round' });
+      trace(c.left, true);
+      g.stroke({ color: colour, width: 3 * u, cap: 'round' });
+    }
+    if (c.built.length) {
+      trace(c.built, false);
+      g.stroke({ color: NATURAL.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
+      trace(c.built, false);
+      g.stroke({ color: colour, width: 4 * u, cap: 'round' });
+    }
+    this.invalidate();
+  }
+
   groundToScreen(gx: number, gy: number): Point {
     return worldToScreen(this.cam, this.vp, gx, gy * K);
   }
 
   /** Both overlays, after a zoom: line widths are set in screen pixels. */
   private drawOverlays(): void {
+    this.drawContractor();
     this.drawDraft();
     this.drawHover();
   }

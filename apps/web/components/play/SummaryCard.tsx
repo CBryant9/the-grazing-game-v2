@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import type { ChangeWire, SummaryWire } from '@/lib/game/types';
+import { useEffect, useRef, useState } from 'react';
+import type { BubbleWire, ChangeWire, SummaryWire } from '@/lib/game/types';
 import { dateText, delta, money, num, plural, shortDate } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import styles from './play.module.css';
@@ -34,6 +34,72 @@ function Change({
   );
 }
 
+/** A worker, drawn plainly: a hat, a head and shoulders. */
+function Worker() {
+  return (
+    <svg className={styles.worker} viewBox="0 0 56 64" aria-hidden="true" focusable="false">
+      <ellipse cx="28" cy="22" rx="20" ry="4" fill="currentColor" />
+      <path d="M14 21 Q14 6 28 6 Q42 6 42 21 Z" fill="currentColor" />
+      <circle cx="28" cy="32" r="10" fill="none" stroke="currentColor" strokeWidth="3" />
+      <path
+        d="M8 62 Q8 44 28 44 Q48 44 48 62 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The worker report: a worker with a speech bubble for each thing done while
+ * the player was away, in the worker's own plain words. One tap for the next,
+ * or skip all. Each is also in the inbox.
+ */
+function Report({
+  bubbles,
+  at,
+  onNext,
+  onSkip,
+  nextRef,
+}: {
+  bubbles: BubbleWire[];
+  at: number;
+  onNext: () => void;
+  onSkip: () => void;
+  nextRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const b = bubbles[at]!;
+  const last = at === bubbles.length - 1;
+  return (
+    <>
+      <h2 id="summary-title" className={`px ${styles.sumtitle}`}>
+        While you were away
+      </h2>
+      <div className={styles.report} role="group" aria-label="Worker report">
+        <Worker />
+        <blockquote className={styles.bubble} aria-live="polite">
+          <span className={styles.bubblewho}>{b.who}</span>
+          <p>{b.text}</p>
+        </blockquote>
+        <p className={styles.reportcount}>
+          {at + 1} of {bubbles.length}. {shortDate(b.date)}.
+        </p>
+      </div>
+      <div className={styles.sumbtns}>
+        {!last && (
+          <button type="button" className="btn ghost" onClick={onSkip}>
+            Skip all
+          </button>
+        )}
+        <button ref={nextRef} type="button" className="btn coral" onClick={onNext}>
+          {last ? 'Show the day' : 'Next'}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function deltaMoney(c: ChangeWire): string {
   const d = c.after - c.before;
   if (d === 0) return 'no change';
@@ -50,10 +116,14 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
   const skip = useGame((s) => s.skip);
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  // The worker report comes first, one bubble at a time. It is over once the last is read or skipped.
+  const [at, setAt] = useState(0);
+  const reporting = at < summary.report.length;
 
   useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
+    (reporting ? nextRef : closeRef).current?.focus();
+  }, [reporting, at]);
 
   const title =
     summary.kind === 'day' && summary.daysRun === 1
@@ -100,79 +170,96 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
         aria-modal="true"
         aria-labelledby="summary-title"
       >
-        <h2 id="summary-title" className={`px ${styles.sumtitle}`}>
-          {title}
-        </h2>
-        <p className={styles.sumwhen}>{when}</p>
-        {summary.stops.length > 0 && (
-          <ul className={styles.sumstops}>
-            {summary.stops.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
+        {reporting ? (
+          <Report
+            bubbles={summary.report}
+            at={at}
+            onNext={() => setAt(at + 1)}
+            onSkip={() => setAt(summary.report.length)}
+            nextRef={nextRef}
+          />
+        ) : (
+          <>
+            <h2 id="summary-title" className={`px ${styles.sumtitle}`}>
+              {title}
+            </h2>
+            <p className={styles.sumwhen}>{when}</p>
+            {summary.stops.length > 0 && (
+              <ul className={styles.sumstops}>
+                {summary.stops.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            )}
+            {summary.daysRun > 0 && summary.daysRun < summary.daysAsked && (
+              <p className={styles.sumwhen}>
+                Stopped after {plural(summary.daysRun, 'day')} of {summary.daysAsked}.
+              </p>
+            )}
+            <dl className={styles.sumlist}>
+              <Change label="Cash" c={summary.cash} dollars />
+              <Change label="Head" c={summary.head} />
+              {(summary.calves.before > 0 || summary.calves.after > 0) && (
+                <Change label="Calves" c={summary.calves} />
+              )}
+              <Change label="Feed" c={summary.massKgHa} unit=" kg DM/ha" />
+              <Change label="Green feed" c={summary.greenKgHa} unit=" kg DM/ha" />
+              <Change label="Ground cover" c={summary.coverPct} unit="%" />
+              <Change label="Live weight" c={summary.liveWeightKg} unit=" kg" />
+            </dl>
+            <ul className={styles.sumfacts}>
+              {summary.planMoves.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+              {summary.growth && <li>{summary.growth}</li>}
+              {summary.births > 0 && <li>{plural(summary.births, 'calf', 'calves')} born.</li>}
+              <li>
+                {summary.deaths === 0
+                  ? 'No deaths.'
+                  : `${plural(summary.deaths, 'head', 'head')} died: ${causes}.`}
+              </li>
+              {m.sales > 0 && <li>Sales: {money(m.sales)}.</li>}
+              {m.buys > 0 && <li>Cattle bought: {money(m.buys)}.</li>}
+              {m.feed > 0 && <li>Feed: {money(m.feed)}.</li>}
+              {m.grain > 0 && <li>Grain sold: {money(m.grain)}.</li>}
+              {m.running > 0 && <li>Running costs: {money(m.running)}.</li>}
+              {m.interest > 0 && <li>Interest: {money(m.interest)}.</li>}
+              {summary.arrived.head > 0 && (
+                <li>{plural(summary.arrived.head, 'head', 'head')} arrived in the stock yards.</li>
+              )}
+              {summary.bookedSold.head > 0 && (
+                <li>
+                  {plural(summary.bookedSold.head, 'head', 'head')} sold from the booking,{' '}
+                  {money(summary.bookedSold.net)} banked.
+                </li>
+              )}
+            </ul>
+            <div className={styles.sumbtns}>
+              {summary.canRunAnyway && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    dismiss();
+                    void skip(
+                      summary.daysAsked === 7
+                        ? 'week'
+                        : summary.daysAsked === 30
+                          ? 'month'
+                          : 'year',
+                      true,
+                    );
+                  }}
+                >
+                  Run it anyway
+                </button>
+              )}
+              <button ref={closeRef} type="button" className="btn coral" onClick={dismiss}>
+                Back to the farm
+              </button>
+            </div>
+          </>
         )}
-        {summary.daysRun > 0 && summary.daysRun < summary.daysAsked && (
-          <p className={styles.sumwhen}>
-            Stopped after {plural(summary.daysRun, 'day')} of {summary.daysAsked}.
-          </p>
-        )}
-        <dl className={styles.sumlist}>
-          <Change label="Cash" c={summary.cash} dollars />
-          <Change label="Head" c={summary.head} />
-          {(summary.calves.before > 0 || summary.calves.after > 0) && (
-            <Change label="Calves" c={summary.calves} />
-          )}
-          <Change label="Feed" c={summary.massKgHa} unit=" kg DM/ha" />
-          <Change label="Green feed" c={summary.greenKgHa} unit=" kg DM/ha" />
-          <Change label="Ground cover" c={summary.coverPct} unit="%" />
-          <Change label="Live weight" c={summary.liveWeightKg} unit=" kg" />
-        </dl>
-        <ul className={styles.sumfacts}>
-          {summary.planMoves.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-          {summary.births > 0 && <li>{plural(summary.births, 'calf', 'calves')} born.</li>}
-          <li>
-            {summary.deaths === 0
-              ? 'No deaths.'
-              : `${plural(summary.deaths, 'head', 'head')} died: ${causes}.`}
-          </li>
-          {m.sales > 0 && <li>Sales: {money(m.sales)}.</li>}
-          {m.buys > 0 && <li>Cattle bought: {money(m.buys)}.</li>}
-          {m.feed > 0 && <li>Feed: {money(m.feed)}.</li>}
-          {m.grain > 0 && <li>Grain sold: {money(m.grain)}.</li>}
-          {m.running > 0 && <li>Running costs: {money(m.running)}.</li>}
-          {m.interest > 0 && <li>Interest: {money(m.interest)}.</li>}
-          {summary.arrived.head > 0 && (
-            <li>{plural(summary.arrived.head, 'head', 'head')} arrived in the stock yards.</li>
-          )}
-          {summary.bookedSold.head > 0 && (
-            <li>
-              {plural(summary.bookedSold.head, 'head', 'head')} sold from the booking,{' '}
-              {money(summary.bookedSold.net)} banked.
-            </li>
-          )}
-        </ul>
-        <div className={styles.sumbtns}>
-          {summary.canRunAnyway && (
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => {
-                dismiss();
-                void skip(
-                  summary.daysAsked === 7 ? 'week' : summary.daysAsked === 30 ? 'month' : 'year',
-                  true,
-                );
-              }}
-            >
-              Run it anyway
-            </button>
-          )}
-          <button ref={closeRef} type="button" className="btn coral" onClick={dismiss}>
-            Back to the farm
-          </button>
-        </div>
       </div>
     </div>
   );

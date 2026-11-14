@@ -26,6 +26,7 @@ import { PlansPanel } from './PlansPanel';
 import { GameOverCard, OverStrip } from './GameOverCard';
 import { SummaryCard } from './SummaryCard';
 import { YearEndCard } from './YearEndCard';
+import { ContractList } from './Contracts';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
 import { TopBar } from './TopBar';
 import { TourStrip } from './TourStrip';
@@ -92,6 +93,7 @@ function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
       <BuildBar build={snapshot.build} docked />
       <h2 className={`px ${styles.minihead}`}>Things to do</h2>
       <TodoList snapshot={snapshot} />
+      <ContractList snapshot={snapshot} />
       <h2 className={`px ${styles.minihead}`}>Paddocks</h2>
       <PaddockChips snapshot={snapshot} />
     </div>
@@ -200,6 +202,14 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
     plan !== null &&
     (plan.phase === 'edit' || plan.phase === 'refused' || plan.phase === 'confirm');
   const anchor = useMemo(() => buildAnchor(build), [build]);
+  // The contractor's fence under way, in its own colour, whatever the player is doing.
+  const contractor = useMemo(
+    () => ({
+      built: snapshot.contracts.flatMap((c) => c.built),
+      left: snapshot.contracts.flatMap((c) => c.left),
+    }),
+    [snapshot.contracts],
+  );
   // The tool bar and the card show on the farm tab, when no sheet is open.
   const showBuild = tab === 'farm' && !sheetOpen && !(helpOpen && !pc);
 
@@ -246,6 +256,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             }
             tool={mapTool}
             draft={draft}
+            contractor={contractor}
             badges={badges}
             anchor={anchor}
             anchorEl={cardRef}

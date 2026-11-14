@@ -37,6 +37,22 @@ export function scoreParts(s: YearScore): ScorePartWire[] {
   ];
 }
 
+/**
+ * "X t DM of pasture grew. The cattle ate Y t DM." Whole tonnes for a year.
+ * `fine` gives one decimal under 10 t, for a week or a month, so a short skip
+ * does not read "0 t".
+ */
+export function growthLine(grownKg: number, eatenKg: number, fine = false): string {
+  const t = (kg: number): string =>
+    fine && kg < 10_000
+      ? (Math.round(kg / 100) / 10).toLocaleString('en-AU', {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })
+      : n0(kg / 1000);
+  return `${t(grownKg)} t DM of pasture grew. The cattle ate ${t(eatenKg)} t DM.`;
+}
+
 /** Plain sentences from the year's figures. */
 export function yearFacts(y: Closed): string[] {
   const out = [`Net worth went from ${dollars(y.worth0)} to ${dollars(y.worth1)}.`];
@@ -49,9 +65,7 @@ export function yearFacts(y: Closed): string[] {
   // Tonnes, with both totals. What was eaten can top what grew (feed carried over counts as eaten),
   // so no percentage is shown. The score uses its own figure, uncapped.
   if (y.grown > 0 || y.eaten > 0) {
-    out.push(
-      `${n0(y.grown / 1000)} t DM of pasture grew. The cattle ate ${n0(y.eaten / 1000)} t DM.`,
-    );
+    out.push(growthLine(y.grown, y.eaten));
     if (y.eaten > y.grown) out.push('They ate feed carried over from before the year as well.');
   }
   // With no monthly readings yet the figure is today's cover, not an average.

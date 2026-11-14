@@ -9,7 +9,8 @@
 
 import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
-export const SNAPSHOT_VERSION = 2;
+/** 3 added `workforce` and `contracts` (milestone 2.2). A saved offline farm of an older version is not shown. */
+export const SNAPSHOT_VERSION = 3;
 
 export interface DateParts {
   year: number;
@@ -72,8 +73,8 @@ export interface TodoWire {
   urgent: boolean;
   /** The mob this is about, so the banner can open its card. Null when it is about something else. */
   mob: number | null;
-  /** 'move' when the button opens the move flow instead of doing a job at once (cattle in the yards). 'fix' when it opens the card for a fence that is down. */
-  opens: 'move' | 'fix' | null;
+  /** 'move' when the button opens the move flow instead of doing a job at once (cattle in the yards). 'fix' when it opens the card for a fence that is down. 'workforce' when it opens the Workforce panel (wages owed). */
+  opens: 'move' | 'fix' | 'workforce' | null;
   /** The fence segment this is about (a fence that is down), so the map can show it. */
   edge: EdgeWire | null;
 }
@@ -261,7 +262,7 @@ export interface MarketWire {
   };
 }
 
-export type InboxKind = 'cattle' | 'sale' | 'crop' | 'plan' | 'water' | 'farm';
+export type InboxKind = 'cattle' | 'sale' | 'crop' | 'plan' | 'water' | 'farm' | 'work';
 
 export interface InboxWire {
   seq: number;
@@ -421,6 +422,99 @@ export interface CropsWire {
   fields: FieldWire[];
 }
 
+/** A skill as a plain number out of 5, with the words for it. */
+export interface SkillWire {
+  label: string;
+  rating: number;
+  /** "Fencing 4 of 5". */
+  text: string;
+}
+
+/** A person looking for work, or a hand on the farm: the facts about them, as words. */
+export interface PersonWire {
+  id: number;
+  name: string;
+  /** "Casual", "Short contract, 91 days", "Salaried". */
+  kindText: string;
+  /** "$320 a day worked", "$1,202 a week". Before super. */
+  rateText: string;
+  /** About what each pay day costs, with super. */
+  payText: string;
+  /** "Works Monday to Friday". */
+  daysText: string;
+  skills: SkillWire[];
+  dogs: boolean;
+  /** Yes or no, and what dogs do, in one line. */
+  dogsText: string;
+}
+
+/** A hand on the farm. */
+export interface HandWire extends PersonWire {
+  /** "Starts tomorrow, Tuesday 17 November", "At work today", "Not one of their days today", "Off hurt until Monday 4 January". */
+  statusText: string;
+  /** For a contract: when it ends. Null otherwise. */
+  endText: string | null;
+  /** What the farm owes them since the last pay day. */
+  owedText: string;
+  /** What they did lately, in their own words, newest first. */
+  recent: string[];
+}
+
+/** The standing with workers, as a level, what it means for the list, and the fact behind it. */
+export interface StandingWire {
+  level: string;
+  effect: string;
+  fact: string;
+}
+
+/** The Workforce panel: people looking for work, the farm's hands, pay and standing. */
+export interface WorkforceWire {
+  seekers: PersonWire[];
+  /** What to say above the list: how many are looking, or that the farm has as many hands as it can take. */
+  seekersText: string;
+  canHire: boolean;
+  hands: HandWire[];
+  /** The next pay day and what is owed to the hands so far. Null with no hands. */
+  payText: string | null;
+  /** Wages the farm could not pay when due, and what happens to them. Null when none are owed. */
+  owedText: string | null;
+  standing: StandingWire;
+}
+
+/** Contract fencing under way: the fact line, and the segments the map draws in the contractor's colour. */
+export interface ContractWire {
+  id: number;
+  teamText: string;
+  /** "Contract fence: 1,200 m left, done on Tuesday 3 March". */
+  text: string;
+  /** "400 m built so far. $2,100 charged so far." */
+  detail: string;
+  built: EdgeWire[];
+  left: EdgeWire[];
+}
+
+/** One of the teams a permanent fence can be built by, with what it costs and when it is done. */
+export interface TeamOptionWire {
+  team: 1 | 2;
+  /** "1-man team". */
+  label: string;
+  /** "$2,340". The whole run, materials and labour. */
+  price: string;
+  /** What it costs, when it is done and that it uses none of the player's day. */
+  lines: string[];
+  /** Why it can not be ordered, or null. */
+  reason: string | null;
+}
+
+/** One speech bubble of the worker report: who says it and what they did, in plain words. */
+export interface BubbleWire {
+  seq: number;
+  /** A hand's name, or "Fencing team" or "Pay day" for what is not one hand's. */
+  who: string;
+  text: string;
+  date: DateParts;
+}
+
 export interface Snapshot {
   version: typeof SNAPSHOT_VERSION;
   /**
@@ -451,6 +545,10 @@ export interface Snapshot {
   paddocks: PaddockWire[];
   /** The build tools, with prices and help lines. */
   build: BuildWire;
+  /** The farm's hands, the people looking for work and the standing with workers. */
+  workforce: WorkforceWire;
+  /** Contract fencing under way. */
+  contracts: ContractWire[];
   /** The newest messages, newest first. */
   inbox: InboxWire[];
   /** Messages the player has not opened, counting the ones past those shown. */
@@ -529,6 +627,8 @@ export interface JobCardWire {
   summary?: string[];
   /** For a line of fence, tape or pipe: the pieces that fit today and the pieces that do not. */
   line: LineWire | null;
+  /** For a permanent fence: the teams that could build it instead, with their prices. Left out for any other job. */
+  teams?: TeamOptionWire[];
 }
 
 /** The pieces of a line job, in the order drawn. Fence and tape give segments, pipe gives squares. */
@@ -553,7 +653,8 @@ export interface Refusal {
 
 /** A job card, with the farm version it was made on. Confirm sends that version back. */
 export type PreviewResponse =
-  { ok: true; card: JobCardWire; version: string } | (Refusal & { version: string });
+  | { ok: true; card: JobCardWire; version: string }
+  | (Refusal & { version: string; teams?: TeamOptionWire[] });
 
 /**
  * What a job did, or why it was refused, with the farm as it is now.
@@ -608,6 +709,10 @@ export interface SummaryWire {
   bookedSold: { head: number; net: number };
   /** Where a grazing plan moved a mob, one line for each mob. */
   planMoves: string[];
+  /** "X t DM of pasture grew. The cattle ate Y t DM." For a skip. Null for a day, or when nothing grew or was eaten. */
+  growth: string | null;
+  /** What the hands and the fencing team did while the player was away, one bubble each. */
+  report: BubbleWire[];
   /** Plain facts about why a skip stopped early, or something to know. */
   stops: string[];
   /** True when nothing ran because of water, and a "run anyway" is allowed. */
@@ -727,6 +832,10 @@ export type SimpleAction =
       /** Set to change a plan that exists. */
       planId?: number;
     }
-  | { type: 'sow'; species: string; cells: number[] };
+  | { type: 'sow'; species: string; cells: number[] }
+  | { type: 'hireHand'; person: number }
+  | { type: 'letHandGo'; hand: number }
+  | { type: 'orderContractFence'; edges: EdgeWire[]; team: 1 | 2 }
+  | { type: 'cancelContractFence'; run: number };
 
 export type SkipRequestLength = 'week' | 'month' | 'year';

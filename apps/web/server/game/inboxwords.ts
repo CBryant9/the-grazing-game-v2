@@ -1,6 +1,7 @@
 import 'server-only';
 import { SPECIES, type CattleNote, type FarmEvent, PTIC_DAYS } from '@gg/engine';
 import type { InboxKind } from '../../lib/game/types';
+import { isLabourEvent, labourMessage, type DateOf } from './labourwords';
 import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText } from './planwords';
@@ -74,9 +75,14 @@ export function noteWord(mobName: string, area: string | null, n: CattleNote): s
 const sold = (e: Extract<FarmEvent, { type: 'cattle-sold' }>): string =>
   `${plural(e.head, 'head', 'head')} sold${e.booked ? ' from the booking' : ''}, averaging ${Math.round(e.avgKg)} kg. ${money(e.net)} paid into the bank after selling costs.`;
 
-/** The message for an event, or null when the inbox does not carry it. */
-export function inboxMessage(e: FarmEvent): Message | null {
+/**
+ * The message for an event, or null when the inbox does not carry it. Every
+ * workforce event has one (`labourMessage` is exhaustive over them), and says
+ * its dates with `dateOf`.
+ */
+export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
   const msg = (kind: InboxKind, text: string): Message => ({ kind, text });
+  if (isLabourEvent(e)) return msg('work', labourMessage(e, dateOf));
   switch (e.type) {
     case 'farm-started':
       return msg('farm', `The farm is set up: ${Math.round(e.farmHa).toLocaleString('en-AU')} ha.`);

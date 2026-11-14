@@ -48,8 +48,10 @@ import type {
   SkipRequestLength,
   Snapshot,
   StaleResponse,
+  TeamOptionWire,
 } from '../../lib/game/types';
 import { parseBuildAction } from './build';
+import { parseLabourAction } from './labour';
 import {
   fenceMaterialsNotes,
   gateNotes,
@@ -58,6 +60,16 @@ import {
   refundNote,
 } from './buildwords';
 import { cropLines, parseSow } from './crops';
+import {
+  cancelLines as cancelContractLines,
+  contractLines,
+  handsNotes,
+  hireLines,
+  letGoLines,
+  reportWire,
+  teamOptions,
+  type DateOf,
+} from './labourwords';
 import { buyLines, cancelLines, saleClassLabel, sellLines } from './marketwords';
 import { suppPerDay } from './mobs';
 import { GROUP_NAME, lostWaterNote, moveNotes } from './mobwords';
@@ -77,6 +89,22 @@ import {
 import { dateText, doneWord, todoKey } from './words';
 import { pastYears, soFarView, yearView } from './years';
 import { join } from 'node:path';
+
+/**
+ * The farm days a pay day was missed in a day or skip, from the first-light
+ * events. The days come from the inbox where it still holds the message;
+ * what has rolled off it counts on the last day.
+ */
+export function missedDays(farm: FarmState, seq0: number, dawn: readonly FarmEvent[]): number[] {
+  const n = dawn.filter((e) => e.type === 'wages-missed').length;
+  if (n === 0) return [];
+  const days = farm.inbox
+    .filter((m) => m.seq >= seq0 && m.event.type === 'wages-missed')
+    .map((m) => m.day)
+    .slice(0, n);
+  while (days.length < n) days.push(farm.day);
+  return days;
+}
 
 /** A refusal the route turns into a plain message with this status. Never carries a stack. */
 export class GameError extends Error {
@@ -262,6 +290,11 @@ export function parseAction(body: unknown, farm?: FarmState): Action | null {
       const port = int(a.port, 0, 1e6);
       return port === null ? null : { type: 'refillPortable', port };
     }
+    case 'hireHand':
+    case 'letHandGo':
+    case 'orderContractFence':
+    case 'cancelContractFence':
+      return parseLabourAction(a, farm);
     default:
       return parseBuildAction(a);
   }
@@ -372,7 +405,7 @@ interface Extras {
 
 const noExtras: Extras = { notes: [], perDay: null, summary: [] };
 
-function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
+function cardWire(card: JobCard, extra: Extras = noExtras, teams?: TeamOptionWire[]): JobCardWire {
   const notes: string[] = [...extra.notes];
   const perDay = extra.perDay;
   // A market job says all this in its own lines.
@@ -419,6 +452,7 @@ function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
     notes,
     ...(extra.summary.length ? { summary: extra.summary } : {}),
     line,
+    ...(teams?.length ? { teams } : {}),
   };
 }
 
@@ -502,7 +536,11 @@ export class GameServer {
     farm: FarmState,
     done?: DoneRequest,
     filings: readonly Filing[] = [],
+    missed: readonly number[] = [],
   ): Promise<Held> {
+    // Pay days missed: only the last year's are kept, for the standing's fact line.
+    const before = held.stored.missedWages ?? [];
+    const kept = [...before, ...missed].filter((d) => d > farm.day - 365);
     const stored: StoredFarm = {
       ...held.stored,
       saved: saveFarm(farm),
@@ -510,6 +548,8 @@ export class GameServer {
       done: done ? [...held.stored.done, done].slice(-DONE_KEPT) : held.stored.done,
       diary: filings.length ? fileLines(held.stored.diary, filings) : held.stored.diary,
     };
+    if (kept.length) stored.missedWages = kept;
+    else delete stored.missedWages;
     await this.store.put(farmId, stored);
     const next = { stored, farm };
     this.remember(farmId, next);
@@ -748,6 +788,14 @@ export class GameServer {
       case 'setPlan':
       case 'resumePlan':
         return planLines(farm, action, card);
+      case 'hireHand':
+        return hireLines(farm, action.person);
+      case 'letHandGo':
+        return letGoLines(farm, events);
+      case 'orderContractFence':
+        return contractLines(farm, card);
+      case 'cancelContractFence':
+        return cancelContractLines(events);
       default:
         return [];
     }
@@ -758,7 +806,9 @@ export class GameServer {
     if (
       action.type !== 'sellClass' &&
       action.type !== 'sellGroup' &&
-      action.type !== 'cancelSale'
+      action.type !== 'cancelSale' &&
+      action.type !== 'letHandGo' &&
+      action.type !== 'cancelContractFence'
     ) {
       return null;
     }
@@ -773,11 +823,25 @@ export class GameServer {
       const { farm, stored } = await this.need(id);
       const action = this.resolve(farm, req);
       const version = stored.version;
-      const result = previewAction(farm, action, envFor(stored.setup));
+      const env = envFor(stored.setup);
+      const result = previewAction(farm, action, env);
+      // A permanent fence can be built by a team instead: the card shows what each would cost and when it is done.
+      // A line that can not be built by the player today (no light left) can still be ordered.
+      const teams =
+        action.type === 'buildFence' && action.fence === 'permanent'
+          ? teamOptions(farm, env, action.edges)
+          : [];
       if (!result.ok) {
-        return { ok: false, reason: result.reason, message: result.message, version };
+        return {
+          ok: false,
+          reason: result.reason,
+          message: result.message,
+          version,
+          ...(teams.length ? { teams } : {}),
+        };
       }
       const x = this.extras(farm, stored, action);
+      x.notes.push(...handsNotes(farm, result.card));
       x.summary = this.summary(
         farm,
         stored,
@@ -785,7 +849,7 @@ export class GameServer {
         result.card,
         this.trialEvents(farm, stored, action),
       );
-      return { ok: true, card: cardWire(result.card, x), version };
+      return { ok: true, card: cardWire(result.card, x, teams), version };
     });
   }
 
@@ -841,9 +905,16 @@ export class GameServer {
       }
       if (result.job) {
         x.summary = this.summary(held.farm, held.stored, action, result.job, result.events);
+        x.notes.push(...handsNotes(held.farm, result.job));
       }
-      const message = doneWord(result.events);
-      const card = result.job ? cardWire(result.job, x) : null;
+      const dateOf: DateOf = (day) => dateParts(dateOn(result.farm, day));
+      const message = doneWord(result.events, dateOf);
+      // The card after the job is the card before it, with the teams' prices as they were shown.
+      const teams =
+        action.type === 'buildFence' && action.fence === 'permanent'
+          ? teamOptions(held.farm, envFor(held.stored.setup), action.edges)
+          : [];
+      const card = result.job ? cardWire(result.job, x, teams) : null;
       const next = await this.save(
         id,
         held,
@@ -923,13 +994,15 @@ export class GameServer {
       if (version !== undefined && version !== held.stored.version) return this.stale(held);
       const seq0 = held.farm.inboxSeq;
       const end = endDay(held.farm, envFor(held.stored.setup));
-      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events);
+      const report = reportWire(end.farm, seq0 - 1, (d) => dateParts(dateOn(end.farm, d)));
+      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, report);
       const next = await this.save(
         id,
         held,
         end.farm,
         undefined,
         periodFilings(end.farm, seq0, summary, [end.day]),
+        missedDays(end.farm, seq0, end.dawn),
       );
       return {
         ok: true,
@@ -962,7 +1035,15 @@ export class GameServer {
       const seq0 = held.farm.inboxSeq;
       const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
       const ticks = result.days.flatMap((d) => d.events);
-      const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks);
+      const report = reportWire(result.farm, seq0 - 1, (d) => dateParts(dateOn(result.farm, d)));
+      const summary = buildSummary(
+        'skip',
+        result.summary,
+        result.stops,
+        result.asked,
+        ticks,
+        report,
+      );
       const next =
         result.daysRun > 0
           ? await this.save(
@@ -971,6 +1052,7 @@ export class GameServer {
               result.farm,
               undefined,
               periodFilings(result.farm, seq0, summary, result.days),
+              missedDays(result.farm, seq0, result.dawn),
             )
           : held;
       return {

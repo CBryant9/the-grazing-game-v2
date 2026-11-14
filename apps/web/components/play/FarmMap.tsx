@@ -5,6 +5,7 @@ import { FARM_GRID_W, type FarmView } from '@gg/shared';
 // Types only: these lines load nothing. The renderer (and PixiJS with it) is
 // loaded below, once the page is on screen, so it is not in the first load.
 import type {
+  ContractorFence,
   FarmMap as FarmMapHandle,
   MapDragEvent,
   MapDraft,
@@ -58,6 +59,7 @@ export function FarmMap({
   onTapPaddock,
   tool,
   draft,
+  contractor,
   anchor,
   anchorEl,
   floating,
@@ -81,6 +83,8 @@ export function FarmMap({
   tool: MapToolName;
   /** The line about to be built, drawn on top. Null for none. */
   draft: MapDraft | null;
+  /** The contractor's fence under way: built and still to build, drawn in its own colour. */
+  contractor: ContractorFence;
   /** The point on the ground the build card sits beside. */
   anchor: { gx: number; gy: number } | null;
   /** The card to place beside it (on a PC). */
@@ -172,6 +176,9 @@ export function FarmMap({
   useEffect(() => {
     if (ready) mapRef.current?.setDraft(draft);
   }, [ready, draft]);
+  useEffect(() => {
+    if (ready) mapRef.current?.setContractor(contractor);
+  }, [ready, contractor]);
 
   // Numbers on paddocks follow the map as it moves. They never take a tap.
   const [badgePos, setBadgePos] = useState<{ text: string; x: number; y: number }[]>([]);

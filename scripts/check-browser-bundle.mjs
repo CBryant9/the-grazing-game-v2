@@ -59,6 +59,27 @@ const ENGINE_ONLY = [
   'saveFarm: an array of a kind that cannot be saved',
   'Soil water needs a capacity above 0 mm',
   'The real years must be whole numbers, oldest first',
+  // The labour rules (milestones 2.1 and 2.2, src/data/labour.ts and src/labour/pool.ts): the figures
+  // table's key names, which a minifier leaves as they are, and the pool's random stream. A screen
+  // gets finished words and whole numbers, never an award table, an injury chance, a draw behind
+  // the list of people or a skill factor.
+  'labour:week:',
+  'awardWeekly',
+  'injuryPerHour',
+  'injuryDaysOff',
+  'injuryCostWeeks',
+  'fencingRisk',
+  'dearerAtZero',
+  'listShareAtZero',
+  'standingMissedPay',
+  'standingPaidOnTime',
+  'skillFactor',
+  'dogsFactor',
+  'handDayShare',
+  'labourPerMetre',
+  'teamMetresPerDay',
+  'newPerWeek',
+  'listedDays',
 ];
 
 /** Text the browser code does hold. Seeing it proves the scan read the right files. */

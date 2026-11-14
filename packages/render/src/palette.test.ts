@@ -184,6 +184,7 @@ describe('red means one thing: the part of a line that does not fit today (Claud
     fenceTape: NATURAL.fenceTape,
     fenceDown: NATURAL.fenceDown,
     removeMark: NATURAL.removeMark,
+    fenceContract: NATURAL.fenceContract,
     fencePostTape: NATURAL.fencePostTape,
     gateOpen: NATURAL.gateOpen,
     gateShut: NATURAL.gateShut,
@@ -215,6 +216,49 @@ describe('red means one thing: the part of a line that does not fit today (Claud
     expect(contrast(NATURAL.notToday, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
     // The take-away mark stands out from the casing too.
     expect(contrast(NATURAL.removeMark, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("the contractor's fence under way has its own colour: not red, not purple, not amber, and apart from every other line", () => {
+    const hue = (c: number): number => {
+      const r = ((c >> 16) & 255) / 255;
+      const g = ((c >> 8) & 255) / 255;
+      const b = (c & 255) / 255;
+      const max = Math.max(r, g, b);
+      const d = max - Math.min(r, g, b);
+      if (d === 0) return 0;
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const apart = (a: number, b: number): number => {
+      const d = Math.abs(hue(a) - hue(b));
+      return Math.min(d, 360 - d);
+    };
+    const mine = NATURAL.fenceContract;
+    expect(isRed(mine)).toBe(false);
+    // Readable on the dark casing every wire sits on, whichever theme the page is in.
+    expect(contrast(mine, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+    // Told apart by hue from the red "does not fit", the knocked-down amber, the no-water
+    // purples (both themes), the take-away lilac and the water blues.
+    const others: Record<string, number> = {
+      notToday: NATURAL.notToday,
+      fenceDown: NATURAL.fenceDown,
+      noWaterDark: THEMES.dark.noWater,
+      noWaterLight: THEMES.light.noWater,
+      layerWaterNone: NATURAL.layerWaterNone,
+      removeMark: NATURAL.removeMark,
+      pipe: NATURAL.pipe,
+      water: NATURAL.water,
+      gateOpen: NATURAL.gateOpen,
+      fenceElectric: NATURAL.fenceElectric,
+      fencePermanent: NATURAL.fencePermanent,
+    };
+    for (const [name, c] of Object.entries(others)) {
+      expect(apart(mine, c), name).toBeGreaterThanOrEqual(30);
+    }
+    // And it stands out from the grass it is drawn on.
+    for (const grass of [NATURAL.leafYoung, NATURAL.leafOld, NATURAL.strawFresh, NATURAL.soil]) {
+      expect(contrast(mine, grass), String(grass)).toBeGreaterThan(1.3);
+    }
   });
 
   it('new tape is white, never red', () => {

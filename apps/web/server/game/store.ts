@@ -43,6 +43,12 @@ export interface StoredFarm {
   inboxRead?: number;
   /** The days lived, oldest first, at most `DIARY_DAYS` of them. */
   diary: StoredDiaryDay[];
+  /**
+   * The farm days a pay day was missed (milestone 2.2), for the Workforce
+   * panel's "Wages missed once in the last year." Left out until the first
+   * one. Only days from the last year are kept.
+   */
+  missedWages?: number[];
 }
 
 /** A stored farm that could not be read: bad JSON, or not a farm at all. */
@@ -71,6 +77,13 @@ export function upgradeStored(raw: unknown, version: () => string): StoredFarm {
     version: typeof raw.version === 'string' && raw.version ? raw.version : version(),
     done: Array.isArray(raw.done) ? (raw.done as DoneRequest[]).slice(-DONE_KEPT) : [],
     ...(typeof raw.inboxRead === 'number' ? { inboxRead: raw.inboxRead } : {}),
+    ...(Array.isArray(raw.missedWages)
+      ? {
+          missedWages: (raw.missedWages as unknown[]).filter(
+            (d) => typeof d === 'number',
+          ) as number[],
+        }
+      : {}),
     // A farm from before the diary has none. It is not broken: the diary starts now.
     diary: Array.isArray(raw.diary) ? (raw.diary as StoredDiaryDay[]).slice(-DIARY_DAYS) : [],
   };

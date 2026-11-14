@@ -20,6 +20,7 @@ import {
 import { DISTRICTS } from '@gg/shared';
 import {
   SNAPSHOT_VERSION,
+  type BubbleWire,
   type ChangeWire,
   type DateParts,
   type InboxWire,
@@ -29,16 +30,18 @@ import {
   type SetupSummary,
   type Snapshot,
   type SummaryWire,
+  type TodoWire,
 } from '../../lib/game/types';
 import { buildWire } from './buildwords';
 import { arableHaByPaddock, cropsWire } from './crops';
 import { inboxMessage } from './inboxwords';
+import { contractsWire, owedTodo, workforceWire } from './labourwords';
 import { marketWire } from './market';
 import { buildMobs } from './mobs';
 import { plansWire, planForm } from './plans';
 import { movedText } from './planwords';
 import { NO_WATER_WHY, causeWord, stopWord, todoWire } from './words';
-import { liveScore, overWire } from './years';
+import { growthLine, liveScore, overWire } from './years';
 
 /** Messages the snapshot carries. The browser shows these; older ones stay on the server. */
 export const INBOX_SHOWN = 40;
@@ -53,6 +56,24 @@ export const dateParts = (d: CalendarDate): DateParts => ({
   month: d.month,
   date: d.date,
 });
+
+/** Things to do about the workforce: wages the farm owes, with a button to the Workforce panel. */
+function workforceTodo(farm: FarmState): TodoWire[] {
+  const text = owedTodo(farm);
+  return text
+    ? [
+        {
+          key: 'wages-owed',
+          text,
+          button: 'See workforce',
+          urgent: false,
+          mob: null,
+          opens: 'workforce',
+          edge: null,
+        },
+      ]
+    : [];
+}
 
 const change = (c: { before: number; after: number }, places = 0): ChangeWire => ({
   before: round(c.before, places),
@@ -85,7 +106,14 @@ export function setupSummary(farm: FarmState, setup: SetupChoices): SetupSummary
  */
 export function buildSnapshot(
   farm: FarmState,
-  stored: { name: string; setup: SetupChoices; inboxRead?: number; version: string },
+  stored: {
+    name: string;
+    setup: SetupChoices;
+    inboxRead?: number;
+    version: string;
+    /** The farm days wages were missed, for the standing's fact line. */
+    missedWages?: readonly number[];
+  },
   env: SourceEnv,
 ): Snapshot {
   const view = farmView(farm, env);
@@ -128,11 +156,12 @@ export function buildSnapshot(
 
   const mobs: MobWire[] = buildMobs(farm, env, market);
 
+  const dateOf = (day: number): DateParts => dateParts(dateOn(farm, day));
   const read = stored.inboxRead ?? 0;
   const worded: InboxWire[] = [];
   for (let i = farm.inbox.length - 1; i >= 0; i--) {
     const m = farm.inbox[i]!;
-    const words = inboxMessage(m.event);
+    const words = inboxMessage(m.event, dateOf);
     if (!words) continue;
     worded.push({
       seq: m.seq,
@@ -180,7 +209,7 @@ export function buildSnapshot(
       evening: clock.evening,
     },
     view,
-    todo: thingsToDo(farm).map(todoWire),
+    todo: [...thingsToDo(farm).map(todoWire), ...workforceTodo(farm)],
     market: marketWire(farm, market),
     plans: plansWire(farm),
     planForm: planForm(),
@@ -188,6 +217,8 @@ export function buildSnapshot(
     mobs,
     paddocks,
     build: buildWire(materialsOnHand(farm)),
+    workforce: workforceWire(farm, stored.missedWages ?? []),
+    contracts: contractsWire(farm),
     inbox,
     inboxUnread,
     score: liveScore(farm),
@@ -230,6 +261,7 @@ export function buildSummary(
   stops: readonly SkipStop[],
   asked: number,
   ticks: readonly TickEvent[] = [],
+  report: BubbleWire[] = [],
 ): SummaryWire {
   const deathsByCause: Record<string, number> = {};
   for (const [cause, n] of Object.entries(s.deathsByCause)) {
@@ -263,6 +295,11 @@ export function buildSummary(
     arrived: { head: s.arrived.head, calves: s.arrived.calves },
     bookedSold: { head: s.bookedSold.head, net: round(s.bookedSold.net) },
     planMoves: planMoveLines(ticks),
+    growth:
+      kind === 'skip' && s.daysRun > 0 && (s.grownKg > 0 || s.eatenKg > 0)
+        ? growthLine(s.grownKg, s.eatenKg, true)
+        : null,
+    report,
     stops: stops.map(stopWord),
     canRunAnyway:
       s.daysRun === 0 &&

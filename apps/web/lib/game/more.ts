@@ -54,6 +54,7 @@ const KIND: Record<InboxKind, string> = {
   plan: 'Plan',
   water: 'Water',
   farm: 'Farm',
+  work: 'Workforce',
 };
 
 export const kindName = (k: InboxKind): string => KIND[k];

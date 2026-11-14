@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import type { Snapshot } from '@/lib/game/types';
 import { cardLines, doneLines, plural } from '@/lib/game/format';
 import { useGame, type JobState } from '@/lib/game/store';
+import { ContractList, useContractWork } from './Contracts';
 import { Icon } from './Icon';
 import styles from './play.module.css';
 
@@ -17,7 +18,7 @@ function Row({
     button: string | null;
     urgent: boolean;
     mob?: number | null;
-    opens?: 'move' | 'fix' | null;
+    opens?: 'move' | 'fix' | 'workforce' | null;
     edge?: { line: 'h' | 'v'; index: number } | null;
   };
   job?: JobState;
@@ -28,6 +29,7 @@ function Row({
   const openMob = useGame((s) => s.openMob);
   const startMove = useGame((s) => s.startMove);
   const startFix = useGame((s) => s.startFix);
+  const openWorkforce = useGame((s) => s.openWorkforce);
   const busy = useGame((s) => s.busy > 0);
   const phase = job?.phase;
   return (
@@ -44,7 +46,9 @@ function Row({
                   ? void startMove({ mobId: item.mob })
                   : item.opens === 'fix' && item.edge
                     ? void startFix(item.edge)
-                    : void startJob(item.key)
+                    : item.opens === 'workforce'
+                      ? openWorkforce()
+                      : void startJob(item.key)
               }
             >
               {item.button}
@@ -157,9 +161,11 @@ export function TodoBanner({ snapshot }: { snapshot: Snapshot }) {
   const jobs = useGame((s) => s.jobs);
   const id = useId();
   const count = snapshot.todo.length;
-  const working = Object.keys(jobs).length > 0;
+  const contractWork = useContractWork();
+  const working = Object.keys(jobs).length > 0 || contractWork;
   const shown = open || working;
   const first = snapshot.todo[0];
+  const run = snapshot.contracts[0];
   return (
     <section className={styles.banner} aria-label="Things to do">
       <button
@@ -173,6 +179,11 @@ export function TodoBanner({ snapshot }: { snapshot: Snapshot }) {
           {count === 0 ? 'Nothing to do now' : plural(count, 'thing', 'things') + ' to do'}
         </span>
         {!shown && first && <span className={styles.bannerpeek}>{first.text}</span>}
+        {!shown && run && (
+          <span className={styles.bannerpeek}>
+            <span className={styles.contractswatch} aria-hidden="true" /> {run.text}
+          </span>
+        )}
         <span className={shown ? styles.flip : undefined}>
           <Icon name="chevron" size={18} />
         </span>
@@ -180,6 +191,7 @@ export function TodoBanner({ snapshot }: { snapshot: Snapshot }) {
       {shown && (
         <div id={id} className={styles.bannerbody}>
           <TodoList snapshot={snapshot} />
+          <ContractList snapshot={snapshot} />
           <h2 className={`px ${styles.minihead}`}>Paddocks</h2>
           <PaddockChips snapshot={snapshot} />
         </div>

@@ -2,7 +2,15 @@ import type { FarmView, ViewEdge } from '@gg/shared';
 import type { MapDraft, NotFit } from '@gg/render/draft';
 import { fenceDraft, markDraft, markSquares, pipeDraft } from '@gg/render/draft';
 import { edgesOfPath, tapeRun, vertexCorner, type Corner } from '@gg/render/lines';
-import type { BuildToolId, EdgeWire, FenceKindId, JobCardWire, Shown, SimpleAction } from './types';
+import type {
+  BuildToolId,
+  EdgeWire,
+  FenceKindId,
+  JobCardWire,
+  Shown,
+  SimpleAction,
+  TeamOptionWire,
+} from './types';
 
 /**
  * The build tools as the page holds them: what the player has drawn or
@@ -78,6 +86,14 @@ export interface BuildState {
   allLate: boolean;
   /** What the card on show was made for: Confirm sends exactly this. */
   shown?: Shown;
+  /**
+   * Who builds a permanent fence: 0 is the player, 1 and 2 are the teams. A
+   * team is ordered once and carries on by itself. Back to 0 whenever the
+   * line or the kind of fence changes.
+   */
+  team: 0 | 1 | 2;
+  /** The teams the server priced for the line as drawn. Kept while a team's own card is on show. */
+  teams?: TeamOptionWire[];
 }
 
 export const newBuild = (tool: BuildTool, over: Partial<BuildState> = {}): BuildState => ({
@@ -92,6 +108,7 @@ export const newBuild = (tool: BuildTool, over: Partial<BuildState> = {}): Build
   moving: null,
   phase: 'pick',
   allLate: false,
+  team: 0,
   ...over,
 });
 
@@ -105,7 +122,12 @@ export const fenceEdges = (b: BuildState): ViewEdge[] => edgesOfPath(b.corners);
 export function lineAction(b: BuildState): SimpleAction | null {
   if (b.tool === 'fence') {
     const edges = fenceEdges(b);
-    return edges.length ? { type: 'buildFence', edges, fence: b.fence } : null;
+    if (!edges.length) return null;
+    // A team builds permanent fence only, and the whole line, whatever fits in today's light.
+    if (b.team !== 0 && b.fence === 'permanent') {
+      return { type: 'orderContractFence', edges, team: b.team };
+    }
+    return { type: 'buildFence', edges, fence: b.fence };
   }
   if (b.tool === 'pipe') {
     return b.cells.length >= 1 ? { type: 'layPipe', cells: b.cells } : null;
@@ -148,7 +170,9 @@ export function buildDraft(b: BuildState | null, view: FarmView): MapDraft | nul
   if (!b || b.phase === 'done') return null;
   if (b.tool === 'fence') {
     if (b.corners.length === 0) return null;
-    return fenceDraft(view, b.fence, b.corners, fenceEdges(b), notFitOf(b));
+    // A line a team will build is drawn in the team's colour, as the fence will be while it goes up.
+    const kind = b.team > 0 && b.fence === 'permanent' ? 'contract' : b.fence;
+    return fenceDraft(view, kind, b.corners, fenceEdges(b), notFitOf(b));
   }
   if (b.tool === 'pipe') {
     return b.cells.length ? pipeDraft(b.cells, notFitOf(b)) : null;
