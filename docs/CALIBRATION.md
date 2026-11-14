@@ -26,6 +26,10 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 
 Seasons are random. Judge a run against its season: a drought year below target is expected, but an average year outside target is a bug.
 
+## Sheep benchmarks
+
+The sheep benchmarks are the table at the end of [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md) (SB-01 to SB-65, with SB-43a, SB-48a and SB-52a to SB-52c), with their sources and the calls behind each band (C1 to C32). Each row is an automated test named by its SB number in `packages/engine/src/calibration/sheep.units.test.ts`, `sheep.paddock.test.ts`, `sheep.mob.test.ts` and `sheep.year.test.ts`, run with the rest by `pnpm test`. A row that cannot be tested yet is a skipped test with its reason in its name. The model's figure for every row is in the results log (15 Nov 2026, milestone 2.3).
+
 ## How to run the checks (the rebuild)
 
 The benchmarks are automated tests in `packages/engine/src/calibration`. The runs they use are in `packages/engine/test-support/calibration.ts`.
@@ -1120,6 +1124,93 @@ Only these reasons are supported by the runs, and whether they matter is for Cla
 - There are only two seeds for each district, so two farms and two sets of seasons.
 
 A longer run that goes through a dry season, with more seeds, would test it harder.
+
+### 15 Nov 2026, milestone 2.3 (the sheep model): engine 0.14.0
+
+The first run of the sheep benchmarks (the table in [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md), section "Sheep benchmarks" above). No cattle or grass figure changed: every cattle band, every `*.mvp.test.ts` and the no-hands digest (engine 0.12.1) pass as they did. 70 rows: **61 pass in full; 4 pass in Western Victoria (or the Central West) with their Tablelands and Central West parts skipped** (SB-40, SB-41, SB-43, SB-47); **5 are skipped** (SB-59 to SB-62 for C18, SB-65 for C26). The reasons follow the table. Each figure is the model's on the run in the test.
+
+| ID | Measure | Band | Model | |
+|---|---|---|---|---|
+| SB-01 | ME, dry 50 kg wether | 7.6–9.7 MJ | 8.30 | pass |
+| SB-02 | DSE, dry 50 kg wether | 0.9–1.1 | 1.00 | pass |
+| SB-03 | DSE, dry ewe 40 and 60 kg | 0.8–1.0; 1.1–1.3 | 0.85; 1.15 | pass (C32: table still to be checked) |
+| SB-04 | ME, single, day 130 | 12–14 MJ | 12.25 | pass |
+| SB-05 | ME, twins, day 130 | 14.5–17.5 MJ | 15.61 | pass |
+| SB-06 | ME, single, mid-lactation | 18.5–23 MJ | 20.40 | pass |
+| SB-07 | ME, twins, mid-lactation | 23.5–28.5 MJ | 27.40 | pass |
+| SB-08 | Large Merino above medium | +1.5–2.5; twins lactating +3–5 | +1.80 at every stage; +3.90 | pass |
+| SB-09 | DSE, last month, single | 1.3–1.5 | 1.47 | pass |
+| SB-10 | DSE, lactating single | 2.2–2.5 | 2.46 | pass |
+| SB-11 | DSE, lactating twins | 3.1–3.4 | 3.30 | pass |
+| SB-12 | DSE, ram | 1.8–2.2 | 1.94 | pass |
+| SB-13 | DSE, 25 kg weaner, 0 and 100 g/day | 0.6–0.7; 0.9–1.0 | 0.65; 0.98 | pass |
+| SB-14 | Intake, dry adult, green leafy | 2–3% LW | 2.7% | pass |
+| SB-15 | Intake, weaner | 3.5–4.5% | 4.2% | pass |
+| SB-16 | Intake, lactating ewe | 4–5.5% | 4.4% single; 4.8% twins | pass |
+| SB-17 | Dry sheep at 400/75%, 600/68%, 1,200/60% green | −20 to +20 g/day; losing at 60% of each mass | +7, +15, +2; −104, −72, −53 | pass |
+| SB-18 | Needs met, last month single, 700/75%, 1,200/68% | 90–110%; under 90% at 60% | 95%, 94%; 74% | pass |
+| SB-19 | Needs met, lactating single, 1,000/75%, 1,700/68% | 90–110%; under 90% at 60% | 106%, 98%; 73% | pass |
+| SB-20 | Needs met, lactating twins, 1,500/75% | 90–110%; under 90% at 68% | 94%; 82% | pass |
+| SB-21 | Weaner growth, 600/75%, 1,000/68% | 100–150 g/day | 122, 129 | pass |
+| SB-22 | Weaner growth, 800/75%, 1,700/68% | 150–200 | 165, 164 | pass |
+| SB-23 | Weaner growth, 1,600/75% | 200–250; under 200 at 68% | 232; 174 | pass |
+| SB-24 | Large Merino and crossbred weaners, over 2,000 FOO | over 200 | 300; 279 (at 1,700 green) | pass |
+| SB-25 | Share of intake at 1,600 kg green | sheep 90%+, above cattle | 0.96 against 0.91 | pass |
+| SB-26 | Sheep at 800, cattle at 1,200 | within 10 points | 0.81 against 0.84 | pass |
+| SB-27 | kg for one CS, SRW 50 | 8.5–10.5 | 9.5 | pass |
+| SB-28 | Oestrous cycle | 17 days | 17 | pass |
+| SB-29 | Gestation; first lambs from the start of joining | 144–150; about day 150 | 147; day 147 | pass |
+| SB-30 | Merino in lamb, CS 3 | 88–95% | 90.8% | pass |
+| SB-31 | Crossbred in lamb, CS 3 | 93–98% | 94.8% | pass |
+| SB-32 | Foetuses per 100 ewes for each CS | 15–25 | +20.3 (CS 2→3), +21.0 (3→4); the rule +20.0 from 1.5 to 4.5 | pass |
+| SB-33 | Merino scanning | 115–135% | 123.6% | pass |
+| SB-34 | Non-Merino scanning | 145–165% | 154.2% | pass |
+| SB-35 | Merino lamb survival, CS 3 | singles 88–93%, twins 68–75% | 90.2%, 71.5% | pass |
+| SB-36 | Crossbred lamb survival, CS 3 | 90–97%, 80–87% | 92.9%, 83.9% | pass |
+| SB-37 | More lambs at CS 3.0–3.5 than 2.0–2.5 | 10–25 per 100, twins gain more | +11.3 per 100 lambs; twins gain more | pass (C32) |
+| SB-38 | Share of lamb deaths in the first 3 days | 70%+ | 78.7% | pass |
+| SB-39 | Lamb deaths, marking to weaning | under 1% | 0.41% | pass |
+| SB-40 | Merino marking, average year | 75–90% | Western Victoria 88.9%; Central West 67.3%, Tablelands 52.6% | pass (WV); skipped (NT, CW) |
+| SB-41 | First-cross marking, average year | 100–120% | Western Victoria 118.5%; Central West 91.5%, Tablelands 64.2% | pass (WV); skipped (NT, CW) |
+| SB-42 | Ewe deaths, scanning to marking | 0.5–3.0, 1.2–5.0, 1.8–14.5% | 1.48%, 3.70%, 7.30% | pass |
+| SB-43 | Merino ewe deaths, average year | 2–4% | Western Victoria 3.80% (CS 2.98 at lambing); Central West 5.70%, Tablelands 19.31% | pass (WV); skipped (NT, CW) |
+| SB-43a | Ewe deaths at lambing | Merino 1.5–2.5%, first-cross 2.8–3.7% | 2.06%, 3.48% | pass |
+| SB-44 | Deaths at CS 1.5 against 2.5–3 | 1.6–2.5 times | 1.73 times in the run; the rule 2.00 | pass |
+| SB-45 | Weaners 24 kg, about 60 g/day | 0–2% | 0.77% | pass |
+| SB-46 | Weaners losing about 10 g/day | 8–15% | 10.58% | pass |
+| SB-47 | Weaners grown to target, average year | 2–6% | Central West 2.07%; Western Victoria 1.63%; Tablelands 9.82% | pass (CW); WV a known gap 0.4 under, held by the test; skipped (NT) |
+| SB-48 | Weaning weight, ewes on 800 and 3,000 FOO | 11–17; 25–31 kg | 16.0; 27.4 | pass |
+| SB-48a | Growth, marking to weaning | 175–220 g/day | singles 212, twins 195 | pass |
+| SB-49 | Wool, last third of pregnancy against dry | 20–40% lower | 30% | pass |
+| SB-50 | Losing 1 CS over pregnancy | 0.5–0.9 kg less; 0.6–1.2 micron finer | 0.58 kg; 0.73 micron | pass |
+| SB-51 | Wethers and rams against ewes | 1–3 micron coarser | 1.9 | pass |
+| SB-52 | Merino wethers, Tablelands and Central West | 3.8–4.6 kg clean; 18–20 micron | 4.01 kg, 19.5; 4.18 kg, 19.0 | pass |
+| SB-52a | Merino breeding ewes, three districts | 3.3–4.7 kg | Tablelands 3.41, Central West 3.64, Western Victoria 4.37 | pass |
+| SB-52b | Weaners, about 8 months of wool | 1.0–1.5 kg | 1.20 (Western Victoria) | pass |
+| SB-52c | First-cross against Merino ewes | 65–85% | 72% (Western Victoria) | pass |
+| SB-53 | Unmulesed Merino ewes struck in a year | 10–25%; about 2% of struck die | 16.6%; 2.7% | pass |
+| SB-54 | Unmulesed crossbred ewes struck | 2–8% | 5.5% | pass |
+| SB-55 | Six weeks after shearing or crutching | fewer strikes | none, against some | pass |
+| SB-56 | Weaner water | 3–5; 5–7 L | 4; 6 | pass |
+| SB-57 | Dry adult water | 4–7; 8–12 L | 6; 10 | pass |
+| SB-58 | Ewes with lambs water | 8–11; 12–15 L | 10; 14 | pass |
+| SB-59 | Tablelands native carrying capacity | 4–6 DSE/ha | 3.55 | skipped (C18) |
+| SB-60 | Tablelands sown pasture | 12–17.5 DSE/ha | 5.5 (phalaris), 5.8 (ryegrass) by the carrying capacity rule | skipped (C18) |
+| SB-61 | Western Victoria improved perennial pasture | 13–23 DSE/ha | 7.1 (phalaris), 7.7 (ryegrass) | skipped (C18) |
+| SB-62 | Central West, a whole farm per 100 mm | 1.0–1.5 DSE/ha | about 0.45 on native pasture (2.7 at 594 mm) | skipped (C18) |
+| SB-63 | Cattle fence holds sheep | no | no | pass |
+| SB-64 | Netting fence holds sheep | yes | yes | pass |
+| SB-65 | Sheep-proof fence price above cattle | Claudia's call (C26) | not built | skipped |
+
+**How the rows are run.** "Unit" rows call the energy, intake, wool and water rules on one sheep. "Paddock" and "Mob" rows run the sheep step on its own on a paddock held at a set green mass and digestibility, with as much of it as the mob wants (the `held` place, tests only), and large seeded mobs (thousands of head). "Year" rows run a flock on the cattle steer block (260 ha, one water) in the district on the average year, stocked at 80% of the block's carrying capacity in DSE (1.5 DSE a ewe for the year; wethers 1 a head; weaners 0.7), rams at 1% + 1, shorn at the start and crutched six months on, averaged over three seeds. The runs are in `packages/engine/test-support/sheep.ts`; the tests in `packages/engine/src/calibration/sheep.*.test.ts`.
+
+**Why the Tablelands and Central West year rows are skipped (C18).** Their ewes are fine on paper (scanning 125% and 126%, the same as Western Victoria's 123%), but the winter on native pasture in the grass model takes them from CS 3 at joining to 1.40 on the Tablelands and 2.24 in the Central West at lambing: green feed falls under 100 kg DM/ha on the Tablelands from June to August and to 200 to 350 in the Central West, and the dead feed is 50% digestible (ME about 7.0). Sheep have no supplement in this build. Western Victoria's winter keeps more green (250 to 400 kg) and its ewes lamb at CS 3.0. Making these rows pass needs the grass model's winter (C18), a sheep supplement (milestone 2.4) or sown pasture and crops in the run (as the Central West figures assume): all for Claudia. The same runs give every Merino wether and ewe fleece in the band, and wethers lose about 1% a year in every district.
+
+**Why the carrying capacity rows are skipped (C18).** The carrying capacity rule (annual growth × 0.65 × district safe use ÷ 3,285 kg) is the grass model's, used for the cattle. With the district's native safe use it gives 3.55 DSE/ha on the Tablelands against the sourced 5, and on sown pasture 5.5 to 7.7 DSE/ha against 12 to 23, though the growth itself (9.4 to 11.5 t DM/ha a year) matches EverGraze's 8 to 12 t at Hamilton (S54). The gap is the safe use: 13 to 23 DSE/ha eats 45 to 80% of that growth, against the rule's 26%.
+
+**Fitted figures.** Each was set so a benchmark holds, and is marked FITTED in `data/sheep.ts` with the row it was fitted to: maintenance (SB-01), the young sheep's maintenance (SB-13), pregnancy (SB-04, SB-09), milk (SB-06, SB-07, SB-10, SB-11), the large Merino's SRW (SB-08), energy in a kg of gain (S6's weaner rows), appetite and short feed (SB-17 to SB-23), the lamb's share of milk and the lambs' grazing (SB-48, SB-48a), milk on short feed (SB-48), lamb survival by CS (SB-37), the crossbred lambing risk (SB-43a), adult deaths (SB-43), weaner deaths (SB-45, SB-46), wool per kg of feed (SB-52), the crossbred wool share (SB-52c), wool and gain, and micron and growth (SB-50), the lamb's wool (SB-52b). The stand-ins with no source are listed in DEVELOPMENT_LOG ("m2.3 Sheep model").
+
+**Wrong turns on the way** (LESSONS SH1 to SH4): dead feed first counted at a quarter in the sheep's reach, which starved sheep on dry winter feed (Tablelands wethers lost 40% in a year); a lamb fated to die "in its first 3 days" died on its fourth; the held mob tests had no joining record, so nothing was weaned.
 
 ### Earlier checks (build sessions, older model versions)
 

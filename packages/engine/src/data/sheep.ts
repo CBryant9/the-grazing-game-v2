@@ -261,8 +261,8 @@ export const TRIPLET_SHARE = { per: 0.1, above: 1.25, max: 0.15 } as const;
 /**
  * Birth weight, kg: singles 4.9, twins 3.7 (Lifetime Wool, S19); triplets
  * 3.0 (STAND-IN). For a 50 kg SRW Merino; other sizes in proportion to SRW
- * (STAND-IN). Each CS lost from joining to day 100 takes 0.32 kg off
- * (S18, S19: 0.30 to 0.35).
+ * (STAND-IN). Each CS lost in early to mid pregnancy (from joining to the
+ * ewe's day 80, her scanning) takes 0.32 kg off (S18, S19: 0.30 to 0.35).
  */
 export const BIRTH_KG = { single: 4.9, twin: 3.7, triplet: 3.0, perCsLost: 0.32 } as const;
 

@@ -1044,3 +1044,114 @@ At first light, for each hand who worked yesterday, one draw from the farm's own
 ### Saves
 
 Save format 9. `farm.labour` (hands, standing, people taken, the next pay day, runs under way, today's help and the injury stream) is saved, loaded and hashed with the farm. A save from format 8 or older has none and loads with no hands and no contract fencing. Save, load and carry on equals running straight through, mid-run.
+
+## 12. Sheep (rebuild, milestone 2.3)
+
+Sheep are a second species on the one grass model. The figures are in `packages/engine/src/data/sheep.ts` and [DATA.md](DATA.md) ("Sheep"), each with its source or marked FITTED or STAND-IN. The benchmarks they hit are in [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md), and the run is logged in [CALIBRATION.md](CALIBRATION.md) ("Sheep"). The shape follows the cattle model (section 3): each sheep is kept on its own and each day it eats, gains or loses, breeds, grows wool and may die.
+
+### On the farm
+
+- A farm's sheep live in `farm.sheep`: its sheep mobs and the sheep's own random streams (`sheep:breeding`, `sheep:deaths`, `sheep:flies`). It is left off a farm that has never had sheep, which plays and saves exactly as before (the digest test from milestone 2.1 still holds). Each sheep mob carries `species: 'sheep'`. Its id comes from the same count as the cattle mobs', and sheep take tag numbers from the cattle's count.
+- Sheep are offered only in the Northern Tablelands, Central West and Western Victoria (`SHEEP_DISTRICTS`). `addSheepMob` puts a mob on the farm. It is an engine and test helper until the market sells sheep in milestone 2.4. It is refused in Central Queensland and where any mob grazes.
+- **The day.** After the cattle's deaths are settled (step 5), each sheep mob in turn: wean the lambs if due, then the mob's day. Then the sheep's dead are taken out. Water use counts sheep with the cattle, and sheep mobs that come to share an area join, after the cattle mobs do (step 6). The farm counts as eaten out with sheep on it as with cattle.
+- **One mob to an area, one species to a paddock** (PRD section 21 row 25). Sheep are never put where a mob is. Cattle are never moved where sheep are: `moveMob` and the like refuse with `sheep-there`, a plan waits with `why: 'sheep-there'`, and weaner calves never go in with sheep. If a fence change or an open gate puts both in one area, both graze it, unjoined, until one is moved. Sheep mobs that share an area join the biggest.
+- Sheep stay in their grazing area. A cattle fence does not hold sheep (`fenceHoldsSheep`), but sheep getting through cattle fences, the netting fence and its price come with milestone 2.4.
+- Sheep deaths are kept out of the year's cattle totals and score until milestone 2.4 decides how sheep score. Sheep have no running cost, no supplement and no lick yet.
+
+### Where sheep graze (`sheepDietOf`, `sheepGrazeAlloc`)
+
+The cattle rules of section 2, with sheep figures:
+
+```
+green share of what they take off a square  pgS = G/(G + 0.1·D + 1), × G/100 if G < 100     (cattle: 0.25·D, 150)
+diet DMD and CP                              pgS·green + (1 − pgS)·dead, on each square
+preference weight                            (G + 0.1·D + 20) × exp((ME − 8) × 0.45) × exp(−distance to water m / 3000), × 0.15 if G + D < 200
+availability                                 1 − exp(−(G + D) / 480)                         (cattle: total mass / 650)
+residual                                     150 kg DM/ha                                     (cattle: 250)
+```
+
+The green and dead figures on a square are the cattle's (section 1, Quality). The graze takes the demand off the squares by preference, in up to 4 passes, green first by `pgS`, with the cattle's trampling (stock density counted in AE: DSE ÷ 8.4), leaf age, rankness, grazing marks and planted squares grazed. So sheep get their fill from shorter feed (96% at 1,600 kg green, 6 cm, against cattle's 91%) and pick greener feed than cattle.
+
+### Intake, kg DM/day
+
+```
+appetite, share of LW: adults 2.6%; young sheep 4% up to 60% of mature weight, falling to 2.6% at it;
+                       a milking ewe 4.2%, + 0.4% for each lamb after the first; a lamb 4% × clamp((age − 14)/96, 0, 1)
+                       × max(0.55, 1 − (CS − 3.5) × 0.4) if CS > 3.5     (the cattle rule)
+pasture = LW × share × clamp(0.62 + (DMD − 0.5) × 2, 0.5, 1.05) × availability,  × (1 − (7 − CP) × 0.05) if CP < 7
+```
+
+Mature weight is the SRW (medium Merino 50 kg, large Merino 65, crossbred 60), or SRW × 1.8 for an entire male. The mob's demand is limited by what the area supplies (`f`), as for cattle.
+
+### Energy (MJ ME a day) and weight
+
+```
+maintenance = 0.401 × LW^0.75 × (1 + 0.12 × max(0, 1 − age/730)) × (1.25 for a mature ram) × (1 + walk)
+              walk = 0.05 + 0.12 × min(1, distance to water / 3000); 0.10 is the reference DSE's walk, where a 50 kg wether needs 8.3 MJ
+pregnancy   = 3.95 × shape × (1 single, 1.85 twins, 2.4 triplets); shape 0 to day 70, rising to 1 at day 130, then + 1% a day
+milk spend  = (12.1 + 7.0 × SRW/50 for a second lamb + 2 for a third) × lactation curve (1 to day 42, falling to 0.5 at day 100)
+              × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((ME − 6)/3, 0.45, 1) × clamp(ME eaten ÷ needs at full milk, 0.5, 1)^1.5
+a lamb gets = its dam's milk spend × 0.45 ÷ her lambs at foot, plus its own pasture
+gain        = balance ÷ (2 + 50 × LW/mature weight) if positive, balance ÷ 22 if negative; −0.4 to +0.4 kg a day
+              no water: −4% of LW a day
+condition   CS += gain ÷ (0.19 × mature weight), × 0.3 for gains in sheep under 540 days old
+```
+
+A sheep's **DSE** is the energy it needs at CS 3 on full feed over 8.3 MJ: maintenance at the reference walk, pregnancy, full milk, and growth at its recent rate for sheep under two. Lambs at foot are 0: they are inside their ewe's figure. **AE** = DSE ÷ 8.4. The cattle screens keep AE × 8 (call C3).
+
+### Breeding
+
+- **Joining** starts each year on the mob's date (`joinOn`; by default the district's: 1 April in Western Victoria and the Central West, 15 May on the Tablelands) and lasts 35 days, two 17-day cycles. The rams in the mob work only in those weeks. A ewe can join if she is weaned, empty, has no lambs at foot, is 210 days old or more and is at least 75% of SRW. Each is given a day of her cycle (0 to 16, one draw) and is on heat on that day of the joining and every 17 days after.
+- **Conception on heat** = `1 − (1 − P)^(17/35)` × ram cover. P is the 5-week share in lamb at her CS (Merino 91.5%, crossbred 95.5%, 5 points a CS, held 30% to 98%). Ram cover is rams ÷ (1% of the ewes joined + 1), up to 1.
+- **Litter**, drawn at conception: foetuses per ewe joined = 1.25 (Merino) or 1.55 (crossbred) + 0.20 a CS (CS held 1.5 to 4.5). The litter of a pregnant ewe averages that ÷ P. Triplets are 10% of the litter above 1.25 (up to 15%); twins make up the rest above 1.
+- **Scanning count** on day 80 of the joining: ewes in lamb and lambs carried. A ewe's CS on day 80 of her pregnancy is kept (`csScan`).
+- **Lambing** at 147 days. The ewe's risk of dying is drawn first: singles 1.35%, twins 3.05%, triplets 6.15%; crossbred × 1.35; × (1 + (2.5 − CS)) under CS 2.5; plus 3.8% × the CS lost since scanning × litter ÷ 3 (pregnancy toxaemia). If she dies, her lambs are born and die with her. Each lamb is a ewe lamb or a ram lamb (50:50), Merino only if both parents are, with the mean of their SRWs. Birth weight is 4.9 kg for a single, 3.7 for a twin, 3.0 for a triplet (× SRW ÷ 50), less 0.32 kg for each CS the ewe lost from joining to scanning.
+- **Lamb survival to marking**, by the ewe's CS at lambing: Merino 91% singles, 71% twins, 52.9% triplets at CS 3; crossbred 93.5%, 83.5% and 60.1%. Each CS below 3 takes off 12 points (singles) or 24 (twins and triplets); each CS above adds 6 or 16. Held 5% to 98%. Of the lambs that die, 80% die on their first or second day (drawn at birth); the rest die at a daily risk from 3 days old to 42. From 42 days to weaning the risk is 0.009% a day.
+- **Marking count** 49 days after the first lamb (every lamb is then 14 days or more): lambs alive. Ram lambs become wethers that day (the marking job and its cost come in milestone 2.4).
+- **Weaning** 98 days (14 weeks) after the first lamb: every lamb is weaned and every ewe dried off. The weaners go to another empty grazing area with water (the one with most green feed first), or stay if there is none. A lamb whose dam dies is weaned at 56 days or more, and before that dies at 2% a day (the cattle orphan rate). A ewe whose last lamb dies is dried off.
+
+### Wool
+
+```
+clean wool g/day = 10.4 × kg DM eaten (a lamb's milk counts at 1/11 kg a MJ)
+                   × 0.57 for crossbreds × (8.8/14.5 while milking, or 0.7 in the last third of pregnancy, from day 98)
+                   × (0.45 + 0.55 × min(1, age/1095)) × clamp(1 + 5.5 × gain kg/day, 0.4, 1.5)
+micron           = base + 0.6 × (g/day × 365/1000 − reference fleece), held 11 to 40
+                   base: Merino ewes 17.0, wethers and rams 19.0, crossbreds 28; reference fleece 4.0, 4.2 and 2.9 kg
+```
+
+Each sheep carries its fleece (clean kg), the fleece kg × micron, and its days of wool. `shearMob` takes every weaned sheep's fleece and gives the clean and greasy kg (greasy at the national 63.6% yield), the micron by weight and the months of wool, and starts the count again. `crutchMob` does not weigh the crutchings. Both give 42 days of cover from flystrike. Selling wool and the shearing job are milestone 2.4.
+
+### Deaths
+
+- Adults, and weaners from a year after weaning: 0.8% a year (0.0022% a day), as well as lambing.
+- Weaners in their first year after weaning: `0.000124 × exp(−0.02743 × g/day) × exp(−17.19 × (weaning kg ÷ SRW − 0.478))` a day, held to 40 times the base. Growth is the smoothed figure.
+- Low condition: + (1.4 − CS) × 1.5% a day under CS 1.4 (the cattle rule).
+- No water: every sheep dies on day 4 (the cattle rule, call C30), with notes on day 1 and day 3.
+- **Flystrike** (Merinos taken as unmulesed, call C21): every weaned sheep without cover is struck at 0.066% a day (Merino) or 0.018% (crossbred). A strike takes 2.7 kg (Merino) or 5.2 kg (crossbred) and 0.3 CS, and gives a 2% chance of dying over the next 7 days. Worms are left out (call C22).
+- The cause recorded: `noWater` from the third day without water, `poorCondition` under CS 1.6, `flystrike` within 7 days of a strike, `lambing`, `newborn` (a lamb under 42 days), `orphaned`, otherwise `natural`.
+
+### Water
+
+Litres a head a day (call C17): weaners 4 (6 from December to February), dry sheep 6 (10), ewes with lambs at foot 10 (14). Lambs at foot drink inside their ewe's figure. The sheep's litres come off portable troughs with the cattle's.
+
+### Notes and events (facts only)
+
+The sheep step returns notes: `noWater`, `shortOfFeed`, `lowCondition`, `losingWeight`, `joiningStarted` (with the rams in and the rams needed), `joiningEnded`, `scanned`, `lambingStarted`, `marked` and `flystrike`. The tick reports them as `sheep` events, with `lambs-born`, `sheep-deaths` (by cause), `sheep-weaned` (and where to) and `mobs-joined`. On a farm with sheep, `DayResult` carries `sheepDeaths` and `lambs`.
+
+### Reads and what a screen may show
+
+- `sheepMobsRead`: head and lambs; classes with head, weight and CS; DSE and AE; fleece kg a head, micron and months of wool; litres drunk; weight change and intake; days without water; the joining record and the joining date.
+- `sheepJoiningRecord`: ewes joined and rams; from the scanning count, the ewes in lamb and lambs carried; then lambs born, and lambs marked and weaned per 100 ewes joined.
+- `stockingRead`: cattle AE, sheep DSE, and both together in AE and in DSE at 8.4.
+- `fleeceOf`, `dressingShare` and `carcaseKg`, for the sale.
+
+A sheep's `preg` and `litter` are not for the screens: a screen shows pregnancy only from the scanning count. Never a chance, a formula or a table (CLAUDE.md rule 14).
+
+### Saves
+
+Save format 10. `farm.sheep` is saved with each mob's sheep in columns, like the cattle. A save from format 9 or older has none and loads with no sheep.
+
+### Not built yet (milestone 2.4)
+
+Buying and selling sheep, the setup choice, the netting fence and its price, sheep getting through cattle fences, the shearing, crutching and marking jobs and their cost, wool income, sheep supplements, sheep on the map, out-of-season joining (S25: about 10% fewer in lamb), and feed on offer at lambing as a cause of lamb deaths.

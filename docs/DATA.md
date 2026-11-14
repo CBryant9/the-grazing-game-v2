@@ -830,3 +830,100 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 ### The farm's standing with workers
 
 All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.
+
+## Sheep (milestone 2.3)
+
+Every figure is a constant in `packages/engine/src/data/sheep.ts`, marked there as here. The rules are MODEL section 12. **Sourced** figures come from [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md) (sources S1 to S74, read 14 Nov 2026), or from the two sources below read for this milestone. **Fitted** figures were set so a sourced benchmark holds (the row is named). **Stand-ins** have no source and are listed for Claudia in DEVELOPMENT_LOG ("m2.3 Sheep model").
+
+### Size, energy and intake
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Districts that run sheep | Northern Tablelands, Central West, Western Victoria | Decided | PRD 5.12, section 21 row 24 |
+| One DSE | a 50 kg dry wether at CS 3, at maintenance, 8.3 MJ ME a day | Sourced | S4, S1 (calls C1, C2) |
+| DSE to the AE | 8.4 | Sourced | S1, S2 (call C3; the cattle screens keep 8) |
+| SRW, medium Merino | 50 kg | Sourced | S19 (call C29) |
+| SRW, large Merino | 65 kg | Fitted | S7: a large ewe needs 10 MJ dry against a medium one's 8 (SB-08) |
+| SRW, crossbred | 60 kg | Stand-in | No SRW table by breed found (C29) |
+| kg in one CS | 0.19 × SRW | Sourced | S27 (C28) |
+| Ram weight; ram maintenance | 1.8 × the ewes' SRW; × 1.25 | Stand-in | Chosen together for NSW's 2.0 DSE (S5, SB-12) |
+| Maintenance | 0.401 × LW^0.75 × (1 + walk), 8.3 MJ at 50 kg and the reference walk (0.10) | Fitted | S4 (SB-01, SB-02) |
+| Young sheep's maintenance | × (1 + 0.12 × (1 − age ÷ 730)) | Fitted | S4, S6 weaner rows (SB-13) |
+| Pregnancy, single at day 130; twins; triplets | 3.95 MJ; × 1.85; × 2.4 | Fitted; fitted; stand-in | S7, S4, S5, S6 (SB-04, SB-05, SB-09); S35 for triplets |
+| Gestation | 147 days | Sourced | S29 (international), S18, S19 (C12) |
+| Milk spend at the top of lactation, single; second lamb; third | 12.1 MJ; 7.0 × SRW ÷ 50; 2 | Fitted; fitted; stand-in | S7, S5, S6 (SB-06, SB-07, SB-10, SB-11) |
+| Lactation curve | full to day 42, half by day 100 | Stand-in | The cattle curve, shortened to 14 weeks |
+| Milk energy a lamb gets per MJ spent | 0.45 | Fitted | S20, S68 (SB-48, SB-48a) |
+| Milk on short feed | × clamp(eaten ÷ needs, 0.5, 1)^1.5 | Fitted | S20 (SB-48) |
+| Energy in a kg of gain | 2 + 50 × LW ÷ mature weight MJ | Fitted | S6 weaner rows |
+| Energy from a kg lost | 22 MJ | Sourced (model) | The cattle model's figure (MODEL section 3) |
+| Most gained or lost in a day | 0.4 kg | Stand-in | A ceiling, not a target |
+| Appetite: adult, young, milking, each extra lamb | 2.6%, 4%, 4.2%, + 0.4% of LW | Fitted | Inside S8's ranges (SB-14 to SB-16), set to the Pasture Ruler rows (S9, SB-17 to SB-23) |
+| Lambs start grazing | from 14 days, full at 110 | Stand-in; fitted | The cattle calves' shape; 110 days fitted with the milk share (SB-48, SB-48a) |
+| Short feed | 1 − exp(−(green + dead) ÷ 480) | Fitted | S9, S58 (SB-17 to SB-23, SB-25); dead counts in full as in the cattle rule, S61 gives limits in feed on offer |
+| Sheep's pick of green; short green; bare | G ÷ (G + 0.1 × D + 1); under 100 kg; under 200 kg | Stand-in | S12 says sheep graze closer; no figure found |
+| Sheep's residual | 150 kg DM/ha | Stand-in | S12 |
+
+### Breeding and deaths
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Oestrous cycle; joining | 17 days; 35 days | Sourced | S25, S28 (C14) |
+| Rams | 1% + 1 | Sourced | S25 (C13) |
+| Joining age and weight | 210 days; 75% of SRW | Sourced | S25, S17 |
+| In lamb after 5 weeks at CS 3 | Merino 91.5%, crossbred 95.5% | Sourced | S25 (SB-30, SB-31) |
+| In lamb, change a CS | 5 points | Stand-in | Splits the CS response between conception and litter size |
+| Foetuses per ewe joined at CS 3; a CS | 1.25 Merino, 1.55 non-Merino; + 0.20 | Sourced | S31; S18, S19, S25 (SB-32 to SB-34) |
+| Triplets | 10% of the litter above 1.25, up to 15% | Stand-in | No litter shares by breed read |
+| Birth weight | single 4.9, twin 3.7 kg; triplet 3.0; − 0.32 kg a CS lost early | Sourced; stand-in; sourced | S19; —; S18, S19 |
+| Lamb survival at CS 3 | Merino 91%, 71%, 52.9%; crossbred 93.5%, 83.5%, 60.1% | Sourced | S19, S33, S32, S35 (C11) |
+| Lamb survival a CS | below 3: 12 points singles, 24 twins; above: 6, 16 | Fitted | Between S19's table (C32) and its text (SB-37) |
+| Lamb deaths in the first 3 days | 80% of deaths to marking | Sourced | S31, S36 (SB-38) |
+| Lamb deaths, marking to weaning | 0.009% a day | Sourced | S33 (SB-39) |
+| Orphans | weaned from 56 days; 2% a day before | Stand-in; model | The cattle orphan rate |
+| Weaning | 14 weeks from the start of lambing | Sourced | S17 |
+| Joining start | 1 April (Western Victoria, Central West), 15 May (Tablelands) | Builder | C27, from the district growth curves |
+| Ewe lambing risk | singles 1.35%, twins 3.05%, triplets 6.15% | Sourced | S35 less the adult rate (SB-42) |
+| Crossbred lambing risk | × 1.35 | Fitted | S67 (SB-43a) |
+| Thin ewes at lambing | × (1 + (2.5 − CS)) | Sourced | S18, S19: doubles at CS 1.5 (SB-44) |
+| Pregnancy toxaemia | + 3.8% a CS lost from scanning to lambing, × litter ÷ 3 | Sourced (triplets) | S35 (C23) |
+| Adult deaths outside lambing | 0.8% a year | Fitted | S19, S67 (SB-43; C7) |
+| Weaner deaths | by growth and weaning weight (MODEL section 12) | Fitted | S17 table 10.1 (SB-45, SB-46) |
+| Low condition, no water | the cattle rules | Model | MODEL section 3 (C30) |
+| Flystrike a day, unprotected | Merino 0.066%, crossbred 0.018% | Fitted | S37: 17% and 5% a year with one shearing and one crutch (SB-53, SB-54; C21) |
+| Strike cost; deaths | 2.7 kg (Merino), 5.2 kg (crossbred), 0.3 CS; 2% within 7 days | Sourced | S37 |
+| Cover after shearing or crutching | 42 days | Sourced | S38 (SB-55) |
+
+### Wool, water and carcase
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Clean wool per kg DM, dry Merino at peak age | 10.4 g | Fitted | S64: wethers 4.2 kg (SB-52) |
+| Crossbred | × 0.57 | Fitted | S65: first-cross ewes cut 72% of Merino ewes' wool (SB-52c) |
+| Milking; last third of pregnancy | × 8.8 ÷ 14.5; × 0.7 | Sourced | S46 (SB-49) |
+| Wool and gain | × (1 + 5.5 × kg a day), 0.4 to 1.5 | Fitted | S18, S19 (SB-50) |
+| Wool by age | 0.45 of the adult rate at birth, full at 3 years | Fitted | S46 (peak at 3 to 4 years), S62 (SB-52b) |
+| Milk as wool feed | 1 ÷ 11 kg DM a MJ | Stand-in | — |
+| Micron at the reference fleece | Merino ewes 17.0, wethers and rams 19.0; crossbred 28 | Sourced; stand-in | S64, S46; no crossbred micron found |
+| Reference fleece | Merino ewes 4.0, males 4.2, crossbred 2.9 kg | Sourced | S62, S63, S64, S65 |
+| Micron and growth rate | 0.6 a kg a year | Fitted | S18, S19 (SB-50) |
+| Clean yield | 63.6% | Sourced | S45 (C15) |
+| Water, average and summer day | weaners 4 and 6 L; dry 6 and 10; ewes with lambs 10 and 14 | Sourced | S13 (C17) |
+| Netting holds sheep; cattle fences do not | — | Sourced | S48 (SB-63, SB-64) |
+| Dressing, lambs | 47.5% second-cross; Merino 2.5% less | Sourced | MMFS ch. 3.2, below |
+| Dressing, mutton by fat score 1 to 5 | wethers 39, 41, 43, 45, 47%; ewes 38, 40, 42, 44, 46% | Sourced | MLA, below |
+| Fat score from CS | CS rounded | Stand-in | No table read |
+
+### Two figures searched for this milestone (read 14 Nov 2026)
+
+**How long sheep go without water (call C30).** No Australian page that could be read gives the days a sheep survives without water. What was read:
+
+- RSPCA Australia Knowledgebase, "What is the impact on animal welfare of depriving farm animals of water during transport?" (updated 14 May 2021): sheep over 4 months may go at most 48 hours off water, then rest at least 36 hours with water, feed and space, as it quotes the land transport standards. Sheep are about 10% dehydrated after about 72 hours. https://kb.rspca.org.au/knowledge-base/what-is-the-impact-on-animal-welfare-of-depriving-farm-animals-of-water-during-transport/ The standard itself was not read.
+- Making More From Sheep, Tool 5.2: sheep drink up to 40% more in summer than in winter, and up to 80% more in extreme heat (as in S14).
+
+The game keeps the cattle rule (every sheep dies on day 4 without water). The 48 hours is kept as `WATER_WELFARE_HOURS` for the screens.
+
+**Dressing percentage (call C31).**
+
+- Making More From Sheep, chapter 3.2, "Manage the production system to meet market specifications" (no date): lambs dress at 45 to 50% hot standard carcase weight; Merino and Border Leicester × Merino lambs dress 1.5 to 3.5% below second-cross lambs; low-digestibility pasture can lower it by up to 3%. https://www.makingmorefromsheep.com.au/manual/module-3-market-focused-lamb-and-sheepmeat-production/chapter-3-2-manage-the-production-system-to-meet-market-specifications/
+- MLA, "Making the most of mutton" (July 2001, reprinted March 2005), table 3, p. 11: dressing percentage by fat score for Merinos 2 to 3 hours off feed with about 50 mm of wool, as in the table above; sheep dress at 35 to 50%, about 2% a fat score; crossbreds 1.5 to 3.5% above Merinos; shorn sheep higher, pregnant ewes lower. https://www.makingmorefromsheep.com.au/globalassets/mmfs/manual/module-3/mla_making-the-most-of-mutton.pdf (dated 2001: check against a current MLA figure before sheep are sold).

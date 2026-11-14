@@ -1,6 +1,8 @@
 # Sheep benchmarks (draft for Claudia)
 
-**Status: draft, 14 Nov 2026. Not yet agreed.** This is milestone 2.3's first step (BUILD_PLAN 2.3, PRD 5.12): the sheep figures from published sources, and the benchmark table the sheep model will be built to. Once Claudia agrees it, the table at the end goes into `docs/CALIBRATION.md` and each row becomes an automated engine test, the same way the cattle benchmarks did. Nothing in the engine uses these figures yet.
+**Status: draft, 14 Nov 2026. Not yet agreed.** This is milestone 2.3's first step (BUILD_PLAN 2.3, PRD 5.12): the sheep figures from published sources, and the benchmark table the sheep model will be built to. Once Claudia agrees it, the table at the end goes into `docs/CALIBRATION.md` and each row becomes an automated engine test, the same way the cattle benchmarks did.
+
+**15 Nov 2026 (m2.3 sheep model):** the engine's sheep model is built to this table with the calls' defaults (MODEL section 12). Every row is a test named by its SB number, and the model's figure for each row is in CALIBRATION (15 Nov 2026). The two figures this file did not search (C30, C31) were searched and are in DATA ("Sheep"). The calls the build made are in DEVELOPMENT_LOG ("m2.3 Sheep model").
 
 Sheep are offered in three districts: Northern Tablelands NSW (Armidale), Central West NSW (Dubbo) and Western Victoria (Hamilton). Not Central Queensland (PRD 5.12, section 21 row 24).
 
