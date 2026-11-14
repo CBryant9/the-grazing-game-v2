@@ -57,12 +57,12 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 
 | Layer | Look |
 |---|---|
-| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; purple = no water *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
-| Pasture quality | purple (ME 6.5) → green (ME 9.8) wash at 45% *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
-| Recently grazed | orange wash, stronger where more was eaten *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; purple = no water *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Pasture quality | purple (ME 6.5) → green (ME 9.8) wash at 45% *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Recently grazed | orange wash, stronger where more was eaten *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Arable land | pale yellow wash (stronger on cropped squares). Also shown while using the Sow tool. |
 | Pipe | blue `#5ab4f0` lines when connected to the bore, grey `#7e8a96` when not |
-| Labels | paddock name (big paddocks in capitals), ha, "no water" in salmon or "water via gate"; planting name under crops |
+| Labels | paddock name (big paddocks in capitals), ha, "no water" in purple (the map's no-water colour, Claudia, 14 Nov 2026; the panels keep the site colour) or "water via gate"; planting name under crops |
 | Profit | small green/red marker over each beast |
 
 ## Infrastructure
@@ -73,18 +73,18 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 | Electric fence | yellow wire `#ffe14a`, two strands |
 | Temporary tape | white dashed tape, one strand, orange posts, shorter |
 | Boundary | heavier brown wire |
-| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; slate flag when shut, green when open *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
-| Knocked-down fence | sagging amber line with an amber "!" marker. Clicking it puts it back up. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; slate flag when shut, green when open *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Knocked-down fence | sagging amber line with an amber "!" marker. Clicking it puts it back up. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Bore | a windmill about 3× a cow's height with a turning fan and red tail vane. A pulsing gold ring and a "BORE: PUT A TROUGH OR WATER HUB HERE" pointer until the first water is built. |
 | Trough | grey concrete with blue water |
 | Water hub | round trough straddling the fence line or corner |
-| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, orange below) *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, orange below) *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Trees | 16 dark green pixel trees |
 | Yards | feedlot and sale yards in a strip on the right of the map |
 
 Drawing aids:
 
-- Fence drag preview: a dashed line with the length and cost. Tape is white and dashed, whether it comes off the roll or is new; the card says how much comes off the roll. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
+- Fence drag preview: a dashed line with the length and cost. Tape is white and dashed, whether it comes off the roll or is new; the card says how much comes off the roll. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
 - Snap dots: green = joins an existing fence, white ring = open ground.
 - A hovered fence segment is highlighted white when it can be clicked.
 - While a tool asks for a paddock (moving a mob), every paddock that can be picked has a light tint and outline, and a paddock with no water is tinted and outlined purple (the water layer's no-water colour).*(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* The paddock sheet lists the same paddocks, with "No water" in words, so colour is never the only signal.
@@ -173,7 +173,7 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 - **Never blurred into the grass:** every beast has a dark outline and, outside it, a thin pale rim. On pale ground the dark line carries it. On dark ground the pale rim does. A test holds the better of the two to 3 to 1 against every colour the ground or grass can be, at midday, first light, last light, under cloud and in rain. **(builder)** **Night is not in that test.** After last light the map goes dark blue and the contrast falls to about 2 to 1. Nothing is done at night in the game (the day ends at last light), but a player can look. To fix or to accept. **(builder)**
 - **Where they stand:** the farm does not store it. The map works it out from the view, the same way every time, so cattle do not jump about. A mob gathers round the square it was put on (usually water) and spreads out from there, about two to a square, without crossing a fence. Cattle stand back from fence lines and never on a square with a trough, the bore or a building. Calves stand beside cows. They move only when the mob, its numbers, or a fence, gate or trough changes. **(builder)**
 - **Big mobs do not hide the pasture.** On open country a mob stands on no more than four squares in ten of its grazing area, three to a square at most. Past that it draws a sample. On a small area (eight squares or fewer, a tape cell say) it uses every square, up to six to a square, so high density looks crowded. The marker and badge always carry the real head count. *(v15 drew up to about 120 a mob.)* **(builder)**
-- **Zoomed out:** one marker for each mob with a cow and the head count, on a soft footprint of the squares it stands on. A mob with no water has a salmon border and says "no water".
+- **Zoomed out:** one marker for each mob with a cow and the head count, on a soft footprint of the squares it stands on. A mob with no water has a purple border and says "no water".
 - **Zoomed in:** a small head-count badge above the mob.
 - A mob in the feedlot is not drawn. A mob in the stock yards is drawn at the yards, 14 beasts at most however many are held there **(builder)**.
 - Not yet: cattle walking and grazing, the selected mob, picked animals, and the profit marker over each beast.
@@ -181,10 +181,10 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 ### Fences, gates and water
 
 - **Fences keep the colours above.** Every wire has a dark casing under it so it reads on any ground **(builder)**. Zoomed out they are bold lines. Zoomed in they have a ground shadow, posts every half square and wires standing above the ground. The boundary is heavier. Tape is white and dashed with orange posts.
-- **Knocked-down fence:** a sagging amber line with an amber "!" marker. It is steady, not flashing **(builder)**. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
-- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is slate when shut and green when open, drawn large so it reads zoomed out. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
+- **Knocked-down fence:** a sagging amber line with an amber "!" marker. It is steady, not flashing **(builder)**. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
+- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is slate when shut and green when open, drawn large so it reads zoomed out. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
 - **Bore:** a windmill about 1.9 squares tall, which is about 7 cow heights. *(The spec above says about 3 times a cow. It is drawn bigger so the bore is easy to find zoomed out.)* **(builder)** A gold ring and "Bore: put a trough or water hub here" until the first trough or hub is built. The fan turns and the ring pulses only when ambient motion is switched on **(builder)**. A paddock label that would sit over the windmill steps to one side.
-- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, orange below. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
+- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, orange below. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
 - **The stock yards** are drawn on their square (no homestead: REQUIREMENTS, 14 Nov 2026). The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.**
 
 ### The build tools on the map (milestone 1.7c)
@@ -194,7 +194,7 @@ All of this is drawn on two layers above everything else on the farm, so a draft
 - **Draft line:** the fence's own colour on a dark casing (permanent brown, electric yellow, tape white and dashed, pipe blue). Pipe draws a tint on each square and a line through their middles. **The part that does not fit today is red**, solid, on the same casing. It is the only red on a line or square on the map (Claudia, 14 Nov 2026). The card beside it says the same in words, so colour is never the only signal. Red goes with the server's job card: the first pieces drawn that fit are the line's colour, the rest are red. If none fits, all of it is red.
 - **Snap dots:** at each end of a fence line, green and filled where it joins an existing fence, a gate or the boundary, a white ring on open ground. A dot also shows at the corner under the mouse in the Fence and Water hub tools.
 - **Hover (PC):** in a tool the thing under the pointer is highlighted: a fence segment or gate in white with a dark casing, a square outlined and tinted lightly, a corner as a dot.
-- **Remove:** what is about to go is marked with a lilac glow round a white core. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* Tape marks the whole straight run that is rolled up.
+- **Remove:** what is about to go is marked with a lilac glow round a white core. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* Tape marks the whole straight run that is rolled up.
 - **A knocked-down fence** is tapped in Look. It offers the card "Put this fence back up", marked on the map, and a tap anywhere else still opens the paddock.
 - **Panning in a tool:** a drag draws, so the map is moved with two fingers, the space bar held, or the middle mouse button. Wheel and pinch still zoom. In Look nothing changed: one finger pans, a tap opens the paddock.
 - **Builder's choices (not in the spec above):** the dashed white for draft tape, the 7 px dark casing, the 7 px dot, a trough or hub picked is marked with a white square or dot, and a tap in a tool reaches the nearest fence within 22 px (10 px counts as "right under the finger" in Remove, so a trough beside a fence can still be picked).
@@ -202,7 +202,7 @@ All of this is drawn on two layers above everything else on the farm, so a draft
 ### Layers, light and weather
 
 - **Layers:** water reach, pasture quality, recently grazed, arable land, pipe and labels, with the colours and strengths above. The profit layer is listed but not drawn yet: the view carries no figures for each beast.
-- **Labels:** the paddock's name and its neutral label chip, then hectares, then "no water" in salmon or "water via gate". They hang under the paddock's top fence. Where the two lines do not fit, the paddock's name in full and a dot in the label's colour ("Paddock 1", never "P1" or a bare number: REQUIREMENTS). A paddock under 96 pixels wide on screen gets no label, and a tap still opens it. Big paddock names are not set in capitals. The planting's name sits on the crop. **(builder: placement and the short form)**
+- **Labels:** the paddock's name and its neutral label chip, then hectares, then "no water" in purple (light and dark) or "water via gate". *(Changed: Claudia, 14 Nov 2026: inside the map red is saved for "can't do this" while drawing; the site's colours, red included, stay as designed outside the map.)* They hang under the paddock's top fence. Where the two lines do not fit, the paddock's name in full and a dot in the label's colour ("Paddock 1", never "P1" or a bare number: REQUIREMENTS). A paddock under 96 pixels wide on screen gets no label, and a tap still opens it. Big paddock names are not set in capitals. The planting's name sits on the crop. **(builder: placement and the short form)**
 - **Time of day:** one tint over the whole map. Warm and low at first light, white through the day, warm before last light, dark blue outside those hours. **Weather:** clear, overcast (dimmer) and rain (dimmer again, with falling streaks). The daytime tints are kept bright enough for the cattle contrast figure to hold. **(builder: the tint colours)**
 - **Reduce motion:** nothing moves. Rain is drawn still, and the change of detail is made at once.
 - **Themes:** the country keeps its natural colours in both. Only the surround, the labels and the markers change.

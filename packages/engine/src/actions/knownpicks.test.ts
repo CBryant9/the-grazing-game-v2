@@ -5,20 +5,20 @@ import { createFarm } from '../sim/create';
 import { surveyOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
-import { knownClassOf, knownGroupOf } from '../sim/told';
+import { PTIC_DAYS, recordClassOf, recordGroupOf } from '../sim/told';
 import { applyAction } from '../day/act';
 
 /*
- * A player picks cattle from what they know (milestone 1.7f). Selling by
+ * A player picks cattle from the record (Claudia, 14 Nov 2026). Selling by
  * sale group and moving part of a mob by class take the animals the mob card
- * lists, by `knownGroupOf` and `knownClassOf`: never by live pregnancy, which
- * a grazier can not see before a preg test.
+ * lists, by `recordGroupOf` and `recordClassOf`: a female is PTIC only from
+ * PTIC_DAYS in calf, never by live pregnancy from the day she conceives.
  */
 
 const inCalf = (a: Animal): boolean => (a.kind === 'cow' || a.kind === 'heifer') && a.preg >= 0;
 
-/** A running farm part way into a joining, with nothing known in calf: an untested joined mob. */
-function untestedJoined(): FarmState {
+/** A running farm part way into a joining, with every cow in calf under PTIC_DAYS in: none on the record yet. */
+function untestedJoined(saleDay = false): FarmState {
   const farm = createFarm({
     seed: 21,
     district: 'nsw',
@@ -32,21 +32,22 @@ function untestedJoined(): FarmState {
     const cows = farm.mobs.flatMap((m) => m.animals).filter((a) => a.kind === 'cow');
     if (cows.filter(inCalf).length >= 5 && cows.some((a) => !inCalf(a))) break;
   }
-  // No preg test since: the player knows no cow is in calf.
-  farm.knownInCalf = new Int32Array(0);
-  return farm;
+  // On a sale day if asked, then every cow in calf is under PTIC_DAYS in: none on the record yet.
+  const at = saleDay ? toSaleDay(farm) : farm;
+  for (const a of at.mobs.flatMap((m) => m.animals)) {
+    if (a.preg >= PTIC_DAYS) a.preg = PTIC_DAYS - 1;
+  }
+  return at;
 }
 
-const known = (farm: FarmState) => new Set(farm.knownInCalf);
 const cowMob = (farm: FarmState) =>
   farm.mobs.find((m) => m.animals.some((a) => a.kind === 'cow' && inCalf(a)))!;
 
 describe('selling by sale group picks by what the player knows', () => {
-  it('"cows not in calf" in an untested mob: the head sold is the head asked for, in-calf cows included', () => {
-    const farm = toSaleDay(untestedJoined());
+  it('"cows" (not PTIC on the record): the head sold is the head asked for, in-calf cows included', () => {
+    const farm = untestedJoined(true);
     const m = cowMob(farm);
-    const k = known(farm);
-    const empties = m.animals.filter((a) => a.kind !== 'calf' && knownGroupOf(a, k) === 'cowE');
+    const empties = m.animals.filter((a) => a.kind !== 'calf' && recordGroupOf(a) === 'cowE');
     const reallyInCalf = empties.filter(inCalf).length;
     expect(reallyInCalf).toBeGreaterThan(0);
     const before = new Set(m.animals.map((a) => a.id));
@@ -58,8 +59,8 @@ describe('selling by sale group picks by what the player knows', () => {
     expect(soldCows.filter(inCalf).length).toBe(reallyInCalf);
   });
 
-  it('the PTIC group of an untested mob sells none', () => {
-    const farm = toSaleDay(untestedJoined());
+  it('the PTIC group, when no cow is PTIC on the record, sells none', () => {
+    const farm = untestedJoined(true);
     const m = cowMob(farm);
     const r = applyAction(farm, { type: 'sellGroup', mob: m.id, group: 'cowP', qty: 50 });
     if (r.ok) {
@@ -85,11 +86,10 @@ describe('moving part of a mob by class picks by what the player knows', () => {
   it('moving every "dry cow" row takes in-calf cows the player was never told about', () => {
     const farm = untestedJoined();
     const m = cowMob(farm);
-    const k = known(farm);
     const rows = new Map<string, Animal[]>();
     for (const a of m.animals) {
       if (a.kind !== 'cow') continue;
-      const c = knownClassOf(a, k);
+      const c = recordClassOf(a);
       rows.set(c, [...(rows.get(c) ?? []), a]);
     }
     expect(rows.has('pticCow')).toBe(false);
@@ -111,7 +111,7 @@ describe('moving part of a mob by class picks by what the player knows', () => {
     expect(movedCows.length).toBe(list.length);
   });
 
-  it('the PTIC cow class of an untested mob moves none', () => {
+  it('the PTIC cow class, when no cow is PTIC on the record, moves none', () => {
     const farm = untestedJoined();
     const m = cowMob(farm);
     const anchor = m.where.kind === 'paddock' ? m.where.anchor : 0;

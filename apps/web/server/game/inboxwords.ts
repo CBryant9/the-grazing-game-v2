@@ -56,17 +56,11 @@ export function noteWord(mobName: string, area: string | null, n: CattleNote): s
       return `The unmarked young bulls in ${mobName} are now fertile.`;
     case 'joiningStarted':
       return `Joining has started in ${mobName}: ${plural(n.adultBulls, 'bull')} with ${plural(n.ready, 'female')} ready to join.`;
+    // No preg test and no count of cows in calf (Claudia, 14 Nov 2026): the record shows a
+    // female as PTIC from the engine's PTIC_DAYS in calf, on the mob card and the herd list.
     case 'joiningProgress':
-      return `${mobName}, joining week ${n.weeks}: ${n.conceived} got in calf in the last 3 weeks. ${n.inCalf} of ${plural(n.females, 'female')} are in calf now.`;
-    case 'pregTest': {
-      const rest = [
-        n.dry > 0 ? `${plural(n.dry, 'female')} not in calf.` : '',
-        n.tooSoon > 0 ? `${plural(n.tooSoon, 'female')} calved too recently to tell.` : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      return `${mobName} preg test: ${n.inCalf} of ${plural(n.females, 'female')} in calf (${pct(n.rate)}). At CS ${n.cs.toFixed(1)} about ${pct(n.expected)} would be expected.${rest ? ` ${rest}` : ''}`;
-    }
+    case 'pregTest':
+      return null;
     case 'noBull':
       return `${mobName} has ${plural(n.ready, 'female')} ready to join and no bull.`;
     case 'lowCondition':

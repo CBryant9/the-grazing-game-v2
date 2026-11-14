@@ -58,7 +58,6 @@ import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { runPlans, stopsToday } from './plans';
-import { forgetStale, toldNotes } from './told';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -296,8 +295,6 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     for (const note of res.notes) {
       events.push({ type: 'cattle', mob: m.id, mobName: m.name, area, note });
     }
-    // What the player is told: the latest joining report and preg test, and who was found in calf.
-    toldNotes(farm, m, res.notes, day);
     for (const g of res.plantingGrazes) {
       const event = squareGrazed(farm.crops, g.square, g.eaten, g.greenEaten, g.greenBefore, day);
       if (event) events.push({ type: 'crop-grazed', mob: m.id, mobName: m.name, event });
@@ -321,8 +318,6 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 5. Deaths are settled.
   settleDeaths(farm.mobs, deaths, byId, farm.year);
-  // A cow known to be in calf that calved, slipped her calf or died comes off the known list.
-  forgetStale(farm);
 
   // 6. Water use, breakouts and mobs joining.
   if (farm.layout.water.ports.length) {

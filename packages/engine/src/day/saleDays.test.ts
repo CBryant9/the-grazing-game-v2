@@ -603,7 +603,7 @@ describe('saves and repeatability', () => {
     const booked = work(farm, { type: 'sellGroup', mob, group: 'steer', qty: 10 }).farm;
     const f = work(toSaleDay(farm), { type: 'buyCattle', cls: 'yearSteer', qty: 4 }).farm;
     const saved = saveFarm(f);
-    expect(saved.saveFormat).toBe(7);
+    expect(saved.saveFormat).toBe(8);
     expect(Array.isArray(saved.arrivals)).toBe(true);
     // The booking is a packed whole-number array, not a list of numbers in text.
     expect(JSON.stringify(saveFarm(booked).saleBookings)).toContain('"$":"i32"');

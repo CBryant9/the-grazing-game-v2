@@ -113,6 +113,7 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
                   <span className={styles.rowsub}>
                     {m.where === 'yards' ? 'Stock yards' : (m.area ?? 'Feedlot')}
                     {m.cs !== null ? `, CS ${num(m.cs, 1)}` : ''}, {gainText(m.adgKg)}
+                    {m.pticText ? `. ${m.pticText}` : ''}
                     {!m.hasWater && m.where === 'paddock' && (
                       <span className={styles.warntag}>No water</span>
                     )}

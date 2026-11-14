@@ -145,32 +145,29 @@ describe('the words for the inbox', () => {
     expect(m.text).not.toMatch(BANNED);
   });
 
-  it('says a joining report and a preg test with the figures', () => {
+  it('says nothing of a joining report or a preg test', () => {
+    // No preg test and no count of cows in calf is reported (Claudia, 14 Nov 2026).
     expect(
-      noteWord('Cows A', 'Paddock 2', {
+      noteWord('Heifers', null, {
+        type: 'pregTest',
+        inCalf: 41,
+        females: 46,
+        rate: 41 / 46,
+        dry: 5,
+        cs: 3.5,
+        expected: 0.89,
+        tooSoon: 0,
+      }),
+    ).toBeNull();
+    expect(
+      noteWord('Heifers', null, {
         type: 'joiningProgress',
         weeks: 3,
-        conceived: 38,
-        inCalf: 38,
-        females: 100,
+        conceived: 20,
+        inCalf: 20,
+        females: 46,
       }),
-    ).toBe(
-      'Cows A, joining week 3: 38 got in calf in the last 3 weeks. 38 of 100 females are in calf now.',
-    );
-    const preg = noteWord('Heifers', null, {
-      type: 'pregTest',
-      inCalf: 41,
-      females: 46,
-      rate: 41 / 46,
-      dry: 5,
-      cs: 3.5,
-      expected: 0.89,
-      tooSoon: 0,
-    })!;
-    expect(preg).toBe(
-      'Heifers preg test: 41 of 46 females in calf (89%). At CS 3.5 about 89% would be expected. 5 females not in calf.',
-    );
-    expect(preg).not.toMatch(BANNED);
+    ).toBeNull();
   });
 
   it('leaves out the events the inbox does not carry', () => {

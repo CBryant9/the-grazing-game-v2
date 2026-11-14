@@ -34,12 +34,17 @@
  * exactly as it did on 0.9.0.
  *
  * 0.11.0 (milestone 1.7f, 14 Nov 2026): selling by sale group and moving
- * part of a mob by class pick by what the player knows (`knownGroupOf`,
- * `knownClassOf`), not by live pregnancy. No formula or price changed; a
- * farm that never sells by a breeding group or moves cows by class runs
- * exactly as it did on 0.10.0.
+ * part of a mob by class picked by what the player was told. Replaced the
+ * same day by 0.12.0.
+ *
+ * 0.12.0 (14 Nov 2026, Claudia): the herd record. A cow or heifer is PTIC
+ * on the record, by herself, from `PTIC_DAYS` in calf (the day the price
+ * pays the in-calf premium); no preg test and nothing kept of what the
+ * player was told. Every class and group the player sees or picks from
+ * uses that rule (`recordClassOf`, `recordGroupOf`). No grass, cattle,
+ * crop, season or price formula changed.
  */
-export const ENGINE_VERSION = '0.11.0';
+export const ENGINE_VERSION = '0.12.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -74,5 +79,9 @@ export const ENGINE_VERSION = '0.11.0';
  * test), both display state only. An older save loads with nothing on hand,
  * no female known in calf, and each mob's latest reports read back from
  * the inbox.
+ *
+ * 8: the herd record (14 Nov 2026, Claudia). A female is PTIC on the record
+ * from `PTIC_DAYS` in calf, worked out from the cattle, so `knownInCalf` and
+ * a mob's `reports` are gone. A format 7 save loads with them dropped.
  */
-export const SAVE_FORMAT_VERSION = 7;
+export const SAVE_FORMAT_VERSION = 8;

@@ -164,7 +164,7 @@ export interface ThemeColours {
   labelBgAlpha: number;
   labelText: number;
   labelMuted: number;
-  /** "No water" on a label or a marker. */
+  /** "No water" on a label or a marker: the map's no-water purple (red inside the map is saved for "can't do this"). */
   noWater: number;
   /** The text on a paddock label chip. */
   chipText: number;
@@ -185,7 +185,7 @@ export const THEMES: Record<MapTheme, ThemeColours> = {
     labelBgAlpha: 0.88,
     labelText: 0xf3e7cf,
     labelMuted: 0xc9c2b0,
-    noWater: 0xffb49a,
+    noWater: 0xc9a2f5,
     chipText: 0x111111,
     markerBg: 0x0b1220,
     markerText: 0xf3e7cf,
@@ -200,7 +200,7 @@ export const THEMES: Record<MapTheme, ThemeColours> = {
     labelBgAlpha: 0.94,
     labelText: 0x1b2438,
     labelMuted: 0x4a5468,
-    noWater: 0xa3301f,
+    noWater: 0x7832aa,
     chipText: 0x111111,
     markerBg: 0xfffaf0,
     markerText: 0x1b2438,

@@ -994,15 +994,36 @@ What was looked at in a real browser (the pane's browser on `next dev`, a runnin
 
 Not done:
 
-- Moving a mob or selling a group by the known classes can ask for more "not in calf" cows than the engine's live classes hold (the engine picks by live pregnancy). The engine then moves or sells fewer, or refuses. A fix needs an engine change.
+- Moving a mob or selling a group by the known classes could ask for more "not in calf" cows than the engine's live classes held. Settled in the second pass below (the herd record, engine 0.12.0).
 - Lighthouse was not run.
 
 Questions for Claudia:
 
-1. **Selling and moving by what is known.** The mob card now shows cows as PTIC only when a preg test said so, but the engine still picks "PTIC cows" and "cows not in calf" by live pregnancy. Should the engine pick by what the player knows?
-2. **The no-water colour.** No water on the water layer and in the move tool is now purple, not red. Right, or another colour?
-3. **The Short label chip** is a red-orange (`#ec6a48`). It is a word chip, not a line, so it was left. Change it too?
+(Questions 1 to 3 were settled in the second pass below.)
 4. **Stale farms.** A farm not played for 90 days is removed (the session cookie lasts 90 days). Right?
+
+### 14 Nov 2026: milestone 1.7f, second pass (review, and Claudia's change of direction)
+
+Same branch. Engine 0.12.0, save format 8.
+
+- **Pregnancy on the record, no preg test** (Claudia, 14 Nov 2026; REQUIREMENTS "pregnancy on the record"). Replaces the "told" design from earlier the same day (engine 0.10.0 and 0.11.0: `knownInCalf`, a mob's `reports`, joining reports and the preg test on the mob card), which is gone; save format 8 drops it from an older save. A cow or heifer is PTIC on the record by herself from `PTIC_DAYS` (50) in calf, the day the price pays the in-calf premium (`PREG_PREMIUM.fromDays`), so the record and the price agree and no money changes. One rule in `sim/told.ts` (`onRecordPtic`, `recordClassOf`, `recordGroupOf`) used by the mob card, the herd list ("31 PTIC, 2 to 4 months in calf."), the map's classes, `sellGroup` (sale and booking) and `moveCattle`. Groups renamed "Heifers" and "Cows" (no "empty", no "not in calf"). The inbox leaves out the joining progress and preg test notes; the cattle step still makes them, because the old game comparison checks them, so they stay in the engine unshown. Bought PTIC cattle come 100 to 210 days in calf, so they are PTIC from arrival (tested). Tests: a cow 10 days in calf shows exactly as an empty cow in every read and screen; selling "Cows" and moving a class by count take exactly the head asked for; the PTIC group and class with nothing on the record take none; PTIC price only from `PTIC_DAYS`; saves. Checked for selection by pregnancy: `sellGroup`, `moveCattle` (now the record); `sellClass` (market class), `sellAnimals`, booking by tag and `cancelSale` (tags), `markCalves`, `wean`, plan moves, `moveMob`, joins, the yards split and auto-weaning (no pregnancy). DATA "When a cow shows as PTIC": Agriculture Victoria gives reliable palpation from about 6 weeks of pregnancy (42 days); the engine keeps 50 (see the question below).
+- **A water job that leaves stock dry says so.** Taking out or moving a hub of either kind, a trough or a portable trough: a trial run finds each mob that has water now and would have none, and the card says "After this, Mob 1 has no water in Paddock 2. Cattle die on the fourth day without water." The job is not blocked.
+- **The key lists** cover the preview, act (stale, refused and repeated answers included), day and skip replies as well as the snapshot, and fail when a listed key is never sent. New fixtures: a booked sale, cattle on the way, a game over, a fence down to fix, a plan by days.
+- **Start-up warning** in production when `GG_TRUSTED_IP_HEADER` is unset (`instrumentation.ts`, `.env.example`).
+- **The session cookie is renewed** with a fresh Max-Age on every route that loads the farm. Tested.
+- **The husbandry reasons** are asserted exactly against `husbandryNow`.
+- **Colour, narrowed** (Claudia: red "is like an error, or a can't go any further, within the picture"). The rule is for the map picture only. The site's colours stay as designed, red included (the panels, the Short chip, the chart, the main button). On the map the no-water label text is now purple in both themes, like the pickable no-water outline. REQUIREMENTS and VISUALS updated.
+
+How it was tested: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` (2,273 tests, calibration and every old game comparison unchanged), `pnpm test:speed`, `pnpm build`, `pnpm check:browser-bundle`; the map fixtures were made again (the mob classes follow the record).
+
+Questions for Claudia:
+
+1. **When a cow shows as PTIC.** The engine uses 50 days in calf, the day the price pays the in-calf premium. Agriculture Victoria says pregnancy can be reliably found by palpation from about 6 weeks (42 days). Keep 50, or move both the record and the price to 42 (that changes sale values against the old game)?
+2. **Late pregnancy shows.** Cows more than 190 days in calf add 10% to AE and give a "late pregnancy" reason on the mob card. A grazier can usually see it by then. Leave it?
+3. **Fence materials.** Fence built over by another kind is lost, and materials on hand count for nothing in net worth. Right?
+4. **The main button is red.** Keep it?
+5. **No water is purple on the map** (labels, markers, the pickable outline) but keeps the site colour in the panels. Right?
+6. **Unused farms are removed after 90 days.** Right?
 
 ## Ideas raised but not built yet
 

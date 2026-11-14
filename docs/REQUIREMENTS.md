@@ -300,7 +300,19 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
 - [ ] **The default fence is the permanent one.** "A normal fence is the one that they would go for. They have to specifically choose electrical." *(Built in milestone 1.7f: the fence tool starts on permanent fence.)*
 - [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)* *(Built in milestone 1.7f: no tool changes the zoom by itself; pinch and wheel zoom work in every tool.)*
 - [ ] **Red means one thing.** Her words: red "means doesn't fit today when building, so use other colours for other stuff". On the map and the cards, red on a line or a square is used only for the part of a line that does not fit today. A knocked-down fence is amber with its "!" marker. New tape is white and dashed, never red. The no-water salmon stays for words and markers, not as a red line. *(Built in milestone 1.7f. Reverses the red knocked-down fence, the red new tape and the red remove mark in VISUALS.)*
+  - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
 - [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
+
+## 14 Nov 2026: pregnancy on the record, no preg test
+
+Her words: "I think we're probably not going to preg test the mobs or need that animal husbandry, but we do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry." "You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows."
+
+- [ ] **No preg test job.** Not on the screens, the to-do list, the banner or the help.
+- [ ] **A cow or heifer is PTIC on the record by herself once she is a set number of days in calf** (the engine's `PTIC_DAYS`, 50: the day the price starts paying the in-calf premium; DATA "When a cow shows as PTIC"). Before that she is a cow or heifer (dry with no calf at foot), whether or not she is really in calf.
+- [ ] **PTIC price only for cows on the record as PTIC.** All others sell as cows.
+- [ ] **The mob lists show head PTIC and how far along**, in whole months ("31 PTIC, 2 to 4 months in calf"), the months for PTIC cows only. Nothing calls a cow "empty".
+- [ ] **Every class and group the player sees or picks from uses the one rule**: selling, booking a sale, moving part of a mob, the map, the herd list.
+- *(Reverses: earlier on 14 Nov 2026 the player was told only what a joining report or preg test had said, with the joining reports, the preg test and "known in calf" on the mob card. Built in engine 0.10.0 and 0.11.0; replaced by engine 0.12.0.)*
 
 ### For the game screens milestone
 

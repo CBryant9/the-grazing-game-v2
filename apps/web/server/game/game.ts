@@ -5,7 +5,6 @@ import {
   CLASS_LABELS,
   EDGE,
   GRID_N,
-  GROUPS,
   MARKET_CLASSES,
   MAX_BUY,
   SALE_CLASSES,
@@ -58,7 +57,7 @@ import {
 import { cropLines, parseSow } from './crops';
 import { buyLines, cancelLines, sellLines } from './marketwords';
 import { suppPerDay } from './mobs';
-import { lostWaterNote, moveNotes } from './mobwords';
+import { GROUP_NAME, lostWaterNote, moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
 import { buildSnapshot, buildSummary } from './snapshot';
 import {
@@ -703,7 +702,7 @@ export class GameServer {
         const what =
           action.type === 'sellClass'
             ? MARKET_CLASSES[action.cls].toLowerCase()
-            : `${GROUPS[action.group].name.toLowerCase()} from ${farm.mobs.find((m) => m.id === action.mob)?.name ?? 'the mob'}`;
+            : `${(GROUP_NAME[action.group as keyof typeof GROUP_NAME] ?? 'cattle').toLowerCase()} from ${farm.mobs.find((m) => m.id === action.mob)?.name ?? 'the mob'}`;
         if (sold?.type === 'cattle-sold') {
           return sellLines({
             head: sold.head,

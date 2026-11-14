@@ -76,43 +76,61 @@ export function mobWhy(i: WhyInputs): string[] {
   return out;
 }
 
+/**
+ * The sale groups' names on the screens. Nothing calls a cow "empty" or "not
+ * in calf": a cow that is not PTIC on the record is just a cow (Claudia,
+ * 14 Nov 2026). The engine's GROUPS keep the old game's words for its
+ * comparison.
+ */
+export const GROUP_NAME = {
+  steer: 'Steers',
+  heifer: 'Heifers',
+  heiferP: 'Heifers (PTIC)',
+  cowP: 'Cows (PTIC)',
+  cowE: 'Cows',
+  bull: 'Bulls',
+} as const;
+
 export const SUPP_LABEL = { none: 'None', lick: 'Lick', hay: 'Hay', pellet: 'Pellets' } as const;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const day = (d: { year: number; month: number; date: number }): string =>
   `${d.date} ${MONTHS[d.month]} ${d.year}`;
-const pct = (share: number): string => `${Math.round(share * 100)}%`;
 
 type Date3 = { year: number; month: number; date: number };
 
 export interface BreedingInputs {
-  /** The joining under way, from its start, or null. Its length is the engine's `JOINING_DAYS`. */
-  joining: { start: Date3; end: Date3; days: number; reportDays: number; ended: boolean } | null;
-  /** The latest joining report, with the date it was made, or null. */
-  report: {
-    date: Date3;
-    weeks: number;
-    conceived: number;
-    inCalf: number;
-    females: number;
-  } | null;
-  /** The latest preg test, with the date it was made, or null. */
-  pregTest: {
-    date: Date3;
-    inCalf: number;
-    females: number;
-    rate: number;
-    dry: number;
-    tooSoon: number;
-  } | null;
-  knownCows: number;
-  knownHeifers: number;
+  /** The joining under way, from the day the bulls went in, or null. Its length is the engine's `JOINING_DAYS`. */
+  joining: { start: Date3; end: Date3; days: number; ended: boolean } | null;
+  /** "31 PTIC, 2 to 4 months in calf.", or null with none PTIC. */
+  ptic: string | null;
 }
 
 /**
- * The breeding lines on the mob card: only what the player has been told,
- * by a joining report, a preg test or the saleyard, each with its date.
- * Nothing here changes on a day with no report (CLAUDE.md rule 14).
+ * Head PTIC on the record and how far along, in whole months: "31 PTIC, 2 to
+ * 4 months in calf." Null with none. The months are for PTIC females only.
+ */
+export function pticWords(
+  ptic: { cows: number; heifers: number },
+  months: { least: number; most: number } | null,
+): string | null {
+  const n = ptic.cows + ptic.heifers;
+  if (n <= 0 || !months) return null;
+  const who =
+    ptic.cows > 0 && ptic.heifers > 0
+      ? ` (${plural(ptic.cows, 'cow')}, ${plural(ptic.heifers, 'heifer')})`
+      : '';
+  const along =
+    months.least === months.most
+      ? plural(months.least, 'month')
+      : `${months.least} to ${months.most} months`;
+  return `${n} PTIC${who}, ${along} in calf.`;
+}
+
+/**
+ * The breeding lines on the mob card: the joining's dates, and the head PTIC
+ * on the record with how far along they are. A female is PTIC from the
+ * engine's PTIC_DAYS in calf; before that she is listed as a cow or heifer.
  */
 export function breedingLines(i: BreedingInputs): string[] {
   const out: string[] = [];
@@ -121,29 +139,11 @@ export function breedingLines(i: BreedingInputs): string[] {
     const weeks = Math.round(j.days / 7);
     out.push(
       j.ended
-        ? `Joining: ${day(j.start)} to ${day(j.end)} (${weeks} weeks). It has ended.`
-        : `Joining: ${day(j.start)} to ${day(j.end)} (${weeks} weeks). A report comes every ${Math.round(j.reportDays / 7)} weeks.`,
+        ? `Joining: bulls in ${day(j.start)} to ${day(j.end)} (${weeks} weeks). It has ended.`
+        : `Joining: bulls in from ${day(j.start)} to ${day(j.end)} (${weeks} weeks).`,
     );
   }
-  const r = i.report;
-  if (r) {
-    out.push(
-      `Joining report, ${r.weeks} weeks in (${day(r.date)}): ${r.inCalf} of ${plural(r.females, 'female')} in calf, ${r.conceived} in the 3 weeks before it.`,
-    );
-  }
-  const p = i.pregTest;
-  if (p) {
-    const soon =
-      p.tooSoon > 0 ? ` ${plural(p.tooSoon, 'female')} calved too recently to tell.` : '';
-    out.push(
-      `Preg test (${day(p.date)}): ${p.inCalf} of ${plural(p.females, 'female')} in calf (${pct(p.rate)}). ${p.dry} not in calf.${soon}`,
-    );
-  }
-  if (i.knownCows + i.knownHeifers > 0) {
-    out.push(
-      `Known in calf now: ${plural(i.knownCows, 'cow')} and ${plural(i.knownHeifers, 'heifer')}.`,
-    );
-  }
+  if (i.ptic) out.push(i.ptic);
   return out;
 }
 

@@ -129,9 +129,11 @@ export interface MobWire {
   classes: MobClassWire[];
   /** Plain sentences on why the mob is losing weight or short of feed or water. Empty when there is nothing to say. */
   why: string[];
-  /** Females known to be in calf (PTIC): a preg test or the saleyard said so. Never the live count. */
+  /** Females on the record as PTIC (the engine's PTIC_DAYS or more in calf). Never the live count. */
   ptic: number;
-  /** The joining, the latest joining report and the latest preg test, each with its date. Empty with none. */
+  /** "31 PTIC, 2 to 4 months in calf.", or null with none PTIC. For the herd list. */
+  pticText: string | null;
+  /** The joining's dates and the PTIC line. Empty with none. */
   breeding: string[];
   supp: SuppId;
   /** The supplements to pick from. Empty when the mob is not on pasture. */

@@ -40,8 +40,8 @@ export interface Animal {
   cost: number;
   /**
    * Days pregnant. -1 means not in calf. NOT FOR THE PLAYER'S SCREENS: the
-   * player knows only what a joining report or preg test has said
-   * (`breedingReports`).
+   * record shows a female as PTIC only from `PTIC_DAYS` in calf
+   * (`recordClassOf`, `breedingReports`).
    */
   preg: number;
   /** Days since calving while she has a calf on her. -1 means dry. */

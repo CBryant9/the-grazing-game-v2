@@ -129,6 +129,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'me',
     'name',
     'ptic',
+    'pticText',
     'sellGroups',
     'sellReason',
     'supp',

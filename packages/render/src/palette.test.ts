@@ -220,6 +220,13 @@ describe('red means one thing: the part of a line that does not fit today (Claud
   it('new tape is white, never red', () => {
     expect(NATURAL.fenceTape).toBe(0xffffff);
   });
+
+  it('the no-water words on the map labels and markers are the map purple, not red', () => {
+    // Inside the map picture red is saved for "can't do this" while drawing (Claudia, 14 Nov 2026).
+    for (const theme of ['dark', 'light'] as const)
+      expect(isRed(THEMES[theme].noWater)).toBe(false);
+    expect(THEMES.light.noWater).toBe(0x7832aa);
+  });
 });
 
 describe('time of day and weather', () => {
