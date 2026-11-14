@@ -91,8 +91,10 @@ export type Outcome =
   | { ok: false; error: string; code: string | undefined };
 
 /** Did it work and touch at least one row? RLS refuses some writes by touching none. */
-export const passed = (o: Outcome): boolean =>
-  o.ok && (o.rows.length > 0 || o.affected > 0);
+export const passed = (o: Outcome): boolean => o.ok && (o.rows.length > 0 || o.affected > 0);
+
+/** The rows of an outcome, or none if it failed. */
+export const rowsOf = (o: Outcome): Record<string, unknown>[] => (o.ok ? o.rows : []);
 
 function failure(e: unknown): Outcome {
   const err = e as { message?: string; code?: string };

@@ -1151,6 +1151,64 @@ Not done or not checked: a real phone (install, the iPhone steps, offline in air
 - The last-farm copy (offline viewing) and the tour progress are kept per browser, not per player, until accounts arrive in Stage 3. A second player on the same browser sees the first player's last farm copy and tour progress.
 - The service worker now keeps only `/` and `/play`. Every other page (admin, sign-in callbacks, account pages) and everything under `/api` goes to the network and is never stored.
 
+### 15 Nov 2026: m3.1 Database
+
+Branch `m3.1-database`, from `m1.7g-scores-diary` (the checked Stage 1 line, fa07767). The database half of milestone 3.1: the Supabase tables, access rules on every table, server functions, seed data and the tests that prove the rules. Sign-in screens are the other half and are not in this piece. Nothing in `apps/web`, `packages/engine` or `packages/render` changed. No account, project or key was made with any outside service.
+
+What was built (details in [DATABASE.md](DATABASE.md)):
+
+- **14 migrations** in `supabase/migrations`: 54 tables, three column-safe views, the access helpers, grants and policies, guards, server functions, four storage buckets with their rules, the reference rows (switches, ad slots, farm limits, products, rate limits, site settings) and two nightly pg_cron jobs.
+- **Tables:** accounts (`profiles`, `account_private`, `account_status`, profile links, experience, education, showcase photos, `guest_sessions`, `farm_limits`); game (`farms`, `farm_saves`, `farm_days`, `farm_snapshots`, `farm_actions`, `farm_scores`, `challenges`, `challenge_entries`, `leaderboard_entries`); community (`follows`, `blocks`, `groups`, `group_members`, `posts`, `post_photos`, `comments`, `likes`, `activity_events`, `reports`, `moderation_actions`, `word_filter`); system (`feature_switches`, `site_settings`, `admin_audit_log`, `rate_limit_rules`, `rate_limit_hits`, `notifications`, `notification_settings`, `notification_prefs`, `push_subscriptions`, `weather_daily`, `price_daily`, `daily_counts`); money (`ad_slots`, `sponsors`, `campaigns`, `ad_creatives`, `campaign_slots`, `ad_events`, `ad_daily`, `products`, `purchases`, `account_entitlements`, `stripe_customers`, `stripe_events`).
+- **`farm_saves` holds what `apps/web/server/game/store.ts` keeps in a file today** (stored format 3: the engine save, setup, farm version, recent act requests, inbox read mark), plus the save format, engine version and data version as columns. The diary moves to one `farm_days` row per day.
+- **`packages/db`**: the test harness on PGlite 0.5.13 (a dev dependency of that package only), the stand-ins for what Supabase supplies (test folder only), and four test files.
+- `.env.example`: the Supabase and Resend variables.
+
+How it was tested: 391 database tests in 4 files, about 20 seconds: every table against a visitor, player A, player B, an under-16 player, an admin and the server for select, insert, update and delete (270 cells and impersonation checks), whole-database checks (row level security on everywhere, every table in the matrix, grants, callable functions, search paths, reference rows matching `packages/shared`), and the rules and functions one by one. Then `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build`, `pnpm check:browser-bundle` and `pnpm check:js-budget`. `pnpm test:speed` was not run (asked to skip). The tests prove the rules on Postgres semantics; one run against a real Supabase project is still owed (DATABASE.md, "Still owed").
+
+**Calls for Claudia** (what, why, how to change it):
+
+1. **Every feature switch starts off in the database**, including sign-ups, both modes, leaderboards and push, which PRD 11.7 and `FEATURE_SWITCHES` in `packages/shared` have on at launch. A new database then shows nothing until you turn each part on in admin. To change: the `feature_switches` rows in `20261114001300_reference_data.sql`, or a switch in admin.
+2. **Guests are sessions the server makes** (a hashed cookie secret in `guest_sessions`), not Supabase anonymous sign-ins. No Auth user per visitor, no CAPTCHA, and it is how the game server already works. A guest's farm moves into the account on sign-up (`convert_guest`). To change: Supabase anonymous sign-ins could replace it later; `complete_sign_up` already refuses an anonymous session.
+3. **A guest whose account has no room** (already 2 Fast Farms) is refused and nothing moves; the server is to offer the choice. To change: `convert_guest`.
+4. **A guest not seen for 30 days is removed with their farm.** PRD 8.1 says the farm lives on the device only; 30 days is my number. To change: `prune_housekeeping`.
+5. **The under-16 rule is worked out live from the date of birth on today's Sydney date**, not a flag stored daily (PRD 15). It is always right and opens on the 16th birthday. To change to the player's own time zone: `app.today_sydney`.
+6. **Admins can use the community while its switches are off**, to check it before launch. An admin still has to be 16 or over. To change: `app.community_ok`.
+7. **Admins can't read a date of birth.** Only the player can. Admin sees role and bans, farms, scores, reports and ads.
+8. **Moderators** read reports, the moderation history, the word filter and every post (removed ones too). All moderation changes go through the server and the audit log.
+9. **Privacy defaults:** profile Public, farm view Followers only, ticker activity off until the player turns it on. To change: column defaults on `profiles`.
+10. **A followers-only or private profile still shows its card** (username, display name, photo, district) to other members, so a post's author can be named and a follow can be asked. The details stay hidden. A private profile can't be followed. If "private" should mean invisible, change `app.can_find_profile_for`.
+11. **Blocks hide both ways everywhere**, including leaderboard rows: the blocked player's row is left out for the viewer. Ranks are not stored; 4.1 works them out.
+12. **Under 16 on leaderboards: username and district only**, so the farm name is hidden too (PRD 8.3 says username and district only). A deleted account shows as "Former player".
+13. **Rate limits** (per account): posts 20 an hour (5 for the first 7 days), comments 60 (15), likes 300 an hour, follows 100 a day (30), reports 20 a day (5), new groups 5 a day (1), sign-ups 3 an hour, jobs 1,200 an hour, farm starts 10 an hour, ticker lines 6 an hour. To change: `rate_limit_rules` rows.
+14. **The word filter** matches whole words in text and letters in usernames. "Block" refuses; "flag" lets it through and puts it in the moderation queue. The seed has two placeholder words only; the real list is yours to supply.
+15. **Download my data leaves out the engine save and the action log**, because they hold the hidden rules. It includes the farms' days, diary and scores. Worth a word with the lawyer about the Privacy Act.
+16. **Deleting an account deletes the groups that player owns.** The alternative is to hand each to the longest-standing member. To change: the `groups.owner_id` foreign key and a step in deletion.
+17. **Not made from PRD 15:** `farm_jobs` (jobs in progress were removed on 14 Nov), `farm_messages` (the farm inbox lives in the engine save; the account inbox is `notifications`), `subscriptions` and `plan_features` (v1.1 replaced the subscription with one-off purchases: `products`, `purchases`, `account_entitlements`, and farm limits in `farm_limits`).
+18. **Products are seeded inactive at the PRD 10.3 prices**, with the proposed perks: the A$30 pack gives the farm pack, supporter badge and full diary; the A$50 pack adds no ads; the A$20 upgrade gives no ads. Keep going: Fast A$5, Daily A$15, A$25, A$50 and A$100 by age. No Stripe price ids until you make the products in Stripe.
+19. **Farm ids are uuids.** The file store uses 32 hex characters; the server is to drop the dashes. 3.2 settles it when the store is swapped.
+20. **The Daily Farm time zone change** is locked for 30 days, and moving to a zone already on a later date makes the farm wait a day rather than gain one.
+21. **pg_cron runs only the database's own nightly jobs** (ad roll-up, housekeeping). The 15-minute rollover needs the engine, so it is a scheduled call to the web server, set up in 3.3.
+22. **The seed accounts have no email addresses** (no contact details in the repo). To sign in as one locally, set its email in the local Studio.
+23. **Avatars are in a private bucket**, served through signed links, so an under-16 account's photo can never be fetched by address. Ad media is a public bucket.
+24. **Sign-up itself checks the sign-ups switch**, so it can be closed without a release.
+25. **Three views run with their owner's rights** (`public_profiles`, `leaderboard_rows`, `public_farms`). The Supabase linter flags this (lint 0010); it is the column-safe view the brief asked for.
+26. **PGlite is pinned to 0.5.13**, a release more than two weeks old, rather than the newest (0.5.16, 9 Nov).
+
+**Keys and accounts Claudia must set up** (BUILD_PLAN section 8, row 3.1). I made none of these and entered no keys.
+
+| Account | What to copy | Where it goes |
+|---|---|---|
+| Supabase project, Free plan, Sydney region | Project URL | `NEXT_PUBLIC_SUPABASE_URL` in Vercel (all environments) and `.env.local` |
+| | Publishable key (older projects: anon key) | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, same places |
+| | Secret key (older projects: service role key) | `SUPABASE_SECRET_KEY`, Vercel only as a server variable, and `.env.local`. Never a `NEXT_PUBLIC_` name |
+| | Database connection string (URI) | `SUPABASE_DB_URL`, only on the machine or CI that applies migrations |
+| | Dashboard settings | Data API exposes `public` only; anonymous sign-ins off; two-step sign-in on your own Supabase login |
+| Google sign-in | A Google OAuth client (client id and secret) | Pasted into the Supabase dashboard (Authentication, Providers, Google), not into an environment variable |
+| Resend (Free) and a domain with DNS access | API key | `RESEND_API_KEY` in Vercel and `.env.local`, and in Supabase Auth's SMTP settings for sign-in links |
+| Vercel project (Hobby), linked to the repo, previews locked | | Paste the variables above |
+
+Not done in this piece: the sign-in screens and Supabase client in `apps/web` (the other half of 3.1), swapping the file store for the database (3.2), the rollover route (3.3), and the run against a real Supabase project.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

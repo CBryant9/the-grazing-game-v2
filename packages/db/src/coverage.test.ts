@@ -102,7 +102,15 @@ describe('every table', () => {
                   has_table_privilege('${role}', 'public.${t}', 'DELETE') as d,
                   has_table_privilege('${role}', 'public.${t}', 'TRUNCATE') as tr`,
         );
-        expect({ t, role, ...r }).toEqual({ t, role, s: false, i: false, u: false, d: false, tr: false });
+        expect({ t, role, ...r }).toEqual({
+          t,
+          role,
+          s: false,
+          i: false,
+          u: false,
+          d: false,
+          tr: false,
+        });
       }
     }
   });
@@ -120,7 +128,12 @@ describe('every table', () => {
         where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm')`,
     );
     expect(objects.filter((o) => o.w).map((o) => o.name)).toEqual([]);
-    expect(objects.filter((o) => o.s).map((o) => o.name).sort()).toEqual(ANON_READ);
+    expect(
+      objects
+        .filter((o) => o.s)
+        .map((o) => o.name)
+        .sort(),
+    ).toEqual(ANON_READ);
   });
 
   it('no browser role may truncate anything', async () => {
@@ -170,7 +183,14 @@ describe('views', () => {
         where table_schema = 'public' and table_name in ('public_profiles', 'leaderboard_rows', 'public_farms')`,
     );
     const names = cols.map((c) => c.column_name);
-    for (const bad of ['date_of_birth', 'email', 'role', 'banned_at', 'suspended_until', 'timezone']) {
+    for (const bad of [
+      'date_of_birth',
+      'email',
+      'role',
+      'banned_at',
+      'suspended_until',
+      'timezone',
+    ]) {
       expect(names).not.toContain(bad);
     }
   });
@@ -248,7 +268,10 @@ describe('the reference data matches packages/shared', () => {
   });
 
   it('every product starts inactive', async () => {
-    const [r] = await rows<{ n: number }>(db, `select count(*)::int as n from public.products where active`);
+    const [r] = await rows<{ n: number }>(
+      db,
+      `select count(*)::int as n from public.products where active`,
+    );
     expect(r!.n).toBe(0);
   });
 

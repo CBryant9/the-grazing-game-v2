@@ -31,7 +31,11 @@ const errorOf = (o: Outcome): string => (o.ok ? '' : o.error);
 const first = (o: Outcome): Record<string, unknown> => (o.ok ? (o.rows[0] ?? {}) : {});
 
 /** Run statements as a brand-new signed-in user with no profile yet. */
-async function asFresh(statements: string[], prep = '', claims: Record<string, unknown> = {}): Promise<Outcome[]> {
+async function asFresh(
+  statements: string[],
+  prep = '',
+  claims: Record<string, unknown> = {},
+): Promise<Outcome[]> {
   const out: Outcome[] = [];
   const jwt = JSON.stringify({ sub: ID.fresh, role: 'authenticated', ...claims });
   await db.exec('begin');
@@ -39,7 +43,9 @@ async function asFresh(statements: string[], prep = '', claims: Record<string, u
     await db.exec(
       `insert into auth.users (id, aud, role) values ('${ID.fresh}', 'authenticated', 'authenticated'); ${prep}`,
     );
-    await db.exec(`set local role authenticated; select set_config('request.jwt.claims', '${jwt}', true);`);
+    await db.exec(
+      `set local role authenticated; select set_config('request.jwt.claims', '${jwt}', true);`,
+    );
     for (const sql of statements) {
       try {
         const r = await db.query<Record<string, unknown>>(sql);
@@ -78,9 +84,15 @@ describe('sign-up (PRD 8.2, 8.3)', () => {
   });
 
   it('refuses anyone under 14, and takes a 14-year-old', async () => {
-    const day = await asFresh([`select public.complete_sign_up('young_one', ${yearsAgo(14, 1)})`], signUpsOpen);
+    const day = await asFresh(
+      [`select public.complete_sign_up('young_one', ${yearsAgo(14, 1)})`],
+      signUpsOpen,
+    );
     expect(errorOf(day[0]!)).toMatch(/too_young/);
-    const ok = await asFresh([`select public.complete_sign_up('young_one', ${yearsAgo(14)})`], signUpsOpen);
+    const ok = await asFresh(
+      [`select public.complete_sign_up('young_one', ${yearsAgo(14)})`],
+      signUpsOpen,
+    );
     expect(ok[0]!.ok).toBe(true);
   });
 
@@ -104,11 +116,20 @@ describe('sign-up (PRD 8.2, 8.3)', () => {
   });
 
   it('refuses a date of birth in the future, a taken username, a bad word, a second go and an anonymous session', async () => {
-    const future = await asFresh([`select public.complete_sign_up('a_name', current_date + 30)`], signUpsOpen);
+    const future = await asFresh(
+      [`select public.complete_sign_up('a_name', current_date + 30)`],
+      signUpsOpen,
+    );
     expect(errorOf(future[0]!)).toMatch(/bad_date_of_birth/);
-    const taken = await asFresh([`select public.complete_sign_up('AVA_GRAZIER', '1990-01-01')`], signUpsOpen);
+    const taken = await asFresh(
+      [`select public.complete_sign_up('AVA_GRAZIER', '1990-01-01')`],
+      signUpsOpen,
+    );
     expect(errorOf(taken[0]!)).toMatch(/duplicate key/);
-    const rude = await asFresh([`select public.complete_sign_up('xbadwordx', '1990-01-01')`], signUpsOpen);
+    const rude = await asFresh(
+      [`select public.complete_sign_up('xbadwordx', '1990-01-01')`],
+      signUpsOpen,
+    );
     expect(errorOf(rude[0]!)).toMatch(/word_filter/);
     const twice = await asFresh(
       [
@@ -118,15 +139,25 @@ describe('sign-up (PRD 8.2, 8.3)', () => {
       signUpsOpen,
     );
     expect(errorOf(twice[1]!)).toMatch(/already_signed_up/);
-    const anon = await asFresh([`select public.complete_sign_up('ghost_user', '1990-01-01')`], signUpsOpen, {
-      is_anonymous: true,
-    });
+    const anon = await asFresh(
+      [`select public.complete_sign_up('ghost_user', '1990-01-01')`],
+      signUpsOpen,
+      {
+        is_anonymous: true,
+      },
+    );
     expect(errorOf(anon[0]!)).toMatch(/anonymous/);
   });
 
   it('a visitor can not sign up through it, and a player can not insert a profile directly', async () => {
-    expect(passed(await as(db, 'anon', `select public.complete_sign_up('x_y_z', '1990-01-01')`, signUpsOpen))).toBe(false);
-    const direct = await asFresh([`insert into public.profiles (user_id, username) values ('${ID.fresh}', 'sneaky')`]);
+    expect(
+      passed(
+        await as(db, 'anon', `select public.complete_sign_up('x_y_z', '1990-01-01')`, signUpsOpen),
+      ),
+    ).toBe(false);
+    const direct = await asFresh([
+      `insert into public.profiles (user_id, username) values ('${ID.fresh}', 'sneaky')`,
+    ]);
     expect(errorOf(direct[0]!)).toMatch(/permission denied/);
   });
 });
@@ -141,7 +172,10 @@ describe('farm limits (PRD 5.5)', () => {
     const fast = await asMany(db, 'service', [newFarm(ID.a, null), newFarm(ID.a, null)]);
     expect(fast[0]!.ok).toBe(true);
     expect(errorOf(fast[1]!)).toMatch(/farm_limit/);
-    const daily = await asMany(db, 'service', [newFarm(ID.a, null, 'daily'), newFarm(ID.a, null, 'daily')]);
+    const daily = await asMany(db, 'service', [
+      newFarm(ID.a, null, 'daily'),
+      newFarm(ID.a, null, 'daily'),
+    ]);
     expect(daily[0]!.ok).toBe(true);
     expect(errorOf(daily[1]!)).toMatch(/farm_limit/);
   });
@@ -180,12 +214,20 @@ describe('farm limits (PRD 5.5)', () => {
   });
 
   it('the player can read their limits', async () => {
-    const a = await as(db, 'a', `select mode, max_active, active from public.my_farm_limits() order by mode`);
+    const a = await as(
+      db,
+      'a',
+      `select mode, max_active, active from public.my_farm_limits() order by mode`,
+    );
     expect(a.ok && a.rows).toEqual([
       { mode: 'daily', max_active: 2, active: 1 },
       { mode: 'fast', max_active: 2, active: 1 },
     ]);
-    const b = await as(db, 'b', `select max_active from public.my_farm_limits() where mode = 'fast'`);
+    const b = await as(
+      db,
+      'b',
+      `select max_active from public.my_farm_limits() where mode = 'fast'`,
+    );
     expect(first(b)).toEqual({ max_active: 5 });
   });
 
@@ -215,12 +257,19 @@ describe('guests (PRD 8.1, 5.16)', () => {
 
   it('an account with no room is refused, and nothing moves', async () => {
     const full = newFarm(ID.a, null) + ';';
-    const o = await as(db, 'service', `select public.convert_guest('${ID.guest}', '${ID.a}')`, full);
+    const o = await as(
+      db,
+      'service',
+      `select public.convert_guest('${ID.guest}', '${ID.a}')`,
+      full,
+    );
     expect(errorOf(o)).toMatch(/farm_limit/);
   });
 
   it('only the server can convert a guest', async () => {
-    expect(passed(await as(db, 'a', `select public.convert_guest('${ID.guest}', '${ID.a}')`))).toBe(false);
+    expect(passed(await as(db, 'a', `select public.convert_guest('${ID.guest}', '${ID.a}')`))).toBe(
+      false,
+    );
   });
 
   it('a guest not seen for 30 days goes, with their farm', async () => {
@@ -228,7 +277,10 @@ describe('guests (PRD 8.1, 5.16)', () => {
     const o = await asMany(
       db,
       'service',
-      [`select public.prune_housekeeping()`, `select 1 from public.farms where id = '${ID.farmGuest}'`],
+      [
+        `select public.prune_housekeeping()`,
+        `select 1 from public.farms where id = '${ID.farmGuest}'`,
+      ],
       prep,
     );
     expect(o[1]!.ok && o[1]!.rows.length).toBe(0);
@@ -241,10 +293,20 @@ describe('the Daily Farm clock (PRD 5.2, BUILD_PLAN 3.3)', () => {
   const sim = (date: string) =>
     `update public.farms set sim_through = '${date}', timezone_changed_at = null, rollover_claimed_at = null where id = '${ID.dailyA}';`;
 
-  it('owes a day once the farm\'s local midnight has passed, and not before', async () => {
+  it("owes a day once the farm's local midnight has passed, and not before", async () => {
     const prep = sim('2026-11-14');
-    const before = await as(db, 'service', `select public.daily_days_owed('${ID.dailyA}', ${at('2026-11-15T23:59:00+11:00')}) as n`, prep);
-    const after = await as(db, 'service', `select public.daily_days_owed('${ID.dailyA}', ${at('2026-11-16T00:01:00+11:00')}) as n`, prep);
+    const before = await as(
+      db,
+      'service',
+      `select public.daily_days_owed('${ID.dailyA}', ${at('2026-11-15T23:59:00+11:00')}) as n`,
+      prep,
+    );
+    const after = await as(
+      db,
+      'service',
+      `select public.daily_days_owed('${ID.dailyA}', ${at('2026-11-16T00:01:00+11:00')}) as n`,
+      prep,
+    );
     expect(first(before)).toEqual({ n: 0 });
     expect(first(after)).toEqual({ n: 1 });
   });
@@ -342,18 +404,28 @@ describe('the Daily Farm clock (PRD 5.2, BUILD_PLAN 3.3)', () => {
 
 describe('groups', () => {
   it('a private group needs its code; a public one does not', async () => {
-    const code = (await rows<{ invite_code: string }>(db, `select invite_code from public.groups where id = '${ID.group}'`))[0]!
-      .invite_code;
+    const code = (
+      await rows<{ invite_code: string }>(
+        db,
+        `select invite_code from public.groups where id = '${ID.group}'`,
+      )
+    )[0]!.invite_code;
     expect(passed(await as(db, 'admin', `select public.join_group('${ID.group}')`))).toBe(false);
-    expect(passed(await as(db, 'admin', `select public.join_group('${ID.group}', 'wrong')`))).toBe(false);
-    expect((await as(db, 'admin', `select public.join_group('${ID.group}', '${code}')`)).ok).toBe(true);
+    expect(passed(await as(db, 'admin', `select public.join_group('${ID.group}', 'wrong')`))).toBe(
+      false,
+    );
+    expect((await as(db, 'admin', `select public.join_group('${ID.group}', '${code}')`)).ok).toBe(
+      true,
+    );
     const open = `update public.groups set visibility = 'public' where id = '${ID.group}';`;
     expect((await as(db, 'admin', `select public.join_group('${ID.group}')`, open)).ok).toBe(true);
   });
 
   it('a full group takes no more', async () => {
     const full = `update public.groups set visibility = 'public', member_limit = 2 where id = '${ID.group}';`;
-    expect(errorOf(await as(db, 'admin', `select public.join_group('${ID.group}')`, full))).toMatch(/group_full/);
+    expect(errorOf(await as(db, 'admin', `select public.join_group('${ID.group}')`, full))).toMatch(
+      /group_full/,
+    );
   });
 
   it('the owner hands over to a member', async () => {
@@ -363,19 +435,35 @@ describe('groups', () => {
     ]);
     expect(o[0]!.ok).toBe(true);
     expect(first(o[1]!)).toEqual({ owner_id: ID.b });
-    expect(passed(await as(db, 'b', `select public.hand_over_group('${ID.group}', '${ID.b}')`))).toBe(false);
+    expect(
+      passed(await as(db, 'b', `select public.hand_over_group('${ID.group}', '${ID.b}')`)),
+    ).toBe(false);
   });
 
   it('the owner can not leave without handing over', async () => {
-    const o = await as(db, 'a', `delete from public.group_members where group_id = '${ID.group}' and user_id = '${ID.a}'`);
+    const o = await as(
+      db,
+      'a',
+      `delete from public.group_members where group_id = '${ID.group}' and user_id = '${ID.a}'`,
+    );
     expect(passed(o)).toBe(false);
   });
 });
 
 describe('deleting an account (21a "Your data")', () => {
   it('the server lists the files to remove first', async () => {
-    const o = await as(db, 'service', `select bucket, path from public.account_storage_paths('${ID.a}') order by bucket, path`);
-    expect(o.ok && o.rows.map((r) => r.bucket)).toEqual(['post-photos', 'post-photos', 'post-photos', 'snapshots', 'snapshots']);
+    const o = await as(
+      db,
+      'service',
+      `select bucket, path from public.account_storage_paths('${ID.a}') order by bucket, path`,
+    );
+    expect(o.ok && o.rows.map((r) => r.bucket)).toEqual([
+      'post-photos',
+      'post-photos',
+      'post-photos',
+      'snapshots',
+      'snapshots',
+    ]);
   });
 
   it('removes the profile, private rows, farms, saves and posts; leaderboard rows stay with no account', async () => {
@@ -417,7 +505,9 @@ describe('the role switch helper', () => {
     await db.exec('begin');
     try {
       await db.exec(becomeSql('a'));
-      const r = await db.query<{ u: string; r: string }>(`select auth.uid()::text as u, current_user as r`);
+      const r = await db.query<{ u: string; r: string }>(
+        `select auth.uid()::text as u, current_user as r`,
+      );
       expect(r.rows[0]).toEqual({ u: ID.a, r: 'authenticated' });
     } finally {
       await db.exec('rollback');

@@ -8,6 +8,7 @@ import {
   freshDb,
   passed,
   rows,
+  rowsOf,
   switchesSql,
   type Outcome,
   type Who,
@@ -34,21 +35,41 @@ const deniedError = (o: Outcome): boolean => !o.ok && /permission denied/.test(o
 describe('private fields', () => {
   it('nobody but the player reads a date of birth, not even an admin', async () => {
     for (const who of ['anon', 'b', 'u16', 'admin'] as Who[]) {
-      const o = await as(db, who, `select date_of_birth from public.account_private where user_id = '${ID.a}'`);
+      const o = await as(
+        db,
+        who,
+        `select date_of_birth from public.account_private where user_id = '${ID.a}'`,
+      );
       expect(refusedOrEmpty(o), who).toBe(true);
     }
-    const own = await as(db, 'a', `select date_of_birth from public.account_private where user_id = '${ID.a}'`);
+    const own = await as(
+      db,
+      'a',
+      `select date_of_birth from public.account_private where user_id = '${ID.a}'`,
+    );
     expect(count(own)).toBe(1);
   });
 
   it('a player can not change their own date of birth', async () => {
-    const o = await as(db, 'a', `update public.account_private set date_of_birth = '2000-01-01' where user_id = '${ID.a}'`);
+    const o = await as(
+      db,
+      'a',
+      `update public.account_private set date_of_birth = '2000-01-01' where user_id = '${ID.a}'`,
+    );
     expect(deniedError(o)).toBe(true);
   });
 
   it('a player can not make themselves an admin or lift a ban', async () => {
-    const o1 = await as(db, 'a', `update public.account_status set role = 'admin' where user_id = '${ID.a}'`);
-    const o2 = await as(db, 'a', `update public.account_status set banned_at = null where user_id = '${ID.a}'`);
+    const o1 = await as(
+      db,
+      'a',
+      `update public.account_status set role = 'admin' where user_id = '${ID.a}'`,
+    );
+    const o2 = await as(
+      db,
+      'a',
+      `update public.account_status set banned_at = null where user_id = '${ID.a}'`,
+    );
     expect(deniedError(o1)).toBe(true);
     expect(deniedError(o2)).toBe(true);
   });
@@ -62,12 +83,14 @@ describe('private fields', () => {
   it('another player sees no private column on a profile', async () => {
     const o = await as(db, 'b', `select * from public.public_profiles where user_id = '${ID.a}'`);
     expect(o.ok && o.rows.length).toBe(1);
-    const cols = Object.keys((o as { rows: Record<string, unknown>[] }).rows[0]!);
+    const cols = Object.keys(rowsOf(o)[0]!);
     for (const bad of ['date_of_birth', 'email', 'role', 'ticker_opt_in', 'privacy_farm_view']) {
       expect(cols).not.toContain(bad);
     }
     // And the base table is closed to them.
-    expect(count(await as(db, 'b', `select * from public.profiles where user_id = '${ID.a}'`))).toBe(0);
+    expect(
+      count(await as(db, 'b', `select * from public.profiles where user_id = '${ID.a}'`)),
+    ).toBe(0);
   });
 
   it('hidden columns stay hidden: challenge seeds, invite codes, moderator notes, Stripe ids, switch notes', async () => {
@@ -76,8 +99,12 @@ describe('private fields', () => {
     expect(deniedError(await as(db, 'a', `select invite_code from public.groups`))).toBe(true);
     expect(deniedError(await as(db, 'b', `select notes from public.reports`))).toBe(true);
     expect(deniedError(await as(db, 'b', `select moderator_id from public.reports`))).toBe(true);
-    expect(deniedError(await as(db, 'b', `select stripe_checkout_session_id from public.purchases`))).toBe(true);
-    expect(deniedError(await as(db, 'anon', `select note from public.feature_switches`))).toBe(true);
+    expect(
+      deniedError(await as(db, 'b', `select stripe_checkout_session_id from public.purchases`)),
+    ).toBe(true);
+    expect(deniedError(await as(db, 'anon', `select note from public.feature_switches`))).toBe(
+      true,
+    );
   });
 
   it('the group invite code goes to the owner only', async () => {
@@ -90,7 +117,7 @@ describe('private fields', () => {
   it('download my data: only the player, and never the engine save', async () => {
     const o = await as(db, 'a', `select public.export_my_data() as d`);
     expect(o.ok).toBe(true);
-    const d = (o as { rows: { d: Record<string, unknown> }[] }).rows[0]!.d;
+    const d = rowsOf(o)[0]!.d as Record<string, unknown>;
     expect((d.profile as { username: string }).username).toBe('ava_grazier');
     expect((d.private as { date_of_birth: string }).date_of_birth).toBe('1990-06-15');
     expect((d.farms as unknown[]).length).toBe(2);
@@ -112,7 +139,11 @@ describe('the engine save', () => {
   });
 
   it('the server reads and writes it', async () => {
-    const o = await as(db, 'service', `select save, stored_format, engine_version from public.farm_saves where farm_id = '${ID.farmA}'`);
+    const o = await as(
+      db,
+      'service',
+      `select save, stored_format, engine_version from public.farm_saves where farm_id = '${ID.farmA}'`,
+    );
     expect(count(o)).toBe(1);
   });
 
@@ -134,20 +165,32 @@ describe('leaderboards', () => {
       );
       const up = await as(db, who, `update public.leaderboard_entries set score = 1e9`);
       const del = await as(db, who, `delete from public.leaderboard_entries`);
-      const score = await as(db, who, `update public.farm_scores set grazier_score = 1e6 where farm_id = '${ID.farmA}'`);
+      const score = await as(
+        db,
+        who,
+        `update public.farm_scores set grazier_score = 1e6 where farm_id = '${ID.farmA}'`,
+      );
       for (const o of [ins, up, del, score]) expect(deniedError(o), who).toBe(true);
     }
   });
 
   it('under 16: username and district only, no photo, no profile link, no farm name', async () => {
-    const o = await as(db, 'anon', `select * from public.leaderboard_rows where username = 'kid_cattle'`);
+    const o = await as(
+      db,
+      'anon',
+      `select * from public.leaderboard_rows where username = 'kid_cattle'`,
+    );
     expect(count(o)).toBe(1);
-    const row = (o as { rows: Record<string, unknown>[] }).rows[0]!;
+    const row = rowsOf(o)[0]!;
     expect(row.district).toBe('cq');
     expect(row.user_id).toBeNull();
     expect(row.avatar_path).toBeNull();
     expect(row.farm_name).toBeNull();
-    const adult = await as(db, 'anon', `select user_id, farm_name from public.leaderboard_rows where username = 'ava_grazier'`);
+    const adult = await as(
+      db,
+      'anon',
+      `select user_id, farm_name from public.leaderboard_rows where username = 'ava_grazier'`,
+    );
     expect(adult.ok && adult.rows[0]!.user_id).toBe(ID.a);
   });
 
@@ -155,12 +198,19 @@ describe('leaderboards', () => {
     const off = switchesSql(['leaderboards'], false);
     expect(count(await as(db, 'anon', `select 1 from public.leaderboard_rows`, off))).toBe(0);
     expect(count(await as(db, 'a', `select 1 from public.leaderboard_rows`, off))).toBe(0);
-    expect(count(await as(db, 'admin', `select 1 from public.leaderboard_rows`, off))).toBeGreaterThan(0);
+    expect(
+      count(await as(db, 'admin', `select 1 from public.leaderboard_rows`, off)),
+    ).toBeGreaterThan(0);
   });
 
   it('a deleted account stays on the board as "Former player"', async () => {
     const prep = `delete from auth.users where id = '${ID.a}';`;
-    const o = await as(db, 'anon', `select username, user_id from public.leaderboard_rows where username = 'Former player'`, prep);
+    const o = await as(
+      db,
+      'anon',
+      `select username, user_id from public.leaderboard_rows where username = 'Former player'`,
+      prep,
+    );
     expect(count(o)).toBe(2);
     expect(o.ok && o.rows.every((r) => r.user_id === null)).toBe(true);
   });
@@ -219,19 +269,46 @@ describe('under 16: no community anywhere (PRD 8.3)', () => {
   }
 
   it('is never shown to anyone else: no profile, no ticker line, no farm view', async () => {
-    expect(count(await as(db, 'a', `select 1 from public.public_profiles where user_id = '${ID.u16}'`))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.activity_events where user_id = '${ID.u16}'`))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.public_farms where owner_id = '${ID.u16}'`))).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.public_profiles where user_id = '${ID.u16}'`)),
+    ).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.activity_events where user_id = '${ID.u16}'`)),
+    ).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.public_farms where owner_id = '${ID.u16}'`)),
+    ).toBe(0);
     const viewU16Daily = `update public.farms set mode = 'daily', timezone = 'Australia/Brisbane', sim_through = current_date where id = '${ID.farmU16}';`;
-    expect(count(await as(db, 'a', `select 1 from public.public_farms where owner_id = '${ID.u16}'`, viewU16Daily))).toBe(0);
-    const can = await as(db, 'service', `select public.can_view_farm('${ID.a}', '${ID.farmU16}') as ok`);
+    expect(
+      count(
+        await as(
+          db,
+          'a',
+          `select 1 from public.public_farms where owner_id = '${ID.u16}'`,
+          viewU16Daily,
+        ),
+      ),
+    ).toBe(0);
+    const can = await as(
+      db,
+      'service',
+      `select public.can_view_farm('${ID.a}', '${ID.farmU16}') as ok`,
+    );
     expect(can.ok && can.rows[0]!.ok).toBe(false);
   });
 
   it('still has the game: their own farms, scores, diary and notifications', async () => {
-    expect(count(await as(db, 'u16', `select 1 from public.farms where owner_id = '${ID.u16}'`))).toBe(1);
-    expect(count(await as(db, 'u16', `select 1 from public.farm_scores where farm_id = '${ID.farmU16}'`))).toBe(1);
-    expect(count(await as(db, 'u16', `select 1 from public.farm_days where farm_id = '${ID.farmU16}'`))).toBe(1);
+    expect(
+      count(await as(db, 'u16', `select 1 from public.farms where owner_id = '${ID.u16}'`)),
+    ).toBe(1);
+    expect(
+      count(
+        await as(db, 'u16', `select 1 from public.farm_scores where farm_id = '${ID.farmU16}'`),
+      ),
+    ).toBe(1);
+    expect(
+      count(await as(db, 'u16', `select 1 from public.farm_days where farm_id = '${ID.farmU16}'`)),
+    ).toBe(1);
     expect(count(await as(db, 'u16', `select 1 from public.notifications`))).toBe(1);
     expect(count(await as(db, 'u16', `select 1 from public.leaderboard_rows`))).toBeGreaterThan(0);
   });
@@ -268,15 +345,49 @@ describe('blocks hide both ways', () => {
 
   it('the blocked player can not follow, comment on or like the blocker', async () => {
     const prep = blockAB + `delete from public.likes where user_id = '${ID.b}';`;
-    expect(passed(await as(db, 'b', `insert into public.follows (follower_id, followee_id) values ('${ID.b}', '${ID.a}')`, prep))).toBe(false);
-    expect(passed(await as(db, 'b', `insert into public.comments (post_id, author_id, body) values ('${ID.postA}', '${ID.b}', 'x')`, prep))).toBe(false);
-    expect(passed(await as(db, 'b', `insert into public.likes (user_id, post_id) values ('${ID.b}', '${ID.postA}')`, prep))).toBe(false);
+    expect(
+      passed(
+        await as(
+          db,
+          'b',
+          `insert into public.follows (follower_id, followee_id) values ('${ID.b}', '${ID.a}')`,
+          prep,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      passed(
+        await as(
+          db,
+          'b',
+          `insert into public.comments (post_id, author_id, body) values ('${ID.postA}', '${ID.b}', 'x')`,
+          prep,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      passed(
+        await as(
+          db,
+          'b',
+          `insert into public.likes (user_id, post_id) values ('${ID.b}', '${ID.postA}')`,
+          prep,
+        ),
+      ),
+    ).toBe(false);
   });
 
   it('a block removes the follows both ways, and the blocked player never sees the block', async () => {
-    const left = await as(db, 'service', `select 1 from public.follows where (follower_id = '${ID.a}' and followee_id = '${ID.b}') or (follower_id = '${ID.b}' and followee_id = '${ID.a}')`, blockAB);
+    const left = await as(
+      db,
+      'service',
+      `select 1 from public.follows where (follower_id = '${ID.a}' and followee_id = '${ID.b}') or (follower_id = '${ID.b}' and followee_id = '${ID.a}')`,
+      blockAB,
+    );
     expect(count(left)).toBe(0);
-    expect(count(await as(db, 'b', `select 1 from public.blocks where blocked_id = '${ID.b}'`, blockAB))).toBe(0);
+    expect(
+      count(await as(db, 'b', `select 1 from public.blocks where blocked_id = '${ID.b}'`, blockAB)),
+    ).toBe(0);
   });
 
   it('the seed block (Ben blocked Cara) hides each from the other', async () => {
@@ -328,63 +439,156 @@ describe('follows', () => {
 
   it('a private profile can not be followed, and its details are hidden', async () => {
     const prep = `update public.profiles set privacy_profile = 'private' where user_id = '${ID.c}';`;
-    expect(passed(await as(db, 'a', `insert into public.follows (follower_id, followee_id) values ('${ID.a}', '${ID.c}')`, prep))).toBe(false);
-    const card = await as(db, 'a', `select username, bio, details_visible from public.public_profiles where user_id = '${ID.c}'`, prep);
-    expect(card.ok && card.rows[0]).toEqual({ username: 'cara_cropper', bio: null, details_visible: false });
+    expect(
+      passed(
+        await as(
+          db,
+          'a',
+          `insert into public.follows (follower_id, followee_id) values ('${ID.a}', '${ID.c}')`,
+          prep,
+        ),
+      ),
+    ).toBe(false);
+    const card = await as(
+      db,
+      'a',
+      `select username, bio, details_visible from public.public_profiles where user_id = '${ID.c}'`,
+      prep,
+    );
+    expect(card.ok && card.rows[0]).toEqual({
+      username: 'cara_cropper',
+      bio: null,
+      details_visible: false,
+    });
   });
 
   it('a followers-only post shows only to accepted followers', async () => {
     expect(count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postB}'`))).toBe(1);
-    expect(count(await as(db, 'admin', `select 1 from public.posts where id = '${ID.postB}' and author_id <> '${ID.admin}'`))).toBe(1);
+    expect(
+      count(
+        await as(
+          db,
+          'admin',
+          `select 1 from public.posts where id = '${ID.postB}' and author_id <> '${ID.admin}'`,
+        ),
+      ),
+    ).toBe(1);
     const unfollow = `delete from public.follows where follower_id = '${ID.a}' and followee_id = '${ID.b}';`;
-    expect(count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postB}'`, unfollow))).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postB}'`, unfollow)),
+    ).toBe(0);
   });
 });
 
 describe('posts, photos and comments', () => {
   it('a photo is never shown to others before the image check passes', async () => {
-    expect(count(await as(db, 'b', `select 1 from public.post_photos where id = '${ID.photoPending}'`))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.post_photos where id = '${ID.photoPending}'`))).toBe(1);
+    expect(
+      count(await as(db, 'b', `select 1 from public.post_photos where id = '${ID.photoPending}'`)),
+    ).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.post_photos where id = '${ID.photoPending}'`)),
+    ).toBe(1);
   });
 
   it('a player can not mark their own photo as checked', async () => {
-    const ins = await as(db, 'a', `insert into public.post_photos (post_id, storage_path, position, moderation_status) values ('${ID.postA}', '${ID.a}/x.jpg', 3, 'approved')`);
+    const ins = await as(
+      db,
+      'a',
+      `insert into public.post_photos (post_id, storage_path, position, moderation_status) values ('${ID.postA}', '${ID.a}/x.jpg', 3, 'approved')`,
+    );
     expect(deniedError(ins)).toBe(true);
-    const up = await as(db, 'a', `update public.post_photos set moderation_status = 'approved' where id = '${ID.photoPending}'`);
+    const up = await as(
+      db,
+      'a',
+      `update public.post_photos set moderation_status = 'approved' where id = '${ID.photoPending}'`,
+    );
     expect(deniedError(up)).toBe(true);
-    const show = await as(db, 'a', `insert into public.farm_showcase_photos (user_id, storage_path, moderation_status) values ('${ID.a}', '${ID.a}/y.jpg', 'approved')`);
+    const show = await as(
+      db,
+      'a',
+      `insert into public.farm_showcase_photos (user_id, storage_path, moderation_status) values ('${ID.a}', '${ID.a}/y.jpg', 'approved')`,
+    );
     expect(deniedError(show)).toBe(true);
   });
 
   it('players write plain posts only; share cards and day cards come from the server', async () => {
-    const o = await as(db, 'a', `insert into public.posts (author_id, kind, body) values ('${ID.a}', 'day_card', 'x')`);
+    const o = await as(
+      db,
+      'a',
+      `insert into public.posts (author_id, kind, body) values ('${ID.a}', 'day_card', 'x')`,
+    );
     expect(deniedError(o)).toBe(true);
   });
 
   it('a removed post is hidden from everyone but its author and staff', async () => {
     const prep = `update public.posts set removed_at = now() where id = '${ID.postA}';`;
-    expect(count(await as(db, 'b', `select 1 from public.posts where id = '${ID.postA}'`, prep))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postA}'`, prep))).toBe(1);
-    expect(count(await as(db, 'admin', `select 1 from public.posts where id = '${ID.postA}'`, prep))).toBe(1);
+    expect(
+      count(await as(db, 'b', `select 1 from public.posts where id = '${ID.postA}'`, prep)),
+    ).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.posts where id = '${ID.postA}'`, prep)),
+    ).toBe(1);
+    expect(
+      count(await as(db, 'admin', `select 1 from public.posts where id = '${ID.postA}'`, prep)),
+    ).toBe(1);
   });
 
   it('a group post shows only to the group', async () => {
-    expect(count(await as(db, 'b', `select 1 from public.posts where id = '${ID.groupPostA}'`))).toBe(1);
+    expect(
+      count(await as(db, 'b', `select 1 from public.posts where id = '${ID.groupPostA}'`)),
+    ).toBe(1);
     const leave = `delete from public.group_members where user_id = '${ID.b}';`;
-    expect(count(await as(db, 'b', `select 1 from public.posts where id = '${ID.groupPostA}'`, leave))).toBe(0);
-    expect(count(await as(db, 'b', `select id from public.challenges where id = '${ID.challengeGroup}'`, leave))).toBe(0);
-    expect(count(await as(db, 'b', `select id from public.challenges where id = '${ID.challengeGroup}'`))).toBe(1);
+    expect(
+      count(await as(db, 'b', `select 1 from public.posts where id = '${ID.groupPostA}'`, leave)),
+    ).toBe(0);
+    expect(
+      count(
+        await as(
+          db,
+          'b',
+          `select id from public.challenges where id = '${ID.challengeGroup}'`,
+          leave,
+        ),
+      ),
+    ).toBe(0);
+    expect(
+      count(
+        await as(db, 'b', `select id from public.challenges where id = '${ID.challengeGroup}'`),
+      ),
+    ).toBe(1);
   });
 
   it('replies go one level deep', async () => {
-    const o = await as(db, 'b', `insert into public.comments (post_id, author_id, parent_id, body) values ('${ID.postA}', '${ID.b}', '${ID.replyA}', 'Too deep')`);
+    const o = await as(
+      db,
+      'b',
+      `insert into public.comments (post_id, author_id, parent_id, body) values ('${ID.postA}', '${ID.b}', '${ID.replyA}', 'Too deep')`,
+    );
     expect(passed(o)).toBe(false);
   });
 
   it('the word filter refuses blocked words and queues flagged ones', async () => {
-    expect(passed(await as(db, 'a', `insert into public.posts (author_id, body) values ('${ID.a}', 'what a badword day')`))).toBe(false);
-    expect(passed(await as(db, 'a', `update public.profiles set username = 'the_badword_1' where user_id = '${ID.a}'`))).toBe(false);
-    const flagged = await asMany(db, 'a', [`insert into public.posts (author_id, body) values ('${ID.a}', 'a flagword here')`]);
+    expect(
+      passed(
+        await as(
+          db,
+          'a',
+          `insert into public.posts (author_id, body) values ('${ID.a}', 'what a badword day')`,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      passed(
+        await as(
+          db,
+          'a',
+          `update public.profiles set username = 'the_badword_1' where user_id = '${ID.a}'`,
+        ),
+      ),
+    ).toBe(false);
+    const flagged = await asMany(db, 'a', [
+      `insert into public.posts (author_id, body) values ('${ID.a}', 'a flagword here')`,
+    ]);
     expect(passed(flagged[0]!)).toBe(true);
     const queued = await as(
       db,
@@ -412,16 +616,51 @@ describe('the community switches', () => {
 
   it('with the community off, players see and write nothing in it; admins still can', async () => {
     expect(count(await as(db, 'a', `select 1 from public.posts`, off))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.public_profiles where user_id <> '${ID.a}'`, off))).toBe(0);
-    expect(passed(await as(db, 'a', `insert into public.posts (author_id, body) values ('${ID.a}', 'x')`, off))).toBe(false);
+    expect(
+      count(
+        await as(db, 'a', `select 1 from public.public_profiles where user_id <> '${ID.a}'`, off),
+      ),
+    ).toBe(0);
+    expect(
+      passed(
+        await as(
+          db,
+          'a',
+          `insert into public.posts (author_id, body) values ('${ID.a}', 'x')`,
+          off,
+        ),
+      ),
+    ).toBe(false);
     expect(count(await as(db, 'admin', `select 1 from public.posts`, off))).toBeGreaterThan(0);
   });
 
   it('each part has its own switch', async () => {
-    expect(count(await as(db, 'b', `select 1 from public.posts`, switchesSql(['feed_posts'], false)))).toBe(0);
-    expect(count(await as(db, 'b', `select id from public.groups`, switchesSql(['groups'], false)))).toBe(0);
-    expect(count(await as(db, 'b', `select 1 from public.activity_events`, switchesSql(['activity_ticker'], false)))).toBe(0);
-    expect(count(await as(db, 'b', `select 1 from public.public_farms`, switchesSql(['farm_viewing'], false)))).toBe(0);
+    expect(
+      count(await as(db, 'b', `select 1 from public.posts`, switchesSql(['feed_posts'], false))),
+    ).toBe(0);
+    expect(
+      count(await as(db, 'b', `select id from public.groups`, switchesSql(['groups'], false))),
+    ).toBe(0);
+    expect(
+      count(
+        await as(
+          db,
+          'b',
+          `select 1 from public.activity_events`,
+          switchesSql(['activity_ticker'], false),
+        ),
+      ),
+    ).toBe(0);
+    expect(
+      count(
+        await as(
+          db,
+          'b',
+          `select 1 from public.public_farms`,
+          switchesSql(['farm_viewing'], false),
+        ),
+      ),
+    ).toBe(0);
     expect(count(await as(db, 'b', `select 1 from public.public_farms`))).toBe(1);
   });
 
@@ -430,25 +669,46 @@ describe('the community switches', () => {
     const suspend = `update public.account_status set suspended_until = now() + interval '3 days' where user_id = '${ID.b}';`;
     expect(count(await as(db, 'b', `select 1 from public.posts`, ban))).toBe(0);
     expect(count(await as(db, 'b', `select 1 from public.posts`, suspend))).toBe(0);
-    expect(count(await as(db, 'a', `select 1 from public.posts where author_id = '${ID.b}'`, ban))).toBe(0);
+    expect(
+      count(await as(db, 'a', `select 1 from public.posts where author_id = '${ID.b}'`, ban)),
+    ).toBe(0);
   });
 
   it('the ticker shows only players who switched it on', async () => {
     const off2 = `update public.profiles set ticker_opt_in = false where user_id = '${ID.a}';`;
-    expect(count(await as(db, 'b', `select 1 from public.activity_events where user_id = '${ID.a}'`))).toBe(1);
-    expect(count(await as(db, 'b', `select 1 from public.activity_events where user_id = '${ID.a}'`, off2))).toBe(0);
+    expect(
+      count(await as(db, 'b', `select 1 from public.activity_events where user_id = '${ID.a}'`)),
+    ).toBe(1);
+    expect(
+      count(
+        await as(db, 'b', `select 1 from public.activity_events where user_id = '${ID.a}'`, off2),
+      ),
+    ).toBe(0);
   });
 });
 
 describe('farm viewing', () => {
-  it('follows the owner\'s farm view setting, Daily Farms only', async () => {
-    expect(count(await as(db, 'b', `select 1 from public.public_farms where farm_id = '${ID.dailyA}'`))).toBe(1);
-    expect(count(await as(db, 'b', `select 1 from public.public_farms where farm_id = '${ID.farmA}'`))).toBe(0);
+  it("follows the owner's farm view setting, Daily Farms only", async () => {
+    expect(
+      count(await as(db, 'b', `select 1 from public.public_farms where farm_id = '${ID.dailyA}'`)),
+    ).toBe(1);
+    expect(
+      count(await as(db, 'b', `select 1 from public.public_farms where farm_id = '${ID.farmA}'`)),
+    ).toBe(0);
     const offView = `update public.profiles set privacy_farm_view = 'off' where user_id = '${ID.a}';`;
     expect(count(await as(db, 'b', `select 1 from public.public_farms`, offView))).toBe(0);
     const followersOnly = `update public.profiles set privacy_farm_view = 'followers' where user_id = '${ID.a}';`;
     expect(count(await as(db, 'b', `select 1 from public.public_farms`, followersOnly))).toBe(1);
-    expect(count(await as(db, 'admin', `select 1 from public.public_farms where owner_id = '${ID.a}'`, followersOnly))).toBe(0);
+    expect(
+      count(
+        await as(
+          db,
+          'admin',
+          `select 1 from public.public_farms where owner_id = '${ID.a}'`,
+          followersOnly,
+        ),
+      ),
+    ).toBe(0);
   });
 });
 
@@ -480,7 +740,10 @@ describe('storage', () => {
   });
 
   it('makes the four buckets', async () => {
-    const b = await rows<{ id: string; public: boolean }>(db, `select id, public from storage.buckets order by id`);
+    const b = await rows<{ id: string; public: boolean }>(
+      db,
+      `select id, public from storage.buckets order by id`,
+    );
     expect(b).toEqual([
       { id: 'ad-media', public: true },
       { id: 'avatars', public: false },
