@@ -20,7 +20,8 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
   const [opened, setOpened] = useState(false);
   const id = useId();
 
-  const tool = state && state.tool !== 'fix' ? state.tool : null;
+  // Once a job is done the tool is back to Look, while its result shows on the card.
+  const tool = state && state.tool !== 'fix' && state.phase !== 'done' ? state.tool : null;
   // A phone's bar opens on a tap and stays open while a tool is in use. A PC's is always open.
   const open = docked || opened || tool !== null;
   const info = tool ? build.tools.find((t) => t.id === tool) : null;

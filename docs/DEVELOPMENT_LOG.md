@@ -871,6 +871,37 @@ Questions for Claudia:
 3. **Figures in the words.** The paddock sheet says cattle with no water die on the fourth day (the banner already did), the milking reason gives MJ a day, and the joining note says week N of 9. Are exact figures like these fine to show, or should they be vaguer (rule 14)?
 4. **Mark calves.** Question 2 from 1.7a still stands: the card says "bull calves and young bulls to mark", and the job marks all of them, as the engine does.
 
+### 14 Nov 2026: milestone 1.7c, the build tools
+
+Branch `m1.7c-build-tools`, on top of `m1.7b-paddock-and-mob`. Nothing under `packages/engine/src` or `packages/shared/src` is changed. No new package or outside service.
+
+Built:
+
+- **The map learns about lines** (`packages/render`). `lines.ts` (pure, no PixiJS, also served as `@gg/render/lines`): the nearest fence segment and the nearest grid corner to a point at any zoom, the path a drag makes along the grid (the long way first, then the short way; dragging back undoes; a second drag from either end extends), the same for squares of pipe, the run of tape a segment rolls up with, and whether a corner joins a fence. `draft.ts` (also `@gg/render/draft`): the draft overlay as data, with the styles `ok`, `late` and `remove`, styled from the server's job card, and the snap dots. In `map.ts`: `setTool`, `setDraft`, `groundToScreen`, and the events `drag`, `toolTap` and `fenceTap`. The draft and the hover are two Graphics layers on top, redrawn on their own, so drawing never rebuilds the map. In a drawing tool one finger or the left button draws; two fingers, the space bar or the middle button pan. Look is as before.
+- **The tool bar** (`BuildBar`): Look and Fence (permanent, electric or tape, each with its price a metre and what it does), Gate, Pipe, Trough, Portable trough, Water hub (on a corner or on a square) and Remove. A compact bar that opens on a phone; at the top of the side panel on a PC. One line of help for each tool. Prices and help lines come from the server's snapshot (`build`). Cancel, Look and Escape go back to Look, and so does every finished job.
+- **Fence and tape.** Drag along the grid, extend by dragging again from an end. The page asks for the job card at most about three times a second, newest answer only (`lib/game/latest.ts`). The part that fits is the line's colour and the part that does not is red. The card beside the line (floating on a PC, above the tool bar on a phone) says the length, the cost, the time lightly, then "You don't have enough time to do this today." with the metres that fit and the metres that do not, and "This would use up your full day." Build puts up the part that fits (the engine builds it from the whole line; the red part is not remembered). If nothing fits, all of it is red and Build is off. A refusal shows the server's reason on the card.
+- **The other tools,** each preview, card, confirm, result, back to Look: Gate (tap a fence for a gate; tap a gate to open or shut it, with the paddocks it joins and that the mobs join if both hold stock; also from a Gates list on the paddock sheet), Pipe (drag over squares), Trough (tap a square; a trough away from water gets the engine's reason; tap a trough to move or take it out), Portable trough (place, move, refill, sell back), Water hub, Remove (fence, tape rolled up, gate, trough, hub, portable trough). A knocked-down fence: tap it in Look, or use "Put it back up" in the things to do, which opens the same card and marks the fence.
+- **Server.** `server/game/build.ts` checks every build action (whole numbers in range, lists of at most 400, known fence kinds). `buildwords.ts` writes the tool help, prices, the line sentences, the gate sentences and what a done job reports ("Built 482 m of permanent fence. It cost $3,377."). The job card carries the pieces that fit and do not fit, with metres, and the words. The request body limit went from 4 KB to 32 KB for long lines.
+
+How it was tested: new tests in `packages/render` (`lines.test.ts`, `draft.test.ts`: segment and corner hit-testing at 12, 26, 60 and 96 px a square, the path a drag makes, tape runs, the overlay styles from a job card, snap dots), `lib/game` (`latest.test.ts`: the throttle and stale answers; `taps.test.ts`; `buildstore.test.ts`: drawing, the red part, a job that cannot start today, stale answers, confirm and refusal, snapping back to Look; `linecard.test.ts`) and the server (`build.test.ts`: the action checks, a short tape line, a permanent fence longer than the day with only the part that fits built, a refusal, a gate with its notes, pipe from the bore then a trough, a portable trough sold back, tape rolled up; `buildwords.test.ts`). `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` and `pnpm check:browser-bundle` pass (see the final counts in the report).
+
+What was looked at in a real browser (the pane's browser, not a phone, on a scratch farm, drawing with scripted pointer events because the screenshot tool crops the pane): the PC layout (1024 wide pane) in light: a tape line drawn and built, a permanent fence longer than the day (brown turning red, both messages, only the 482 m that fit built), a gate put in and the open card, pipe from the bore then a trough on it, a portable trough set down and sold back, a fence taken down. Phone upright at 375 and 360 wide: the bar, the card above it, no sideways scroll (measured), every bar button at least 44 px, a drawn electric line. A script checked text contrast in the bar and card in light and dark: nothing under 4.5 to 1 (it approximates the translucent bar over a plain background). Not looked at: phone on its side, the dark theme by eye, a real touch, a keyboard-only run, the pipe's red part, hub placement, and a knocked-down fence on screen (none occurs on a fresh farm).
+
+Not done:
+
+- Drawing a fence or pipe by keyboard. The tools and the card buttons are reachable and have focus rings, but the line is drawn with a finger or the mouse.
+- Half-built lines and pegs on the map (still the working day's piece). The farmer and the ute.
+- Moving a square water hub, and taking out a square hub as one job (Remove takes out a trough or a corner hub).
+- The card on a PC sits beside the end of the line and can cover part of it.
+- Lighthouse was not run.
+
+Questions for Claudia:
+
+1. **Pipe on a phone.** Pipe squares are 15 to 40 px wide on a phone zoomed out. Should the tool zoom the map in for her, or is pinching first fine?
+2. **The default fence.** The bar starts on electric. Right?
+3. **Gate sentence.** Opening a gate says "The mobs in them will join if both hold stock." Is that the wording she wants, given joining is automatic?
+4. **Remove.** Removing a fence gives nothing back and is free (the engine's rule). Is that intended, or should a permanent fence pay something back?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

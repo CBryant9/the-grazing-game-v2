@@ -149,7 +149,8 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | S3 | A patch script run from Python on Windows turned every file it touched from LF to CRLF | Text mode writes `
 ` as `
 ` on Windows | Open files for writing with `newline='
-'`, and check for `` before committing. Prettier would have caught it, but only at the end |
+'`, and check for `
+` before committing. Prettier would have caught it, but only at the end |
 | P1 | The first plan comparison with the old game failed before the first day: year buys, infrastructure and opening net worth differed | The farm was set up with the instant path (pipe, fences, troughs, cattle), so its year totals held that spending. The old game's fresh game had none | Start the comparison from a year with nothing spent: `farm.year = newYear(farm)` after the set-up. **Rule: a comparison starts from a state both sides agree on, however the farm was built** |
 | P2 | In the 180-day play test the ordinary player's rotation plan never moved on the seed 1 farms, and ended with plans waiting. The test passed | Each farm had as many mobs as paddocks with water, and the engine made a plan wait when another mob was in the next paddock (P4) | Found by reading what the test left undone (things to do left at the end). The wait is out. **Rule: read what a passing test leaves undone, not only that it passed** |
 | P3 | A patch to `state.ts` ran its backticked comments as shell commands and left the file half changed | The patch was a `node -e "..."` string in double quotes, and the shell runs backticks inside them | Reverted from git. Patches go in a script file written with the editor and run by name. Same family as D12 and S3 |
@@ -164,6 +165,8 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | G7 | The paddocks a move can pick, and the selected paddock, could hardly be seen on the map | The outline is a thin line on the paddock edge, and on a farm of two paddocks most edges are the farm boundary fence | Pickable paddocks also get a light tint (red where there is no water). A paddock that matters on the map needs more than an outline |
 | G8 | The move result said "Mob 2 joined Mob 1. Mob 1 moved (258 head)", which read as the wrong mob moving | Two events (moved, joined) were turned into two sentences, and the moved event carried the name of the mob after the join | One sentence when a move joins mobs: "Mob 2 moved (258 head) and joined Mob 1." Read the words a job makes in the browser, not only the figures |
 | G9 | On a phone, a job card opened under a button and the sheet jumped, so the card was out of view | The button row closed (the sell picker) and the sheet got shorter, so the scroll position moved | The job card scrolls itself into view when it opens or changes |
+| G10 | After a fence was built the tool bar still showed Fence as picked, though the map was already back to Look | The bar read the tool from the build state, which stays until the result is dismissed, while the map's tool mode was already Look | One rule for both: once a job is done the tool is Look everywhere, and the result stays on the card until OK. Look at the bar after a job in the browser, not only the map |
+| G11 | A long line drawn in several drags looked like one drag had replaced the rest | The line's first row was the farm boundary, which the engine does not count as new fence, so the card showed only the new metres | The card says the metres the server will build, and the draft draws every segment the player dragged. A boundary segment is dragged over but not counted |
 
 ## Process lessons
 
