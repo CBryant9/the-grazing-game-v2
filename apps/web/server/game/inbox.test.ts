@@ -125,7 +125,7 @@ describe('the words for the inbox', () => {
           estimate: { tha: 2.1, t: 48.3, ha: 23, value: 12_000, cost: 1_000 },
         },
       },
-      /^Wheat is ready to harvest: about 48\.3 t of grain\.$/,
+      /^The wheat crop is ready to harvest: about 48\.3 t of grain\.$/,
     ],
     [
       'a harvest',

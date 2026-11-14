@@ -217,7 +217,7 @@ function BuyView({ market }: { market: MarketWire }) {
               </span>
               <span className={styles.pickfacts}>
                 {c.cKg === null ? 'Priced by the head' : `${num(c.cKg)} c/kg`}, about{' '}
-                {money(c.perHead)} a head with fees
+                {money(c.perHead)} {c.perText} with fees
               </span>
             </button>
           </li>
@@ -392,8 +392,9 @@ function Bookings({ snapshot }: { snapshot: Snapshot }) {
               )}
               <ActJob
                 slot={slot}
-                title={`Cancel the booking for ${m.name}`}
-                confirmLabel="Cancel booking"
+                title={`Take ${m.name} off the sale`}
+                confirmLabel="Take off the sale"
+                cancelLabel="Keep the booking"
               />
             </li>
           );

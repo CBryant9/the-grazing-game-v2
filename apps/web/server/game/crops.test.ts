@@ -46,7 +46,7 @@ describe('the words for crops', () => {
 
   it('says why a species is not open, naming the window and the month', () => {
     expect(outOfWindow('Wheat', [3, 4, 5], 10)).toBe(
-      'Wheat is sown in Apr to Jun. It is November now.',
+      'The sowing window for wheat is Apr to Jun. It is November now.',
     );
   });
 
@@ -186,7 +186,7 @@ describe('crops in the snapshot', () => {
     expect(wheat.costPerHa).toBeGreaterThan(50);
     expect(wheat.window).toMatch(/^[A-Z][a-z]{2}( to [A-Z][a-z]{2})?$/);
     expect(wheat.open).toBe(false);
-    expect(wheat.reason).toMatch(/^Wheat is sown in .+\. It is September now\.$/);
+    expect(wheat.reason).toMatch(/^The sowing window for wheat is .+\. It is September now\.$/);
     expect(c.options.find((o) => o.id === 'phal')!.open).toBe(true);
     expect(c.options.find((o) => o.id === 'phal')!.reason).toBeNull();
     // A mixed farm starts with crops in the ground, in plain words.

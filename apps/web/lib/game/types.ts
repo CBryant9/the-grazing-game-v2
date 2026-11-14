@@ -221,6 +221,8 @@ export interface BuyClassWire {
   cKg: number | null;
   /** About what one head costs with fees and freight, dollars. */
   perHead: number;
+  /** "a head", or "a unit" for a cow with her calf. */
+  perText: string;
 }
 
 /** A market class on the farm, with the head that are free to sell. */

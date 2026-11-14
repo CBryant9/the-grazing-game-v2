@@ -83,7 +83,7 @@ export const aboutLine = (id: string): string => ABOUT[id] ?? '';
 
 /** Why a species can not be sown now: its window, and the month it is. */
 export function outOfWindow(name: string, months: readonly number[], month: number): string {
-  return `${name} is sown in ${monthRange(months)}. It is ${monthName(month)} now.`;
+  return `The sowing window for ${name.toLowerCase()} is ${monthRange(months)}. It is ${monthName(month)} now.`;
 }
 
 /** Where a planting is up to. Stated as a fact, with no countdown. */
@@ -172,6 +172,6 @@ export function harvestLines(h: HarvestLines): string[] {
     `Harvest ${h.name.toLowerCase()} on ${hectares(h.ha)}: about ${tonnes(h.t)} t of grain, ${tonnes(h.tha)} t/ha.`,
     `Worth about ${money(h.value)}. Harvesting costs ${money(h.cost)}.`,
     `That brings the bank to ${signed(h.cashBefore + h.value - h.cost)}.`,
-    'Harvest happens at once and takes none of the day. The paddock is left in stubble.',
+    'Harvest happens at once and takes none of the day. The land is left in stubble.',
   ];
 }

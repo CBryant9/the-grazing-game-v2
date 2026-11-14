@@ -320,7 +320,7 @@ describe('a plan on a running farm', () => {
     });
     expect(p.ok).toBe(true);
     if (!p.ok) return;
-    expect(p.card.notes).toContain(
+    expect([...(p.card.summary ?? []), ...p.card.notes]).toContain(
       `${b.name} (${b.head} head) is in ${bPaddock.name}. The two mobs will join when the plan gets there.`,
     );
     const dry = first.paddocks.find((x) => x.water === 'none');
@@ -337,7 +337,7 @@ describe('a plan on a running farm', () => {
         },
       });
       if (d.ok) {
-        expect(d.card.notes).toContain(
+        expect([...(d.card.summary ?? []), ...d.card.notes]).toContain(
           `${dry.name} has no water. The plan waits there until it has water.`,
         );
       }

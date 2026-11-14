@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import type { Snapshot } from '@/lib/game/types';
-import { cardLines, plural } from '@/lib/game/format';
+import { cardLines, doneLines, plural } from '@/lib/game/format';
 import { useGame, type JobState } from '@/lib/game/store';
 import { Icon } from './Icon';
 import styles from './play.module.css';
@@ -92,7 +92,9 @@ function Row({
       {phase === 'done' && (
         <div className={styles.jobresult} role="status">
           <p>{job?.message}</p>
-          {job?.card && <p className="muted">{cardLines(job.card).slice(0, 2).join(' ')}</p>}
+          {job?.card && doneLines(job.card).length > 0 && (
+            <p className="muted">{doneLines(job.card).join(' ')}</p>
+          )}
           <button type="button" className="btn sm ghost" onClick={() => dismissJob(item.key)}>
             OK
           </button>

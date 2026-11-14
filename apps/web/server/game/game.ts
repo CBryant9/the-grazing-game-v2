@@ -295,16 +295,6 @@ function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
       `${card.arrival.head} head arrive in the stock yards at first light on ${dateText(card.arrival.date)}.`,
     );
   }
-  if (card.plan) {
-    for (const area of card.plan.dryAreas) {
-      notes.push(`${area} has no water. The plan waits there until it has water.`);
-    }
-    for (const j of card.plan.joins) {
-      notes.push(
-        `${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join when the plan gets there.`,
-      );
-    }
-  }
   if (card.action === 'markCalves') {
     notes.push('Marking covers every bull calf and young bull in the mob that is not marked yet.');
   }
@@ -548,7 +538,7 @@ export class GameServer {
         return cropLines(farm, env, action);
       case 'setPlan':
       case 'resumePlan':
-        return planLines(farm, action);
+        return planLines(farm, action, card);
       default:
         return [];
     }

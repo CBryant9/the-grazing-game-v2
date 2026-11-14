@@ -1082,6 +1082,7 @@
   border: 1px solid var(--ghost);
   border-radius: 8px;
   overflow: hidden;
+  min-height: calc(var(--tap) + 2px);
 }
 .seg button {
   min-height: var(--tap);
@@ -1380,6 +1381,8 @@
   border: 1px solid var(--ghost);
   border-radius: 8px;
   overflow: hidden;
+  /* A box that clips its edges can shrink to nothing in a scrolling grid. Keep it a finger tall. */
+  min-height: calc(var(--tap) + 2px);
 }
 .seg3 button {
   min-height: var(--tap);

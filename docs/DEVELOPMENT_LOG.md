@@ -902,6 +902,40 @@ Questions for Claudia:
 3. **Gate sentence.** Opening a gate says "The mobs in them will join if both hold stock." Is that the wording she wants, given joining is automatic?
 4. **Remove.** Removing a fence gives nothing back and is free (the engine's rule). Is that intended, or should a permanent fence pay something back?
 
+### 14 Nov 2026: milestone 1.7d, market, plans, crops and the inbox
+
+Branch `m1.7d-market-and-plans`, on top of `m1.7c-build-tools`. Nothing under `packages/engine/src` or `packages/shared/src` is changed. No new package or outside service.
+
+Built:
+
+- **Market tab.** Prices, Buy and Sell. The top says whether there is a sale today or names the next one. Prices lists the eight classes the game sells in, with c/kg live weight, $ a head for a typical beast (the middle of the class's sale weight range, or the farm's own calves) and the change since the first day on the chart. A plain SVG chart shows the last month of prices the farm has lived (a class can be shown or hidden, each line has its own dash). Real-year farms show the MLA credit line under the prices. Buy: pick a class and a number, Check the buy, then a card with the total with freight, the head price, "They arrive tomorrow morning in the stock yards" and what is left in the bank, then Confirm. With no sale it is off with the engine's reason and the next sale named. Sell: by class across the farm or by mob and group. On a sale day the card gives the money after selling costs. On another day it says the stock go down for the next sale, with its date, that nothing is paid now and that the price is set on the day. Booked stock is listed by mob with a Cancel for each.
+- **Plans tab.** Each plan with its paddocks in order, its rule in words, rounds, what follows, and each mob on it: step, round, running, paused or waiting with the reason, what it will do next, and its report. Make or change a plan on the farm tab: pick the mob, tap paddocks on the map in order (numbers sit over the map) or pick them from the list, pick the rule and figure, the rounds, and the step to start from. The card shows the move now, that it takes none of the day, any stop with no water and any stop that holds another mob. Pause, Resume from a step and Clear. A plan paused by a manual move says so. The day card now says when a plan moved a mob (one line for each mob, with a count over a skip).
+- **Crops (mixed farms only).** The paddock sheet shows plantings with their stage in plain words and Harvest when ready, and Sow: the species the district grows with cost a hectare, window and a line on what each is for; outside the window the option is off with the reason. Squares are picked by dragging a box on the map (the squares tool the build tools use) or "all the arable land". The cards give hectares, cost, expected tonnes and money and what is left in the bank. The things-to-do item for a ready crop opens the same card.
+- **More tab.** Inbox (newest first, 40 messages, built on the server from the engine's events, with the cause where there is one), a count on the tab for unread, the farm's name and setup, Start a new farm behind an in-page confirm, the theme switch and a link home.
+- **Server.** New modules `market`, `marketwords`, `plans`, `planwords`, `crops`, `cropwords`, `inboxwords`. The job card carries ready-made `summary` lines for market, plan and crop jobs, so the browser works nothing out. `parseAction` takes `buyCattle`, `sellClass`, `setPlan`, `resumePlan` and `sow`, checking every number and list. A new route `/api/game/inbox` records how far the player has read (kept with the farm). The snapshot gains the market prices and chart, plans in words, the plan form's limits, `cropping`, arable hectares for each paddock and unread counts. The deny list gained price series, calendar, schedule and crop table names. A 4,143 head farm is 54,334 bytes. A mixed large farm with a plan and a full inbox is 61,325 bytes.
+
+How it was tested: new unit tests for the server words (market, plans, crops, inbox), the request checks, the snapshot additions (including that the chart ends today and holds at most 31 days), buying through to the arrival and moving out, selling and booking and cancelling, a rotation that moves, pauses, resumes and clears, sowing, refusal out of the window, harvest from the paddock sheet and from the things to do (same card), the inbox read mark (also through the route), and the pure client parts (chart geometry, plan form, square picking, inbox helpers, card lines).
+
+What was looked at in a real browser (the pane's browser, not a phone, on a real-year Central West NSW mixed farm starting Sep 1997): the PC at 1280 by 800 in light: the Market tab on a non-sale day with Buy off and the reason, Next day to the sale day, a buy of 12 weaner steers with the card and Confirm, their arrival and the things to do, moving them out, booking 3 head on a non-sale day and cancelling, a three-paddock plan made by tapping the map (numbers showed), the plan moving the mob by itself with the day card line, Pause, Resume from a step, Sow with a dragged box (refused where crops stand, with the reason) and with all arable land on a paddock with fallow, Harvest from the things to do, and the inbox. Phone at 375 wide: the Market prices and chart, the Plans tab (light) and the More tab (dark), and no sideways scroll on the pages looked at. The pane cropped some screenshots after a resize, so the phone plan form, the crop sheet and the 1280 dark theme were measured by script or not looked at (see Not done). The dev server was stopped after the run, and a few wording fixes made after it (see below) were covered by tests, not looked at again.
+
+Changed after the browser run: the Cancel booking card now says "Take off the sale" and "Keep the booking"; a finished market, plan or crop job repeats only where the bank stands; cow and calf units are priced "a unit"; the sowing reason reads "The sowing window for wheat is Mar to May. It is September now."; join notes on a plan say "join now" for the first stop.
+
+Departures from the spec: the price list is by market class (what prices are set in), the Buy list is by sale class (what the yard sells), so they are not the same eight; the chart toggles by market class. Plans made in the form have one leg (the engine allows more; a plan with more legs shows but its Change button is off). Crop squares are picked by dragging a box, not a path. The mob card's Sell now uses the new sale words too.
+
+Not done:
+
+- The phone plan form, the crop sheet on a phone and the dark theme at 1280 were not looked at in a screenshot. Keyboard use of the map taps and box drag is not possible (the paddock list and "all the arable land" are the keyboard routes).
+- A forage or grain crop can only be picked on arable land. The pick also takes squares that already hold a crop; the card says how many can not take it.
+- Lighthouse was not run.
+- No "worker moved the mob" character, and nothing for Daily Farm.
+
+Questions for Claudia:
+
+1. **Typical beast.** $ a head uses the middle of each class's sale weight range. Heavy steers use the weight where the engine starts calling them heavy, and calves use the farm's own. Right?
+2. **Inbox volume.** Births fill the inbox in calving season (one line a day). Should births be one line a week?
+3. **Plan "next".** The plan card says "Moves into Paddock 2 after 2 more days here". That is the plan's own rule, not a forecast of the farm. Fine?
+4. **Crop details.** The sow cards name how many squares can not take a crop. Should the map mark those squares red?
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

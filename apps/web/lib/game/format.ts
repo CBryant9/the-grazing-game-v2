@@ -76,6 +76,16 @@ export function aboutTime(minutes: number): string {
   return `about ${durationText(m)}`;
 }
 
+/**
+ * What a card says again under the result of a job. A market, plan or crop
+ * job already said what it did, so only where the bank stands is repeated.
+ * Any other job repeats its time and cost.
+ */
+export function doneLines(card: JobCardWire): string[] {
+  if (card.summary?.length) return card.summary.filter((l) => /^That (leaves|brings)/.test(l));
+  return cardLines(card).slice(0, 2);
+}
+
 /** What a job card says, as short facts: time, cost, and the light left after it. */
 export function cardLines(card: JobCardWire): string[] {
   // A market, plan or crop job comes with its own lines from the server.

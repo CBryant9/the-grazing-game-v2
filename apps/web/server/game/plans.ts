@@ -10,6 +10,7 @@ import {
   surveyOf,
   type Action,
   type FarmState,
+  type JobCard,
   type PlanRule,
   type PlanView,
 } from '@gg/engine';
@@ -189,7 +190,7 @@ export function parsePlanAction(a: Record<string, unknown>): Action | null {
 }
 
 /** The lines on the plan card: where the mob goes now, what the plan does after, and the time. */
-export function planLines(farm: FarmState, action: Action): string[] {
+export function planLines(farm: FarmState, action: Action, card: JobCard): string[] {
   if (action.type !== 'setPlan' && action.type !== 'resumePlan') return [];
   const m = farm.mobs.find((x) => x.id === action.mob);
   if (!m) return [];
@@ -215,6 +216,7 @@ export function planLines(farm: FarmState, action: Action): string[] {
     }
   }
   const out: string[] = [];
+  const notes: string[] = [];
   if (cell !== undefined) {
     const to = nameOf(cell);
     const at = m.where.kind === 'paddock' && areaIdOf(survey, m) === topo.areaOf[cell];
@@ -224,6 +226,17 @@ export function planLines(farm: FarmState, action: Action): string[] {
         : `${m.name} moves into ${to} now.`,
     );
     out.push('Setting a plan takes none of the day.');
+    // What the engine found in the plan: stops with no water, and stops that hold another mob.
+    for (const area of card.plan?.dryAreas ?? []) {
+      notes.push(`${area} has no water. The plan waits there until it has water.`);
+    }
+    for (const j of card.plan?.joins ?? []) {
+      notes.push(
+        j.area === to
+          ? `${j.mobName} (${j.head} head) is in ${j.area}, so the two mobs join now.`
+          : `${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join when the plan gets there.`,
+      );
+    }
   }
-  return [...out, ...lines];
+  return [...out, ...lines, ...notes];
 }

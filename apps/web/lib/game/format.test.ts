@@ -5,6 +5,7 @@ import {
   clockText,
   dateText,
   delta,
+  doneLines,
   durationText,
   lightNote,
   money,
@@ -85,5 +86,24 @@ describe('cardLines', () => {
   });
   it('adds the notes after the figures', () => {
     expect(cardLines(card({ notes: ['One more fact.'] })).at(-1)).toBe('One more fact.');
+  });
+});
+
+describe('a job with its own lines', () => {
+  const own = card({
+    summary: [
+      'Buy 12 weaner steers: $5,572, freight and fees included. That is about $464 a head.',
+      'They arrive tomorrow morning in the stock yards.',
+      'That leaves $149,313 in the bank.',
+    ],
+    notes: ['One more fact.'],
+  });
+  it('uses the server lines, then the notes, and not the time and cost lines', () => {
+    expect(cardLines(own)).toEqual([...own.summary!, 'One more fact.']);
+  });
+  it('repeats only where the bank stands under the result', () => {
+    expect(doneLines(own)).toEqual(['That leaves $149,313 in the bank.']);
+    expect(doneLines(card({ summary: ['Sale booked.'] }))).toEqual([]);
+    expect(doneLines(card())).toEqual(['Takes about 30 min.', 'Costs $72.']);
   });
 });

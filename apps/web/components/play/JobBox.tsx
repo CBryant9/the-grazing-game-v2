@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { cardLines } from '@/lib/game/format';
+import { cardLines, doneLines } from '@/lib/game/format';
 import type { JobCardWire } from '@/lib/game/types';
 import styles from './play.module.css';
 
@@ -98,7 +98,9 @@ function Inner({
     return (
       <div className={styles.jobresult} role="status">
         <p>{job.message}</p>
-        {job.card && <p className="muted">{cardLines(job.card).slice(0, 2).join(' ')}</p>}
+        {job.card && doneLines(job.card).length > 0 && (
+          <p className="muted">{doneLines(job.card).join(' ')}</p>
+        )}
         <button type="button" className="btn sm ghost" onClick={onDismiss}>
           OK
         </button>

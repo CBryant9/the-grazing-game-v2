@@ -167,6 +167,8 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | G9 | On a phone, a job card opened under a button and the sheet jumped, so the card was out of view | The button row closed (the sell picker) and the sheet got shorter, so the scroll position moved | The job card scrolls itself into view when it opens or changes |
 | G10 | After a fence was built the tool bar still showed Fence as picked, though the map was already back to Look | The bar read the tool from the build state, which stays until the result is dismissed, while the map's tool mode was already Look | One rule for both: once a job is done the tool is Look everywhere, and the result stays on the card until OK. Look at the bar after a job in the browser, not only the map |
 | G11 | A long line drawn in several drags looked like one drag had replaced the rest | The line's first row was the farm boundary, which the engine does not count as new fence, so the card showed only the new metres | The card says the metres the server will build, and the draft draws every segment the player dragged. A boundary segment is dragged over but not counted |
+| G12 | The Market tab's Prices / Buy / Sell switch showed as a thin line | A box that clips its edges (`overflow: hidden`) can shrink to nothing as a row in a scrolling grid | Give a clipping box a minimum height of a finger. Look at every new control in the browser, not only its text |
+| G13 | After a change to the server words, the browser still showed the old words | The dev server keeps the one game server object across reloads, and that object holds the old code | Restart the dev server after changing anything under `server/game` before judging the words on screen |
 
 ## Process lessons
 

@@ -14,11 +14,14 @@ export function ActJob({
   slot,
   title,
   confirmLabel,
+  cancelLabel,
   children,
 }: {
   slot: string;
   title: string;
   confirmLabel: string;
+  /** What the Cancel button says, when "Cancel" would be unclear. */
+  cancelLabel?: string;
   /** Extra buttons beside Cancel. */
   children?: ReactNode;
 }) {
@@ -32,6 +35,7 @@ export function ActJob({
       title={title}
       job={job}
       confirmLabel={confirmLabel}
+      {...(cancelLabel ? { cancelLabel } : {})}
       busy={busy}
       onConfirm={() => void confirmAct(slot)}
       onCancel={() => dismissAct(slot)}

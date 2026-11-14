@@ -129,6 +129,7 @@ function buyClasses(farm: FarmState): BuyClassWire[] {
       // Bulls are priced by the head, not by weight.
       cKg: c.kind === 'bull' ? null : Math.round(centsPerKg(typical, prices)),
       perHead: Math.round(estimateBuy(id, 1, prices)),
+      perText: 'calf' in c ? 'a unit' : 'a head',
     };
   });
 }

@@ -19,6 +19,9 @@ const pct = (n: number): string => `${Math.round(n * 100)}%`;
 const t1 = (n: number): string => (Math.round(n * 10) / 10).toLocaleString('en-AU');
 const name = (sp: keyof typeof SPECIES): string => SPECIES[sp].short;
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+/** A planting as a noun that takes "is": "Phalaris pasture", "The oats crop". */
+const planting = (sp: keyof typeof SPECIES): string =>
+  SPECIES[sp].type === 'pasture' ? `${capital(name(sp))} pasture` : `The ${name(sp)} crop`;
 
 export interface Message {
   kind: InboxKind;
@@ -199,22 +202,20 @@ function cropMessage(c: Extract<FarmEvent, { type: 'crop' }>['event']): Message 
     case 'self-sown':
       return msg(`Some ${name(c.sp)} came back from seed, at ${pct(c.share)} of a full stand.`);
     case 'pasture-established':
-      return msg(`${capital(name(c.sp))} is established.`);
+      return msg(`${planting(c.sp)} is established.`);
     case 'pasture-thinning':
-      return msg(`${capital(name(c.sp))} is past its life and thinning.`);
+      return msg(`${planting(c.sp)} is past its life and thinning.`);
     case 'crop-established':
-      return msg(`${capital(name(c.sp))} is established.`);
+      return msg(`${planting(c.sp)} is established.`);
     case 'lock-up-soon':
-      return msg(`${capital(name(c.sp))} locks up for grain in ${plural(c.days, 'day')}.`);
+      return msg(`${planting(c.sp)} locks up for grain in ${plural(c.days, 'day')}.`);
     case 'harvest-ready':
-      return msg(
-        `${capital(name(c.sp))} is ready to harvest: about ${t1(c.estimate.t)} t of grain.`,
-      );
+      return msg(`${planting(c.sp)} is ready to harvest: about ${t1(c.estimate.t)} t of grain.`);
     case 'grain-shedding':
       return msg(`Grain in the ${name(c.sp)} is starting to shed.`);
     case 'forage-finished':
       return msg(
-        `${capital(name(c.sp))} has finished for the season.${c.mayRegrow ? ' Some may come back from seed.' : ''}`,
+        `${planting(c.sp)} has finished for the season.${c.mayRegrow ? ' Some may come back from seed.' : ''}`,
       );
     case 'not-harvested':
       return msg(`The ${name(c.sp)} was not harvested. The grain is gone and it is stubble now.`);
