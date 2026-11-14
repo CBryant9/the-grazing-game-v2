@@ -10,7 +10,7 @@
 import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
 /** 3 added `workforce` and `contracts` (milestone 2.2). A saved offline farm of an older version is not shown. */
-export const SNAPSHOT_VERSION = 4;
+export const SNAPSHOT_VERSION = 5;
 
 export interface DateParts {
   year: number;
@@ -557,6 +557,54 @@ export interface Snapshot {
   /** The live year so far: its number and its score if it closed today. */
   score: { year: number; total: number };
   over: OverWire | null;
+  /** What only a Daily Farm has. Null for a Fast Farm. */
+  daily: DailyWire | null;
+}
+
+/** One game day the player was away for, as the diary has it. */
+export interface CatchUpDay {
+  day: number;
+  date: DateParts;
+  lines: string[];
+}
+
+/** What happened on the days the player did not open the farm, shown once before today starts. */
+export interface CatchUpWire {
+  days: CatchUpDay[];
+  /** What the hands did while the player was away, one bubble each. */
+  report: BubbleWire[];
+}
+
+/** A grazing plan move that is due and that no hand is there to make (PRD 5.15). */
+export interface PlanDueWire {
+  mob: number;
+  mobName: string;
+  from: string | null;
+  to: string;
+  /** The step of the plan the move goes to, for `resumePlan`. */
+  step: number;
+  /** The plan card's words, as a fact: "Your grazing plan said today you would move from X to Y." */
+  text: string;
+}
+
+/**
+ * The part of a snapshot only a Daily Farm has. The clock is the server's: `endsAt` and
+ * `serverNow` are both from the server, so the countdown can not be moved by the device's clock.
+ */
+export interface DailyWire {
+  /** The farm's time zone, locked when it started. */
+  timezone: string;
+  /** Local midnight, which ends today, ms since 1970 on the server's clock. */
+  endsAt: number;
+  /** The server's clock when this was sent, ms since 1970. */
+  serverNow: number;
+  /** The day has ended and the farm is waiting for yesterday's weather and prices, so no job can start yet. */
+  waiting: string | null;
+  work: DailyWork;
+  /** Days passed while the player was away, until they have seen them. */
+  catchUp: CatchUpWire | null;
+  /** Plan moves due today that no hand will make. */
+  planDue: PlanDueWire[];
 }
 
 /** What the game over screen shows. */
@@ -743,9 +791,21 @@ export interface FarmResponse {
 }
 
 /** One farm in the picker (milestone 3.2). The id is the one the browser sends back to open or delete it. */
+/** The two ways to play (PRD section 3). Daily Farm runs in real time, Fast Farm at the player's pace. */
+export type FarmMode = 'daily' | 'fast';
+
+/** Where a Daily Farm's work for today stands. A fact, never a nudge. */
+export type DailyWork = 'not-started' | 'started' | 'done';
+
 export interface FarmListItem {
   id: string;
   name: string;
+  /** Daily Farm or Fast Farm. */
+  mode: FarmMode;
+  /** The farm's date as the game reports it. */
+  date: DateParts | null;
+  /** A Daily Farm's work for today. Null for a Fast Farm. */
+  work: DailyWork | null;
   districtName: string;
   /** Farm day, from 0. The screens show day + 1. */
   day: number;
@@ -806,6 +866,10 @@ export interface SetupChoices {
   startType: SetupStart;
   difficulty: SetupDifficulty;
   name: string;
+  /** Which mode the farm plays. Left out is a Fast Farm (milestone 3.3). */
+  mode?: FarmMode;
+  /** A Daily Farm's time zone, an IANA name from the device. It is locked when the farm starts (PRD 5.2). */
+  timezone?: string;
 }
 
 /** What the browser may ask the server to do to a farm. The server checks every request. */

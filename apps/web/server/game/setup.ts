@@ -151,6 +151,17 @@ export function parseSetup(body: unknown): Parsed<SetupChoices> {
     difficulty: difficulty.value,
     name,
   };
+  // The mode and a Daily Farm's time zone (milestone 3.3). The server checks the zone against its own list.
+  if (b.mode !== undefined) {
+    if (b.mode !== 'daily' && b.mode !== 'fast') return bad('Choose Daily Farm or Fast Farm.');
+    out.mode = b.mode;
+  }
+  if (b.timezone !== undefined) {
+    if (typeof b.timezone !== 'string' || b.timezone.length > 64) {
+      return bad('Your time zone was not sent properly.');
+    }
+    out.timezone = b.timezone;
+  }
   if (enterprise.value === 'mixed') {
     const allowed = ARABLE_SHARES[district.value].mixed;
     if (typeof b.arablePct !== 'number' || !allowed.includes(b.arablePct)) {

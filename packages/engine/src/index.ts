@@ -662,6 +662,8 @@ export type { ClockView, ThingToDo } from './day/look';
 export { LABOUR, awardHourly, casualDayRate, contractDayRate } from './data/labour';
 export type { AwardLevel, LabourFigureSource } from './data/labour';
 export { standingOf } from './labour/pool';
+// Milestone 3.3 (Daily Farm): does a hand work on a farm day? The same rule the worker report and the standing duties use.
+export { worksOn } from './labour/help';
 // The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
 export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
 export type {

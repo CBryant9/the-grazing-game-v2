@@ -10,6 +10,7 @@ import type {
   SetupChoices,
 } from '../../lib/game/types';
 import { DIARY_DAYS, type StoredDiaryDay } from './diary';
+import { cleanDaily, type DailyStored } from '../daily/state';
 
 /**
  * The version of what is kept for a farm. 1 had no `format` (milestone
@@ -55,6 +56,8 @@ export interface StoredFarm {
    * one. Only days from the last year are kept.
    */
   missedWages?: number[];
+  /** What only a Daily Farm keeps (milestone 3.3). Left out for a Fast Farm. */
+  daily?: DailyStored;
 }
 
 /** A stored farm that could not be read: bad JSON, or not a farm at all. */
@@ -96,6 +99,7 @@ export function upgradeStored(raw: unknown, version: () => string): StoredFarm {
           ) as number[],
         }
       : {}),
+    ...(cleanDaily(raw.daily) ? { daily: cleanDaily(raw.daily)! } : {}),
     // A farm from before the diary has none. It is not broken: the diary starts now.
     diary: Array.isArray(raw.diary) ? (raw.diary as StoredDiaryDay[]).slice(-DIARY_DAYS) : [],
   };
@@ -120,6 +124,8 @@ export interface FarmFacts {
   date: DateParts;
   /** Why the game ended, or null while it is going. */
   over: string | null;
+  /** A Daily Farm (milestone 3.3): its mode, time zone and the last local date simulated. Left out for a Fast Farm. */
+  daily?: { timezone: string; simThrough: string };
 }
 
 /** One job or skip, for the action log (PRD 14.5). The file store does not keep it. */
@@ -145,6 +151,19 @@ export interface PutOptions {
   action?: ActionLogEntry;
   /** The farm on its new day, kept for "see the farm on a past day". */
   past?: PastDayWire;
+  /**
+   * A Daily Farm simulated through this local date (milestone 3.3). The database store moves
+   * the farm's clock (`daily_finish`) in the same transaction as the save, with the server's
+   * time in `at` (ms). `daily_finish` refuses a day that is not over in the farm's time zone.
+   */
+  dailyThrough?: { date: string; at: number };
+}
+
+/** Farms with days owed, found for the rollover (database only). */
+export interface DailyClaim {
+  farmId: string;
+  daysOwed: number;
+  localToday: string;
 }
 
 /**
@@ -209,6 +228,10 @@ export interface FarmStore {
   past(farmId: string, day: number): Promise<PastDayWire | null>;
   /** The days that have a picture kept, newest first. */
   pastDays(farmId: string): Promise<number[]>;
+  /** The rollover (milestone 3.3, database only): claim up to `batch` Daily Farms with days owed at `at` (ms). */
+  dailyClaim?(batch: number, at: number): Promise<DailyClaim[]>;
+  /** Give up a claim, so the next run picks the farm up at once. */
+  dailyRelease?(farmId: string): Promise<void>;
 }
 
 const ID = /^[0-9a-f]{32}$/;
@@ -517,6 +540,9 @@ export class MemoryFarmStore implements FarmStore {
       .map(([id, f]) => ({
         id,
         name: f.name,
+        mode: 'fast' as const,
+        date: null,
+        work: null,
         districtName: f.districtName,
         day: f.day,
         lastPlayed: f.used,

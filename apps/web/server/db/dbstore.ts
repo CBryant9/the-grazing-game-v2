@@ -9,12 +9,15 @@ import {
   PAST_MAX_DAYS,
   SaveConflictError,
   StoreUnavailableError,
+  type DailyClaim,
   type FarmFacts,
   type FarmStore,
   type Owner,
   type PutOptions,
   type StoredFarm,
 } from '../game/store';
+import { localDate } from '../daily/clock';
+import { cleanDaily, workOf } from '../daily/state';
 import type { SqlClient, SqlRunner } from './sql';
 
 /** The game's farm id is 32 hex; the database's is a uuid. One form at the edge, converted here. */
@@ -72,6 +75,7 @@ interface SaveRow {
   done: unknown;
   inbox_read: number | null;
   missed_wages: number[];
+  daily: unknown;
 }
 
 const json = (v: unknown): string => JSON.stringify(v);
@@ -104,7 +108,7 @@ export class DbFarmStore implements FarmStore {
     return this.guard(async () => {
       const r = await this.sql.query<SaveRow>(
         `select s.stored_format, f.name, s.save, s.setup, s.farm_version, s.done,
-                s.inbox_read, s.missed_wages
+                s.inbox_read, s.missed_wages, s.daily
            from public.farm_saves s join public.farms f on f.id = s.farm_id
           where s.farm_id = $1`,
         [id],
@@ -133,6 +137,7 @@ export class DbFarmStore implements FarmStore {
         done: row.done,
         ...(row.inbox_read !== null ? { inboxRead: row.inbox_read } : {}),
         ...(row.missed_wages.length ? { missedWages: row.missed_wages } : {}),
+        ...(row.daily ? { daily: row.daily } : {}),
         diary,
       };
     });
@@ -172,7 +177,8 @@ export class DbFarmStore implements FarmStore {
       `update public.farm_saves
           set stored_format = $2, save_format = $3, engine_version = $4, save = $5::jsonb,
               setup = $6::jsonb, farm_version = $7, done = $8::jsonb, inbox_read = $9,
-              missed_wages = array(select jsonb_array_elements_text($10::jsonb)::int)
+              missed_wages = array(select jsonb_array_elements_text($10::jsonb)::int),
+              daily = $12::jsonb
         where farm_id = $1 and farm_version = $11`,
       [
         id,
@@ -186,6 +192,7 @@ export class DbFarmStore implements FarmStore {
         farm.inboxRead ?? null,
         json(farm.missedWages ?? []),
         expect,
+        farm.daily ? json(farm.daily) : null,
       ],
     );
     return r.rowCount;
@@ -278,8 +285,10 @@ export class DbFarmStore implements FarmStore {
         await tx.query(
           `insert into public.farms
              (id, owner_id, guest_session_id, mode, name, district, size, size_ha, enterprise,
-              start_type, difficulty, years, engine_version, current_day, game_date)
-           values ($1, $2, $3, 'fast', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::date)`,
+              start_type, difficulty, years, engine_version, current_day, game_date,
+              timezone, sim_through)
+           values ($1, $2, $3, $15, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::date,
+                   $16, $17::date)`,
           [
             id,
             ownerId,
@@ -295,12 +304,15 @@ export class DbFarmStore implements FarmStore {
             facts.engineVersion,
             facts.day,
             dateText(facts.date),
+            facts.daily ? 'daily' : 'fast',
+            facts.daily?.timezone ?? null,
+            facts.daily?.simThrough ?? null,
           ],
         );
         await tx.query(
           `insert into public.farm_saves
-             (farm_id, stored_format, save_format, engine_version, save, setup, farm_version, done)
-           values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, '[]'::jsonb)`,
+             (farm_id, stored_format, save_format, engine_version, save, setup, farm_version, done, daily)
+           values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, '[]'::jsonb, $8::jsonb)`,
           [
             id,
             farm.format,
@@ -309,6 +321,7 @@ export class DbFarmStore implements FarmStore {
             json(farm.saved),
             json(farm.setup),
             farm.version,
+            farm.daily ? json(farm.daily) : null,
           ],
         );
       }),
@@ -327,6 +340,15 @@ export class DbFarmStore implements FarmStore {
         // second one finds the version changed and changes nothing.
         const changed = await this.writeSave(tx, id, farm, options.expect);
         if (changed === 0) throw new SaveConflictError('The farm changed under this save.');
+        // A Daily Farm's clock moves in the same transaction as its save. The database refuses a
+        // day that is not over in the farm's time zone, so no save can make an extra day.
+        if (options.dailyThrough) {
+          await tx.query('select public.daily_finish($1, $2::date, $3::timestamptz)', [
+            id,
+            options.dailyThrough.date,
+            new Date(options.dailyThrough.at).toISOString(),
+          ]);
+        }
         if (options.facts) await this.writeFacts(tx, id, options.facts);
         if (options.diaryDays) await this.writeDays(tx, id, farm, options.diaryDays);
         const a = options.action;
@@ -422,23 +444,57 @@ export class DbFarmStore implements FarmStore {
         name: string;
         district: string;
         current_day: number;
+        mode: 'daily' | 'fast';
+        d: string | null;
+        timezone: string | null;
+        daily: unknown;
         ms: string;
       }>(
-        `select f.id, f.name, f.district, f.current_day,
+        `select f.id, f.name, f.district, f.current_day, f.mode, f.timezone,
+                to_char(f.game_date, 'YYYY-MM-DD') as d, s.daily,
                 (extract(epoch from f.last_opened_at) * 1000)::bigint::text as ms
-           from public.farms f
+           from public.farms f left join public.farm_saves s on s.farm_id = f.id
           where ${where}
           order by f.last_opened_at desc, f.created_at desc`,
         [owner.kind === 'user' ? owner.id : sessionHash(owner.session)],
       );
-      return r.rows.map((f) => ({
-        id: fromUuid(f.id),
-        name: f.name,
-        districtName: f.district,
-        day: f.current_day,
-        lastPlayed: Number(f.ms),
-        current: false,
+      return r.rows.map((f) => {
+        const daily = f.mode === 'daily' ? cleanDaily(f.daily) : undefined;
+        return {
+          id: fromUuid(f.id),
+          name: f.name,
+          mode: f.mode,
+          date: f.d ? dateParts(f.d) : null,
+          work: daily && f.timezone ? workOf(daily, localDate(this.clock(), f.timezone)) : null,
+          districtName: f.district,
+          day: f.current_day,
+          lastPlayed: Number(f.ms),
+          current: false,
+        };
+      });
+    });
+  }
+
+  async dailyClaim(batch: number, at: number): Promise<DailyClaim[]> {
+    return this.guard(async () => {
+      const r = await this.sql.query<{ farm_id: string; days_owed: number; local_today: string }>(
+        `select farm_id, days_owed, to_char(local_today, 'YYYY-MM-DD') as local_today
+           from public.daily_claim_due($1, $2::timestamptz)`,
+        [batch, new Date(at).toISOString()],
+      );
+      return r.rows.map((x) => ({
+        farmId: fromUuid(x.farm_id),
+        daysOwed: x.days_owed,
+        localToday: x.local_today,
       }));
+    });
+  }
+
+  async dailyRelease(farmId: string): Promise<void> {
+    await this.guard(async () => {
+      await this.sql.query('update public.farms set rollover_claimed_at = null where id = $1', [
+        toUuid(farmId),
+      ]);
     });
   }
 

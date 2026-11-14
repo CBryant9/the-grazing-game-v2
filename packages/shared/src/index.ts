@@ -64,7 +64,7 @@ export type AdSlotId = (typeof AD_SLOTS)[number];
 /** Feature switches and their launch defaults (PRD 11.7). */
 export const FEATURE_SWITCHES = {
   signups_open: true,
-  daily_farm: true,
+  daily_farm: false,
   fast_farm: true,
   community: false,
   feed_posts: false,
