@@ -175,6 +175,11 @@ export interface RouteOptions {
   name: string;
   /** True for anything that changes a farm: a cross-site request is refused. */
   write?: boolean;
+  /**
+   * True for a route that loads the farm: the session cookie is sent again
+   * with a fresh Max-Age, so a farm that is played is never removed as stale.
+   */
+  renew?: boolean;
 }
 
 export interface RouteContext {
@@ -224,7 +229,8 @@ export function route(
       const minted = !existing && options.mint ? randomBytes(16).toString('hex') : null;
       const sessionId = existing ?? minted;
       const out = await handler({ req, sessionId });
-      const extra: Record<string, string> = minted ? { 'Set-Cookie': setCookie(req, minted) } : {};
+      const fresh = minted ?? (options.renew ? existing : null);
+      const extra: Record<string, string> = fresh ? { 'Set-Cookie': setCookie(req, fresh) } : {};
       if (out instanceof Response) {
         for (const [k, v] of Object.entries(extra)) out.headers.set(k, v);
         out.headers.set('Cache-Control', 'no-store');

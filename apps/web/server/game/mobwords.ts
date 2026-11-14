@@ -1,5 +1,6 @@
 import 'server-only';
 import type { GainForecast, GainReason } from '@gg/engine';
+import { NO_WATER_WHY } from './words';
 
 /**
  * The words on the mob card and the move and supplement job cards. Plain
@@ -144,6 +145,11 @@ export function breedingLines(i: BreedingInputs): string[] {
     );
   }
   return out;
+}
+
+/** A water job would leave a mob with none: the fact, and why it matters. */
+export function lostWaterNote(mob: string, area: string | null): string {
+  return `After this, ${mob} has no water${area ? ` in ${area}` : ''}. ${NO_WATER_WHY}`;
 }
 
 /** The notes a move job card carries beyond the engine's own: water, and a mob already there. */

@@ -78,17 +78,28 @@ describe('the mob wire', () => {
     expect(mob.suppReason).toBeNull();
   }, 60_000);
 
-  it('says why a husbandry button is off, in plain words', async () => {
+  it('says why a husbandry button is off, in the words the job itself gives', async () => {
     const s = await server().create(A, choices({ startType: 'scratch' }));
     expect(s.mobs).toEqual([]);
-    const running = await server().create(A, choices());
-    for (const m of running.mobs) {
-      // The reason is the one the job itself gives (the engine's husbandryNow).
-      if (m.markCount === 0) expect(m.markReason).toMatch(/^There are no .*mark/);
-      else expect(m.markReason).toBeNull();
-      if (m.weanCount === 0) expect(m.weanReason).toMatch(/wean/);
-      else expect(m.weanReason).toBeNull();
+    const farm = createFarm({
+      seed: 7,
+      district: 'cw',
+      size: 'small',
+      start: { year: 2026, month: 8 },
+      startType: 'running',
+      difficulty: 'medium',
+    });
+    const snap = buildSnapshot(farm, { name: 'X', setup: choices(), version: 'v1' }, {});
+    const hus = husbandryNow(farm, {});
+    let off = 0;
+    for (const m of snap.mobs) {
+      const h = hus.find((x) => x.mob === m.id)!;
+      expect(m.markReason).toBe(h.mark.canDo ? null : h.mark.why!.message);
+      expect(m.weanReason).toBe(h.wean.canDo ? null : h.wean.why!.message);
+      if (!h.mark.canDo) off++;
+      if (!h.wean.canDo) off++;
     }
+    expect(off).toBeGreaterThan(0);
   });
 });
 
@@ -341,7 +352,8 @@ describe('the mob card reads the engine, never a copy of it', () => {
       const h = hus.find((x) => x.mob === m.id)!;
       expect(m.markCount).toBe(h.mark.count);
       expect(m.weanCount).toBe(h.wean.count);
-      expect(m.markReason).toBe(h.mark.canDo ? null : (h.mark.why?.message ?? expect.any(String)));
+      expect(m.markReason).toBe(h.mark.canDo ? null : h.mark.why!.message);
+      expect(m.weanReason).toBe(h.wean.canDo ? null : h.wean.why!.message);
     }
     expect(priced).toBeGreaterThan(0);
   });

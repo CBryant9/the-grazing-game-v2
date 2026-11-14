@@ -58,7 +58,7 @@ import {
 import { cropLines, parseSow } from './crops';
 import { buyLines, cancelLines, sellLines } from './marketwords';
 import { suppPerDay } from './mobs';
-import { moveNotes } from './mobwords';
+import { lostWaterNote, moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
 import { buildSnapshot, buildSummary } from './snapshot';
 import {
@@ -318,6 +318,43 @@ export function moveNotesFor(farm: FarmState, action: Action): string[] {
     )
     .map((m) => ({ name: m.name, head: m.animals.filter((a) => a.kind !== 'calf').length }));
   return moveNotes(area.name, areaWatered(survey.points, areaId), others);
+}
+
+/** Jobs that take water away from where it was: a hub or a trough taken out or moved. */
+const WATER_JOBS = new Set<Action['type']>([
+  'removeHub',
+  'moveHub',
+  'removeSquareHub',
+  'moveSquareHub',
+  'removeTrough',
+  'moveTrough',
+  'removePortable',
+  'movePortable',
+]);
+
+/**
+ * Mobs that have water now and would have none after a water job, found by
+ * a trial run of the job on a copy. A fact on the card; the job is not
+ * blocked.
+ */
+export function waterLossNotesFor(farm: FarmState, action: Action, env: SourceEnv): string[] {
+  if (!WATER_JOBS.has(action.type)) return [];
+  const trial = applyAction(farm, action, env);
+  if (!trial.ok) return [];
+  const before = surveyOf(farm);
+  const after = surveyOf(trial.farm);
+  const notes: string[] = [];
+  for (const m of farm.mobs) {
+    if (m.where.kind !== 'paddock') continue;
+    const was = areaIdOf(before, m);
+    if (was < 0 || !areaWatered(before.points, was)) continue;
+    const t = trial.farm.mobs.find((x) => x.id === m.id);
+    if (!t || t.where.kind !== 'paddock') continue;
+    const now = areaIdOf(after, t);
+    if (now < 0 || areaWatered(after.points, now)) continue;
+    notes.push(lostWaterNote(m.name, after.topology.areas[now]?.name ?? null));
+  }
+  return notes;
 }
 
 /** What a job card carries beyond the engine's own: notes, a daily price, and the ready-made lines of a market, plan or crop job. */
@@ -617,16 +654,17 @@ export class GameServer {
         summary: [],
       };
     }
+    const water = waterLossNotesFor(farm, action, envFor(stored.setup));
     if (action.type === 'removePortable') {
       const back = portableRefund(farm, action.port);
       return {
-        notes: back === null ? [] : [refundNote(back)],
+        notes: [...(back === null ? [] : [refundNote(back)]), ...water],
         perDay: null,
         summary: [],
       };
     }
     return {
-      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)],
+      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action), ...water],
       perDay: null,
       summary: [],
     };

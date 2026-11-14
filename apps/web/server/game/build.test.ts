@@ -403,3 +403,28 @@ describe('fence materials and water hubs (milestone 1.7f)', () => {
     expect(amount(note)).toBe(amount(done.message));
   });
 });
+
+describe('a water job that would leave stock dry says so', () => {
+  it('taking out the only trough a mob drinks from: the card states it, and the job is not blocked', async () => {
+    const game = server();
+    const s = await game.create(A, choices({ startType: 'running' }));
+    const area = (cell: number) => s.view.squares.area[cell];
+    const only = s.view.water.troughs.find(
+      (t) =>
+        t.kind === 'fixed' &&
+        s.view.water.troughs.filter((o) => area(o.cell) === area(t.cell)).length === 1 &&
+        s.view.mobs.some((m) => m.where === 'paddock' && m.area === area(t.cell)),
+    );
+    expect(only, 'a stocked area with one trough').toBeDefined();
+    const p = await game.preview(A, { action: { type: 'removeTrough', cell: only!.cell } });
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    const note = p.card.notes.find((n) => /^After this, /.test(n));
+    expect(note).toMatch(
+      /^After this, .+ has no water( in .+)?\. Cattle die on the fourth day without water\.$/,
+    );
+    // A trough that leaves water behind says nothing of the kind.
+    const keep = await game.preview(A, { action: { type: 'placeTrough', cell: only!.cell } });
+    if (keep.ok) expect(keep.card.notes.some((n) => /^After this, /.test(n))).toBe(false);
+  });
+});

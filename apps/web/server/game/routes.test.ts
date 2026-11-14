@@ -510,3 +510,22 @@ describe('allow', () => {
     expect(allow('k', 2, 1000, 1500)).toBe(true);
   });
 });
+
+describe('the session cookie is renewed', () => {
+  it('a request that loads the farm sends the same session again with a fresh Max-Age', async () => {
+    const cookie = await started();
+    const session = cookie.split('=')[1]!;
+    const got = await farm.GET(new Request(`${HOST}/api/game/farm`, { headers: { cookie } }));
+    const set = got.headers.get('set-cookie')!;
+    expect(set).toMatch(new RegExp(`^gg_session=${session};`));
+    expect(set).toMatch(/Max-Age=7776000/);
+    expect(set).toMatch(/HttpOnly/);
+    const version = (await got.json()).snapshot.farmVersion;
+    const d = await day.POST(post('day', { version }, cookie));
+    expect(d.headers.get('set-cookie')).toMatch(new RegExp(`^gg_session=${session};`));
+    // A refusal sends nothing new, and a visitor with no session gets no cookie.
+    const bad = await day.POST(post('day', {}, cookie));
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get('set-cookie')).toBeNull();
+  });
+});
