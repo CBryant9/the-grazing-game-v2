@@ -98,6 +98,7 @@ import type { DraftDot, DraftKind, MapDraft } from './draft';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
 import { easeFade, fadeStep, lodMode, type LodMode } from './lod';
+import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, TICK, tickOffsets } from './linestyle';
 import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
 import { NATURAL, breedFor, paletteFor, type MapPalette, type MapTheme } from './palette';
@@ -434,6 +435,9 @@ class PixiFarmMap implements FarmMap {
   /** The contractor's fence under way: built (solid) and still to build (dashed), in the contractor's own colour. */
   private contractG = new Graphics();
   private contractor: ContractorFence | null = null;
+  /** The "Team fence" tag on the run, and the point on the map it sits at. */
+  private contractTag: Container | null = null;
+  private contractTagAt: { wx: number; wy: number } | null = null;
   private tool: MapTool = 'look';
   private draft: MapDraft | null = null;
   private hoverTool: HoverTarget | null = null;
@@ -970,6 +974,7 @@ class PixiFarmMap implements FarmMap {
     if (labelsKey !== this.keys.labels) {
       this.keys.labels = labelsKey;
       this.buildLabels();
+      this.drawContractTag();
     }
     for (const w of this.washes.values()) w.dirty = true;
     this.refreshWashes();
@@ -1452,6 +1457,7 @@ class PixiFarmMap implements FarmMap {
     const view = this.view!;
     const ui = this.palette.ui;
     this.labelLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    this.contractTag = null;
     this.pinned = [];
     this.padLabels = [];
 
@@ -1584,6 +1590,14 @@ class PixiFarmMap implements FarmMap {
         if (overTower && Math.abs(x - b.x) < half) x = b.x + (x >= b.x ? half : -half);
       }
       l.root.position.set(Math.round(x), Math.round(s.y + 15));
+    }
+    if (this.contractTag && this.contractTagAt) {
+      const show = showLabels && cam.zoom >= CONTRACT_TAG_MIN_PX;
+      this.contractTag.visible = show;
+      if (show) {
+        const s = worldToScreen(cam, vp, this.contractTagAt.wx, this.contractTagAt.wy);
+        this.contractTag.position.set(Math.round(s.x), Math.round(s.y - 16));
+      }
     }
     for (const p of this.pinned) {
       const alpha = p.when === 'far' ? lod.far : p.when === 'near' ? lod.near : 1;
@@ -1840,6 +1854,7 @@ class PixiFarmMap implements FarmMap {
     this.drawBase();
     if (this.view) {
       this.buildLabels();
+      this.drawContractTag();
       this.drawOutlines();
     }
     this.invalidate();
@@ -1928,20 +1943,65 @@ class PixiFarmMap implements FarmMap {
         }
       }
     };
+    // Cross ticks, evenly spaced in screen pixels at every zoom: the pattern that
+    // tells the team's fence from every other line without colour (linestyle.ts).
+    const ticks = (edges: readonly ViewEdge[]): void => {
+      const half = (TICK.lengthPx / 2) * u;
+      for (const e of edges) {
+        const [x0, y0, x1, y1] = edgeEnds(e);
+        const across = y0 === y1;
+        const len = Math.hypot(x1 - x0, (y1 - y0) * K);
+        for (const s of tickOffsets(len / u, TICK.spacingPx)) {
+          const a = (s * u) / len;
+          const px = x0 + (x1 - x0) * a;
+          const py = (y0 + (y1 - y0) * a) * K;
+          if (across) g.moveTo(px, py - half).lineTo(px, py + half);
+          else g.moveTo(px - half, py).lineTo(px + half, py);
+        }
+      }
+    };
     const colour = NATURAL.fenceContract;
     if (c.left.length) {
       trace(c.left, true);
       g.stroke({ color: NATURAL.fenceCasing, width: 6 * u, alpha: 0.75, cap: 'round' });
       trace(c.left, true);
       g.stroke({ color: colour, width: 3 * u, cap: 'round' });
+      ticks(c.left);
+      g.stroke({ color: NATURAL.fenceCasing, width: 5 * u, alpha: 0.75, cap: 'butt' });
+      ticks(c.left);
+      g.stroke({ color: colour, width: 2.4 * u, cap: 'butt' });
     }
     if (c.built.length) {
       trace(c.built, false);
       g.stroke({ color: NATURAL.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
       trace(c.built, false);
       g.stroke({ color: colour, width: 4 * u, cap: 'round' });
+      ticks(c.built);
+      g.stroke({ color: NATURAL.fenceCasing, width: 5 * u, alpha: 0.9, cap: 'butt' });
+      ticks(c.built);
+      g.stroke({ color: colour, width: 2.4 * u, cap: 'butt' });
     }
+    this.drawContractTag();
     this.invalidate();
+  }
+
+  /** The words "Team fence" on the run, drawn at a steady size once the map is zoomed in enough to read them. */
+  private drawContractTag(): void {
+    this.contractTag?.destroy({ children: true });
+    this.contractTag = null;
+    const c = this.contractor;
+    const first = c ? (c.built[0] ?? c.left[0]) : undefined;
+    if (!first) return;
+    const ui = this.palette.ui;
+    const [x0, y0, x1, y1] = edgeEnds(first);
+    const tag = this.pill([this.text(CONTRACT_TAG, 11, ui.labelText)], {
+      line: NATURAL.fenceContract,
+      pad: 6,
+    });
+    this.contractTagAt = { wx: (x0 + x1) / 2, wy: ((y0 + y1) / 2) * K };
+    this.contractTag = tag;
+    this.labelLayer.addChild(tag);
+    this.placeLabels();
   }
 
   groundToScreen(gx: number, gy: number): Point {

@@ -10,7 +10,7 @@
 import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
 /** 3 added `workforce` and `contracts` (milestone 2.2). A saved offline farm of an older version is not shown. */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
 export interface DateParts {
   year: number;
@@ -432,7 +432,8 @@ export interface SkillWire {
 
 /** A person looking for work, or a hand on the farm: the facts about them, as words. */
 export interface PersonWire {
-  id: number;
+  /** An opaque id for this farm: hire and let go name a person by it. */
+  id: string;
   name: string;
   /** "Casual", "Short contract, 91 days", "Salaried". */
   kindText: string;
@@ -627,8 +628,6 @@ export interface JobCardWire {
   summary?: string[];
   /** For a line of fence, tape or pipe: the pieces that fit today and the pieces that do not. */
   line: LineWire | null;
-  /** For a permanent fence: the teams that could build it instead, with their prices. Left out for any other job. */
-  teams?: TeamOptionWire[];
 }
 
 /** The pieces of a line job, in the order drawn. Fence and tape give segments, pipe gives squares. */
@@ -653,7 +652,7 @@ export interface Refusal {
 
 /** A job card, with the farm version it was made on. Confirm sends that version back. */
 export type PreviewResponse =
-  | { ok: true; card: JobCardWire; version: string }
+  | { ok: true; card: JobCardWire; version: string; teams?: TeamOptionWire[] }
   | (Refusal & { version: string; teams?: TeamOptionWire[] });
 
 /**
@@ -704,6 +703,10 @@ export interface SummaryWire {
     grain: number;
     running: number;
     interest: number;
+    /** Contract fencing charged: infrastructure, in no other row. */
+    contract: number;
+    /** Wages and super paid. They are in `running` too. */
+    wages: number;
   };
   arrived: { head: number; calves: number };
   bookedSold: { head: number; net: number };
@@ -713,6 +716,8 @@ export interface SummaryWire {
   growth: string | null;
   /** What the hands and the fencing team did while the player was away, one bubble each. */
   report: BubbleWire[];
+  /** True when the report is stepped through before the summary (after a skip of days, or when something needs the player's eye). Otherwise it sits in the summary. */
+  reportFirst: boolean;
   /** Plain facts about why a skip stopped early, or something to know. */
   stops: string[];
   /** True when nothing ran because of water, and a "run anyway" is allowed. */
@@ -833,8 +838,8 @@ export type SimpleAction =
       planId?: number;
     }
   | { type: 'sow'; species: string; cells: number[] }
-  | { type: 'hireHand'; person: number }
-  | { type: 'letHandGo'; hand: number }
+  | { type: 'hireHand'; person: string }
+  | { type: 'letHandGo'; hand: string }
   | { type: 'orderContractFence'; edges: EdgeWire[]; team: 1 | 2 }
   | { type: 'cancelContractFence'; run: number };
 

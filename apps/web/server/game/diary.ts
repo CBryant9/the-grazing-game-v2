@@ -104,6 +104,9 @@ export function summaryLines(s: SummaryWire): string[] {
   if (m.feed > 0) out.push(`Feed: ${money(m.feed)}${over}.`);
   if (m.grain > 0) out.push(`Grain sold: ${money(m.grain)}${over}.`);
   if (m.running > 0) out.push(`Running costs: ${money(m.running)}${over}.`);
+  if (m.wages > 0)
+    out.push(`Wages and super paid: ${money(m.wages)}${over}, in the running costs.`);
+  if (m.contract > 0) out.push(`Contract fencing: ${money(m.contract)}${over}.`);
   if (m.interest > 0) out.push(`Interest earned: ${money(m.interest)}${over}.`);
   if (m.interest < 0) out.push(`Interest paid: ${money(m.interest)}${over}.`);
   return out;

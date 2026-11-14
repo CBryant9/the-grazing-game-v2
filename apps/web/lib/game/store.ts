@@ -449,7 +449,7 @@ export const useGame = create<GameState>()((set, get) => {
           allLate: false,
           shown: shownOf({ action }, r.version),
           // The line's own card carries the teams' prices. A team's card keeps the ones already shown.
-          teams: b.team === 0 ? r.card.teams : b.teams,
+          teams: b.team === 0 ? r.teams : b.teams,
         });
       } else {
         setBuild({

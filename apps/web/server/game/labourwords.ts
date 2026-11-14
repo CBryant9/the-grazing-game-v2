@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import {
   LABOUR,
   contractView,
@@ -143,9 +144,27 @@ type PersonFacts = Pick<
   'id' | 'name' | 'kind' | 'skills' | 'dogs' | 'days' | 'rate' | 'weekCost'
 > & { contractDays: number | null };
 
-function personWire(p: PersonFacts): PersonWire {
+/**
+ * A person's id as the browser sees it. The engine's own id says which week
+ * the person joined the list, which the engine's read leaves out on purpose,
+ * so the browser gets a keyed hash instead: the same for this farm every
+ * time, and no use for working out anything. A request names a person by it
+ * and the server finds them again in today's list, or among the hands.
+ */
+export function personRef(farm: FarmState, id: number): string {
+  return createHash('sha256').update(`gg-person:${farm.seed}:${id}`).digest('hex').slice(0, 12);
+}
+
+/** The engine's id for a person the browser named, among the people looking for work and the hands. -1 when there is no one: the engine then refuses in plain words. */
+export function personFor(farm: FarmState, ref: unknown): number {
+  if (typeof ref !== 'string') return -1;
+  const ids = [...jobSeekers(farm).map((p) => p.id), ...workforceView(farm).hands.map((h) => h.id)];
+  return ids.find((id) => personRef(farm, id) === ref) ?? -1;
+}
+
+function personWire(farm: FarmState, p: PersonFacts): PersonWire {
   return {
-    id: p.id,
+    id: personRef(farm, p.id),
     name: p.name,
     kindText: kindText(p.kind, p.contractDays),
     rateText: rateText(p.kind, p.rate),
@@ -166,7 +185,14 @@ type Say = { who: string; text: string; group: string; merge?: Merge };
 type Merge =
   | { type: 'plan'; mobName: string; to: string }
   | { type: 'duty'; what: 'trough' | 'fence'; cost: number }
-  | { type: 'built'; metres: number; byHandsM: number; metresLeft: number; doneDay: number };
+  | {
+      type: 'built';
+      metres: number;
+      byHandsM: number;
+      metresLeft: number;
+      doneDay: number;
+      cost: number;
+    };
 
 const TEAM = 'Fencing team';
 const PAY = 'Pay day';
@@ -228,7 +254,7 @@ function say(item: WorkerReportItem, dateOf: DateOf): Say | null {
     case 'contract-built':
       return {
         who: TEAM,
-        text: builtText(e.metres, 1, e.byHandsM, e.metresLeft, on(e.doneDay)),
+        text: builtText(e.metres, 1, e.byHandsM, e.metresLeft, on(e.doneDay), e.cost),
         group: `built:${e.run}`,
         merge: {
           type: 'built',
@@ -236,6 +262,7 @@ function say(item: WorkerReportItem, dateOf: DateOf): Say | null {
           byHandsM: e.byHandsM,
           metresLeft: e.metresLeft,
           doneDay: e.doneDay,
+          cost: e.cost,
         },
       };
     case 'contract-finished':
@@ -278,11 +305,12 @@ function builtText(
   byHandsM: number,
   left: number,
   done: string,
+  cost: number,
 ): string {
   const over = days > 1 ? ` over ${plural(days, 'working day')}` : ' today';
   const hands = byHandsM > 0 ? `, ${num(byHandsM)} m of it by your hands` : '';
   const rest = left > 0 ? ` ${num(left)} m to go. Done on ${done}.` : '';
-  return `Built ${num(metres)} m of fence${over}${hands}.${rest}`;
+  return `Built ${num(metres)} m of fence${over}${hands}. It cost ${money(cost)}.${rest}`;
 }
 
 /** When a run starts and when it is done at the team's pace. */
@@ -304,11 +332,25 @@ const stoppedText = (why: 'no-money' | 'line-changed'): string =>
  */
 export const REPORT_MAX = 24;
 
-export function reportWire(farm: FarmState, sinceSeq: number, dateOf: DateOf): BubbleWire[] {
+/** What needs the player's eye when it happens away: a hand hurt, a hand gone, wages missed, a run stopped. */
+const NEEDS_EYE: ReadonlySet<string> = new Set([
+  'hand-injured',
+  'hand-left',
+  'wages-missed',
+  'contract-stopped',
+]);
+
+export function reportWire(
+  farm: FarmState,
+  sinceSeq: number,
+  dateOf: DateOf,
+): { bubbles: BubbleWire[]; attention: boolean } {
+  let attention = false;
   const groups = new Map<string, { first: number; says: Say[]; seqs: number[]; date: DateParts }>();
   for (const item of workerReport(farm, sinceSeq)) {
     const s = say(item, dateOf);
     if (!s || !s.who) continue;
+    if (NEEDS_EYE.has(item.event.type)) attention = true;
     const g = groups.get(s.group);
     if (g) {
       g.says.push(s);
@@ -327,7 +369,7 @@ export function reportWire(farm: FarmState, sinceSeq: number, dateOf: DateOf): B
       date: g.date,
     });
   }
-  return out.sort((a, b) => a.seq - b.seq).slice(-REPORT_MAX);
+  return { bubbles: out.sort((a, b) => a.seq - b.seq).slice(-REPORT_MAX), attention };
 }
 
 /** The same thing said many times, as one line with the total. */
@@ -345,9 +387,16 @@ function merged(says: readonly Say[], dateOf: DateOf): string {
       m.what === 'trough' ? 'filled a portable trough' : 'put a knocked-down fence back up';
     return `I ${what} ${plural(n, 'time')}.${cost > 0 ? ` It cost ${money(cost)} in all.` : ''}`;
   }
-  const sum = (key: 'metres' | 'byHandsM'): number =>
+  const sum = (key: 'metres' | 'byHandsM' | 'cost'): number =>
     says.reduce((t, s) => t + (s.merge?.type === 'built' ? s.merge[key] : 0), 0);
-  return builtText(sum('metres'), n, sum('byHandsM'), m.metresLeft, longDate(dateOf(m.doneDay)));
+  return builtText(
+    sum('metres'),
+    n,
+    sum('byHandsM'),
+    m.metresLeft,
+    longDate(dateOf(m.doneDay)),
+    sum('cost'),
+  );
 }
 
 /** What a hand did lately, newest first, for their entry in the Workforce panel. */
@@ -460,9 +509,14 @@ export function labourMessage(e: LabourEvent, dateOf: DateOf): string {
 /** Wages the farm could not pay on time, in the last year, as a fact. */
 function standingWire(farm: FarmState, missedDays: readonly number[]): StandingWire {
   const s = standingOf(farm);
-  const missed = missedDays.filter((d) => d > farm.day - 365).length;
+  // One pay day is one miss, however many hands it left unpaid.
+  const missed = new Set(missedDays.filter((d) => d > farm.day - 365)).size;
   const levels: [number, string, string][] = [
-    [90, 'Top', 'The list is as long as it gets, and people ask the award rate.'],
+    [
+      90,
+      'Top',
+      'Almost everyone looking for work is on the list. Asking rates are at or just above the award.',
+    ],
     [
       70,
       'High',
@@ -508,7 +562,10 @@ function handWire(
           ? 'Not one of their days today'
           : `Off hurt until ${dayText(farm, h.offUntil ?? farm.day)}`;
   return {
-    ...personWire({ ...h, contractDays: h.kind === 'contract' ? LABOUR.contractDays.value : null }),
+    ...personWire(farm, {
+      ...h,
+      contractDays: h.kind === 'contract' ? LABOUR.contractDays.value : null,
+    }),
     statusText: status,
     endText: h.endDay === null ? null : `Contract ends on ${dayText(farm, h.endDay)}`,
     owedText:
@@ -527,7 +584,7 @@ export function workforceWire(farm: FarmState, missedDays: readonly number[]): W
   const nextPay = wf.nextPayDate ? dateParts(wf.nextPayDate) : null;
   const full = wf.hands.length >= wf.maxHands;
   return {
-    seekers: seekers.map(personWire),
+    seekers: seekers.map((p) => personWire(farm, p)),
     seekersText: full
       ? `The farm has ${plural(wf.hands.length, 'hand')}, the most it can take on at once.`
       : seekers.length === 0
@@ -584,15 +641,54 @@ export function handsNotes(farm: FarmState, card: JobCard): string[] {
     .map((x) => x.name);
   const who = list(names.length ? names : ['Your hand']);
   const many = names.length > 1;
-  if (h.metres !== undefined) {
+  const own = many ? 'their own days' : 'their own day';
+  const line = card.line;
+  if (h.metres !== undefined && line) {
+    const fits = line.fits.metres;
+    const late = line.doesNotFit.metres;
+    // The share covers every piece that is built today: the hand builds it all.
+    if (h.metres > 0 && h.metres >= fits) {
+      return [
+        late > 0
+          ? `${who} ${many ? 'build' : 'builds'} all ${num(fits)} m that is built today, from ${own}. It uses none of your light.`
+          : `${who} ${many ? 'build' : 'builds'} all of this line, ${num(fits)} m, from ${own}. It uses none of your light.`,
+      ];
+    }
+    // The share covers whole pieces: say the metres.
+    if (h.metres > 0) {
+      return [
+        `${who}: the first ${num(h.metres)} m is ${many ? "the hands'" : "the hand's"} share, done from ${own}. It uses none of your light.`,
+      ];
+    }
+    // The share is less than one piece: say it in time. Never "0 m".
     return [
-      `${who}: the first ${num(h.metres)} m is ${many ? "the hands'" : "the hand's"} share, done from ${many ? 'their own days' : 'their own day'}. It uses none of your light.`,
+      `${who === 'Your hand' ? "The hand's" : many ? `${who}: their` : `${who}'s`} work takes about ${minText(h.workMin)} off your day for this line.`,
     ];
   }
-  const min = Math.max(5, Math.round(h.workMin / 5) * 5);
   return [
-    `${who} ${many ? 'do' : 'does'} about ${min} min of this from ${many ? 'their own days' : 'their own day'}. That uses none of your light.`,
+    `${who} ${many ? 'do' : 'does'} about ${minText(h.workMin)} of this from ${own}. That uses none of your light.`,
   ];
+}
+
+/** "35 min", "2 h 10 min": to the nearest 5 minutes, never under 5. */
+function minText(minutes: number): string {
+  const m = Math.max(5, Math.round(minutes / 5) * 5);
+  if (m < 60) return `${m} min`;
+  const rest = m % 60;
+  return rest ? `${Math.floor(m / 60)} h ${rest} min` : `${m / 60} h`;
+}
+
+/** What went out in a day or skip, from the first-light events: contract fencing charged, and wages and super paid. */
+export function payFrom(events: readonly FarmEvent[]): { contract: number; wages: number } {
+  let contract = 0;
+  let wages = 0;
+  for (const e of events) {
+    if (e.type === 'contract-built') contract += e.cost;
+    else if (e.type === 'wages-paid') wages += e.total;
+    else if (e.type === 'hand-left') wages += e.paid;
+    else if (e.type === 'wages-owed-paid') wages += e.amount;
+  }
+  return { contract: Math.round(contract), wages: Math.round(wages) };
 }
 
 /** The lines on the card for hiring a person. */

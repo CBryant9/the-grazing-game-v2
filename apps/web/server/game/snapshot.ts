@@ -261,7 +261,11 @@ export function buildSummary(
   stops: readonly SkipStop[],
   asked: number,
   ticks: readonly TickEvent[] = [],
-  report: BubbleWire[] = [],
+  labour: {
+    bubbles: BubbleWire[];
+    pay: { contract: number; wages: number };
+    stepThrough: boolean;
+  } = { bubbles: [], pay: { contract: 0, wages: 0 }, stepThrough: false },
 ): SummaryWire {
   const deathsByCause: Record<string, number> = {};
   for (const [cause, n] of Object.entries(s.deathsByCause)) {
@@ -291,6 +295,8 @@ export function buildSummary(
       grain: round(s.money.grain),
       running: round(s.money.running),
       interest: round(s.money.interest),
+      contract: labour.pay.contract,
+      wages: labour.pay.wages,
     },
     arrived: { head: s.arrived.head, calves: s.arrived.calves },
     bookedSold: { head: s.bookedSold.head, net: round(s.bookedSold.net) },
@@ -299,7 +305,8 @@ export function buildSummary(
       kind === 'skip' && s.daysRun > 0 && (s.grownKg > 0 || s.eatenKg > 0)
         ? growthLine(s.grownKg, s.eatenKg, true)
         : null,
-    report,
+    report: labour.bubbles,
+    reportFirst: labour.stepThrough && labour.bubbles.length > 0,
     stops: stops.map(stopWord),
     canRunAnyway:
       s.daysRun === 0 &&

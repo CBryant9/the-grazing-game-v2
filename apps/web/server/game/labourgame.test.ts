@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createFarm, jobSeekers, type FarmState, type LabourEvent } from '@gg/engine';
+import {
+  applyAction,
+  createFarm,
+  endDay,
+  jobSeekers,
+  previewAction,
+  workforceView,
+  type FarmState,
+  type JobCard,
+  type LabourEvent,
+} from '@gg/engine';
 import type { SetupChoices, Snapshot, SummaryWire } from '../../lib/game/types';
 import { GameServer, missedDays, parseAction } from './game';
 import { inboxMessage } from './inboxwords';
 import {
   contractsWire,
   daysText,
+  handsNotes,
   isLabourEvent,
   labourMessage,
   owedTodo,
@@ -224,15 +235,24 @@ describe('every workforce event has words in the inbox', () => {
 });
 
 describe('the growth line on a skip', () => {
-  it('says tonnes grown and eaten, with a decimal for a short skip and none for a year', () => {
+  it('says tonnes grown and eaten, with one rounding for both and kilograms under a tonne', () => {
     expect(growthLine(182_400, 176_300)).toBe('182 t DM of pasture grew. The cattle ate 176 t DM.');
     // A flat "Feed A to A" week still reads sensibly.
     expect(growthLine(3_400, 3_350, true)).toBe(
       '3.4 t DM of pasture grew. The cattle ate 3.4 t DM.',
     );
-    expect(growthLine(24_000, 2_000, true)).toBe(
-      '24 t DM of pasture grew. The cattle ate 2.0 t DM.',
+    // Both figures use the same rounding: never "12 t ... 9.8 t" or "0.0 t".
+    expect(growthLine(12_000, 9_800, true)).toBe(
+      '12 t DM of pasture grew. The cattle ate 10 t DM.',
     );
+    expect(growthLine(24_000, 2_000, true)).toBe('24 t DM of pasture grew. The cattle ate 2 t DM.');
+    expect(growthLine(9_800, 12_000, true)).toBe(
+      '10 t DM of pasture grew. The cattle ate 12 t DM.',
+    );
+    // Under a tonne, kilograms.
+    expect(growthLine(40, 25, true)).toBe('40 kg DM of pasture grew. The cattle ate 25 kg DM.');
+    expect(growthLine(0, 0, true)).toBe('0 kg DM of pasture grew. The cattle ate 0 kg DM.');
+    expect(growthLine(840, 910, true)).toBe('840 kg DM of pasture grew. The cattle ate 910 kg DM.');
   });
 });
 
@@ -341,13 +361,147 @@ describe('the Workforce panel', () => {
   });
 });
 
-describe('pay days missed are counted from first light', () => {
-  it('takes the days from the inbox, and the last day for what has rolled off it', () => {
+describe("pay days missed are dated from the run's own first-light events", () => {
+  const miss = { type: 'wages-missed' } as never;
+  const paid = { type: 'wages-paid' } as never;
+
+  it('dates each miss by the pay day it fell on, not by the inbox or the last day of a skip', () => {
+    const farm = { ...farmWithSeekers(), day: 100 };
+    expect(missedDays(farm, 14, [])).toEqual([]);
+    // Three hands unpaid on the first pay day: the same day three times (one pay day).
+    expect(missedDays(farm, 14, [miss, miss, miss])).toEqual([14, 14, 14]);
+    // A pay day that paid, then one that missed: the second pay day, a cycle later.
+    expect(missedDays(farm, 14, [paid, miss])).toEqual([28]);
+    expect(missedDays(farm, 14, [paid, paid, miss, miss])).toEqual([42, 42]);
+    // Never after the day the skip ended.
+    expect(missedDays({ ...farm, day: 20 }, 14, [paid, paid, miss])).toEqual([20]);
+    // No pay day known: the farm's day.
+    expect(missedDays(farm, null, [miss])).toEqual([100]);
+  });
+
+  it('counts a pay day once, however many hands it left unpaid', () => {
     const farm = farmWithSeekers();
-    expect(missedDays(farm, 0, [])).toEqual([]);
-    const miss = { type: 'wages-missed' } as const;
-    // Nothing in the inbox: the miss counts on the farm's day.
-    expect(missedDays(farm, 0, [miss as never])).toEqual([farm.day]);
+    const fact = (days: number[]) => workforceWire(farm, days).standing.fact;
+    expect(fact([farm.day - 5, farm.day - 5, farm.day - 5])).toBe(
+      'Wages missed once in the last year.',
+    );
+    expect(fact([farm.day - 5, farm.day - 5, farm.day - 40])).toBe(
+      'Wages missed 2 times in the last year.',
+    );
+  });
+});
+
+describe("the hand's share on a job card", () => {
+  const sizes = ['small', 'medium', 'large'] as const;
+
+  /** A farm of this size with one hand of this fencing skill who is at work today. */
+  function withHand(size: (typeof sizes)[number], skill: number): FarmState {
+    let farm = createFarm({
+      seed: 3,
+      // The largest size is the Central Queensland station, where a piece of fence is longest.
+      district: size === 'large' ? 'cq' : 'cw',
+      size,
+      start: { year: 2026, month: 8 },
+      startType: 'running',
+      difficulty: 'easy',
+    });
+    for (let i = 0; i < 20 && jobSeekers(farm).length === 0; i++) farm = endDay(farm).farm;
+    const hired = applyAction(farm, { type: 'hireHand', person: jobSeekers(farm)[0]!.id });
+    if (!hired.ok) throw new Error(hired.message);
+    farm = hired.farm;
+    farm.labour!.hands[0]!.skills.fencing = skill;
+    for (let i = 0; i < 9 && workforceView(farm).hands[0]!.status !== 'working'; i++) {
+      farm = endDay(farm).farm;
+    }
+    expect(workforceView(farm).hands[0]!.status).toBe('working');
+    return farm;
+  }
+
+  const line = (n: number, row = 14) =>
+    Array.from({ length: n }, (_, i) => ({ line: 'h' as const, index: row * W + 5 + i }));
+
+  /** A line of n pieces in the first row with new fence to build, or null. */
+  const freeLine = (farm: FarmState, n: number) => {
+    for (let row = 5; row < 25; row++) {
+      const edges = line(n, row);
+      if (previewAction(farm, { type: 'buildFence', edges, fence: 'permanent' }).ok) return edges;
+    }
+    return null;
+  };
+
+  const noteFor = (farm: FarmState, n: number): { text: string; card: JobCard } | null => {
+    const edges = freeLine(farm, n);
+    if (!edges) return null;
+    const r = previewAction(farm, { type: 'buildFence', edges, fence: 'permanent' });
+    if (!r.ok || !r.card.hands) return null;
+    return { text: handsNotes(farm, r.card).join(' '), card: r.card };
+  };
+
+  /** Which of the three truths a note tells. */
+  const kind = (text: string): 'all' | 'metres' | 'time' =>
+    /builds all /.test(text)
+      ? 'all'
+      : /the first [\d,]+ m is the hand's share/.test(text)
+        ? 'metres'
+        : 'time';
+
+  it('says the metres when the share covers whole pieces, all of it when the line is inside the share, and the time when the share is under a piece: never 0 m', () => {
+    const seen = new Set<string>();
+    for (const size of sizes) {
+      for (const skill of [1, 3, 5]) {
+        const farm = withHand(size, skill);
+        for (const n of [1, 3, 20]) {
+          const got = noteFor(farm, n);
+          if (!got) continue;
+          const { text, card } = got;
+          expect(text, `${size} skill ${skill} ${n} pieces`).not.toMatch(/\b0 m\b/);
+          expect(text).toMatch(/uses none of your light|off your day for this line/);
+          const k = kind(text);
+          seen.add(k);
+          const h = card.hands!;
+          const fits = card.line!.fits.metres;
+          if (h.metres === 0) expect(k).toBe('time');
+          else if (h.metres! >= fits) expect(k).toBe('all');
+          else expect(k).toBe('metres');
+          if (k === 'time')
+            expect(text).toMatch(
+              /takes about (\d+ h )?(\d+ min|\d+ h) off your day for this line\.$/,
+            );
+          if (k === 'all') expect(text).toContain(`${Math.round(fits).toLocaleString('en-AU')} m`);
+        }
+      }
+    }
+    // The tests reach all three.
+    expect([...seen].sort()).toEqual(['all', 'metres', 'time']);
+  });
+
+  it('says it in time on the largest farm for a skill-1 hand and a one-piece line', () => {
+    const farm = withHand('large', 1);
+    const side = farm.layout.scale.sideM;
+    expect(side).toBeGreaterThanOrEqual(200);
+    const got = noteFor(farm, 1);
+    expect(got).not.toBeNull();
+    expect(got!.card.hands!.metres).toBe(0);
+    expect(got!.text).toMatch(/work takes about .+ off your day for this line\.$/);
+    expect(got!.text).not.toMatch(/\b0 m\b/);
+  });
+
+  it('a hand who has already used part of the day still gets a true note', () => {
+    const farm = withHand('medium', 3);
+    const first = applyAction(farm, {
+      type: 'buildFence',
+      edges: freeLine(farm, 6)!,
+      fence: 'permanent',
+    });
+    if (!first.ok) throw new Error(first.message);
+    const got = noteFor(first.farm, 20);
+    if (got) {
+      expect(got.text).not.toMatch(/\b0 m\b/);
+      const h = got.card.hands!;
+      expect(kind(got.text)).toBe(
+        h.metres === 0 ? 'time' : h.metres! >= got.card.line!.fits.metres ? 'all' : 'metres',
+      );
+    }
   });
 });
 
@@ -360,6 +514,11 @@ describe('hiring, fencing by a team and the worker report, through the game serv
       snap = (await game.endDay(A)).snapshot;
     }
     const person = snap.workforce.seekers[0]!;
+    // The id is opaque: the engine's own says which week the person joined the list.
+    expect(person.id).toMatch(/^[0-9a-f]{12}$/);
+    const stale = await game.act(A, { action: { type: 'hireHand', person: 'deadbeef0000' } });
+    expect(stale.ok).toBe(false);
+    expect(stale.ok ? '' : stale.message).toMatch(/not on the list/);
 
     // Hire: the card says the cost per pay and when they start. Nothing is charged yet.
     const hirePreview = await game.preview(A, { action: { type: 'hireHand', person: person.id } });
@@ -390,8 +549,9 @@ describe('hiring, fencing by a team and the worker report, through the game serv
       action: { type: 'buildFence', edges, fence: 'permanent' },
     });
     if (!fence.ok) throw new Error(fence.message);
-    expect(fence.card.teams?.map((t) => t.label)).toEqual(['1-man team', '2-man team']);
-    for (const t of fence.card.teams!) {
+    expect(fence.teams?.map((t) => t.label)).toEqual(['1-man team', '2-man team']);
+    expect(Object.hasOwn(fence.card, 'teams')).toBe(false);
+    for (const t of fence.teams!) {
       expect(t.price).toMatch(/^\$[\d,]+$/);
       expect(t.lines.join(' ')).toMatch(/Materials \$[\d,]+ plus labour \$[\d,]+\./);
       expect(t.lines.join(' ')).toMatch(/Done on [A-Z][a-z]+day \d+ [A-Z][a-z]+\./);
@@ -400,7 +560,7 @@ describe('hiring, fencing by a team and the worker report, through the game serv
     // Tape is not built by a team.
     const tape = await game.preview(A, { action: { type: 'buildFence', edges, fence: 'tape' } });
     if (!tape.ok) throw new Error(tape.message);
-    expect(tape.card.teams).toBeUndefined();
+    expect(tape.teams).toBeUndefined();
 
     // Order a team: the card says materials plus labour, the start day and the done day.
     const order = { action: { type: 'orderContractFence' as const, edges, team: 1 as const } };
@@ -429,7 +589,13 @@ describe('hiring, fencing by a team and the worker report, through the game serv
     const sum: SummaryWire = week.summary;
     expect(sum.growth).toMatch(/^[\d.,]+ t DM of pasture grew\. The cattle ate [\d.,]+ t DM\.$/);
     const team = sum.report.find((b) => b.who === 'Fencing team');
-    expect(team?.text).toMatch(/^Built \d+ m of fence/);
+    expect(team?.text).toMatch(/^Built \d+ m of fence.* It cost \$[\d,]+\./);
+    // After a skip of days the report is stepped through; the money leaves with a line of its own.
+    expect(sum.reportFirst).toBe(true);
+    expect(sum.money.contract).toBeGreaterThan(0);
+    expect(sum.money.wages).toBeGreaterThanOrEqual(0);
+    const diary = (await game.record(A)).diary.flatMap((d) => d.lines).join('\n');
+    expect(diary).toMatch(/Contract fencing: \$[\d,]+/);
     expect(
       week.snapshot.contracts.length + sum.report.filter((b) => /finished/.test(b.text)).length,
     ).toBeGreaterThan(0);
@@ -439,6 +605,8 @@ describe('hiring, fencing by a team and the worker report, through the game serv
     // A day has no growth line.
     const day = await game.endDay(A);
     expect(day.summary.growth).toBeNull();
+    // A day with nothing that needs the eye keeps the report inside the summary, with no step-through.
+    expect(day.summary.reportFirst).toBe(false);
     snap = day.snapshot;
 
     // The whole run is a permanent fence in the end, and nothing is left under way.
@@ -484,8 +652,9 @@ describe('hiring, fencing by a team and the worker report, through the game serv
     expect(parseAction({ type: 'orderContractFence', edges, team: 3 })).toBeNull();
     expect(parseAction({ type: 'orderContractFence', edges, team: 1.5 })).toBeNull();
     expect(parseAction({ type: 'orderContractFence', edges: [], team: 1 })).toBeNull();
-    expect(parseAction({ type: 'hireHand', person: -1 })).toBeNull();
-    expect(parseAction({ type: 'letHandGo', hand: 'x' })).toBeNull();
+    expect(parseAction({ type: 'hireHand', person: 12 })).toBeNull();
+    expect(parseAction({ type: 'hireHand', person: 'abc' })).toBeNull();
+    expect(parseAction({ type: 'letHandGo', hand: 7 })).toBeNull();
     expect(parseAction({ type: 'cancelContractFence', run: 1e12 })).toBeNull();
     const ok = parseAction({ type: 'orderContractFence', edges, team: 2, handsHelp: true });
     expect(ok).toEqual({ type: 'orderContractFence', edges, team: 2, handsHelp: false });

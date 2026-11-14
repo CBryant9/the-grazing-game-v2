@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FarmView } from '@gg/shared';
-import type { ActResponse, JobCardWire, PreviewResponse, Snapshot } from './types';
+import type { ActResponse, JobCardWire, PreviewResponse, Snapshot, TeamOptionWire } from './types';
 
 const api = vi.hoisted(() => ({
   setup: vi.fn(),
@@ -48,7 +48,12 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   ...over,
 });
 
-const okPreview = (c: JobCardWire): PreviewResponse => ({ ok: true, card: c, version: 'v1' });
+const okPreview = (c: JobCardWire, teams?: TeamOptionWire[]): PreviewResponse => ({
+  ok: true,
+  card: c,
+  version: 'v1',
+  ...(teams ? { teams } : {}),
+});
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -292,7 +297,7 @@ describe('drawing a fence', () => {
       },
     ];
     useGame.getState().selectTool('fence');
-    api.preview.mockResolvedValue(okPreview(card({ teams })));
+    api.preview.mockResolvedValue(okPreview(card(), teams));
     draw([
       [3, 3],
       [4, 3],
@@ -335,7 +340,7 @@ describe('drawing a fence', () => {
 
   it("going back to yourself asks for the player's own card, and a new line drops the team", async () => {
     useGame.getState().selectTool('fence');
-    api.preview.mockResolvedValue(okPreview(card({ teams: [] })));
+    api.preview.mockResolvedValue(okPreview(card(), []));
     draw([
       [3, 3],
       [4, 3],

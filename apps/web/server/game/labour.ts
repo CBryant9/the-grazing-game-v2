@@ -1,6 +1,7 @@
 import 'server-only';
 import type { Action, FarmState } from '@gg/engine';
 import { edgesOf } from './build';
+import { personFor } from './labourwords';
 
 /**
  * Checking the workforce actions a browser asks for: hiring and letting
@@ -18,12 +19,13 @@ const int = (v: unknown, min: number, max: number): number | null =>
 export function parseLabourAction(a: Record<string, unknown>, farm?: FarmState): Action | null {
   switch (a.type) {
     case 'hireHand': {
-      const person = int(a.person, 0, 1e9);
-      return person === null ? null : { type: 'hireHand', person };
+      // The browser names a person by the opaque id it was given. Anyone not on today's list is -1, which the engine refuses in plain words.
+      if (typeof a.person !== 'string' || a.person.length > 40 || !farm) return null;
+      return { type: 'hireHand', person: personFor(farm, a.person) };
     }
     case 'letHandGo': {
-      const hand = int(a.hand, 0, 1e9);
-      return hand === null ? null : { type: 'letHandGo', hand };
+      if (typeof a.hand !== 'string' || a.hand.length > 40 || !farm) return null;
+      return { type: 'letHandGo', hand: personFor(farm, a.hand) };
     }
     case 'orderContractFence': {
       const edges = edgesOf(a.edges);

@@ -43,13 +43,18 @@ export function scoreParts(s: YearScore): ScorePartWire[] {
  * does not read "0 t".
  */
 export function growthLine(grownKg: number, eatenKg: number, fine = false): string {
-  const t = (kg: number): string =>
-    fine && kg < 10_000
-      ? (Math.round(kg / 100) / 10).toLocaleString('en-AU', {
-          minimumFractionDigits: 1,
-          maximumFractionDigits: 1,
-        })
-      : n0(kg / 1000);
+  // One unit and one rounding for both figures, chosen by the bigger: never "12 t ... 9.8 t".
+  const big = Math.max(grownKg, eatenKg);
+  if (fine && big < 1000) {
+    const kg = (v: number): string => `${n0(v)} kg`;
+    return `${kg(grownKg)} DM of pasture grew. The cattle ate ${kg(eatenKg)} DM.`;
+  }
+  const places = fine && big < 10_000 ? 1 : 0;
+  const t = (v: number): string =>
+    (Math.round(v / 10 ** (3 - places)) / 10 ** places).toLocaleString('en-AU', {
+      minimumFractionDigits: places,
+      maximumFractionDigits: places,
+    });
   return `${t(grownKg)} t DM of pasture grew. The cattle ate ${t(eatenKg)} t DM.`;
 }
 

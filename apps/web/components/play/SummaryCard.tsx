@@ -62,7 +62,9 @@ function Report({
   onNext,
   onSkip,
   nextRef,
+  closing,
 }: {
+  closing: string;
   bubbles: BubbleWire[];
   at: number;
   onNext: () => void;
@@ -93,7 +95,7 @@ function Report({
           </button>
         )}
         <button ref={nextRef} type="button" className="btn coral" onClick={onNext}>
-          {last ? 'Show the day' : 'Next'}
+          {last ? closing : 'Next'}
         </button>
       </div>
     </>
@@ -119,7 +121,8 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
   const nextRef = useRef<HTMLButtonElement>(null);
   // The worker report comes first, one bubble at a time. It is over once the last is read or skipped.
   const [at, setAt] = useState(0);
-  const reporting = at < summary.report.length;
+  // After a skip of days, or when something needs the eye, the report is stepped through first. Otherwise it sits in the summary.
+  const reporting = summary.reportFirst && at < summary.report.length;
 
   useEffect(() => {
     (reporting ? nextRef : closeRef).current?.focus();
@@ -177,6 +180,7 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
             onNext={() => setAt(at + 1)}
             onSkip={() => setAt(summary.report.length)}
             nextRef={nextRef}
+            closing={summary.kind === 'skip' ? 'Show the summary' : 'Show the day'}
           />
         ) : (
           <>
@@ -207,6 +211,20 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
               <Change label="Ground cover" c={summary.coverPct} unit="%" />
               <Change label="Live weight" c={summary.liveWeightKg} unit=" kg" />
             </dl>
+            {!summary.reportFirst && summary.report.length > 0 && (
+              <section aria-labelledby="away-title" className={styles.awaybox}>
+                <h3 id="away-title" className={`px ${styles.minihead}`}>
+                  While you were away
+                </h3>
+                <ul className={styles.awaylist}>
+                  {summary.report.map((b) => (
+                    <li key={b.seq}>
+                      <b>{b.who}:</b> {b.text}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <ul className={styles.sumfacts}>
               {summary.planMoves.map((line) => (
                 <li key={line}>{line}</li>
@@ -223,6 +241,10 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
               {m.feed > 0 && <li>Feed: {money(m.feed)}.</li>}
               {m.grain > 0 && <li>Grain sold: {money(m.grain)}.</li>}
               {m.running > 0 && <li>Running costs: {money(m.running)}.</li>}
+              {m.wages > 0 && (
+                <li>Wages and super paid: {money(m.wages)}, in the running costs.</li>
+              )}
+              {m.contract > 0 && <li>Contract fencing: {money(m.contract)}.</li>}
               {m.interest > 0 && <li>Interest: {money(m.interest)}.</li>}
               {summary.arrived.head > 0 && (
                 <li>{plural(summary.arrived.head, 'head', 'head')} arrived in the stock yards.</li>

@@ -300,6 +300,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'money',
     'planMoves',
     'report',
+    'reportFirst',
     'stops',
     'to',
   ],
@@ -314,7 +315,16 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'day.summary.head': ['after', 'before'],
   'day.summary.liveWeightKg': ['after', 'before'],
   'day.summary.massKgHa': ['after', 'before'],
-  'day.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
+  'day.summary.money': [
+    'buys',
+    'contract',
+    'feed',
+    'grain',
+    'interest',
+    'running',
+    'sales',
+    'wages',
+  ],
   'day.summary.report[]': ['date', 'seq', 'text', 'who'],
   'day.summary.report[].date': ['date', 'month', 'year'],
   'day.summary.to': ['date', 'month', 'year'],
@@ -331,11 +341,13 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'outcome',
     'perDay',
     'summary',
-    'teams',
     'usesRestOfDay',
     'workMin',
   ],
-  'preview.card.teams[]': ['label', 'lines', 'price', 'reason', 'team'],
+  'act.card.line': ['doesNotFit', 'fits', 'words'],
+  'act.card.line.doesNotFit': ['cells', 'edges', 'metres'],
+  'act.card.line.fits': ['cells', 'edges', 'metres'],
+  'act.card.line.fits.edges[]': ['index', 'line'],
   'preview.card.line': ['doesNotFit', 'fits', 'words'],
   'preview.card.line.doesNotFit': ['cells', 'edges', 'metres'],
   'preview.card.line.fits': ['cells', 'edges', 'metres'],
@@ -376,6 +388,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'money',
     'planMoves',
     'report',
+    'reportFirst',
     'stops',
     'to',
   ],
@@ -390,7 +403,16 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'skip.summary.head': ['after', 'before'],
   'skip.summary.liveWeightKg': ['after', 'before'],
   'skip.summary.massKgHa': ['after', 'before'],
-  'skip.summary.money': ['buys', 'feed', 'grain', 'interest', 'running', 'sales'],
+  'skip.summary.money': [
+    'buys',
+    'contract',
+    'feed',
+    'grain',
+    'interest',
+    'running',
+    'sales',
+    'wages',
+  ],
   'skip.summary.report[]': ['date', 'seq', 'text', 'who'],
   'skip.summary.report[].date': ['date', 'month', 'year'],
   'skip.summary.to': ['date', 'month', 'year'],
@@ -581,6 +603,16 @@ async function serverFixtures(): Promise<{
   replies.act!.push(await game.act(A, { action: { type: 'markCalves', mob: 9999 } }));
   replies.preview!.push(await game.preview(A, { action: { type: 'markCalves', mob: 9999 } }));
   replies.day!.push(await game.endDay(A, 'abc'));
+  // A permanent fence built through the act route: the card after the job, with its line.
+  const built = await game.act(A, {
+    action: {
+      type: 'buildFence',
+      edges: [5, 6, 7].map((x) => ({ line: 'h' as const, index: 24 * W + x })),
+      fence: 'permanent',
+    },
+  });
+  expect(built.ok ? 'ok' : built.message).toBe('ok');
+  replies.act!.push(built);
   replies.record!.push(await game.record(A));
   const last = await game.snapshot(A);
   return { snaps: [snap, last!], replies };

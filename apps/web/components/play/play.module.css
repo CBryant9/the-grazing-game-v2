@@ -1963,6 +1963,24 @@
   font-size: 0.75rem;
   color: var(--muted);
 }
+.awaybox {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.awaylist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 .reportcount {
   grid-column: 1 / -1;
   font-size: 0.75rem;

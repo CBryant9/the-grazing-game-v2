@@ -29,6 +29,7 @@ import {
   dateOn,
   type FarmState,
   type GroupId,
+  LABOUR,
   type JobCard,
   type SourceEnv,
   type Supplement,
@@ -64,6 +65,7 @@ import {
   cancelLines as cancelContractLines,
   contractLines,
   handsNotes,
+  payFrom,
   hireLines,
   letGoLines,
   reportWire,
@@ -91,18 +93,29 @@ import { pastYears, soFarView, yearView } from './years';
 import { join } from 'node:path';
 
 /**
- * The farm days a pay day was missed in a day or skip, from the first-light
- * events. The days come from the inbox where it still holds the message;
- * what has rolled off it counts on the last day.
+ * The farm days a pay day was missed in a day or skip, one for each hand left
+ * unpaid, dated from the run's own first-light events. Pay days fall every
+ * pay cycle from the one the farm was waiting for (`firstPayDay`). In the
+ * stream of first-light events each pay day that paid anyone ends in
+ * `wages-paid`, and a miss comes before it, so the number of those already
+ * seen says which pay day a miss was. The inbox is not read: it is capped,
+ * and a long skip rolls it over.
  */
-export function missedDays(farm: FarmState, seq0: number, dawn: readonly FarmEvent[]): number[] {
-  const n = dawn.filter((e) => e.type === 'wages-missed').length;
-  if (n === 0) return [];
-  const days = farm.inbox
-    .filter((m) => m.seq >= seq0 && m.event.type === 'wages-missed')
-    .map((m) => m.day)
-    .slice(0, n);
-  while (days.length < n) days.push(farm.day);
+export function missedDays(
+  farm: FarmState,
+  firstPayDay: number | null,
+  dawn: readonly FarmEvent[],
+): number[] {
+  const days: number[] = [];
+  let paidDays = 0;
+  for (const e of dawn) {
+    if (e.type === 'wages-paid') paidDays++;
+    else if (e.type === 'wages-missed') {
+      const day =
+        firstPayDay === null ? farm.day : firstPayDay + paidDays * LABOUR.payCycleDays.value;
+      days.push(Math.min(day, farm.day));
+    }
+  }
   return days;
 }
 
@@ -405,7 +418,7 @@ interface Extras {
 
 const noExtras: Extras = { notes: [], perDay: null, summary: [] };
 
-function cardWire(card: JobCard, extra: Extras = noExtras, teams?: TeamOptionWire[]): JobCardWire {
+function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
   const notes: string[] = [...extra.notes];
   const perDay = extra.perDay;
   // A market job says all this in its own lines.
@@ -452,7 +465,6 @@ function cardWire(card: JobCard, extra: Extras = noExtras, teams?: TeamOptionWir
     notes,
     ...(extra.summary.length ? { summary: extra.summary } : {}),
     line,
-    ...(teams?.length ? { teams } : {}),
   };
 }
 
@@ -849,7 +861,12 @@ export class GameServer {
         result.card,
         this.trialEvents(farm, stored, action),
       );
-      return { ok: true, card: cardWire(result.card, x, teams), version };
+      return {
+        ok: true,
+        card: cardWire(result.card, x),
+        version,
+        ...(teams.length ? { teams } : {}),
+      };
     });
   }
 
@@ -909,12 +926,7 @@ export class GameServer {
       }
       const dateOf: DateOf = (day) => dateParts(dateOn(result.farm, day));
       const message = doneWord(result.events, dateOf);
-      // The card after the job is the card before it, with the teams' prices as they were shown.
-      const teams =
-        action.type === 'buildFence' && action.fence === 'permanent'
-          ? teamOptions(held.farm, envFor(held.stored.setup), action.edges)
-          : [];
-      const card = result.job ? cardWire(result.job, x, teams) : null;
+      const card = result.job ? cardWire(result.job, x) : null;
       const next = await this.save(
         id,
         held,
@@ -995,14 +1007,19 @@ export class GameServer {
       const seq0 = held.farm.inboxSeq;
       const end = endDay(held.farm, envFor(held.stored.setup));
       const report = reportWire(end.farm, seq0 - 1, (d) => dateParts(dateOn(end.farm, d)));
-      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, report);
+      const summary = buildSummary('day', end.summary, end.stops, 1, end.day.events, {
+        ...report,
+        pay: payFrom(end.dawn),
+        // One day: the bubbles sit in the summary, unless something needs the player's eye.
+        stepThrough: report.attention,
+      });
       const next = await this.save(
         id,
         held,
         end.farm,
         undefined,
         periodFilings(end.farm, seq0, summary, [end.day]),
-        missedDays(end.farm, seq0, end.dawn),
+        missedDays(end.farm, held.farm.labour?.nextPayDay ?? null, end.dawn),
       );
       return {
         ok: true,
@@ -1036,14 +1053,12 @@ export class GameServer {
       const result = skipDays(held.farm, length, envFor(held.stored.setup), { anyway });
       const ticks = result.days.flatMap((d) => d.events);
       const report = reportWire(result.farm, seq0 - 1, (d) => dateParts(dateOn(result.farm, d)));
-      const summary = buildSummary(
-        'skip',
-        result.summary,
-        result.stops,
-        result.asked,
-        ticks,
-        report,
-      );
+      const summary = buildSummary('skip', result.summary, result.stops, result.asked, ticks, {
+        ...report,
+        pay: payFrom(result.dawn),
+        // After more than a day the bubbles are stepped through; after one day only if something needs the eye.
+        stepThrough: result.daysRun > 1 || report.attention,
+      });
       const next =
         result.daysRun > 0
           ? await this.save(
@@ -1052,7 +1067,7 @@ export class GameServer {
               result.farm,
               undefined,
               periodFilings(result.farm, seq0, summary, result.days),
-              missedDays(result.farm, seq0, result.dawn),
+              missedDays(result.farm, held.farm.labour?.nextPayDay ?? null, result.dawn),
             )
           : held;
       return {
