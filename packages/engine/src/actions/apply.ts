@@ -145,6 +145,7 @@ export const MAX_BUY = 5000;
 
 const FENCE_CODE: Record<FenceKind, FenceType> = {
   permanent: EDGE.permanent,
+  netting: EDGE.netting,
   electric: EDGE.electric,
   tape: EDGE.tape,
 };
@@ -1133,7 +1134,8 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   const side = farm.layout.scale.sideM;
   const each = segmentCost(a.fence, side);
   // A segment built from materials on hand (kept from fence taken down) is half price.
-  const reused = a.fence === 'tape' ? each : reusedSegmentCost(a.fence, side);
+  const reused =
+    a.fence === 'tape' || a.fence === 'netting' ? each : reusedSegmentCost(a.fence, side);
   const fromStock = new Set(out.fromStockEdges.map(edgeKey));
   const fenceCost = (out.segments - out.fromStock) * each + out.fromStock * reused;
   let cost: number;
@@ -1169,7 +1171,7 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
     farm.year.running += fee;
   } else farm.year.infra += fenceCost;
   farm.layout = out.layout;
-  const onHand = a.fence === 'tape' ? 0 : farm.layout.fenceOnHand[a.fence];
+  const onHand = a.fence === 'tape' || a.fence === 'netting' ? 0 : farm.layout.fenceOnHand[a.fence];
   j.events.push({
     type: 'layout-job',
     job: 'buildFence',

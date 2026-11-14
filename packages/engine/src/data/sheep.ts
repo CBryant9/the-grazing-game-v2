@@ -566,6 +566,14 @@ export const BOUGHT = {
   weanShareOfSrw: 0.45,
 } as const;
 
+/**
+ * A running farm's start flock: Merino ewes worked out at this many DSE
+ * each over a year (lambs inside her). STAND-IN: the same figure the sheep
+ * year benchmarks stock at (a dry ewe is 1.0, late pregnancy 1.3 to 1.5,
+ * milking a single 2.2 to 2.5, by the DSE tables S5, S6).
+ */
+export const START_FLOCK = { eweYearDse: 1.5 } as const;
+
 // ---------------------------------------------------------------------------
 // Fences
 // ---------------------------------------------------------------------------

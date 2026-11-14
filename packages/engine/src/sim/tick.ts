@@ -40,13 +40,14 @@ import { INTEREST, overheadsPerYear } from '../money/costs';
 import { closeYear, netWorth } from '../money/worth';
 import { growGrass } from '../pasture/grow';
 import { coverPct } from '../pasture/summary';
-import { rngFromState, type Rng } from '../rng';
+import { rngFromState, rngStream, type Rng } from '../rng';
 import {
   areaNameOf,
   cropContextOf,
   grazingArea,
   keepSurvey,
   landOf,
+  placeAnchor,
   pricesOf,
   realSourcesOf,
   seasonsOf,
@@ -115,6 +116,74 @@ export interface DayResult {
   sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause; count: number }[];
   /** Lambs born today, by record and mob. Left out on a farm with no sheep. */
   lambs?: { id: number; mob: number; count: number }[];
+}
+
+/**
+ * Fences that sheep get through: the cattle fences (permanent, electric,
+ * tape), standing or knocked down (S48: a plain-wire fence that suits cattle
+ * "will not be adequate for sheep"). Netting, gates and the boundary hold
+ * them.
+ */
+const SHEEP_GET_THROUGH = [
+  EDGE.permanent,
+  EDGE.electric,
+  EDGE.tape,
+  EDGE.electricDown,
+  EDGE.tapeDown,
+] as const;
+
+/**
+ * Hungry or thirsty sheep mobs (the cattle rule: under 85% of the feed they
+ * want, or no water; the cattle chance and the cattle 21-day wait) get
+ * through one fence that does not hold sheep into the next area, and the
+ * fence stays standing. They never go where cattle graze (call, 15 Nov
+ * 2026): they take another fence, or stay put. Draws from the sheep's own
+ * stream, so the cattle's draws never move.
+ */
+function sheepBreakouts(farm: FarmState, survey: Survey, day: number, events: TickEvent[]): void {
+  const state = farm.sheep!;
+  const rng = rngFromState(state.rng.breakouts ?? rngStream(farm.seed, 'sheep:breakouts').state());
+  const cattleAreas = new Set<number>();
+  for (const m of farm.mobs) {
+    if (m.where.kind === 'paddock' && m.animals.length) {
+      cattleAreas.add(survey.topology.areaOf[m.where.anchor]!);
+    }
+  }
+  let moved = false;
+  for (const m of state.mobs) {
+    if (m.where.kind !== 'paddock' || !m.st || !m.sheep.length) continue;
+    const hungry = m.st.f < BREAKOUT_FEED_SHARE || m.dry > 0;
+    if (!hungry || day - (m.lastBreak ?? -99) < BREAKOUT_COOLDOWN_DAYS) continue;
+    const head = m.sheep.reduce((t, s) => t + s.n, 0);
+    const chance =
+      (m.dry > 0 ? BREAKOUT_CHANCE.thirsty : BREAKOUT_CHANCE.hungry) *
+      Math.min(BREAKOUT_SIZE.max, head / BREAKOUT_SIZE.headDivisor + BREAKOUT_SIZE.base);
+    if (rng.next() > chance) continue;
+    const areaId = survey.topology.areaOf[m.where.anchor]!;
+    const edges = areaEdges(survey.topology, farm.layout.fences, areaId, [
+      ...SHEEP_GET_THROUGH,
+    ]).filter((e) => {
+      const to = areaAcross(survey.topology, e, areaId);
+      return to >= 0 && !cattleAreas.has(to);
+    });
+    if (!edges.length) continue;
+    const edge = rng.pick(edges);
+    const to = areaAcross(survey.topology, edge, areaId);
+    m.where = { kind: 'paddock', anchor: placeAnchor(survey, to) };
+    m.lastBreak = day;
+    moved = true;
+    events.push({
+      type: 'sheep-breakout',
+      mob: m.id,
+      mobName: m.name,
+      reason: m.dry > 0 ? 'thirsty' : 'hungry',
+      edge,
+      from: survey.topology.areas[areaId]!.name,
+      to: survey.topology.areas[to]!.name,
+    });
+  }
+  state.rng.breakouts = rng.state();
+  if (moved) mergeSheepShared(farm, survey, events);
 }
 
 /** Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its area and the day's stops. */
@@ -414,6 +483,9 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     });
   }
   if (brokeOut) survey = surveyOf(farm);
+  // Hungry or thirsty sheep get through fences that do not hold sheep. A farm
+  // with no sheep skips this.
+  if (farm.sheep) sheepBreakouts(farm, survey, day, events);
   mergeShared(farm, survey, events);
   mergeSheepShared(farm, survey, events);
 

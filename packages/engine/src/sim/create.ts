@@ -24,6 +24,11 @@ import { rngStream, type Rng, type RngState } from '../rng';
 import type { GrowthFactorSource } from '../season/factors';
 import { planRealYears, type YearOrder } from '../season/realYears';
 import { weatherSeasons } from '../season/weatherSeasons';
+import { DSE_PER_AE } from '../data/stocking';
+import { START_FLOCK, sheepDistrict } from '../data/sheep';
+import { ramsNeeded } from '../sheep/breeding';
+import { addSheepMob, occupiedAreas } from '../sheep/farm';
+import { sheepBuyPrice } from '../sheep/market';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 import { startDay } from './clock';
 import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
@@ -73,6 +78,13 @@ export interface CreateFarmOptions {
   difficulty: Difficulty;
   /** Money to use in place of the difficulty's. For tests and calibration. */
   money?: StartMoney;
+  /**
+   * The stock a running farm starts with (PRD setup step 4): cattle (the
+   * default), sheep, or a mix (half the stocking each, by DSE). Sheep are
+   * only offered in the sheep districts: asking for sheep elsewhere throws.
+   * A scratch farm starts with no stock either way.
+   */
+  stock?: 'cattle' | 'sheep' | 'mix';
 }
 
 /** The stream the starting herd is drawn from. */
@@ -88,9 +100,15 @@ export const START_HERD_SHARE = { lo: 0.35, hi: 0.65 } as const;
  * are the AE x 0.3 / 0.55, half steers and half heifers. Each beast is
  * valued at today's market. Returns null if no area has water.
  */
-export function startHerd(farm: FarmState, rng: Rng): StartHerd | null {
+export function startHerd(
+  farm: FarmState,
+  rng: Rng,
+  mix?: { scale: number; weanersWithCows: boolean },
+): StartHerd | null {
   const share = rng.range(START_HERD_SHARE.lo, START_HERD_SHARE.hi);
-  const ae = carryingCapacityAE(farm.district, farm.layout.scale.farmHa) * share;
+  const full = carryingCapacityAE(farm.district, farm.layout.scale.farmHa) * share;
+  // On a mixed farm the cattle take their part of the stocking (call, 15 Nov 2026).
+  const ae = mix ? full * mix.scale : full;
   const survey = surveyOf(farm);
   const wet = survey.topology.areas
     .filter((r) => survey.points.areaTroughs[r.id]!.length > 0)
@@ -124,10 +142,58 @@ export function startHerd(farm: FarmState, rng: Rng): StartHerd | null {
   const steers = Math.round(weaners / 2);
   put(
     [...batch('weanerSteer', steers), ...batch('weanerHeifer', weaners - steers)],
-    wet[1] ?? wet[0]!,
+    mix?.weanersWithCows ? wet[0]! : (wet[1] ?? wet[0]!),
   );
   mergeShared(farm, survey);
   return { cows, bulls, weaners, ae, share };
+}
+
+/** The stream a running farm's start flock is drawn from. */
+export const FLOCK_STREAM = 'gen:flock';
+
+/** A running farm's start flock. */
+export interface StartFlock {
+  ewes: number;
+  rams: number;
+  /** The flock's DSE over a year (`START_FLOCK.eweYearDse` a ewe). */
+  dse: number;
+  share: number;
+}
+
+/**
+ * Put a running farm's start flock on it (milestone 2.4): self-replacing
+ * Merino ewes at the same share of carrying capacity as a start herd
+ * (`START_HERD_SHARE`, in DSE at 8.4), `scale` of it on a mixed farm, with
+ * rams at 1% + 1, in the biggest area with water that holds no cattle.
+ * Returns null if there is none. Draws one number (the share).
+ */
+export function startFlock(farm: FarmState, rng: Rng, scale: number): StartFlock | null {
+  const share = rng.range(START_HERD_SHARE.lo, START_HERD_SHARE.hi);
+  const dse =
+    carryingCapacityAE(farm.district, farm.layout.scale.farmHa) * DSE_PER_AE * share * scale;
+  const survey = surveyOf(farm);
+  const taken = occupiedAreas(farm, survey);
+  const wet = survey.topology.areas
+    .filter((r) => survey.points.areaTroughs[r.id]!.length > 0 && !taken.has(r.id))
+    .sort((a, b) => b.ha - a.ha);
+  if (!wet.length) return null;
+  const ewes = Math.max(20, Math.round(dse / START_FLOCK.eweYearDse));
+  const rams = ramsNeeded(ewes);
+  const r = addSheepMob(farm, survey, {
+    cell: placeAnchor(survey, wet[0]!.id),
+    breed: 'merino',
+    name: 'Ewes',
+    groups: [
+      { cls: 'ewe', head: ewes },
+      { cls: 'ram', head: rams },
+    ],
+  });
+  if (!r.ok) return null;
+  for (const s of r.mob.sheep) {
+    s.paid = s.sex === 'M' ? sheepBuyPrice('merinoRams') : sheepBuyPrice('merinoEwes');
+    s.cost = s.paid;
+  }
+  return { ewes, rams, dse: ewes * START_FLOCK.eweYearDse, share };
 }
 
 /** What a real-year farm is set up with: its years, its weather and its market on day 0. */
@@ -266,7 +332,22 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
   };
   startDay(farm);
 
-  const herd = running ? startHerd(farm, rngStream(o.seed, HERD_STREAM)) : null;
+  const stock = o.stock ?? 'cattle';
+  if (stock !== 'cattle' && !sheepDistrict(o.district)) {
+    throw new RangeError('Sheep are not run in this district (PRD 5.12).');
+  }
+  const herd =
+    running && stock !== 'sheep'
+      ? startHerd(
+          farm,
+          rngStream(o.seed, HERD_STREAM),
+          stock === 'mix' ? { scale: 0.5, weanersWithCows: true } : undefined,
+        )
+      : null;
+  const flock =
+    running && stock !== 'cattle'
+      ? startFlock(farm, rngStream(o.seed, FLOCK_STREAM), stock === 'mix' ? 0.5 : 1)
+      : null;
   farm.year = newYear(farm);
 
   const season = seasonsOf(farm, { data: env.data }).factorsOn(0);
@@ -279,6 +360,7 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     broke: farm.broke,
     improvements: gen.improvements,
     herd,
+    ...(flock ? { flock } : {}),
     season: { label: season.label, factor: season.seasonF },
   };
   toInbox(farm, 0, [started]);

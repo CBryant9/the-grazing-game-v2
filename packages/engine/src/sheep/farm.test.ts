@@ -166,7 +166,7 @@ describe('sheep on a farm', () => {
         f.mobs.map((m) => m.animals.map((a) => [a.kind, a.age, a.wt, a.cond, a.preg])),
       );
     expect(cattle(mixed)).toBe(cattle(plain));
-    expect(mixed.cash).toBeCloseTo(plain.cash, 6);
+    // Cash differs: the sheep have their own costs (health, shearing, crutching).
   });
 
   it('drink by class: more with lambs, more in summer', () => {

@@ -66,8 +66,18 @@
  * water, flystrike) and water by class (docs/MODEL.md, the sheep section).
  * No grass, cattle, crop, season or price formula changed. A farm with no
  * sheep plays exactly as it did on 0.13.0 (a test holds its digest).
+ *
+ * 0.15.0 (milestone 2.3 second pass and the engine half of 2.4): sheep run
+ * as records of like animals with head counts (drawn from the seeded
+ * streams); sheep feeding (lick, grain, hay); contractor shearing and
+ * crutching on dates, with wool sold at shearing; sheep health costs; sheep
+ * deaths in the year score; the sheep market (buying and selling at the
+ * MLA indicators); netting fence; sheep that get through cattle fences;
+ * the cattle, sheep or mix choice at setup; one DSE figure (8.4) for every
+ * display. No grass, cattle, crop, season or price formula changed. A farm
+ * with no sheep plays exactly as it did on 0.13.0 (a test holds its digest).
  */
-export const ENGINE_VERSION = '0.14.0';
+export const ENGINE_VERSION = '0.15.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -117,5 +127,11 @@ export const ENGINE_VERSION = '0.14.0';
  * their random streams); a mob's sheep are saved in columns. It is left out
  * on a farm that has never had sheep, so an older save loads with no sheep
  * and is otherwise unchanged.
+ *
+ * 11: sheep as records (milestone 2.3 second pass and 2.4, engine half). A
+ * sheep record has `n` (head) and `doomed2`; a sheep mob has `feed`,
+ * `shearOn`, `crutchOn` and `lastBreak`; a year may have `wool` and
+ * `sheepDeaths`. A format 10 save loads each sheep as a record of one, with
+ * the district's shearing days and no feed. Older saves load with no sheep.
  */
-export const SAVE_FORMAT_VERSION = 10;
+export const SAVE_FORMAT_VERSION = 11;

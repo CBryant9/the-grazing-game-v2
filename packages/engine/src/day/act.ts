@@ -321,7 +321,7 @@ function materialsOf(
   if (!w || !t) return {};
   const n = (v: number | boolean | string | undefined): number => Number(v ?? 0);
   if (action.type === 'buildFence') {
-    if (action.fence === 'tape') return {};
+    if (action.fence === 'tape' || action.fence === 'netting') return {};
     return {
       fenceMaterials: {
         fence: action.fence,

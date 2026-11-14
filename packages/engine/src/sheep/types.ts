@@ -189,6 +189,8 @@ export interface SheepMob {
   lastThin: number;
   /** Days in a row losing more than 20 g a head a day. */
   lossDays: number;
+  /** The farm day the mob last got through a fence, or null. */
+  lastBreak: number | null;
   /** What the mob is fed on top of the pasture (`setSheepFeed`). */
   feed: SheepFeed;
 }
@@ -197,7 +199,7 @@ export interface SheepMob {
 export interface SheepState {
   mobs: SheepMob[];
   /** The sheep's own random streams, saved with the farm, so sheep never shift the cattle's draws. */
-  rng: { breeding: RngState; deaths: RngState; flies: RngState };
+  rng: { breeding: RngState; deaths: RngState; flies: RngState; breakouts?: RngState };
 }
 
 /** The random streams the sheep step draws from. */

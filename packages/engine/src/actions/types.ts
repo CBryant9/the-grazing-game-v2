@@ -18,7 +18,7 @@ import type { FarmEvent } from '../sim/events';
 import type { FarmState, PlanRule } from '../sim/state';
 
 /** The fences a player can build. */
-export type FenceKind = 'permanent' | 'electric' | 'tape';
+export type FenceKind = 'permanent' | 'electric' | 'tape' | 'netting';
 
 /** Where cattle are sent: the grazing area that holds a square, or the feedlot. */
 export type MoveTarget = { cell: number } | 'lot';

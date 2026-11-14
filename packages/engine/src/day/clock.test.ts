@@ -251,6 +251,9 @@ describe('looking is free', () => {
       sheepMobsOf: (f) => engine.sheepMobsOf(f),
       sheepMobsRead: (f) => engine.sheepMobsRead(f, 0),
       stockingRead: (f) => engine.stockingRead(f),
+      sheepMarketRead: (f) => engine.sheepMarketRead(f),
+      nettingEdges: (f) => engine.nettingEdges(f),
+      sheepYearRead: (f) => engine.sheepYearRead(f),
     };
     // These change the farm they are given. That is their job: the tick, and its helpers.
     const CHANGES = [

@@ -30,11 +30,18 @@ export const EDGE = {
   tapeDown: 7,
   /** The farm boundary. Nothing crosses it and it can't be changed. */
   boundary: 9,
+  /**
+   * Sheep-proof netting fence (milestone 2.4, engine half): hinge-joint
+   * netting that holds sheep and cattle (S48). Cattle fences (permanent,
+   * electric, tape) do not hold sheep.
+   */
+  netting: 10,
 } as const;
 export type EdgeCode = (typeof EDGE)[keyof typeof EDGE];
 
 /** The fence types a player can build. */
-export type FenceType = typeof EDGE.permanent | typeof EDGE.electric | typeof EDGE.tape;
+export type FenceType =
+  typeof EDGE.permanent | typeof EDGE.electric | typeof EDGE.tape | typeof EDGE.netting;
 
 /**
  * Every fence line on the farm. `hE` holds the lines along the top and
@@ -107,9 +114,9 @@ const flags = (codes: readonly number[]): Uint8Array => {
 };
 
 /** What stops stock: standing fences, shut gates and the boundary. */
-export const STOCK_BLOCK: Uint8Array = flags([1, 2, 3, 4, 9]);
+export const STOCK_BLOCK: Uint8Array = flags([1, 2, 3, 4, 9, 10]);
 /** What bounds a paddock: any fence or gate at all, and the boundary. */
-export const PADDOCK_BLOCK: Uint8Array = flags([1, 2, 3, 4, 5, 6, 7, 9]);
+export const PADDOCK_BLOCK: Uint8Array = flags([1, 2, 3, 4, 5, 6, 7, 9, 10]);
 
 /**
  * Group the squares that connect without crossing a blocking edge. Groups

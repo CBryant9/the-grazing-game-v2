@@ -6,7 +6,7 @@
 
 import type { DistrictId } from '@gg/shared';
 import { dateAt, type FarmStart } from '../src/calendar';
-import { DSE_PER_AE, SRW, type SheepBreed } from '../src/data/sheep';
+import { DSE_PER_AE, SRW, START_FLOCK, type SheepBreed } from '../src/data/sheep';
 import { carryingCapacityAE } from '../src/money/costs';
 import { rngStream } from '../src/rng';
 import type { GrowthFactorSource } from '../src/season/factors';
@@ -50,7 +50,7 @@ export const WEANER_FEED_TO = 0.07;
 export const SHEEP_BLOCK_HA = 260;
 
 /** The average DSE of a breeding ewe over a year, for setting the stocking (lambs inside her). STAND-IN for the test. */
-export const EWE_YEAR_DSE = 1.5;
+export const EWE_YEAR_DSE = START_FLOCK.eweYearDse;
 
 export interface SheepYearCase {
   district: DistrictId;

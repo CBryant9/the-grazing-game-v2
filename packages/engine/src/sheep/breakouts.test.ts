@@ -86,4 +86,86 @@ describe('one mob to a paddock, across species', () => {
     expect(noWater).toBeGreaterThan(0);
     expect(headOf(sheepMobsOf(farm)[0]!.sheep)).toBe(50);
   });
+
+  /** The same block, with sheep (not cattle) in the half with no water. */
+  function dryHalfSheep(seed: number): { farm: FarmState; boreCell: number; dryCell: number } {
+    let farm = createFarm({
+      seed,
+      district: 'nsw',
+      size: 'small',
+      start: { year: 2021, month: 6 },
+      startType: 'scratch',
+      difficulty: 'easy',
+      money: { cash: 1e7, overdraft: -1e7, broke: -1e8 },
+    });
+    const done = applyInstantly(farm, {
+      type: 'buildFence',
+      edges: across(13, 0, GRID_W - 1),
+      fence: 'permanent',
+    });
+    if (!done.ok) throw new Error(done.message);
+    farm = done.farm;
+    const bore = farm.layout.water.bore;
+    const s = surveyOf(farm);
+    const dry = s.topology.areas.find((a) => a.id !== s.topology.areaOf[bore])!;
+    const r = addSheepMob(farm, s, {
+      cell: dry.cells[0]!,
+      breed: 'merino',
+      groups: [{ cls: 'wether', head: 200 }],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    return { farm, boreCell: bore, dryCell: dry.cells[0]! };
+  }
+
+  it('thirsty sheep get through a cattle fence (permanent) into the empty paddock next door', () => {
+    const { farm, boreCell } = dryHalfSheep(4);
+    let got = 0;
+    for (let d = 0; d < 3; d++) {
+      for (const e of stepDay(farm).events) if (e.type === 'sheep-breakout') got++;
+    }
+    expect(got).toBe(1);
+    const s = surveyOf(farm);
+    const m = sheepMobsOf(farm)[0]!;
+    expect(m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor]).toBe(
+      s.topology.areaOf[boreCell],
+    );
+  });
+
+  it('thirsty sheep never get into a paddock that holds cattle; they take another fence', () => {
+    const { farm, boreCell, dryCell } = dryHalfSheep(4);
+    const bought = applyInstantly(farm, {
+      type: 'buyCattle',
+      cls: 'weanerSteer',
+      qty: 20,
+      to: { cell: boreCell },
+    });
+    if (!bought.ok) throw new Error(bought.message);
+    const f = bought.farm;
+    const s = surveyOf(f);
+    const cattleArea = s.topology.areaOf[boreCell]!;
+    for (let d = 0; d < 3; d++) {
+      for (const e of stepDay(f).events) {
+        if (e.type === 'sheep-breakout') expect(e.to).not.toBe(s.topology.areas[cattleArea]!.name);
+      }
+      const m = sheepMobsOf(f)[0];
+      if (m && m.where.kind === 'paddock') {
+        expect(s.topology.areaOf[m.where.anchor]).not.toBe(cattleArea);
+      }
+    }
+    void dryCell;
+  });
+
+  it('a netting fence holds sheep: thirsty sheep behind netting stay put', () => {
+    const { farm } = dryHalfSheep(4);
+    const done = applyInstantly(farm, {
+      type: 'buildFence',
+      edges: across(13, 0, GRID_W - 1),
+      fence: 'netting',
+    });
+    if (!done.ok) throw new Error(done.message);
+    const f = done.farm;
+    for (let d = 0; d < 3; d++) {
+      expect(stepDay(f).events.some((e) => e.type === 'sheep-breakout')).toBe(false);
+    }
+  });
 });

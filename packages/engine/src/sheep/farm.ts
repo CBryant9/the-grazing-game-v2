@@ -218,6 +218,7 @@ export function createSheepMob(
     lastThin: -99,
     lossDays: 0,
     feed: 'none',
+    lastBreak: null,
   };
 }
 

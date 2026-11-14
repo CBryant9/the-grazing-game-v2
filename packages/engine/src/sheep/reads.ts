@@ -5,7 +5,17 @@
  */
 
 import { aeOf } from '../cattle/animal';
-import { DSE_PER_AE } from '../data/sheep';
+import { DSE_PER_AE, fenceHoldsSheep, sheepDistrict, type SheepFeed } from '../data/sheep';
+import {
+  SHEEP_INDICATORS_C_KG,
+  SHEEP_PRICE_DATE,
+  SHEEP_TRADE,
+  WOOL_PRICE_C_KG,
+  type SheepIndicatorId,
+} from '../data/sheepMarket';
+import { EDGE, type EdgeRef } from '../farm/topology';
+import { COST_PER_M } from '../money/costs';
+import { SHEEP_BUY_CLASSES, sheepBuyPrice, type SheepBuyClassId } from './market';
 import { surveyOf, areaNameOf } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { aeFromDse, dseOf, sheepClassOf } from './energy';
@@ -73,6 +83,11 @@ export interface SheepMobRead {
   dryDays: number;
   /** The joining record, or null before the first joining. May be shown. */
   joining: SheepJoiningRecord | null;
+  /** What the mob is fed: none, lick, grain or hay. May be shown. */
+  feed: SheepFeed;
+  /** The contractors' shearing and crutching days each year, or null when not booked. May be shown. */
+  shearOn: { month: number; date: number } | null;
+  crutchOn: { month: number; date: number } | null;
   /** The day and month joining starts each year (month 0 is January). May be shown. */
   joinOn: { month: number; date: number };
 }
@@ -157,6 +172,9 @@ export function sheepMobsRead(farm: FarmState, month: number): SheepMobRead[] {
       dryDays: m.dry,
       joining: sheepJoiningRecord(m),
       joinOn: m.joinOn,
+      feed: m.feed,
+      shearOn: m.shearOn,
+      crutchOn: m.crutchOn,
     };
   });
 }
@@ -201,3 +219,82 @@ export function fleeceOf(s: Pick<Sheep, 'fleece' | 'micronKg' | 'woolDays'>): {
 
 /** Dressing percentage and carcase weight, for the sale (call C31). */
 export { carcaseKg, dressingShare } from './market';
+
+/** A class of sheep for sale, for the market screen. */
+export interface SheepBuyRead {
+  cls: SheepBuyClassId;
+  /** The class's name. May be shown. */
+  name: string;
+  /** Dollars a head, the head fee included. May be shown. */
+  perHead: number;
+}
+
+/** The sheep for sale today and the prices they are worth, for the market screen. */
+export interface SheepMarketRead {
+  /** Classes to buy, with their price a head. May be shown. */
+  buy: SheepBuyRead[];
+  /** MLA's indicators the sheep sell on, c/kg carcase, and their date. May be shown. */
+  indicators: Record<SheepIndicatorId, number>;
+  date: string;
+  /** Clean wool, c/kg, by micron (the dated stand-in). May be shown. */
+  wool: { micron: number; cKg: number }[];
+  /** False in a district that does not run sheep: show no sheep market there. */
+  offered: boolean;
+}
+
+/** The sheep market as a screen may show it. Prices are figures to show, not formulas. */
+export function sheepMarketRead(farm: Pick<FarmState, 'district'>): SheepMarketRead {
+  return {
+    buy: (Object.keys(SHEEP_BUY_CLASSES) as SheepBuyClassId[]).map((cls) => ({
+      cls,
+      name: SHEEP_BUY_CLASSES[cls].name,
+      perHead: Math.round(sheepBuyPrice(cls) + SHEEP_TRADE.headFee),
+    })),
+    indicators: { ...SHEEP_INDICATORS_C_KG },
+    date: SHEEP_PRICE_DATE,
+    wool: WOOL_PRICE_C_KG.map(([micron, cKg]) => ({ micron, cKg })),
+    offered: sheepDistrict(farm.district),
+  };
+}
+
+/** A kind of fence for the build tool. */
+export interface FenceKindRead {
+  kind: 'permanent' | 'electric' | 'tape' | 'netting';
+  /** Dollars a metre, new. May be shown. */
+  perM: number;
+  /** Whether it holds cattle and whether it holds sheep. May be shown. */
+  holdsCattle: boolean;
+  holdsSheep: boolean;
+}
+
+/** The fences the build tool offers, what they cost and what they hold. */
+export function fenceKindsRead(): FenceKindRead[] {
+  return (['permanent', 'electric', 'tape', 'netting'] as const).map((kind) => ({
+    kind,
+    perM: COST_PER_M[kind],
+    holdsCattle: true,
+    holdsSheep: fenceHoldsSheep(kind),
+  }));
+}
+
+/**
+ * The netting fence on the farm, edge by edge, for the map (the map's
+ * fence codes draw netting as permanent fence until they have their own).
+ */
+export function nettingEdges(farm: Pick<FarmState, 'layout'>): EdgeRef[] {
+  const out: EdgeRef[] = [];
+  const f = farm.layout.fences;
+  for (let i = 0; i < f.hE.length; i++)
+    if (f.hE[i] === EDGE.netting) out.push({ line: 'h', index: i });
+  for (let i = 0; i < f.vE.length; i++)
+    if (f.vE[i] === EDGE.netting) out.push({ line: 'v', index: i });
+  return out;
+}
+
+/** The farm's sheep money this year so far: wool sold, for the money screen. May be shown. */
+export function sheepYearRead(farm: Pick<FarmState, 'year'>): {
+  wool: number;
+  sheepDeaths: number;
+} {
+  return { wool: farm.year.wool ?? 0, sheepDeaths: farm.year.sheepDeaths ?? 0 };
+}

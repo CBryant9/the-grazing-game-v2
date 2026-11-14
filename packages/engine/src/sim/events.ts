@@ -470,6 +470,8 @@ export interface FarmStarted {
   /** Fence, gates, troughs and pipe that came with the farm, in segments and counts. */
   improvements: StartImprovements;
   herd: StartHerd | null;
+  /** A running sheep or mixed farm's start flock (milestone 2.4). Left out otherwise. */
+  flock?: { ewes: number; rams: number; dse: number; share: number };
   /** The season on day 0, and its growth as a multiple of a normal season. */
   season: { label: string; factor: number };
 }

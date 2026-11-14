@@ -63,6 +63,8 @@ const pieceKey = (ref: JobPiece): string =>
 function removalWork(code: number, sideM: number): PieceWork {
   if (code === EDGE.gateShut || code === EDGE.gateOpen) return { minutes: JOB_TIMES.gateMin.value };
   if (code === EDGE.permanent) return { metres: sideM, pace: 'permanent' };
+  // Netting goes up at the permanent fence's pace (STAND-IN: no netting job time was found).
+  if (code === EDGE.netting) return { metres: sideM, pace: 'permanent' };
   if (code === EDGE.electric || code === EDGE.electricDown) {
     return { metres: sideM, pace: 'electric' };
   }
@@ -106,7 +108,7 @@ function linePieces(before: FarmState, after: FarmState, action: Action): Piece[
       if (was === getEdge(after.layout.fences, ref.edge)) continue;
       const work: PieceWork =
         action.type === 'buildFence'
-          ? { metres: sideM, pace: action.fence }
+          ? { metres: sideM, pace: action.fence === 'netting' ? 'permanent' : action.fence }
           : removalWork(was, sideM);
       out.push({ ref, work });
     } else {

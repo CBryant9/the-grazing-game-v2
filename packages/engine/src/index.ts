@@ -681,8 +681,9 @@ export type { ContractStopWhy, HandDuty, HandLeftWhy, LabourEvent } from './sim/
 // come in milestone 2.4: these are the helpers and reads they use. Screens
 // show the numbers and classes the reads give (each field says what may be
 // shown), never a chance, a formula or a table (rule 14).
-export { SHEEP_DISTRICTS, sheepDistrict, WATER_WELFARE_HOURS } from './data/sheep';
-export type { SheepBreed } from './data/sheep';
+export { SHEEP_DISTRICTS, SHEEP_FEEDS, sheepDistrict, WATER_WELFARE_HOURS } from './data/sheep';
+export type { SheepBreed, SheepFeed } from './data/sheep';
+export { MVP_DSE_PER_AE } from './data/stocking';
 export {
   addSheepMob,
   ensureSheepState,
@@ -700,12 +701,27 @@ export {
   carcaseKg,
   dressingShare,
   fleeceOf,
+  fenceKindsRead,
+  nettingEdges,
   sheepJoiningRecord,
+  sheepMarketRead,
   sheepMobsRead,
+  sheepYearRead,
   stockingRead,
 } from './sheep/reads';
-export type { SheepClassRow, SheepJoiningRecord, SheepMobRead, StockingRead } from './sheep/reads';
-export type { SheepDeathCause, SheepNote } from './sheep/notes';
+export type {
+  FenceKindRead,
+  SheepBuyRead,
+  SheepClassRow,
+  SheepJoiningRecord,
+  SheepMarketRead,
+  SheepMobRead,
+  StockingRead,
+} from './sheep/reads';
+export { SHEEP_BUY_CLASSES } from './sheep/market';
+export type { SheepBuyClassId } from './sheep/market';
+export type { SheepDeathCause, SheepLossReason, SheepNote } from './sheep/notes';
+export type { StartFlock } from './sim/create';
 export type {
   Sheep,
   SheepClass,

@@ -17,6 +17,14 @@ export const COST_PER_M = {
   electric: 3.6,
   tape: 0.9,
   pipe: 4.8,
+  /**
+   * Sheep-proof netting fence, a metre. STAND-IN, Claudia's to set (call
+   * C26): above the cattle fence's $7, as PRD 5.12 says it costs more. The
+   * sources read do not give the two side by side (docs/SHEEP_BENCHMARKS.md,
+   * section 10: WA DPIRD's netting fence materials $4,186 a km in 2026;
+   * about $4,850 a km built in Queensland in 2012).
+   */
+  netting: 10,
 } as const;
 export type PerMetreItem = keyof typeof COST_PER_M;
 

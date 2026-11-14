@@ -9,6 +9,7 @@
  */
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
+import { sheepJobDates } from '../sheep/farm';
 import type { Sheep, SheepSex } from '../sheep/types';
 import { GRID_N } from '../grid';
 import { startDay } from '../sim/clock';
@@ -283,7 +284,12 @@ function packSheep(list: readonly Sheep[]): PackedSheep {
 function unpackSheep(p: PackedSheep): Sheep[] {
   const ints = new Int32Array(ownBuffer(fromBase64(p.ints)));
   const nums = new Float64Array(ownBuffer(fromBase64(p.nums)));
-  const NI = SHEEP_INTS.length;
+  // A format 10 save has no head count or second-day column: read it with its own columns.
+  const cols: readonly string[] =
+    p.n > 0 && ints.length / p.n !== SHEEP_INTS.length
+      ? SHEEP_INTS.filter((k) => k !== 'n' && k !== 'doomed2')
+      : SHEEP_INTS;
+  const NI = cols.length;
   const NN = SHEEP_NUMS.length + 1;
   const out: Sheep[] = [];
   for (let i = 0; i < p.n; i++) {
@@ -295,7 +301,7 @@ function unpackSheep(p: PackedSheep): Sheep[] {
       dead: !!(f & 2),
       di: f & 4 ? nums[i * NN + NN - 1]! : undefined,
     } as Record<string, unknown>;
-    for (let k = 0; k < NI; k++) s[SHEEP_INTS[k]!] = ints[i * NI + k]!;
+    for (let k = 0; k < NI; k++) s[cols[k]!] = ints[i * NI + k]!;
     for (let k = 0; k < NN - 1; k++) s[SHEEP_NUMS[k]!] = nums[i * NN + k]!;
     out.push(s as unknown as Sheep);
   }
@@ -420,6 +426,21 @@ function upgrade(f: Record<string, unknown>): void {
   // Sheep (format 10): a farm saved before had none. `sheep` is left out until the first
   // sheep come, so there is nothing to fill in.
   if (farm.sheep === null) delete farm.sheep;
+  // Format 11: a format 10 sheep is a record of one; mobs get no feed, the district's
+  // shearing and crutching days, and no fence got through yet.
+  for (const m of farm.sheep?.mobs ?? []) {
+    m.feed ??= 'none';
+    m.lastBreak ??= null;
+    if (m.shearOn === undefined || m.crutchOn === undefined) {
+      const d = sheepJobDates(m.joinOn);
+      m.shearOn ??= d.shearOn;
+      m.crutchOn ??= d.crutchOn;
+    }
+    for (const x of m.sheep) {
+      x.n ??= 1;
+      x.doomed2 ??= 0;
+    }
+  }
 }
 
 /**
