@@ -1,6 +1,6 @@
 import type { DistrictId } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from '../actions/types';
 import { GRID_H, GRID_W } from '../grid';
 import type { FarmState } from '../sim/state';
@@ -32,7 +32,7 @@ interface Cell {
 }
 
 function must(farm: FarmState, action: Action): FarmState {
-  const done = applyAction(farm, action, env);
+  const done = applyInstantly(farm, action, env);
   if (!done.ok) throw new Error(`${action.type} was refused: ${done.message}`);
   return done.farm;
 }

@@ -18,7 +18,7 @@ import {
   scratchFarm,
   PLENTY,
 } from '../../test-support/wholeFarm';
-import { applyAction } from '../actions/apply';
+import { applyInstantly as applyAction } from '../../test-support/instant';
 import { dateAt } from '../calendar';
 import { DISTRICTS } from '../data/districts';
 import { daylightFor } from '../daylight/daylight';
@@ -603,12 +603,12 @@ describe('the farm view says what the model says', () => {
     expect(lying.fences.v[tape.index]).toBe(VIEW_FENCE.tapeDown);
   });
 
-  it('the homestead and the yards are in the buildings list, on their squares', () => {
+  it('the yards are the only building in the list, on the yards square', () => {
     const farm = scratchFarm();
-    expect(farmView(farm).buildings).toEqual([
-      { kind: 'homestead', cell: farm.buildings.homestead },
-      { kind: 'yards', cell: farm.buildings.yards },
-    ]);
+    const view = farmView(farm);
+    expect(view.buildings).toHaveLength(1);
+    expect(view.buildings[0]!.kind).toBe('yards');
+    expect(view.buildings).toEqual([{ kind: 'yards', cell: farm.buildings.yards }]);
   });
 
   it('a mob in the feedlot is listed off pasture, so the map does not draw it', () => {

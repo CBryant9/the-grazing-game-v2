@@ -39,11 +39,7 @@ describe('the sprite registry', () => {
       'windmill.tower',
       'windmill.fan',
       'tree',
-      'building.homestead',
       'building.yards',
-      'building.shed',
-      'building.silo',
-      'building.feedBin',
       'gate.across.shut',
       'gate.across.open',
       'gate.down.shut',
@@ -102,7 +98,7 @@ describe('the sprite registry', () => {
     mine.replace('tree', art, { w: 280, h: 312, ppu: 248 });
     expect(mine.get('tree')!.w).toBe(280);
     // Nothing else changed, and the registry it was copied from is untouched.
-    expect(mine.get('building.homestead')).toEqual(reg.get('building.homestead'));
+    expect(mine.get('building.yards')).toEqual(reg.get('building.yards'));
     expect(reg.get('tree')!.image).toBeUndefined();
     expect(mine.ids()).toEqual(reg.ids());
   });

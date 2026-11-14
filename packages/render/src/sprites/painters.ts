@@ -484,61 +484,6 @@ function paintTree(ctx: Ctx, W: number, H: number): void {
   }
 }
 
-function paintHomestead(ctx: Ctx, W: number, H: number): void {
-  const base = H - 10;
-  const x = W * 0.1;
-  const w = W * 0.66;
-  const wallH = H * 0.3;
-  shadow(ctx, W / 2 + 6, base, W * 0.46, 9, 0.26);
-  ctx.lineWidth = 2.2;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = css(0x4a3a2a);
-  // Rainwater tank at the end of the house.
-  ctx.fillStyle = css(N.iron);
-  rrect(ctx, x + w + 4, base - H * 0.34, W * 0.16, H * 0.34, 6);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = css(N.ironDark);
-  ctx.lineWidth = 1.2;
-  for (let k = 1; k < 4; k++) {
-    ctx.beginPath();
-    ctx.moveTo(x + w + 6, base - (H * 0.34 * k) / 4);
-    ctx.lineTo(x + w + 2 + W * 0.16, base - (H * 0.34 * k) / 4);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = css(0x4a3a2a);
-  ctx.lineWidth = 2.2;
-  // Walls.
-  ctx.fillStyle = css(N.wall);
-  ctx.fillRect(x, base - wallH, w, wallH);
-  ctx.strokeRect(x, base - wallH, w, wallH);
-  // Roof.
-  ctx.fillStyle = css(N.roof);
-  ctx.beginPath();
-  ctx.moveTo(x - w * 0.07, base - wallH);
-  ctx.lineTo(x + w * 0.22, base - wallH - H * 0.3);
-  ctx.lineTo(x + w * 0.78, base - wallH - H * 0.3);
-  ctx.lineTo(x + w * 1.07, base - wallH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = css(shade(N.roof, 0.8));
-  ctx.fillRect(x - w * 0.07, base - wallH, w * 1.14, 5);
-  // Verandah posts, windows and a door.
-  ctx.fillStyle = css(0x5a8fc0);
-  for (const wx of [0.12, 0.7]) {
-    ctx.fillRect(x + w * wx, base - wallH * 0.72, w * 0.16, wallH * 0.36);
-    ctx.strokeRect(x + w * wx, base - wallH * 0.72, w * 0.16, wallH * 0.36);
-  }
-  ctx.fillStyle = css(0x6b4a2c);
-  ctx.fillRect(x + w * 0.44, base - wallH * 0.74, w * 0.12, wallH * 0.74);
-  ctx.strokeRect(x + w * 0.44, base - wallH * 0.74, w * 0.12, wallH * 0.74);
-  // Chimney.
-  ctx.fillStyle = css(N.ironDark);
-  ctx.fillRect(x + w * 0.62, base - wallH - H * 0.4, w * 0.07, H * 0.14);
-  ctx.strokeRect(x + w * 0.62, base - wallH - H * 0.4, w * 0.07, H * 0.14);
-}
-
 /** Timber stock yards: pens, a race and a loading ramp. The farm's own yards, never a saleyard. */
 function paintYards(ctx: Ctx, W: number, H: number): void {
   const x0 = 10;
@@ -593,88 +538,6 @@ function paintYards(ctx: Ctx, W: number, H: number): void {
   ctx.moveTo(x1 - 2, y0 - 4);
   ctx.lineTo(x1 + 10, y0 - 20);
   ctx.lineTo(x1 + 10, y0 - 4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-function paintShed(ctx: Ctx, W: number, H: number): void {
-  const base = H - 10;
-  const x = W * 0.08;
-  const w = W * 0.84;
-  const wallH = H * 0.42;
-  shadow(ctx, W / 2 + 6, base, W * 0.46, 8, 0.26);
-  ctx.lineWidth = 2.2;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = css(shade(N.ironDark, 0.5));
-  ctx.fillStyle = css(N.iron);
-  ctx.fillRect(x, base - wallH, w, wallH);
-  ctx.strokeRect(x, base - wallH, w, wallH);
-  ctx.fillStyle = css(N.ironDark);
-  ctx.beginPath();
-  ctx.moveTo(x - 6, base - wallH);
-  ctx.lineTo(x + w / 2, base - wallH - H * 0.26);
-  ctx.lineTo(x + w + 6, base - wallH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // An open bay.
-  ctx.fillStyle = css(0x2a2622);
-  ctx.fillRect(x + w * 0.18, base - wallH * 0.8, w * 0.64, wallH * 0.8);
-  ctx.strokeRect(x + w * 0.18, base - wallH * 0.8, w * 0.64, wallH * 0.8);
-}
-
-function paintSilo(ctx: Ctx, W: number, H: number): void {
-  const base = H - 10;
-  const x = W * 0.16;
-  const w = W * 0.68;
-  shadow(ctx, W / 2 + 5, base, W * 0.44, 7, 0.26);
-  ctx.lineWidth = 2.2;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = css(shade(N.ironDark, 0.5));
-  ctx.fillStyle = css(N.iron);
-  rrect(ctx, x, base - H * 0.62, w, H * 0.62, 5);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = css(N.ironDark);
-  ctx.beginPath();
-  ctx.moveTo(x - 3, base - H * 0.62);
-  ctx.lineTo(W / 2, base - H * 0.86);
-  ctx.lineTo(x + w + 3, base - H * 0.62);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = css(N.ironDark);
-  ctx.lineWidth = 1.2;
-  for (let k = 1; k < 5; k++) {
-    ctx.beginPath();
-    ctx.moveTo(x + 2, base - (H * 0.62 * k) / 5);
-    ctx.lineTo(x + w - 2, base - (H * 0.62 * k) / 5);
-    ctx.stroke();
-  }
-}
-
-function paintFeedBin(ctx: Ctx, W: number, H: number): void {
-  const base = H - 8;
-  shadow(ctx, W / 2 + 3, base, W * 0.4, 5, 0.26);
-  ctx.lineWidth = 2;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = css(shade(N.ironDark, 0.5));
-  // Legs, then a hopper.
-  ctx.beginPath();
-  for (const lx of [0.26, 0.74]) {
-    ctx.moveTo(W * lx, base);
-    ctx.lineTo(W * lx, base - H * 0.4);
-  }
-  ctx.stroke();
-  ctx.fillStyle = css(N.iron);
-  ctx.beginPath();
-  ctx.moveTo(W * 0.16, base - H * 0.82);
-  ctx.lineTo(W * 0.84, base - H * 0.82);
-  ctx.lineTo(W * 0.84, base - H * 0.46);
-  ctx.lineTo(W * 0.58, base - H * 0.24);
-  ctx.lineTo(W * 0.42, base - H * 0.24);
-  ctx.lineTo(W * 0.16, base - H * 0.46);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -825,11 +688,7 @@ function addThings(reg: SpriteRegistry): void {
   def('windmill.tower', 120, 226, 0.42, 218 / 226, 110, paintWindmillTower);
   def('windmill.fan', 124, 124, 0.5, 0.5, 110, paintWindmillFan);
   def('tree', 140, 156, 0.5, 148 / 156, 124, paintTree);
-  def('building.homestead', 250, 176, 0.42, 166 / 176, 104, paintHomestead);
   def('building.yards', 210, 132, 0.5, 0.72, 110, paintYards);
-  def('building.shed', 176, 136, 0.5, 126 / 136, 104, paintShed);
-  def('building.silo', 92, 176, 0.5, 166 / 176, 104, paintSilo);
-  def('building.feedBin', 72, 92, 0.5, 84 / 92, 104, paintFeedBin);
   const across = GATE_PPU + GATE_PAD * 2;
   def(
     'gate.across.shut',

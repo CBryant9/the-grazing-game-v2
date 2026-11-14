@@ -1,13 +1,13 @@
 /**
  * The farm at the start: soil, the bore, fences, gates, water, arable land,
- * the starting rotation, the homestead and yards, and the pasture as the
+ * the starting rotation, the stock yards, and the pasture as the
  * last owner left it.
  *
  * Each piece draws from its own named random stream, so a change to one
  * never shifts another (BUILD_PLAN 2.3). The pieces follow the MVP's newGame,
  * startScratch and startLayout, drawing their random numbers in the same
  * order, so each can be checked against the MVP given the same numbers.
- * The homestead and yards are new in the rebuild (PRD 5.13).
+ * The yards are new in the rebuild (PRD 5.13). There is no homestead.
  */
 
 import type { DistrictId } from '@gg/shared';
@@ -244,23 +244,27 @@ export function layRunning(rng: Rng, bore: number, scale: FarmScale): StartLayou
   return { fences, water, improvements: improvements(fences, water) };
 }
 
-/** The farm's buildings at the start. Each is the square it stands on. */
+/**
+ * The farm's buildings: the stock yards, as the square they stand on.
+ * Bought cattle arrive there. There is no homestead (Claudia, 14 Nov
+ * 2026).
+ */
 export interface FarmBuildings {
-  homestead: number;
   yards: number;
 }
 
-/** Squares between the bore and either building, at the least. */
+/** Squares between the bore and the yards, at the least. */
 export const BUILDING_CLEAR_OF_BORE = 3;
 
 /**
- * Place the homestead and the stock yards. The homestead goes on a square
- * that touches the boundary. The yards go within two squares of the
- * boundary, two to five squares from the homestead. Both keep at least
+ * Place the stock yards: within two squares of the boundary, at least
  * three squares clear of the bore and off any square with a trough.
  *
- * They are drawn from their own stream after everything else is laid out,
- * so they never change the rest of the farm for a seed.
+ * The yards were first placed two to five squares from a homestead on the
+ * boundary. The homestead was taken out, but its square is still drawn
+ * and used to place the yards, so the yards of every farm stand exactly
+ * where they did. The draws come from their own stream after everything
+ * else is laid out, so they never change the rest of the farm for a seed.
  */
 export function placeBuildings(rng: Rng, water: Water): FarmBuildings {
   const bx = water.bore % GRID_W;
@@ -279,14 +283,15 @@ export function placeBuildings(rng: Rng, water: Water): FarmBuildings {
     Math.max(Math.abs((i % GRID_W) - bx), Math.abs(((i / GRID_W) | 0) - by)) >=
       BUILDING_CLEAR_OF_BORE && !water.troughs.includes(i);
   const squares = Array.from({ length: GRID_N }, (_, i) => i);
-  const homestead = rng.pick(squares.filter((i) => depth(i) === 0 && free(i)));
+  // Where the homestead used to go. Kept only so the yards do not move.
+  const oldHomestead = rng.pick(squares.filter((i) => depth(i) === 0 && free(i)));
   const yards = rng.pick(
     squares.filter((i) => {
-      const d = apart(i, homestead);
+      const d = apart(i, oldHomestead);
       return depth(i) <= 1 && free(i) && d >= 2 && d <= 5;
     }),
   );
-  return { homestead, yards };
+  return { yards };
 }
 
 /** The pasture's state before the run-up: the same everywhere but for a little rankness. */

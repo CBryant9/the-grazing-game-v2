@@ -30,7 +30,7 @@ export type MobWhere =
   | { kind: 'paddock'; anchor: number }
   /** In the feedlot, on the ration. */
   | { kind: 'lot' }
-  /** In the stock yards (deliveries and yard work, milestone 1.5). */
+  /** In the stock yards, where bought cattle arrive. They have water. The player moves stock out to a paddock. */
   | { kind: 'yards' };
 
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
@@ -205,6 +205,12 @@ export interface InboxMessage {
   seq: number;
   /** The farm day it happened. */
   day: number;
+  /**
+   * The time of day it happened, in minutes after midnight on the district
+   * town's clock: for a job, the time it finished for the day. Left out for
+   * what the daily tick reports, which has no time of day.
+   */
+  at?: number;
   event: FarmEvent;
 }
 
@@ -216,6 +222,31 @@ export interface LoggedAction {
   /** The farm day it was done on. */
   day: number;
   action: Action;
+  /**
+   * When the job started and finished that day, in minutes after midnight
+   * on the district town's clock. Left out for an action done without the
+   * farm clock (calibration and tests).
+   */
+  at?: ClockSpan;
+}
+
+/** A start and a finish, in minutes after midnight on the district town's clock. */
+export interface ClockSpan {
+  start: number;
+  end: number;
+}
+
+/**
+ * The farm clock (PRD 5.1). Every day runs from first light to last light.
+ * Looking is free. Doing a job moves `used` on.
+ */
+export interface FarmClock {
+  /** First light today, in minutes after midnight on the district town's clock. */
+  firstLight: number;
+  /** Last light today, the same way. */
+  lastLight: number;
+  /** Minutes of today's light used so far. 0 at first light. */
+  used: number;
 }
 
 export type GameOverReason =
@@ -288,6 +319,9 @@ export interface FarmState {
   over: { reason: GameOverReason; day: number } | null;
   /** Every action taken on the farm, in order. */
   actionLog: LoggedAction[];
+
+  /** The farm clock: how far through today the player is. */
+  clock: FarmClock;
 }
 
 /** The MVP's price chart kept 31 days. */
@@ -317,8 +351,19 @@ export function deepCopy<T>(v: T): T {
 /** A separate copy of a farm, so one can change without the other. */
 export const cloneFarm = (farm: FarmState): FarmState => deepCopy(farm);
 
-/** Add events to the inbox, oldest dropped past the limit. */
-export function toInbox(farm: FarmState, day: number, events: readonly FarmEvent[]): void {
-  for (const event of events) farm.inbox.push({ seq: farm.inboxSeq++, day, event });
+/** Add events to the inbox, oldest dropped past the limit. `at` is the time of day, when there is one. */
+export function toInbox(
+  farm: FarmState,
+  day: number,
+  events: readonly FarmEvent[],
+  at?: number,
+): void {
+  for (const event of events) {
+    farm.inbox.push(
+      at === undefined
+        ? { seq: farm.inboxSeq++, day, event }
+        : { seq: farm.inboxSeq++, day, at, event },
+    );
+  }
   if (farm.inbox.length > INBOX_LIMIT) farm.inbox.splice(0, farm.inbox.length - INBOX_LIMIT);
 }

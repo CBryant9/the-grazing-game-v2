@@ -17,6 +17,7 @@ import type { SpeciesId } from '../data/species';
 import type { StartImprovements } from '../farm/generate';
 import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
+import type { ActionType } from '../actions/types';
 import type { GameOverReason, MobWhere, YearRecord } from './state';
 
 /** Where a mob is, with the grazing area's name when it is on pasture. */
@@ -102,7 +103,18 @@ export type ActionEvent =
       /** `net` less what the cattle have cost. */
       profit: number;
     }
-  | ({ type: 'mob-moved'; mob: number; mobName: string; head: number } & MobPlaceNote)
+  | ({
+      type: 'mob-moved';
+      mob: number;
+      mobName: string;
+      head: number;
+      /**
+       * The time of day the mob arrived, in minutes after midnight on the
+       * district town's clock. Left out for a move done without the farm
+       * clock (calibration and tests).
+       */
+      at?: number;
+    } & MobPlaceNote)
   /** The area a mob was put in has no water. Everything dies on day 4 without water. */
   | { type: 'no-water'; mob: number; mobName: string; area: string }
   /** What stock will meet on the area they were put in: a crop not ready to graze, stubble, a mixed paddock. */
@@ -144,7 +156,27 @@ export type ActionEvent =
       tha: number;
       value: number;
       cost: number;
-    };
+    }
+  | WorkEvent;
+
+/** Events from the working day. */
+export type WorkEvent =
+  /**
+   * Time was spent on a job. Times of day are minutes after midnight on the
+   * district town's clock. It comes first, ahead of the events for what
+   * the work did.
+   */
+  {
+    type: 'job-worked';
+    action: ActionType;
+    start: number;
+    end: number;
+    workMin: number;
+    /** True if all that was asked for was done. False for a line cut short by the light. */
+    finished: boolean;
+    /** For fence, tape and pipe: the pieces built, and the pieces that did not fit today. */
+    pieces?: { built: number; notBuilt: number };
+  };
 
 /** The herd a running farm starts with. */
 export interface StartHerd {

@@ -38,8 +38,6 @@ import {
 import { fieldProgress } from '../crops/fields';
 import { DISTRICTS } from '../data/districts';
 import { SPECIES } from '../data/species';
-import { daylightFor } from '../daylight/daylight';
-import { DISTRICT_PLACES } from '../daylight/places';
 import { EDGE, labelSquare } from '../farm/topology';
 import { NO_WATER_DISTANCE, PORTABLE_CAPACITY_L, pipeReach } from '../farm/water';
 import { GRID_N } from '../grid';
@@ -47,6 +45,7 @@ import { clamp } from '../num';
 import { LAND } from '../pasture/state';
 import { paddockSummary, type PaddockSummary } from '../pasture/summary';
 import { hash32 } from '../rng';
+import { lightOn } from './clock';
 import { dateOn, plantingsNow, surveyOf, type SourceEnv } from './derived';
 import type { FarmState } from './state';
 import { mobSummaries, paddockSummaries } from './summary';
@@ -224,10 +223,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
   ];
 
   // ---- Buildings
-  const buildings: FarmViewBuilding[] = [
-    { kind: 'homestead', cell: farm.buildings.homestead },
-    { kind: 'yards', cell: farm.buildings.yards },
-  ];
+  const buildings: FarmViewBuilding[] = [{ kind: 'yards', cell: farm.buildings.yards }];
 
   // ---- Paddocks and grazing areas
   const summaries = paddockSummaries(farm, env);
@@ -347,7 +343,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
 
   // The date the game reports: the real date on a real-year farm.
   const date = dateOn(farm);
-  const light = daylightFor(DISTRICT_PLACES[farm.district], date);
+  const light = lightOn(farm);
 
   return {
     viewVersion: FARM_VIEW_VERSION,

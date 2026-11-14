@@ -517,6 +517,79 @@ Corrections from the code (milestone 1.2c):
 - **What counts as infrastructure in net worth (the rebuild's rule):** what was paid for fence, gates, pipe, troughs and hubs still in place; the tape the farm owns at the price of new tape; $555 of a portable trough's $600 (not its first fill of water); the $900 energiser; and half the establishment cost of a sown perennial pasture still in the ground. Net worth counts 80% of that. Improvements that came with the farm count for nothing. See MODEL.md, section 8.
 - Sowing a forage or grain crop, and harvest costs, go to the year's cropping costs. Sowing a perennial pasture goes to the year's infrastructure total in full.
 
+## Job times (milestone 1.5a, the working day)
+
+How long each job takes, for one person with normal gear. The table is `packages/engine/src/data/jobTimes.ts` (`JOB_TIMES`), and each figure carries its mark in the code as well as here.
+
+**A job's time is its work only.** On 14 Nov 2026 Claudia made the working day simpler (REQUIREMENTS.md, "14 Nov 2026: the working day made simpler"): no driving and no drive home, no trip to the saleyard, no contractor to wait for, no route through gates and no walking time, and one kind of gate. The figures that went with those are listed under "Taken out" below so nobody brings them back by mistake.
+
+**These figures are the PRD's (section 5.4 and section 21, rows 5, 13, 14, 16 and 34), which is Claudia's document. None is a looked-up real-world figure and none has an outside source.** The marks are the PRD's own:
+
+- **Decided:** Claudia has decided it.
+- **Proposed:** in the PRD's table, for Claudia to check ("Claudia to check every figure").
+- **Builder:** not in the PRD. Chosen in the build as the simplest reading, and on the question list for Claudia (DEVELOPMENT_LOG, milestone 1.5a).
+
+"Used" says whether an action uses the figure yet.
+
+| Job | Figure | Mark | In the engine | Used |
+|---|---|---|---|---|
+| Permanent fence, on your own | 500 m a working day | Decided | `permanentFenceMPerDay` | yes |
+| Electric fence, single wire | 1,000 m an hour | Proposed | `electricFenceMPerHour` | yes |
+| Temporary tape, put out or roll up | 3,000 m an hour | Proposed | `tapeMPerHour` | yes |
+| Poly pipe with a pipe layer | 400 m an hour | Proposed | `pipeMPerHour` | yes |
+| Proper swing gate | 60 min | Proposed | `gateMin` | yes |
+| Open or shut a gate | 0 min | Builder | `gateOpenShutMin` | yes |
+| Trough with fittings | 180 min | Proposed | `troughMin` | yes |
+| Move or refill a portable trough | 30 min | Proposed | `portableTroughMin` | yes |
+| Move a mob: settling | 15 min | Proposed | `moveMobSettleMin` | yes |
+| Move a mob: for each 100 head | 1 min | Proposed | `moveMobMinPer100Head` | yes |
+| Muster a whole paddock: to start | 30 min | Proposed | `musterBaseMin` | no (taken out 14 Nov 2026) |
+| Muster a whole paddock: for each 200 ha | 60 min | Proposed | `musterMinPer200Ha` | no (taken out 14 Nov 2026) |
+| Feed lick or hay to a mob | 30 min | Proposed | `feedOutMin` | no (kept for Daily Farm feeders, a later part) |
+| Lick run or feed run, each mob | 5 min | Proposed | `feedRunMinPerMob` | not yet (feed on hand, Daily Farm) |
+| Wean: to start | 30 min | Proposed | `weanBaseMin` | yes |
+| Wean: for each head | 0.5 min | Proposed | `weanMinPerHead` | yes |
+| Mark calves: for each calf | 2 min | Proposed | `markMinPerCalf` | yes |
+| Preg test: for each cow | 1 min | Proposed | `pregTestMinPerCow` | not yet |
+| Sell (draft and load): to start | 60 min | Proposed | `sellBaseMin` | yes |
+| Sell: for each 10 head | 1 min | Proposed | `sellMinPer10Head` | yes |
+| Buy online | 30 min | Proposed | `buyOnlineMin` | not yet |
+
+### Taken out on 14 Nov 2026 (not in the table)
+
+| PRD figure | Was | Why it went |
+|---|---|---|
+| Travel on the farm | 25 km/h (Decided) | No driving and no drive home: "the drive home is just adding too much of an element into the time" |
+| Go to the saleyard to buy | 6 h including travel | No trip. Buying takes none of the day. Bought cattle will arrive in the stock yards (next part) |
+| Sowing or harvest by contractor | "within a few days of booking" (the builder had taken 3 days) | They happen at once: "they can straight up just go and harvest" |
+| Walking a mob along its route | 1.5 km/h (Decided) | "Pick the paddock, done": no route through gates and no walking time |
+| Muster a whole paddock | 30 min and 60 min for each 200 ha (Proposed) | Husbandry is done where the mob is, with no muster, so marking, weaning and selling no longer include it. For Claudia to confirm |
+| Wire gate, tape gate handle, and 5 min each time stock go through a wire gate | 30 min, 5 min, 5 min | The three gate types are dropped for now. One gate: the proper swing gate |
+
+Not built yet: contractor fencing teams (500 m and 1,000 m a day, Decided, PRD 5.11) and a farm hand's share of a fence (about 500 m, Proposed).
+
+### Rules the builder chose (all for Claudia to check)
+
+The PRD gives the figures. Where it does not say how a figure is applied, the simplest reading was built.
+
+1. **"500 m per working day".** A working day is that day's light, from first light to last light, whatever its length. So a whole day on the fence builds 500 m in June and in December, half a day builds 250 m, and time spent on other jobs comes off it in proportion. The other way to read it is a fixed pace by the hour (500 m over a 10 hour day would be 50 m an hour: about 535 m on a Western Victoria June day and 715 m on a Central Queensland December day). `metresPerMinute` in `jobTimes.ts`.
+2. **Whole segments only.** A line is built one map square's side at a time. A segment is built if all of it fits in the light left. On a big farm a segment is long (340 m on 12,000 ha), so a day of permanent fence there is one segment, not 500 m.
+3. **The bank must cover the whole line as drawn**, though only the part that fits is built and charged today.
+4. **A job that needs more than a whole day's light** can be done at first light, before anything else that day, and it uses the whole day. This is so no job is impossible. With the muster gone it matters only for a very big mob: weaning 2,000 head is 17 h 10 m.
+5. **Taking things out takes as long as putting them in:** pulling down fence (at the pace of its kind), taking out a gate (60 min), a trough or a water hub (180 min). `removalWork` and the removal cases in `day/spec.ts`.
+6. **Moving a fixed trough** takes as long as fitting one (180 min).
+7. **Water hubs.** On a fence line or corner: a trough (180 min). On a square: a trough if the square has none (180 min) and a swing gate for each side that gets one (60 min each).
+8. **Putting a knocked-down segment back up:** its length at the pace of its kind (electric or tape).
+9. **There is no muster.** Marking, weaning and selling are done where the mob is, and the size of the paddock does not change the time. (Taken out on 14 Nov 2026. For Claudia to confirm.)
+10. **Weaning's "0.5 min per head"** counts every head in the mob, calves included.
+11. **Marking's "2 min per calf"** counts every calf at foot in the mob, heifer calves too, though only bull calves are marked.
+12. **Selling's "1 min per 10 head"** counts every animal loaded, calves at foot included. Cattle sold out of several mobs take the same single time.
+13. **Moving stock:** 15 min for each mob cattle are taken from, and 1 min per 100 head moved, calves included.
+14. **Switching a supplement on or off takes none of the day.** In Fast Farm it is switched on at a daily price that does not cut the daylight (Claudia, 14 Nov 2026). The 30 minute figure is kept for Daily Farm feeders, a later part.
+15. **Opening or shutting a gate** takes none of the day, but it is still a job: it can't be done after last light.
+16. **Buying, sowing and harvest take none of the day** and can be done after last light.
+17. **Skips:** a week is 7 days, a month 30 (the MVP's) and a year 365.
+
 ## Supplements (`FEED`)
 
 | Feed | Cost | What it does |

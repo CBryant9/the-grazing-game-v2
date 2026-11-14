@@ -80,7 +80,7 @@ export function mob(over: Partial<FarmViewMob> = {}): FarmViewMob {
  * A farm with its boundary fence and a fence down the middle (between
  * columns 19 and 20), making two paddocks and two grazing areas: 0 on the
  * left, 1 on the right. The bore is at (2, 2) with a trough at (5, 5). The
- * homestead is at (0, 20) and the yards at (2, 22). Every square starts leafy.
+ * yards are at (2, 22). Every square starts leafy.
  */
 export function sampleView(): FarmView {
   const fill = (v: number): number[] => new Array<number>(N).fill(v);
@@ -130,10 +130,7 @@ export function sampleView(): FarmView {
       hubs: [],
     },
     trees: [],
-    buildings: [
-      { kind: 'homestead', cell: cell(0, 20) },
-      { kind: 'yards', cell: cell(2, 22) },
-    ],
+    buildings: [{ kind: 'yards', cell: cell(2, 22) }],
     paddocks: [0, 1].map((id) => ({
       id,
       name: `Paddock ${id + 1}`,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import { createFarm } from './create';
 import { surveyOf } from './derived';
 import { farmTotals } from './summary';
@@ -34,7 +34,7 @@ describe('speed', () => {
     const s = surveyOf(farm);
     for (const r of s.topology.areas) {
       if (!s.points.areaTroughs[r.id]!.length) continue;
-      const done = applyAction(farm, {
+      const done = applyInstantly(farm, {
         type: 'buyCattle',
         cls: 'weanerSteer',
         qty: 700,

@@ -17,7 +17,8 @@ import { createFarm } from '../sim/create';
 import { pricesOf, surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmMob, type FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
-import { MAX_BUY, applyAction } from './apply';
+import { applyInstantly } from '../../test-support/instant';
+import { MAX_BUY } from './apply';
 import type { Action } from './types';
 
 /*
@@ -205,8 +206,12 @@ describe('buying cattle', () => {
     expect(farmHash(farm)).toBe(hash);
     expect(MAX_BUY).toBe(5000);
     expect(
-      applyAction(farm, { type: 'buyCattle', cls: 'weanerSteer', qty: MAX_BUY, to: { cell: bore } })
-        .ok,
+      applyInstantly(farm, {
+        type: 'buyCattle',
+        cls: 'weanerSteer',
+        qty: MAX_BUY,
+        to: { cell: bore },
+      }).ok,
     ).toBe(true);
   });
 });
@@ -624,7 +629,7 @@ describe('requests with parts missing', () => {
       {},
     ] as unknown as Action[];
     for (const action of bad) {
-      const out = applyAction(farm, action);
+      const out = applyInstantly(farm, action);
       expect(out.ok, JSON.stringify(action)).toBe(false);
       if (!out.ok) expect(out.reason, JSON.stringify(action)).toBe('bad-request');
     }

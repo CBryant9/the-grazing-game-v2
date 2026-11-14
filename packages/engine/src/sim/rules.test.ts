@@ -14,7 +14,7 @@ import {
   refused,
   twoPaddockFarm,
 } from '../../test-support/wholeFarm';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action, FenceKind } from '../actions/types';
 import { EDGE, getEdge, hEdge, vEdge, type EdgeRef } from '../farm/topology';
 import { GRID_N, GRID_W } from '../grid';
@@ -510,7 +510,7 @@ describe('one mob per grazing area after any gate or fence change', () => {
       jobs.push({ type: 'placeSquareHub', cell: rng.pick(farm.layout.water.troughs) });
       const job = rng.pick(jobs);
       const before = everyone();
-      const out = applyAction(farm, job);
+      const out = applyInstantly(farm, job);
       if (out.ok) {
         farm = out.farm;
         done.set(job.type, (done.get(job.type) ?? 0) + 1);
@@ -623,7 +623,7 @@ describe('fallow only after a crop, and a finished crop never regrows', () => {
             for (let i = 0; i < GRID_N; i++) {
               if (farm.pasture.land[i]! >= LAND.fallow && i % 3 === 0) cells.push(i);
             }
-            const out = applyAction(farm, { type: 'sow', species: e.event.sp, cells });
+            const out = applyInstantly(farm, { type: 'sow', species: e.event.sp, cells });
             if (out.ok) {
               farm = out.farm;
               for (const i of cells) if (farm.crops.fid[i]! >= 0) cropped[i] = 1;
@@ -759,7 +759,7 @@ describe('the same seed and the same actions give the same farm', () => {
     ];
     let ok = 0;
     for (const job of jobs) {
-      const out = applyAction(farm, job);
+      const out = applyInstantly(farm, job);
       if (out.ok) {
         ok++;
         expect(farmHash(out.farm)).not.toBe(before);
@@ -952,7 +952,7 @@ describe('stock held in the yards (a stand-in until yard work is built)', () => 
     expect(farm.pasture.lastG[yards]).toBeGreaterThanOrEqual(0);
     const mass = (i: number): number => farm.pasture.G[i]! + farm.pasture.D[i]!;
     expect(mass(yards)).toBeLessThan(450);
-    expect(mass(farm.buildings.homestead)).toBeGreaterThan(2 * mass(yards));
+    expect(mass(farm.layout.water.bore)).toBeGreaterThan(2 * mass(yards));
     expectOneMobPerArea(farm);
     // One square is not enough for 60 steers: they are short of feed.
     expect(m.st!.f).toBeLessThan(0.5);

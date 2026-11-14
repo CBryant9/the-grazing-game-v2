@@ -10,6 +10,7 @@
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
 import { GRID_N } from '../grid';
+import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 
@@ -274,6 +275,18 @@ function upgrade(f: Record<string, unknown>): void {
     farm.layout.water.nextPortId ??=
       farm.layout.water.ports.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   }
+  // The working day (format 4). A farm saved before it had no clock: it
+  // loads at first light.
+  if (!farm.clock) startDay(farm as FarmState);
+  // What the first cut of the working day kept and Claudia took out on
+  // 14 Nov 2026: the homestead, the player's place, the travel switches,
+  // jobs in progress and contractors' bookings. A save that has any of
+  // them loads without them. The stock yards stay, and a mob in the yards
+  // stays there.
+  if (farm.buildings) delete (farm.buildings as unknown as Record<string, unknown>).homestead;
+  delete (farm.clock as unknown as Record<string, unknown>).at;
+  for (const key of ['workRules', 'jobs', 'nextJobId', 'bookings', 'nextBookingId']) delete f[key];
+  for (const entry of farm.actionLog) delete (entry as unknown as Record<string, unknown>).job;
 }
 
 /**

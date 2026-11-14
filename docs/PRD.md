@@ -66,6 +66,33 @@ All **[Decided]** by Claudia on 13 Nov 2026 unless marked. **Where older wording
 | Minimum age | 13 | **14** to make an account. No community under 16 |
 | Cattle look | Breeds by class | Brahman style in Central Qld, British breeds in NSW and Victoria |
 
+### Changed after v1.1 (14 Nov 2026)
+
+**[Decided]** by Claudia on 14 Nov 2026, after the first cut of the working day was built. The older sections below are not rewritten. **Where they disagree with this block, this block wins.** Her words and the full rules are in `REQUIREMENTS.md`, "14 Nov 2026: the working day made simpler".
+
+| Section | v1.1 says | Now |
+|---|---|---|
+| 5.1 Travel | Each job includes driving to it and home at the end of the day | **No driving and no drive home.** A job's time is its work only |
+| 5.1 Jobs too big for today | Built in part, the rest is a job in progress that carries on | **No job in progress.** A fence or pipe line: the part that fits is built, the rest shows red ("You don't have enough time to do this today") and is drawn again another day. Any other job is done if it fits and not done if it does not |
+| 5.1, 5.2 Time | A daylight bar and job cards | Kept, but shown lightly: the player is not made to watch the clock. At last light the farm goes dark, can still be looked at, and Next day invites a click |
+| 5.4 Travel on the farm | Distance ÷ 25 km/h | Taken out |
+| 5.4 Go to the saleyard to buy | Most of the day (6 h including travel) | No trip. Buying takes none of the day |
+| 5.4 Sow or harvest | Contractor, done within a few days of booking | **Done at once.** Costs money, takes none of the day |
+| 5.4 Move a mob | Drive out + 15 min + walking the route through gates at 1.5 km/h + 1 min per 100 head | **"Pick the paddock, done."** 15 min + 1 min per 100 head. No route, no walking time |
+| 5.4 Wire gate, tape gate handle | 30 min and 5 min, and 5 min each use | Dropped for now. One gate, the proper swing gate |
+| 5.13 Homestead | Every farm has a homestead and stock yards | **No homestead.** The stock yards stay, as the place bought cattle arrive |
+| 5.13 Yard work | Marking, weaning, preg testing, drafting and loading happen at the yards | **Done where the mob is**, from a button on the mob. Stock never have to come to the yards |
+| 5.13 Gates and routes | Three kinds of gate. Stock move along a route through gates. A long walk costs the day's gain | Dropped for now |
+| 5.13 Feed | Stock on hand in a shed, silo or feed bin. A lick run or feed run is a job | **Fast Farm:** a supplement is switched on at a daily price, with no daylight cost. **Daily Farm:** stock on hand in a feeder or as a lick block with a capacity, and filling it is a job. No feeder has to be bought |
+| 5.13 Buildings the player can add | Sheds, silos, feed bins, extra yards, a feedlot | None for now |
+| 5.7 Things to check | A chip on the map | A banner and the mob card say what needs doing, as facts, each with its button |
+| 21, row 4 Travel time | Included, at 25 km/h, behind a setting | Taken out. There is no setting |
+| 5.3 Skips | Jobs in progress keep going during a skip | Reversed with jobs in progress: there are none, so nothing carries on through a skip |
+| 5.11 and 21, row 34 Contractor teams | Teams that "keep going day after day" | Stage 2, and **not decided by this change.** Question for Claudia: is a contractor's run the one kind of job that carries on from day to day? |
+| 21, rows 16, 17, 18, 20, 34 | Gate types, walking with dogs, yard work at the yards, building costs, fences longer than a day | Follow the rows above. Row 34 is now: the part of a line that fits is built and the rest is drawn again another day |
+
+For the game screens milestone: an information panel that explains how the day works, and onboarding and a tour, with help available at any time.
+
 ## 2. Decisions so far
 
 | Date | Decision |

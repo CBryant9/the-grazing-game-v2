@@ -22,7 +22,7 @@ import { createFarm } from '../sim/create';
 import { seasonsOf, surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmMob, type FarmState } from '../sim/state';
 import { stepDay } from '../sim/tick';
-import { applyAction } from './apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from './types';
 
 /*
@@ -417,7 +417,7 @@ describe('harvest', () => {
           ? { seasonF: 0.5, monthF: 0.5, label: 'Drought' }
           : { seasonF: 1.35, monthF: 1.35, label: 'Wet' },
     };
-    const out = applyAction(farm, { type: 'harvest', field }, { seasons });
+    const out = applyInstantly(farm, { type: 'harvest', field }, { seasons });
     if (!out.ok) throw new Error(out.message);
     const e = out.events[0]!;
     if (e.type !== 'harvested') throw new Error('expected a harvest');

@@ -104,8 +104,8 @@ describe.each(names)('fixture %s through the renderer', (name) => {
     for (const [key, list] of Object.entries(view.squares)) {
       expect(list.length, key).toBe(FARM_GRID_N);
     }
-    // A homestead and yards, and nothing that is a saleyard or a feedlot.
-    expect(view.buildings.map((b) => b.kind).sort()).toEqual(['homestead', 'yards']);
+    // The yards only (no homestead), and nothing that is a saleyard or a feedlot.
+    expect(view.buildings.map((b) => b.kind).sort()).toEqual(['yards']);
   });
 
   it('paddock labels are the neutral four', () => {

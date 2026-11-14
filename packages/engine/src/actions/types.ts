@@ -75,7 +75,9 @@ export type Action =
   /** Sell a portable trough back for half its price. */
   | { type: 'removePortable'; port: number }
   // ---- Crops and pastures
+  /** Sow. It costs money, happens at once and takes none of the player's day. */
   | { type: 'sow'; species: SpeciesId; cells: number[] }
+  /** Harvest, the same way. */
   | { type: 'harvest'; field: number };
 
 export type ActionType = Action['type'];
@@ -95,7 +97,11 @@ export type ActionRefusalReason =
   | 'nothing-to-move'
   | 'already-there'
   | 'no-calves-to-wean'
-  | 'nothing-to-mark';
+  | 'nothing-to-mark'
+  /** Today's light is used up. No more jobs can start until tomorrow. */
+  | 'no-daylight'
+  /** There is light left, but not enough for this job, or for the first piece of this line. */
+  | 'not-enough-daylight';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {
@@ -111,6 +117,93 @@ export interface ActionDone {
   farm: FarmState;
   /** What happened, in order: the action's own events, and any mobs that joined or split because of it. */
   events: FarmEvent[];
+  /**
+   * The time and money the job took, as the job card showed it. Left out
+   * for an action done without the farm clock (calibration and tests).
+   */
+  job?: JobCard;
 }
+
+/** One part of a job's work, for the job card. */
+export interface JobWorkPart {
+  /** What the time is for. The screens write the words. */
+  what:
+    | 'build'
+    | 'pull-down'
+    | 'gate'
+    | 'trough'
+    | 'portable-trough'
+    | 'pipe'
+    | 'muster'
+    | 'settle'
+    | 'head'
+    | 'feed-out'
+    /** Drafting and loading, done where the mob is. */
+    | 'draft-and-load';
+  minutes: number;
+}
+
+/** One piece of a line: a fence segment or a square of pipe. */
+export type JobPiece = { edge: { line: 'h' | 'v'; index: number } } | { cell: number };
+
+/**
+ * What a job takes: the figures on the job card (PRD 5.1). `previewAction`
+ * gives it before the job, and `applyAction` gives the same figures back
+ * when the job is done. Times of day are minutes after midnight on the
+ * district town's clock. Lengths of time are minutes. A job's time is its
+ * work: there is no driving.
+ */
+export interface JobCard {
+  action: ActionType;
+  /**
+   * `done`: all of it is done today. `part`: a line too long for today:
+   * the pieces that fit are built and the rest are not. `free`: it takes
+   * none of the day.
+   */
+  outcome: 'done' | 'part' | 'free';
+  /** When the job starts and when it finishes. */
+  startsAt: number;
+  endsAt: number;
+  /** Minutes of today's light the job uses. */
+  workMin: number;
+  /** Today's light, how much was used before the job, and how much is left after it. */
+  dayMin: number;
+  usedBeforeMin: number;
+  leftAfterMin: number;
+  /** True if all of it is done today. */
+  fitsToday: boolean;
+  /**
+   * True if this job uses up the rest of today's light: it finishes with
+   * none to spare, or it is a line cut short (what is left is less than
+   * its next piece needs). The screen says "this would use up your full
+   * day".
+   */
+  usesRestOfDay: boolean;
+  /** The work in the whole job as it was asked for, at today's pace. More than `workMin` for a line cut short. */
+  totalWorkMin: number;
+  /** How the work is made up. */
+  parts: JobWorkPart[];
+  /** Dollars for the whole job as it was asked for. Negative for money in. */
+  cost: number;
+  /** Dollars charged today: for a line cut short, the part that was built. */
+  costToday: number;
+  /**
+   * Fence, tape and pipe: the pieces that fit today, in the order drawn,
+   * and the pieces that do not, with the metres of each. A screen draws
+   * the first in the line's own colour and the rest in red.
+   */
+  line?: {
+    fits: { pieces: JobPiece[]; metres: number };
+    doesNotFit: { pieces: JobPiece[]; metres: number };
+  };
+  /**
+   * For a line cut short: the reason the rest was not built, in plain
+   * words. It is not remembered. The player draws it again another day.
+   */
+  notToday?: { reason: 'not-enough-daylight'; message: string };
+}
+
+/** What `previewAction` returns: the job card, or why the job can't be done. Nothing changes. */
+export type JobPreview = { ok: true; card: JobCard } | ActionRefusal;
 
 export type ActionResult = ActionDone | ActionRefusal;

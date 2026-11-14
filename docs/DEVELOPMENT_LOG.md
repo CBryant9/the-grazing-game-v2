@@ -567,6 +567,99 @@ After the realism check (same milestone, before the push):
 - More questions for Claudia, all written up in CALIBRATION.md (real years, CHECK 8 to 10) and DATA.md: how a farm's data version should work once Daily Farm fetches data every day; which quarter "today's dollars" should be; whether a farm starting in 1997 can pay its way; and how the 1 July "new season" message should read on a real-year farm, where it reports the 12 months just gone.
 - Known gap, older than this change: the lint rule that keeps the engine out of browser code covers `apps/web/components` and `packages/render`, not `apps/web/app`. Nothing in `apps/web` imports the engine today. It is closed properly in milestone 3.2, when the browser build is tested to hold no engine.
 
+### 14 Nov 2026: milestone 1.5a, the clock
+
+Engine 0.7.0, save format 4. Engine work only, no screens. Branch `m1.5a-the-clock`, on top of `m1.4c-real-years-wiring`. The first part of milestone 1.5 ("The working day").
+
+This entry describes the milestone as it ended. It was built once with driving, a homestead, contractor bookings and jobs that carried over from day to day, reviewed, and then made much simpler on Claudia's decisions of 14 Nov 2026 (REQUIREMENTS.md, "14 Nov 2026: the working day made simpler"). What changed on the way is under "After the review" below.
+
+Built, all in `packages/engine`:
+
+- **The farm clock** (`sim/clock.ts`). Every day runs from first light to last light for the district town, on the date the game reports (the real date on a real-year farm). The farm keeps today's first and last light and the light used. Looking never moves it. With the light used up no job starts, and the refusal says so.
+- **Job times** (`data/jobTimes.ts`): one table of the figures in PRD 5.4 that are still in the game, each marked Decided, Proposed or Builder in the code and in DATA.md. A job's time is its work only.
+- **One path for the job card and the job** (`day/act.ts`, `day/spec.ts`). `previewAction` gives the card and `applyAction` does the job. Both run the same function, so they can't disagree.
+- **What fits today.** A job done in one go is done if it fits in the light left and refused if it does not, with how long it takes. A line of fence, tape or pipe is built as far as its whole pieces fit, in the order drawn, and charged for that much. The card gives the pieces that fit and the pieces that do not, the reason "You don't have enough time to do this today", and a flag when the job uses up the rest of the day. Nothing carries over.
+- **Buying, sowing and harvest** take none of the day and happen at once.
+- **Next day and skips** (`day/days.ts`): `endDay`, and `skipDays` for a week, a month, a year or a number of days. A skip stops for everything the MVP stopped its clock for. Both return a summary of facts.
+- **Things to do** (`day/look.ts`, `thingsToDo`): a read-only list for the banner and the mob card. A mob with no water, a portable trough low or empty, calves to mark, a crop ready, a fence down. Weaning is not listed: the model weans a drop by itself when it is due. Each is a fact with the mob or the place and a count, and names the action that deals with it.
+- **Evening** (`clockView`): says when the light is used up, and when less is left than the shortest job needs, so a screen can dim the farm and light up Next day.
+- **The time of day** is on every job in the action log, on a `job-worked` event, on a mob's arrival and on each inbox message from a job.
+- **The instant path** for the calibration suites and the MVP comparisons: `applyInstant`, not exported, reached only by test support.
+- **The homestead is gone. The stock yards stay**, where they were.
+- **Saves:** format 4. Older saves load.
+
+What was not changed: no grass, cattle, crop or price formula or figure. The daily tick has one new last step (the clock goes back to first light). How a mob grazes is untouched. The figure for the age at which the model notes calves for marking (60 days) was given a name so the things-to-do list reads the same figure. Its value is the same.
+
+After the review (14 Nov 2026):
+
+- The review of the first cut found four defects: a card that showed all of a job's work done on a job that had not taken effect; driving inside a line under-charged; a contractor booked inside the sowing window arriving outside it; and the instant path reachable through the public `applyAction`. Each was fixed with a test that failed first (LESSONS D7, D8, D10, D11).
+- Claudia then took out driving and the drive home, the homestead, contractor bookings, routes through gates and jobs in progress. The first three defects went with them. The fourth fix stands.
+- **Taking the homestead out moved nothing else.** The yards were placed two to five squares from the homestead, from their own random stream. The homestead's square is still drawn, and thrown away, so the yards of every farm stand where they did. Checked on 480 farms against the generator as it was (yards, fences, water, pasture and soil all equal), and three yards squares from before are pinned in a test.
+- Marking's time counts every calf at foot (it counted bull calves only).
+- "Looking is free" is tested against every function the index exports that takes a farm, not a list picked by hand.
+- A real-year farm saved in format 2 loads, gets its real date's light, and carries on.
+
+After the second review:
+
+1. `startDay` is no longer exported from the engine index. It resets the day's used light, so a caller could have switched the daylight limit off. A test checks the index leaves out `startDay`, `applyInstant`, `tryAction` and `recordAction`, and the lint guard now names all three of the last. `day/act.ts`, which puts them behind the clock, has the one exception.
+2. The `calves-to-wean` item is gone from things to do. It listed calves from 90 days, the youngest the model allows, so it showed for months. The model weans a drop by itself at about 280 days.
+3. `calves-to-mark` shows only when there are bull calves of 60 days or more. Young bulls stay on the item as a number for information and no longer make it show.
+4. Marking, weaning and selling have no muster. A 4,000 ha paddock made each of them take a whole day. Marking is 2 min per calf, weaning 30 min and 0.5 min a head, selling 60 min and 1 min per 10 head.
+5. Switching a supplement on takes none of the day. The 30 minute figure is kept for Daily Farm feeders.
+
+Questions for Claudia from the second review:
+
+- (a) Husbandry now has no mustering time: right?
+- (b) On a 12,000 ha farm one permanent fence segment is about 340 m and takes 68% of a day, so it is one a day, and none once a third of the day is used. On 6,000 ha a day builds 480 m and on 4,000 ha 392 m. Should permanent fence scale with the farm?
+- (c) Things to do does not list a crop to lock up or grain shedding, though the model raises both. Add them?
+- (d) Does a contractor's fence run carry on day after day (Stage 2)?
+
+How it was tested:
+
+- 1,546 tests pass in 70 files: the 1,424 from before the milestone, and 122 new ones in seven files under `packages/engine/src/day/` and in `farm/generate.test.ts`. Type check, lint, format check and the speed test pass (2.65 ms a day with 4,895 head, limit 5).
+- **Calibration and the MVP comparisons are unchanged.** They act through the instant path. The edits to existing tests are: the name of the function they call; the homestead taken out of two generation tests and one rules test; and nothing else.
+- **The clock:** a winter day in Western Victoria (10 h 42 m on 1 June) has less working light than a summer day in Central Queensland (14 h 18 m on 1 December), and the same pipe job gets 30 squares done on the first against 41 on the second. A real-year farm in order from 2025 takes its light from 1 January 1997 on day 365.
+- **Job times:** every figure is written out in a test, and each action's time is checked against figures written in the test.
+- **A long permanent fence:** 1,800 m drawn again each day takes four days at 500, 500, 500 and 300 m, and ends up the same fence, ledger and cost as one built at once. Tape and electric put the same line up in 36 minutes and 1 h 48 m.
+- **A job done in one go:** a move with 21 minutes left fits and the mob moves. With less light than it needs it is refused and nothing changes. Across eight kinds of job and 57 amounts of light, every job that was done had all its work done and every one that was not was refused with the reason.
+- **The card and the job agree** for all 29 kinds of action (34 cases).
+- **Skips** stop for a mob with no water (before and during), a portable trough low (before) and dry (during), a crop ready, the year's end, and game over at the bank and from feed.
+- **Saves:** save, load and carry on after every step of a 14-day run equals running straight through. Saves in format 2 and format 3 load, and a mob in the yards stays there.
+- **Break-it checks:** 60 changes were tried on the final code (change a figure or a rule, run the working-day, save and generation tests, restore it). 59 failed a test at once: all 18 figures in the job times table that an action uses (each failed a test of what the job does, as well as the two tests of the table itself), and 41 rules, among them what fits today, the order a line is built, each thing that stops a skip, the real date, old saves, the yards moving, each item on the things-to-do list at its edge, and the instant switch put back on the public action (the review's fourth defect). One was missed: tape that is down was not on the things-to-do list, because only electric fence was tested. It now has a test and fails. For the review's first three defects the tests were written first and 11 of them failed before the fixes went in. Those defects then left with travel and bookings. The changes were chosen by the builder who wrote the tests, so this is weaker than it sounds: the review found four faults that 53 earlier break-it checks had not.
+
+PRD defaults used (section 21): row 5 (job times in one data file and DATA.md), row 13 (first light to last light), row 14 (electric 1 km an hour, tape 3 km an hour), row 16 (the proper gate's hour). Row 4 (travel) and row 34 (fences longer than a day) are overtaken by Claudia's decisions.
+
+Figures and rules the builder chose are in DATA.md, "Job times": one figure marked Builder (opening or shutting a gate takes none of the day) and 17 rules. The four that matter most are what "500 m a working day" means, whole segments only, a job longer than a day's light, and that the bank must cover the whole line.
+
+Not done, or not verified:
+
+- **No screens.** Nothing here was looked at on a phone.
+- **The `realism-guardian` agent was not run** on this change, and there was no Lighthouse run (no page changed).
+- **A mob's grazing is not split at the time of a move.** The times are recorded.
+- **Buying is still straight into a paddock.** Sale days, and delivery into the yards for the player to move out, are the next part.
+- **Daily Farm:** nothing specific was built.
+- **Farm hands and contractor fencing** are Stage 2.
+- The VISUALS and mockups docs still show a homestead and a "job in progress". They were not touched.
+- First and last light as clock times lean on the machine's time zone database. The minutes of light in a day do not.
+- CALIBRATION.md has no new run: no model formula or figure changed and the suites pass as they were.
+
+Questions for Claudia:
+
+1. **"500 m a working day."** Built: a working day is that day's light, so a whole day on the fence is 500 m in June and in December, and other jobs come off it. Or is it a pace by the hour?
+2. **Whole segments only.** A line is built one map square's side at a time, so on a big farm a day of permanent fence can be one 340 m segment, with the rest of the day's light left for other jobs. Right, or should the last segment be built in part?
+3. **A job longer than a day's light.** Built: a job longer than the day's light can be done at first light, before anything else that day, and takes the whole day. With the muster taken out this only affects a very big mob (weaning 2,000 head is 17 h 10 m). Right?
+4. **The bank** must cover the whole line as drawn, though only today's part is built and paid for. Right?
+5. **Electric fence pace.** PRD 5.4 has single-wire electric at about 1 km an hour (built). The mockup's job card shows 650 m in 4 h 20 m, which is 150 m an hour. Which?
+6. **Taking things out.** The PRD has no times. Built: as long as putting in (a gate 1 h, a trough or hub 3 h, fence at its building pace). Moving a fixed trough: 3 h.
+7. **Opening or shutting a gate** takes none of the day. Right?
+8. **Weaning's "0.5 min per head":** every head in the mob (built), or each calf?
+9. **Marking's "2 min per calf":** every calf at foot (built), or only the bull calves that are marked?
+10. **Selling's "1 min per 10 head":** calves at foot counted (built)?
+11. **Buying takes none of the day** now that there is no trip to the saleyard. Right, until sale days and delivery are built?
+12. **"The line stops drawing when the day is used up" and "the part that fits is built, the rest shows red"** are built as one thing: the engine gives the split and a "uses the rest of the day" flag, and the screen draws the red and says the words. Is that how you meant them?
+13. **A year's skip started part-way through a year stops at the year's end** (the MVP stopped its clock there). A month is 30 days and a year 365. Right?
+14. **Evening** is called when less than 15 minutes of light is left (the shortest job, moving a mob). Right time to dim the farm?
+15. **Things to do** lists five kinds of fact. Should anything else be on the banner (no bull with the cows, a sowing window open, low condition)? They were left off because they are closer to advice than to a job.
 ### 14 Nov 2026: milestone 1.6a, map core
 
 The first half of milestone 1.6: the map itself and the numbers it is drawn from. Branch `m1.6a-map-core`, cut from `m1.4-real-years`. Not wired into `/play`: the game screens are milestone 1.7.
@@ -639,6 +732,7 @@ After the realism check (same milestone, before the push):
 - **Recorded in VISUALS.md:** the builder's decisions that were not marked as such, and a list of what the map does not do yet (the fence tool's map side, clicking a knocked-down fence, the farmer, the phone hint, night contrast, speed on a phone).
 - **For Claudia:** the "Short" label is the same colour as danger.
 - **Joined to the real-years line:** the view now reports the real date and the light for that date on a real-year farm.
+- Joined to the farm clock (1.5a): the homestead is gone from the view and the map, the yards stay, and the view's version is 3.
 
 ## Ideas raised but not built yet
 

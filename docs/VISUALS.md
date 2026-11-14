@@ -184,7 +184,7 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 - **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is red when shut and green when open, drawn large so it reads zoomed out.
 - **Bore:** a windmill about 1.9 squares tall, which is about 7 cow heights. *(The spec above says about 3 times a cow. It is drawn bigger so the bore is easy to find zoomed out.)* **(builder)** A gold ring and "Bore: put a trough or water hub here" until the first trough or hub is built. The fan turns and the ring pulses only when ambient motion is switched on **(builder)**. A paddock label that would sit over the windmill steps to one side.
 - **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, red below.
-- **Homestead and stock yards** are drawn on their squares. The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.** Sheds, silos and feed bins have sprites ready for when the model has them.
+- **The stock yards** are drawn on their square (no homestead: REQUIREMENTS, 14 Nov 2026). The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.**
 
 ### Layers, light and weather
 

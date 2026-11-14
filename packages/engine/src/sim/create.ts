@@ -25,6 +25,7 @@ import type { GrowthFactorSource } from '../season/factors';
 import { planRealYears, type YearOrder } from '../season/realYears';
 import { weatherSeasons } from '../season/weatherSeasons';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
+import { startDay } from './clock';
 import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
 import type { FarmStarted, StartHerd } from './events';
 import { mergeShared, newMob } from './mobs';
@@ -32,6 +33,7 @@ import {
   PLAY_STREAMS,
   emptyLedger,
   toInbox,
+  type FarmClock,
   type FarmState,
   type MarketState,
   type PlayStream,
@@ -255,7 +257,10 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     noFeedDays: 0,
     over: null,
     actionLog: [],
+    // Set below: the clock reads the date from the farm.
+    clock: null as unknown as FarmClock,
   };
+  startDay(farm);
 
   const herd = running ? startHerd(farm, rngStream(o.seed, HERD_STREAM)) : null;
   farm.year = newYear(farm);

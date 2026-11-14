@@ -9,7 +9,7 @@
  */
 
 import type { DistrictId } from '@gg/shared';
-import { applyAction } from '../src/actions/apply';
+import { applyInstantly } from './instant';
 import type { Action } from '../src/actions/types';
 import type { Supplement } from '../src/data/feed';
 import { carryingCapacityAE } from '../src/money/costs';
@@ -48,7 +48,7 @@ export interface RealRun {
 
 /** Do an action that must work. A refusal is a fault in the run. */
 export function mustDo(farm: FarmState, action: Action, env: SourceEnv = {}): FarmState {
-  const done = applyAction(farm, action, env);
+  const done = applyInstantly(farm, action, env);
   if (!done.ok) throw new Error(`The ${action.type} action was refused: ${done.message}`);
   return done.farm;
 }

@@ -7,7 +7,7 @@
 
 import type { DistrictId } from '@gg/shared';
 import { expect } from 'vitest';
-import { applyAction } from '../src/actions/apply';
+import { applyInstantly } from './instant';
 import type { Action, ActionRefusal } from '../src/actions/types';
 import { hEdge, vEdge, type EdgeRef } from '../src/farm/topology';
 import { GRID_W } from '../src/grid';
@@ -61,21 +61,21 @@ export function twoPaddockFarm(
 
 /** Do an action that must succeed. Returns the farm after it. */
 export function act(farm: FarmState, action: Action): FarmState {
-  const done = applyAction(farm, action);
+  const done = applyInstantly(farm, action);
   if (!done.ok) throw new Error(`${action.type} was refused (${done.reason}): ${done.message}`);
   return done.farm;
 }
 
 /** Do an action that must succeed. Returns the farm after it and the events. */
 export function actWith(farm: FarmState, action: Action): { farm: FarmState; events: FarmEvent[] } {
-  const done = applyAction(farm, action);
+  const done = applyInstantly(farm, action);
   if (!done.ok) throw new Error(`${action.type} was refused (${done.reason}): ${done.message}`);
   return { farm: done.farm, events: done.events };
 }
 
 /** Do an action that must be refused. Returns the refusal. */
 export function refused(farm: FarmState, action: Action): ActionRefusal {
-  const done = applyAction(farm, action);
+  const done = applyInstantly(farm, action);
   if (done.ok) throw new Error(`${action.type} should have been refused`);
   expect(done.message.length).toBeGreaterThan(10);
   return done;

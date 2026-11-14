@@ -17,7 +17,7 @@ import type { DistrictId, PaddockLabelId } from './index';
  * The version of the view's shape. It goes up whenever a field is added,
  * removed or changes meaning, so a browser holding an old map can tell.
  */
-export const FARM_VIEW_VERSION = 2;
+export const FARM_VIEW_VERSION = 3;
 
 /** Every farm is this many squares, whatever its size in hectares. */
 export const FARM_GRID_W = 40;
@@ -148,8 +148,11 @@ export interface FarmViewWater {
   hubs: number[];
 }
 
-/** Buildings. Sheds, silos and feed bins arrive in a later milestone. */
-export type ViewBuildingKind = 'homestead' | 'yards' | 'shed' | 'silo' | 'feedBin';
+/**
+ * The stock yards, where bought cattle arrive. There is no homestead and there
+ * are no other buildings for now (REQUIREMENTS, 14 Nov 2026).
+ */
+export type ViewBuildingKind = 'yards';
 
 export interface FarmViewBuilding {
   kind: ViewBuildingKind;
@@ -330,7 +333,7 @@ export interface FarmView {
   water: FarmViewWater;
   /** Squares with a tree. The model has no trees yet, so this is empty. */
   trees: number[];
-  /** The homestead, the stock yards and anything else built. */
+  /** The stock yards, where bought cattle arrive. There is no homestead and there are no other buildings for now (REQUIREMENTS, 14 Nov 2026). */
   buildings: FarmViewBuilding[];
   paddocks: FarmViewPaddock[];
   areas: FarmViewArea[];

@@ -18,7 +18,7 @@ import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
 import { surveyOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
-import { applyAction } from './apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from './types';
 
 /*
@@ -591,7 +591,7 @@ describe('the overdraft is enforced', () => {
     ];
     for (const [job, cost] of jobs) {
       const exact = withRoom(ready, cost);
-      const done = applyAction(exact, job);
+      const done = applyInstantly(exact, job);
       expect(done.ok, `${job.type} with exactly ${cost}`).toBe(true);
       if (done.ok) expect(done.farm.cash, job.type).toBe(exact.overdraft);
       const short = withRoom(ready, cost - 0.01);
@@ -620,11 +620,11 @@ describe('the action log and the inbox', () => {
     expect((farm.actionLog[0]!.action as { edges: EdgeRef[] }).edges).toEqual(kept);
     asked.push(...kept);
     refused(farm, { type: 'placeGate', edge: hEdge(13, 20) });
-    expect(applyAction(farm, { type: 'dance' } as unknown as Action)).toMatchObject({
+    expect(applyInstantly(farm, { type: 'dance' } as unknown as Action)).toMatchObject({
       ok: false,
       reason: 'bad-request',
     });
-    expect(applyAction(farm, null as unknown as Action)).toMatchObject({ ok: false });
+    expect(applyInstantly(farm, null as unknown as Action)).toMatchObject({ ok: false });
     farm = act(farm, jobs[1]!);
     farm = cloneFarm(farm);
     farm.day = 7;

@@ -542,7 +542,7 @@ export {
   farmView,
 } from './sim/view';
 
-export { MAX_BUY, applyAction } from './actions/apply';
+export { MAX_BUY } from './actions/apply';
 export type { ActionEnv } from './actions/apply';
 export type {
   Action,
@@ -557,3 +557,25 @@ export type {
 
 export { farmHash, fromBase64, loadFarm, saveFarm, toBase64 } from './save/save';
 export type { SavedFarm } from './save/save';
+
+// Milestone 1.5a: the working day (the farm clock, job times, Next day and
+// skips, what needs doing).
+export { JOB_TIMES, SKIP_DAYS, metresPerMinute } from './data/jobTimes';
+export type { FigureStatus, JobFigure, Pace, SkipLength } from './data/jobTimes';
+export { dayMinutes, lightLeft, lightOn, timeNow } from './sim/clock';
+export type { ClockSpan, FarmClock } from './sim/state';
+export type { WorkEvent } from './sim/events';
+export type { JobCard, JobPiece, JobPreview, JobWorkPart } from './actions/types';
+export { NOT_TODAY, applyAction, previewAction } from './day/act';
+export { TROUGH_LOW_DAYS, endDay, skipDays, stopsIn, waterCheck } from './day/days';
+export type {
+  Change,
+  DayEnd,
+  DayEnv,
+  PeriodSummary,
+  SkipOptions,
+  SkipResult,
+  SkipStop,
+} from './day/days';
+export { SHORTEST_JOB_MIN, clockView, jobsToday, thingsToDo } from './day/look';
+export type { ClockView, ThingToDo } from './day/look';

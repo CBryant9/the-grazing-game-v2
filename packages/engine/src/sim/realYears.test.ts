@@ -1,6 +1,6 @@
 import { DISTRICT_IDS } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyAction } from '../actions/apply';
+import { applyInstantly } from '../../test-support/instant';
 import type { Action } from '../actions/types';
 import { dateAt, type CalendarDate } from '../calendar';
 import { generateFarm } from '../farm/generate';
@@ -25,7 +25,7 @@ import { stepDay, type DayResult } from './tick';
 /*
  * A farm that plays real years, through the engine's own wiring
  * (docs/MODEL.md, section 1A): made by createFarm, stepped by stepDay,
- * acted on by applyAction, with the real data handed in as `env.data`.
+ * acted on by applyInstantly, with the real data handed in as `env.data`.
  */
 
 vi.setConfig({ testTimeout: 600_000 });
@@ -538,10 +538,10 @@ describe('a real-year farm without its data', () => {
       { type: 'wean', mob },
     ];
     for (const job of jobs) {
-      expect(() => applyAction(farm, job), job.type).toThrow(NEEDS);
-      expect(() => applyAction(farm, job, { seasons: averageYear }), job.type).toThrow(NEEDS);
+      expect(() => applyInstantly(farm, job), job.type).toThrow(NEEDS);
+      expect(() => applyInstantly(farm, job, { seasons: averageYear }), job.type).toThrow(NEEDS);
     }
-    expect(applyAction(farm, jobs[0]!, env).ok).toBe(true);
+    expect(applyInstantly(farm, jobs[0]!, env).ok).toBe(true);
     expect(farmHash(farm)).toBe(hash);
   });
 
@@ -573,7 +573,9 @@ describe('a real-year farm without its data', () => {
     const OTHER =
       /started on real data version [0-9a-f]{16}\. The data given is version [0-9a-f]{16}/;
     expect(() => stepDay(farm, { data: changed })).toThrow(OTHER);
-    expect(() => applyAction(farm, { type: 'markCalves', mob }, { data: changed })).toThrow(OTHER);
+    expect(() => applyInstantly(farm, { type: 'markCalves', mob }, { data: changed })).toThrow(
+      OTHER,
+    );
     expect(() => farmTotals(farm, { data: changed })).toThrow(OTHER);
     expect(farmHash(farm)).toBe(hash);
     // A farm made on the changed data runs on it, and not on the first.
@@ -628,7 +630,7 @@ describe('save, load and carry on, on a real-year farm', () => {
       for (let d = 0; d < 480 && !farm.over; d++) {
         for (const [day, job] of jobs) {
           if (day !== d) continue;
-          const out = applyAction(farm, job, env);
+          const out = applyInstantly(farm, job, env);
           if (out.ok) farm = out.farm;
         }
         stepDay(farm, env);
@@ -684,7 +686,7 @@ describe('save, load and carry on, on a real-year farm', () => {
   it('a copy made by an action carries on the same as a farm loaded from a save', () => {
     let farm = real({ startType: 'running', start: { year: 2016, month: 2 } });
     run(farm, 30);
-    const out = applyAction(farm, { type: 'sellClass', cls: 'cow', qty: 2 }, env);
+    const out = applyInstantly(farm, { type: 'sellClass', cls: 'cow', qty: 2 }, env);
     if (!out.ok) throw new Error(out.message);
     farm = out.farm;
     const loaded = viaJson(farm);

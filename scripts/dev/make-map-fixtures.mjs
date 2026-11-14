@@ -69,11 +69,28 @@ const PLENTY = { cash: 5e7, overdraft: -5e7, broke: -1e9 };
 const W = 40;
 const cellAt = (x, y) => y * W + x;
 
-/** Do an action that must work. */
+/**
+ * Do an action that must work. Each action starts on a fresh working day, so
+ * building a whole farm in one go is not held up by the light. The day count
+ * and the grass are not touched. A line of fence or pipe that the day's light
+ * cuts short is asked for again until all of it is built, so the farm is the
+ * one that was drawn, not a part of it.
+ */
 function act(farm, action) {
-  const done = applyAction(farm, action);
-  if (!done.ok) throw new Error(`${action.type} was refused (${done.reason}): ${done.message}`);
-  return done.farm;
+  const lines = action.type === 'buildFence' || action.type === 'layPipe';
+  for (let again = 0; again < 30; again++) {
+    if (farm.clock) farm.clock.used = 0;
+    const done = applyAction(farm, action);
+    if (!done.ok) {
+      if (again > 0) break; // nothing left to build
+      throw new Error(`${action.type} was refused (${done.reason}): ${done.message}`);
+    }
+    if (done.farm.clock) done.farm.clock.used = 0;
+    const grew = lines && JSON.stringify(done.farm.layout) !== JSON.stringify(farm.layout);
+    farm = done.farm;
+    if (!grew) break;
+  }
+  return farm;
 }
 
 function run(farm, days, env) {
@@ -124,7 +141,7 @@ const FIXTURES = [
   {
     name: 'cq-small-scratch',
     title: 'Central Queensland, small, from scratch',
-    note: 'Day 1. The boundary, the bore, the homestead and the yards. No cattle.',
+    note: 'Day 1. The boundary, the bore and the yards. No cattle.',
     build: () =>
       make({
         seed: 14,

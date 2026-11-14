@@ -16,7 +16,7 @@ One simulated day runs in this order (`stepDay`):
 10. End-of-year score
 11. Game-over checks
 
-The rebuild's tick follows this order exactly. The detail of each step as built, and what the whole farm adds around the formulas, is in section 8.
+The rebuild's tick follows this order exactly, and then puts the farm clock back to first light for the new day. The detail of each step as built, and what the whole farm adds around the formulas, is in section 8. What the player does between two ticks, and how long it takes, is the working day: section 9.
 
 ## 1. Pasture, per square
 
@@ -492,16 +492,15 @@ The rebuild's code is in `packages/engine/src/farm/`. Paddock ids, grazing area 
 - **Strays.** The MVP decided which side of a new fence each beast was on from where it was drawn. The rebuild does not. A change to the fences reports which grazing areas were split, and into which new areas, and which were joined. The mob is shared out by a seeded rule (section 8, "A fence through a mob").
 - **Money is left out of these rules.** Each job reports what was built or removed (segments, metres, gates, troughs, tape off the roll and tape bought) and the caller applies the costs. The energiser is charged for electric fence only.
 
-### The homestead and stock yards (new in the rebuild, PRD 5.13)
+### The stock yards (new in the rebuild, PRD 5.13, changed 14 Nov 2026)
 
-Every farm gets a homestead and a set of stock yards when it is generated. Each is one square.
+Every farm gets a set of stock yards when it is generated, on one square. They are where bought cattle will arrive, for the player to move out to a paddock. Stock never have to come to the yards for marking, weaning or selling: that is done where the mob is (section 9).
 
-- The homestead is on a square that touches the boundary.
-- The yards are within two squares of the boundary, and two to five squares from the homestead (counting diagonals as one).
-- Both are at least three squares from the bore and never on a square with a trough.
+- The yards are within two squares of the boundary.
+- They are at least three squares from the bore and never on a square with a trough.
 - They are drawn from their own random stream (`gen:buildings`) after the fences and water are laid, so they never change the rest of the farm for a seed.
 
-Buildings, travel from the homestead and yard work come in milestone 1.5.
+**There is no homestead** (Claudia, 14 Nov 2026). The first version placed a homestead on the boundary and the yards two to five squares from it. The homestead's square is still drawn from the stream and used to place the yards, then thrown away, so the yards of every farm stand exactly where they did. Checked on 480 farms against the generator as it was, and pinned in `farm/generate.test.ts`.
 
 ### The farm at the start (rebuild)
 
@@ -541,7 +540,7 @@ The code is in `packages/engine/src`: `sim/` (the farm's state, making a farm, t
 
 ### The farm in one object
 
-`FarmState` holds everything a farm is, as plain data and typed arrays: the seed, district, start date and day; cash, the overdraft and the bank's limit; the pasture, crops, fences and water; the homestead and yards; every mob with its cattle; the id counters; the market; the saved state of each random stream; the year's totals and the years finished; the ledger of infrastructure spending; the inbox; the days-eaten-out count; whether the game is over; and every action taken, in order. Paddocks, grazing areas, watered squares and the distance to water are worked out from it when needed and never stored.
+`FarmState` holds everything a farm is, as plain data and typed arrays: the seed, district, start date and day; cash, the overdraft and the bank's limit; the pasture, crops, fences and water; the stock yards; every mob with its cattle; the id counters; the market; the saved state of each random stream; the year's totals and the years finished; the ledger of infrastructure spending; the inbox; the days-eaten-out count; whether the game is over; and every action taken, in order. Paddocks, grazing areas, watered squares and the distance to water are worked out from it when needed and never stored.
 
 A mob is in one of three places: on pasture (it holds one square of its grazing area, its "anchor"), in the feedlot, or in the stock yards.
 
@@ -559,6 +558,8 @@ A mob is in one of three places: on pasture (it holds one square of its grazing 
 9. **The day counter goes up, then the market moves** to the new day. Mobs with no cattle left are dropped.
 10. **The year closes.** On a farm with random seasons that is every 365 farm days (not on a calendar date, and leap years make no difference). On a real-year farm it is when the game year ends, 365 or 366 days after it opened, so each scored year is one real year (section 1A, "The calendar on a real-year farm"). The year is scored and filed, and a new one opens at the farm's net worth.
 11. **Game over** if cash is at or past the bank's limit. Otherwise, if there are cattle on pasture, the feed cattle can reach is averaged over every square of the farm: `max(0, G + D − 250)`. Under 40 kg DM/ha counts as eaten out. A warning event goes out on the first day, and after 10 days in a row the game is over. Cattle in the feedlot don't count, and the count starts again on any day the farm is not eaten out or has no cattle on pasture.
+
+12. **The farm clock goes back to first light** for the new day (section 9).
 
 Once the game is over the tick does nothing and every action is refused.
 
@@ -620,7 +621,7 @@ in today's dollars: every price × CPI(September quarter 2026) ÷ CPI(the real d
 - With years at random, or in order after the newest year, the market on the first day of a game year is another real year's market, so prices step between the last day of one game year and the first of the next. The step is in neither year's score (section 1A, "A real year is scored on its own prices"), but the player's stock is worth more or less overnight.
 - Cattle only. The sheep tables are not read yet.
 
-**Sale days** (`market/saleCalendar.ts`). A real-year farm can ask whether its district yard holds a cattle sale on a farm day, of what type, and when the next one is (`saleDayOn`, `nextSaleDay`). Past years use the days the yard really sold, with a weekly stand-in for the stretches MLA has nothing for (DATA.md, "Sale calendars"). Nothing uses the calendar yet: buying and selling are still instant. Booking stock onto a sale, and delivery, are milestone 1.5.
+**Sale days** (`market/saleCalendar.ts`). A real-year farm can ask whether its district yard holds a cattle sale on a farm day, of what type, and when the next one is (`saleDayOn`, `nextSaleDay`). Past years use the days the yard really sold, with a weekly stand-in for the stretches MLA has nothing for (DATA.md, "Sale calendars"). Nothing uses the calendar yet: buying and selling are not tied to sale days. Booking stock onto a sale, and delivery into the stock yards, are the next part of milestone 1.5.
 
 What an animal is worth is the MVP's rule and does not depend on the source: its class price, the condition adjustments, the pregnancy premium, 5% commission and $30 a head.
 
@@ -651,6 +652,8 @@ The MVP counted the improvements a farm came with at full price, and never took 
 
 Everything a player does is an action: a plain record that `applyAction(farm, action)` checks and carries out. It never changes the farm it is given. It returns the farm after the action with the events, or a refusal with a reason code and a plain message and nothing changed. So a server can check every action before it saves. Every action done is added to the farm's action log with its day.
 
+From milestone 1.5a every action is a job on the farm clock: it takes its work off the day's light, and it fits today or it does not (section 9). The rules below say what each action does. They are unchanged, and live in `actions/apply.ts` (`tryAction`), which knows nothing about time. Section 9 says whether a job fits and how much of a line is built.
+
 The actions: buy cattle straight into an area or a mob (an instant buy for tests and calibration; sale days and delivery to the yards come later); sell animals, a group from a mob, or a market class across the farm; move a whole mob or part of one by class and number, into an area or the feedlot; set a supplement; wean; mark calves; build and pull down fence; roll up tape; hang, open, shut and remove a gate; fix a knocked-down fence; lay pipe; place, move and remove a trough; both kinds of water hub; place, move, refill and sell a portable trough; sow; harvest.
 
 Moving cattle onto ground with no water, or onto a crop that is not ready to graze, is allowed. The events say so as data (`no-water`, `crop-risks`), and the screen asks first.
@@ -659,7 +662,7 @@ Rules that were screen code in the MVP are actions here: buying a sowing, removi
 
 ### Stock yards (a stand-in)
 
-Deliveries to the yards and yard work are milestone 1.5. Until then no action puts a mob in the yards. So the engine can carry such a mob, the tick gives it water and lets it graze only the square the yards stand on. This is a placeholder, not a rule Claudia has set.
+Deliveries to the yards are the next part of milestone 1.5. Until then no action puts a mob in the yards. So the engine can carry such a mob, the tick gives it water and lets it graze only the square the yards stand on. The water is Claudia's rule (the yards have water). The grazing is a placeholder.
 
 ### Random streams
 
@@ -667,7 +670,7 @@ Each part draws from its own named stream, and each stream's state is saved with
 
 ### Saves and the farm hash
 
-`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. The save format is 2 from milestone 1.4: a farm's `seasons` and `market` can be a real-year farm's. A format 1 save loads as it is, because nothing was added to a farm with random seasons. `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
+`saveFarm` packs a farm as plain data that survives JSON. The big arrays and the cattle are packed as base64 text, bit for bit, so a farm that is saved, loaded and carried on is exactly the farm that ran straight through. The day's growth on each square is saved too, so a paddock sheet reads the same after a reload. Every save records the save format and the engine version. The save format is 2 from milestone 1.4: a farm's `seasons` and `market` can be a real-year farm's. A format 1 save loads as it is, because nothing was added to a farm with random seasons. The save format is 4 from milestone 1.5a: a farm has a clock, and the homestead is gone (section 9, "Saves"). `loadFarm` fills in defaults for anything an older save does not have, refuses a save from a newer format, and stamps the farm with the current versions.
 
 `farmHash` is 16 hex digits worked from the whole saved form, with keys in order. The same seed and the same actions always give the same hash.
 
@@ -683,3 +686,137 @@ Each part draws from its own named stream, and each stream's state is saved with
 - On a farm with random seasons the year closes every 365 days, so over the years it drifts off the calendar date by a day each leap year. (A real-year farm closes its year when the real year ends.)
 - A harvest goes by the season the last day ran on, so a crop harvested on 1 July before the day runs is scored on the old season.
 - A hungry mob with no tape round it still uses a number from the breakouts stream each day.
+
+## 9. The working day (rebuild, milestone 1.5a)
+
+Every game day runs from first light to last light. Looking is free, doing takes time, and a job fits in today's light or it does not (PRD 5.1 to 5.4, as Claudia simplified them on 14 Nov 2026: REQUIREMENTS.md, "14 Nov 2026: the working day made simpler").
+
+Code: `packages/engine/src/sim/clock.ts`, `data/jobTimes.ts` and `day/` (`spec.ts`, `act.ts`, `days.ts`, `look.ts`). Tests: `day/*.test.ts`. No grass, cattle, crop or price formula was changed. The daily tick is section 8's, with one step added at its end (the clock goes back to first light).
+
+**What is not in the working day, by Claudia's decision.** There is no driving, no drive home and no place on the farm the player has to be. There is no homestead. Stock work is done where the mob is: nothing is walked to the yards. Sowing and harvest happen at once. Moving a mob is "pick the paddock, done": no route through gates and no walking time. Nothing carries over from one day to the next: there are no jobs in progress. The first cut of this milestone had all of those. They were taken out because they made the day's time hard to follow (LESSONS D9).
+
+### The clock
+
+- **First and last light** are civil dawn and dusk for the district town (DATA.md, "District towns, for daylight"), on **the date the game reports**: `dateOn(farm)`, which is the real date on a real-year farm. A farm in order from 2025 reads 1 January 1997 on day 365, and its light is that day's.
+- The farm keeps today's first and last light and the minutes of light used so far (`farm.clock`). Times of day are minutes after midnight on the town's clock, daylight saving included.
+- A day starts with nothing used. The daily tick sets this for the new day as its last step (`startDay`), so it is true however the day was ended.
+- **Looking never moves the clock.** Previews, summaries and every other read leave the farm exactly as it was. Only a job that is done moves it. A job that is refused moves nothing. A test walks every function the engine exports that takes a farm, so a new read can't be missed.
+- **When the light is used up no more jobs can start.** The refusal is `no-daylight`: "It is last light. No more jobs can start today." Less than a millionth of a minute of light counts as none, so rounding can't start a job.
+- Still allowed after last light, because they take none of the day: looking, buying, sowing, harvest, and taking a mob off its supplement.
+
+### How long a job takes
+
+A job's time is its work only. The times are one table, `JOB_TIMES` in `data/jobTimes.ts`, with every figure marked Decided, Proposed or Builder. They are set out in DATA.md, "Job times", with the rules the builder chose and the figures that were taken out. In brief:
+
+```
+permanent fence   metres ÷ (500 ÷ the day's minutes of light)      a whole day builds 500 m
+electric fence    metres ÷ 1,000 m an hour
+tape              metres ÷ 3,000 m an hour, out or rolled up
+pipe              metres ÷ 400 m an hour
+gate 60 min       trough or hub 180 min       portable trough 30 min
+move a mob        15 min for each mob cattle come from + head ÷ 100
+wean              30 min + 0.5 min × head in the mob
+mark              2 min × calves at foot in the mob
+sell              60 min + head loaded ÷ 10
+supplement        none of the day (switched on or off at a daily price)
+muster            none: husbandry is done where the mob is
+taking out        as long as putting in
+buy, sow, harvest none of the day
+```
+
+**"500 m a working day".** The builder's reading: a working day is that day's light. A whole day on the fence builds 500 m in any season, and the fence gets the share of 500 m that it gets of the day.
+
+### Doing a job: one path for the card and the real thing
+
+`applyAction(farm, action, env)` does a job and `previewAction(farm, action, env)` returns its job card. Both run the same function and the preview throws the farm away, so the card can't disagree with what happens. Neither changes the farm it is given.
+
+```
+1. trial = the action tried all at once on a copy, with no clock
+           (every rule, the bank, the cost). A refusal there is the refusal.
+2. spec  = the job's work
+3. with no light left: refused (no-daylight)
+4. by kind:
+   free          done on the spot. The clock does not move.
+   in one go     done if its work fits in the light left. Refused if not.
+   a line        the whole pieces that fit are built. The rest is not.
+```
+
+There are three kinds of job (`day/spec.ts`):
+
+- **Done in one go** (a gate, a trough, a hub, a move, a muster, a sale). If its work fits in the light left, it is done and the clock moves on by the work. If it does not, it is refused with `not-enough-daylight`: "You don't have enough time to do this today. It takes 3 h 0 m and there is 1 h 0 m of light left." Nothing is built, nothing is charged and nothing waits for tomorrow. So a card can never show a job worked that has not taken effect.
+- **A line** (fence, tape, pipe, pulling down, rolling up). A piece is one fence segment or one square of pipe. Only pieces the action would change are work: fence of the same kind, gates and the boundary in the run take no time, and a piece drawn twice is one piece. **The whole pieces that fit in the light left are built, in the order drawn, and charged.** They are built by the same action on just those pieces, so a line drawn again each day until it is done is the same fence, at the same cost, as one built at once. **The rest is not built and not remembered. The player draws it again another day.** If not even one whole piece fits, the line is refused with the reason.
+- **Free** (buying, sowing, harvest, taking a mob off its supplement). Done on the spot, at any time of day. Sowing and harvest are exactly the at-once jobs the crop calibration uses.
+
+**The builder's rule for a job longer than a day** (for Claudia to check). A job done in one go that needs more than a whole day's light, such as mustering 4,000 ha, can be done at first light, before anything else that day, and it uses the whole day. Otherwise it could never be done. Once anything has been done that day it is refused, and the reason says to do it at first light.
+
+**The job card** (`JobCard`) has: when the job starts and finishes, the minutes of light it uses, the day's minutes with what was used before and what is left after (for the daylight bar), whether all of it is done today, the work in the whole job and how it is made up, the cost of the whole job and the cost charged today. For a line it has **the pieces that fit and the pieces that do not, with the metres of each**, so a screen can draw the first in the line's own colour and the rest in red, and for a line cut short the reason in Claudia's words: "You don't have enough time to do this today." `usesRestOfDay` is true when the job leaves no light, or is a line cut short: the screen says "this would use up your full day". REQUIREMENTS has both "the line stops drawing when the day is used up, with a warning that this is the full day" and, from 14 Nov, "the part that fits is built, the rest shows red". They are built as one: the engine gives the split and the flag, and the wording and the red line are the screen's.
+
+### Money
+
+- A line cut short is charged for the pieces that were built, and nothing more is owed.
+- The bank must cover the **whole** line as drawn before any of it is built (a builder's rule): the player sees the whole cost on the card. A shorter line can be drawn in its place.
+- Each job is its own: the $10 for running tape off the roll, or rolling it up, is paid by each tape job. The energiser is bought with the first electric fence built.
+
+### Next day and skips
+
+**Next day** (`endDay`): the daily tick runs (section 8) and the clock goes back to first light. It is exactly the daily tick on a copy of the farm. Nothing is built: there is nothing to carry on.
+
+**A skip** (`skipDays`) runs a week (7 days), a month (30, as in the MVP) or a year (365), or a number of days. It is Next day that many times, and it stops after any day that held a reason to.
+
+**What stops a skip.** Everything the MVP stopped its clock for (its `U.queue = 0` lines and its "Check the water first"):
+
+| Reason | When |
+|---|---|
+| A mob on pasture with no water | Before the first day: nothing runs. The MVP asked before +1 week and +1 month |
+| A portable trough with under 3 days of water at its last day's use | Before the first day: nothing runs |
+| A mob's first day without water | After that day |
+| A portable trough running dry | After that day |
+| A crop ready to harvest | After that day |
+| A year closing | After that day |
+| Game over (the bank, or the farm eaten out for 10 days) | After that day. Nothing runs on a farm that is over |
+
+The two checks before the first day can be passed with `anyway: true`, as the MVP's "Run time anyway". Next day is not checked, as in the MVP. A day's reasons are also given by `endDay`, and `stopsIn` reads them from any day's events. The MVP's seventh stop, a grazing plan whose next paddock has no water, comes with plans.
+
+**The summary** (`PeriodSummary`, from both) states facts: the dates, cash, net worth, head, calves, live weight, feed and green feed per hectare and ground cover before and after; births, deaths by cause, feed grown and eaten, weight gained, money by kind; every mob as it stands; and a count of each kind of event. No praise and no blame.
+
+### What needs doing, and evening
+
+**Things to do** (`thingsToDo(farm)`), for the banner and the mob card. A read-only list of what needs doing now, as plain facts with the mob or the place and a count. It uses only what the model already knows and adds no rule about when something should be done:
+
+| Item | The fact | The model's own rule it reads | The action |
+|---|---|---|---|
+| `no-water` | A mob on ground with no water, its head and its days dry so far | The mob's grazing area has no water point | `moveMob` (the player picks the paddock) |
+| `trough-low`, `trough-empty` | A portable trough under a quarter full, or empty, and the litres left | The trough's own low-water mark (1,500 L) | `refillPortable` |
+| `calves-to-mark` | Unmarked bull calves of 60 days or more (young bulls are counted on the item for information, but do not make it show) | The age at which the model notes calves for marking | `markCalves` |
+| `crop-ready` | A grain crop that has reached maturity, and its hectares | The crop's days to maturity | `harvest` |
+| `fence-down` | A segment of electric fence or tape that is knocked down | The fence code | `fixFence` |
+
+Weaning is not listed, because the model weans a drop by itself when it is due. Weaning earlier is the player's choice, offered on the mob card.
+
+Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, stock, crops, fences. It holds no words, so it can't nag or judge.
+
+**Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then only jobs shorter than that still fit (a few segments of tape, for example), so a screen can dim the farm and light up Next day. `canStartJobs` is false only when no light is left. The farm can still be looked at after dark.
+
+### The time of day on what happens
+
+- Every job done on the clock is in the action log with when it started and finished (`LoggedAction.at`). `jobsToday(farm)` gives today's in order.
+- A `job-worked` event comes first in a job's events: the action, the times, the work, whether all that was asked was done, and for a line the pieces built and not built.
+- A `mob-moved` event carries the time the mob arrived (`at`), and every inbox message from a job carries the time the job finished. So a later part can split a mob's day of grazing at the time it was moved: the share of the day before the move is `(at − first light) ÷ the day's minutes`. **A mob's grazing is not changed in this part**: a mob still grazes where it stands when the tick runs.
+- What the daily tick reports has no time of day.
+
+### The instant path (calibration and tests only)
+
+`applyInstant` (in `actions/apply.ts`) does a whole action at once with no clock: no job time and no daylight limit. It exists because the calibration suites and the MVP comparisons were written before jobs took time, and their figures depend on a farm being set up all at once on day 0. With it they pass with no change to an expected number.
+
+**The public API can't be made instant.** `applyAction` and `previewAction` take an env with no switch for the clock, and ignore one if it is passed anyway. `applyInstant` is not exported from the engine's index. Test support reaches it by importing the engine's own file (`test-support/instant.ts`, `applyInstantly`). Lint forbids engine and server code from importing it, and tests hold all of this: a public call with `instant: true` cast into the env still runs on the clock; the env type has no such field; the function is named in two files only; and nothing outside the engine names it. The tick never reads the clock, so a farm driven this way runs exactly as it did on engine 0.6.0.
+
+### Saves
+
+The clock is part of the farm: saved, loaded and hashed. The save format is 4. A format 1 or 2 save (before the clock) loads at first light. Format 3 was the first cut of this milestone and was never released: such a save loads with the player's place, the travel switches, the jobs in progress and the bookings dropped. From any older save the homestead is dropped and the stock yards are kept, and a mob in the yards stays in the yards. A save made part-way through a day keeps its time of day. Save, load and carry on equals running straight through.
+
+### What it does not do
+
+- Buying is still straight into a paddock. Sale days, and delivery into the stock yards for the player to move out, are the next part.
+- Putting a mob on a supplement still takes 30 minutes. Claudia has said that in Fast Farm it is switched on at a daily price with no daylight cost, and that in Daily Farm feed is stock on hand in a feeder or a lick block. That is a later part.
+- Nothing a mob eats depends on the time of day yet.
+- There are no farm hands and no contractor fencing (Stage 2).

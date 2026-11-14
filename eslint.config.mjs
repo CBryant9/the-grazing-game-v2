@@ -79,6 +79,13 @@ export default tseslint.config(
               group: ['**/server/**'],
               message: 'Engine model code must not import the server-only file readers.',
             },
+            {
+              // The instant path is for calibration and tests only.
+              group: ['**/actions/apply', './apply'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
+              message:
+                'Engine code must not use the instant path. Jobs go through applyAction in day/act.ts, on the farm clock.',
+            },
           ],
         },
       ],
@@ -96,6 +103,12 @@ export default tseslint.config(
             {
               group: ['**/test-support/**'],
               message: 'Engine code must not import test support. Only *.test.ts files may.',
+            },
+            {
+              group: ['**/actions/apply'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
+              message:
+                'Server code must not use the instant path. Jobs go through applyAction, on the farm clock.',
             },
           ],
         },

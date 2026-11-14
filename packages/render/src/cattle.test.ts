@@ -162,7 +162,6 @@ describe('cattle stay inside their grazing area', () => {
     const taken = new Set(p.beasts.map(squareOf));
     expect(taken.has(cell(5, 5))).toBe(false); // trough
     expect(taken.has(cell(2, 2))).toBe(false); // bore
-    expect(taken.has(cell(0, 20))).toBe(false); // homestead
     expect(taken.has(cell(2, 22))).toBe(false); // yards
     // They gather round the trough: its neighbours are taken.
     expect(taken.has(cell(4, 5)) || taken.has(cell(6, 5))).toBe(true);
