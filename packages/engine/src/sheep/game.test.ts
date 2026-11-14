@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyInstantly } from '../../test-support/instant';
 import { heldRun, testMob, testSheep } from '../../test-support/sheep';
-import { across } from '../../test-support/workingDay';
+import { across, toSaleDay, work } from '../../test-support/workingDay';
+import { endDay } from '../day/days';
 import { SHEEP_RATION } from '../data/sheep';
 import { SHEARING_RATE, WOOL_HARVEST, woolPriceCKg } from '../data/sheepMarket';
 import { DSE_PER_AE, MVP_DSE_PER_AE } from '../data/stocking';
@@ -200,7 +201,7 @@ describe('the sheep market', () => {
       to: { cell: anchor(cattle.where) },
     });
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.reason).toBe('sheep-there');
+    if (!bad.ok) expect(bad.reason).toBe('cattle-there');
     void s;
     const cq = createFarm({
       seed: 1,
@@ -221,7 +222,20 @@ describe('the sheep market', () => {
     expect(sheepMarketRead(cq).offered).toBe(false);
   });
 
-  it('sells sheep at the mutton indicator less commission and the head fee', () => {
+  it('on the farm clock, sheep bought on a sale day land in the yards at first light, as cattle do', () => {
+    const farm = toSaleDay(farmWithSheep());
+    const bought = work(farm, { type: 'buySheep', cls: 'merinoWethers', qty: 40, to: { cell: 0 } });
+    expect(bought.events.some((e) => e.type === 'sheep-on-the-way')).toBe(true);
+    expect(bought.farm.sheep!.arrivals!.length).toBe(1);
+    expect(bought.farm.year.sheepBuys).toBeGreaterThan(0);
+    const next = endDay(bought.farm).farm;
+    const yards = sheepMobsOf(next).find((m) => m.where.kind === 'yards');
+    expect(yards).toBeDefined();
+    expect(headOf(yards!.sheep)).toBe(40);
+    expect(next.sheep!.arrivals).toBeUndefined();
+  });
+
+  it('sells sheep at the mutton indicator less commission and the head fee, in the sheep sales line', () => {
     const farm = farmWithSheep();
     const mob = sheepMobsOf(farm)[0]!.id;
     const done = applyInstantly(farm, { type: 'sellSheep', mob, cls: 'wether', qty: 100 });
@@ -231,6 +245,8 @@ describe('the sheep market', () => {
       const got = done.farm.cash - farm.cash;
       expect(got).toBeGreaterThan(100 * 50);
       expect(got).toBeLessThan(100 * 400);
+      expect(done.farm.year.sheepSales).toBeCloseTo(got, 6);
+      expect(done.farm.year.sales).toBe(farm.year.sales);
     }
     expect(applyInstantly(farm, { type: 'sellSheep', mob, cls: 'lamb', qty: 1 }).ok).toBe(false);
   });

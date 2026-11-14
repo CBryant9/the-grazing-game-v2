@@ -166,8 +166,11 @@ export interface YearTotals {
   buys: number;
   /** Dollars spent on supplements and the feedlot (and on feeding sheep). */
   feed: number;
-  /** Dollars from wool sold at shearing. Left out until a farm first sells wool. */
+  /** Dollars from wool sold at shearing, after selling costs. Left out until a farm first sells wool. */
   wool?: number;
+  /** Dollars from sheep sold, after selling costs, and spent buying sheep. Left out until the first. */
+  sheepSales?: number;
+  sheepBuys?: number;
   /** Sheep that died (lambs included). Left out until a farm first has sheep die. */
   sheepDeaths?: number;
   /**

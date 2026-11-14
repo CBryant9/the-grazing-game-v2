@@ -16,7 +16,14 @@ import { saleDayOn, surveyOf, type SourceEnv } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
 import { sheepClassOf } from './energy';
-import { addSheepMob, groupRecord, sheepAreas, sheepMobsOf, type SheepGroupSpec } from './farm';
+import {
+  addSheepMob,
+  ensureSheepState,
+  groupRecord,
+  sheepAreas,
+  sheepMobsOf,
+  type SheepGroupSpec,
+} from './farm';
 import {
   SHEEP_BUY_CLASSES,
   boughtKg,
@@ -122,34 +129,9 @@ export function buySheep(
   }
   const no = notSaleDay(farm, env, clocked);
   if (no) return no;
-  const s = surveyOf(farm);
-  const areaId = s.topology.areaOf[a.to?.cell ?? -1];
-  if (areaId === undefined || areaId < 0)
-    return refuse('bad-request', 'That square is off the farm.');
-  const cattleThere = farm.mobs.some(
-    (m) =>
-      m.where.kind === 'paddock' &&
-      m.animals.length &&
-      s.topology.areaOf[m.where.anchor] === areaId,
-  );
-  if (cattleThere) {
-    return refuse(
-      'sheep-there',
-      'Cattle are grazing there. Cattle and sheep run in separate paddocks.',
-    );
-  }
   const c: SheepBuyClass = SHEEP_BUY_CLASSES[a.cls as SheepBuyClassId];
   const each = sheepBuyPrice(a.cls as SheepBuyClassId) + SHEEP_TRADE.headFee;
   const total = each * a.qty;
-  if (!spend(farm, total)) {
-    return refuse('bank-limit', "The bank won't lend that much for sheep.");
-  }
-  // Into the sheep already there, or a new mob.
-  const there = sheepAreas(farm, s).has(areaId)
-    ? sheepMobsOf(farm).find(
-        (m) => m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor] === areaId,
-      )
-    : undefined;
   const cls =
     c.sex === 'M'
       ? 'ram'
@@ -160,11 +142,38 @@ export function buySheep(
           : c.age < 730
             ? 'hogget'
             : 'ewe';
-  const spec = {
-    cell: a.to.cell,
-    breed: c.breed,
-    groups: [{ cls, head: a.qty, sex: c.sex, ageDays: c.age, wt: boughtKg(c) }] as [SheepGroupSpec],
-  };
+  const group: SheepGroupSpec = { cls, head: a.qty, sex: c.sex, ageDays: c.age, wt: boughtKg(c) };
+  if (clocked) {
+    // On the farm clock: paid for now, in the stock yards at first light tomorrow, as cattle are.
+    if (!spend(farm, total)) return refuse('bank-limit', "The bank won't lend that much for sheep.");
+    farm.year.sheepBuys = (farm.year.sheepBuys ?? 0) + total;
+    const state = ensureSheepState(farm);
+    const x = groupRecord(farm.animalIds, c.breed, srwOf(c.breed), group);
+    x.paid = each;
+    x.cost = each;
+    (state.arrivals ??= []).push({ arriveDay: farm.day + 1, cls: a.cls, total, sheep: [x] });
+    events.push({ type: 'sheep-on-the-way', cls: a.cls, qty: a.qty, total, arriveDay: farm.day + 1 });
+    return null;
+  }
+  const s = surveyOf(farm);
+  const areaId = s.topology.areaOf[a.to?.cell ?? -1];
+  if (areaId === undefined || areaId < 0) return refuse('bad-request', 'That square is off the farm.');
+  const cattleThere = farm.mobs.some(
+    (m) =>
+      m.where.kind === 'paddock' && m.animals.length && s.topology.areaOf[m.where.anchor] === areaId,
+  );
+  if (cattleThere) {
+    return refuse('cattle-there', 'Cattle are grazing there. Cattle and sheep run in separate paddocks.');
+  }
+  if (!spend(farm, total)) return refuse('bank-limit', "The bank won't lend that much for sheep.");
+  farm.year.sheepBuys = (farm.year.sheepBuys ?? 0) + total;
+  // Into the sheep already there, or a new mob.
+  const there = sheepAreas(farm, s).has(areaId)
+    ? sheepMobsOf(farm).find(
+        (m) => m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor] === areaId,
+      )
+    : undefined;
+  const spec = { cell: a.to.cell, breed: c.breed, groups: [group] as [SheepGroupSpec] };
   let mob: SheepMob;
   if (there) {
     const x = groupRecord(farm.animalIds, c.breed, srwOf(c.breed), spec.groups[0]);
@@ -181,7 +190,6 @@ export function buySheep(
     }
     mob = r.mob;
   }
-  farm.year.buys += total;
   events.push({
     type: 'sheep-bought',
     cls: a.cls,
@@ -252,7 +260,7 @@ export function sellSheep(
   const st = farm.sheep!;
   st.mobs = st.mobs.filter((x) => headOf(x.sheep) > 0);
   farm.cash += net;
-  farm.year.sales += net;
+  farm.year.sheepSales = (farm.year.sheepSales ?? 0) + net;
   events.push({
     type: 'sheep-sold',
     mob: m.id,

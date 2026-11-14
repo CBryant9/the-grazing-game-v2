@@ -14,7 +14,6 @@ import { netSaleValue, type Prices } from '../market/prices';
 import { coverPct } from '../pasture/summary';
 import { pricesOf } from '../sim/derived';
 import type { FarmState, InfraLedger, YearRecord, YearScore, YearTotals } from '../sim/state';
-import { DSE_PER_AE } from '../data/stocking';
 import { sheepWorth } from '../sheep/market';
 import { INFRA_WORTH_SHARE, segmentCost } from './costs';
 

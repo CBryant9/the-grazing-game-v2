@@ -464,13 +464,17 @@ export const WOOL = {
 
 /**
  * Fibre diameter, micron, when a sheep grows its reference fleece: Merino
- * wethers and rams 19.0 (NSW bloodlines, S64), Merino ewes 17.0 (males are
- * about 12% coarser, S46), crossbreds 28 (STAND-IN: no crossbred micron was
- * found). The reference fleece, kg clean a year: Merino males 4.2 (S64),
+ * wethers and rams 19.0 (NSW bloodlines, S64); Merino ewes 17.8. Males are 1
+ * to 3 micron coarser (S46; about 12% would put ewes at 17.0, as the first
+ * pass had), but the document says the three districts grow mostly medium
+ * wool, 19 to 21 micron (section 6), and the 17-micron ewes came from a
+ * fine-wool flock (Balmoral, S62). So ewes are set at the coarsest micron
+ * that keeps SB-51's 1-micron gap (third pass, 15 Nov 2026). Crossbreds 28
+ * (STAND-IN: no crossbred micron was found). The reference fleece, kg clean a year: Merino males 4.2 (S64),
  * Merino ewes 4.0 (S62, S63: 3.3 to 4.7), crossbreds 72% of the ewes'.
  */
 export const MICRON = {
-  merino: { F: 17.0, M: 19.0, W: 19.0 },
+  merino: { F: 17.8, M: 19.0, W: 19.0 },
   xb: { F: 28, M: 28, W: 28 },
   refKg: { merinoF: 4.0, merinoM: 4.2, xb: 2.9 },
   /**
@@ -581,7 +585,28 @@ export const BOUGHT = {
  * year benchmarks stock at (a dry ewe is 1.0, late pregnancy 1.3 to 1.5,
  * milking a single 2.2 to 2.5, by the DSE tables S5, S6).
  */
-export const START_FLOCK = { eweYearDse: 1.5 } as const;
+export const START_FLOCK = {
+  eweYearDse: 1.5,
+  /** CS at the start: AWI's target of CS 3 at joining, scanning, lambing (singles) and weaning (S22). */
+  cs: 3,
+  /** Maidens are joined at about 1.5 years (MMFS S25: maiden Merinos joined at 75 to 80% of SRW). */
+  maidenYears: 1.5,
+  /**
+   * Ewes are cast for age at 6 years. STAND-IN: no page read (search
+   * summaries put cast for age at 5 to 6 years).
+   */
+  castForAge: 6,
+  /**
+   * The mean day of the joining a ewe conceives on: DERIVED from the model's
+   * own conception, about 70% on the first heat (mean day 8 of a 17-day
+   * cycle) and the rest 17 days later, so about day 12.
+   */
+  meanConceptionDay: 12,
+  /** Lambs grow 198 g a day to weaning (Kelly 1992, S68: singles 198, twins 193). */
+  lambGrowthKg: 0.198,
+  /** Weaners grow 50 g a day after weaning (MMFS S17: the least to 12 months). */
+  weanerGrowthKg: 0.05,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Fences

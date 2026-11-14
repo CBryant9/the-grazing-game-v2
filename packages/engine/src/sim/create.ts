@@ -29,6 +29,8 @@ import { START_FLOCK, sheepDistrict } from '../data/sheep';
 import { ramsNeeded } from '../sheep/breeding';
 import { addSheepMob, occupiedAreas } from '../sheep/farm';
 import { sheepBuyPrice } from '../sheep/market';
+import { buildStartFlock } from '../sheep/start';
+import { dateAt } from '../calendar';
 import { ENGINE_VERSION, SAVE_FORMAT_VERSION } from '../version';
 import { startDay } from './clock';
 import { placeAnchor, pricesOf, seasonsOf, surveyOf, type SourceEnv } from './derived';
@@ -163,9 +165,9 @@ export interface StartFlock {
 /**
  * Put a running farm's start flock on it (milestone 2.4): self-replacing
  * Merino ewes at the same share of carrying capacity as a start herd
- * (`START_HERD_SHARE`, in DSE at 8.4), `scale` of it on a mixed farm, with
- * rams at 1% + 1, in the biggest area with water that holds no cattle.
- * Returns null if there is none. Draws one number (the share).
+ * (`START_HERD_SHARE`, in DSE at 8.4), `scale` of it on a mixed farm, in
+ * the biggest area with water that holds no cattle, built as it would stand
+ * on the start date (`buildStartFlock`). Returns null if there is none.
  */
 export function startFlock(farm: FarmState, rng: Rng, scale: number): StartFlock | null {
   const share = rng.range(START_HERD_SHARE.lo, START_HERD_SHARE.hi);
@@ -189,8 +191,10 @@ export function startFlock(farm: FarmState, rng: Rng, scale: number): StartFlock
     ],
   });
   if (!r.ok) return null;
+  // The flock as it stands on the start date: ages, pregnancy or lambs, replacements, wool.
+  buildStartFlock(r.mob, ewes, dateAt(farm.start, farm.day), farm.animalIds, rng);
   for (const s of r.mob.sheep) {
-    s.paid = s.sex === 'M' ? sheepBuyPrice('merinoRams') : sheepBuyPrice('merinoEwes');
+    s.paid = !s.weaned ? 0 : s.sex === 'M' ? sheepBuyPrice('merinoRams') : sheepBuyPrice('merinoEwes');
     s.cost = s.paid;
   }
   return { ewes, rams, dse: ewes * START_FLOCK.eweYearDse, share };

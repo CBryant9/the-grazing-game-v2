@@ -160,6 +160,10 @@ export type TickEvent =
   | { type: 'sheep-plan-waiting'; mob: number; mobName: string; why: PlanWaitReason; area: string }
   /** A sheep plan moved its mob on. */
   | { type: 'sheep-plan-moved'; mob: number; mobName: string; from: string; to: string }
+  /** Sheep bought on a sale day, on their way to the yards (they land at first light on `arriveDay`). */
+  | { type: 'sheep-on-the-way'; cls: string; qty: number; total: number; arriveDay: number }
+  /** Sheep bought landed in the stock yards. */
+  | { type: 'sheep-arrived'; cls: string; head: number; cost: number; mob: number; mobName: string }
   /** A sheep mob's feed was set. */
   | { type: 'sheep-feed-set'; mob: number; mobName: string; feed: SheepFeed }
   /** A sheep mob's joining, shearing and crutching days, as they now stand (null: not booked). */

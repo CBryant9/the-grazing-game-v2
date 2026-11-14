@@ -205,6 +205,11 @@ export interface SheepState {
   mobs: SheepMob[];
   /** The sheep's own random streams, saved with the farm, so sheep never shift the cattle's draws. */
   rng: { breeding: RngState; deaths: RngState; flies: RngState; breakouts?: RngState };
+  /**
+   * Sheep bought on a sale day and on their way: they land in the stock
+   * yards at first light on `arriveDay`, as cattle do. Left out when none.
+   */
+  arrivals?: { arriveDay: number; cls: string; total: number; sheep: Sheep[] }[];
 }
 
 /** The random streams the sheep step draws from. */

@@ -408,7 +408,7 @@ export function sheepDay(
   const deaths: SheepDeath[] = [];
   for (let i = 0; i < state.mobs.length; i++) {
     const m = state.mobs[i]!;
-    if (m.where.kind !== 'paddock') continue;
+    if (m.where.kind === 'lot') continue;
     if (sheepWeaningDue(m, day)) {
       const lambs = weanLambs(m);
       const weaned = headOf(lambs);
@@ -458,9 +458,13 @@ export function sheepDay(
       farm.cash -= health;
       farm.year.running += health;
     }
-    const areaId = areaIdOf(survey, m);
+    // Sheep in the stock yards graze the yards' square and have water, as cattle there do.
+    const grazeArea =
+      m.where.kind === 'yards'
+        ? { cells: [farm.buildings.yards], ha: farm.layout.scale.haPerSquare, hasWater: true }
+        : grazingArea(survey, areaIdOf(survey, m));
     const res = simFlock(m, {
-      place: { kind: 'paddock', area: grazingArea(survey, areaId) },
+      place: { kind: 'paddock', area: grazeArea },
       land,
       day,
       date,
