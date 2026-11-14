@@ -13,7 +13,7 @@ export const ADMIN_LINKS = [
   { href: '/admin/settings', label: 'Site settings', later: false },
   { href: '/admin/audit', label: 'Audit log', later: false },
   { href: '/admin/moderation', label: 'Moderation', later: true },
-  { href: '/admin/ads', label: 'Ads and sponsors', later: true },
+  { href: '/admin/ads', label: 'Ads and sponsors', later: false },
   { href: '/admin/purchases', label: 'Purchases', later: true },
   { href: '/admin/challenges', label: 'Challenges', later: true },
 ] as const;

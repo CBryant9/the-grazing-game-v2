@@ -57,6 +57,12 @@ function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20
     'admin/users/[id]',
     'admin/users',
     'admin',
+    'admin/ads',
+    'admin/ads/sponsors',
+    'admin/ads/campaigns',
+    'admin/ads/campaigns/[id]',
+    'admin/ads/campaigns/[id]/report',
+    'admin/ads/stats',
   ]) {
     mkdirSync(join(app, rel, 'page'), { recursive: true });
     writeFileSync(
@@ -113,6 +119,13 @@ describe('the JavaScript budget check', () => {
     const over = run(pretend(0, 100, false, 20, 200));
     expect(over.status).toBe(1);
     expect(over.stdout).toMatch(/OVER\s+\/admin\s/);
+  });
+
+  it('gives the ad screens their own /admin/ads line', () => {
+    const ok = run(pretend(0, 100, false, 20, 20));
+    expect(ok.stdout).toMatch(/ok\s+\/admin\/ads\s/);
+    const over = run(pretend(0, 100, false, 20, 200));
+    expect(over.stdout).toMatch(/OVER\s+\/admin\/ads\s/);
   });
 
   it('does not count the polyfills for old browsers (nomodule)', () => {

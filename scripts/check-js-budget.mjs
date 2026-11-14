@@ -131,14 +131,27 @@ for (const page of PAGES) {
 // files every page starts with) and its client reference manifest (the files of the client
 // components it uses). The heaviest admin page is the line. The limit is the measured size with
 // room to spare, never raised to make a change pass.
-const ADMIN_PAGES = [
-  'admin/switches',
-  'admin/settings',
-  'admin/users/[id]',
-  'admin/users',
-  'admin',
+// Each group is one line in the report. /admin is the original five pages; the ad screens
+// (milestone 5.1) have their own line so a new page never hides in another's limit.
+const ADMIN_GROUPS = [
+  {
+    path: '/admin',
+    limitKb: Number(arg('--limit-admin', '150')),
+    pages: ['admin/switches', 'admin/settings', 'admin/users/[id]', 'admin/users', 'admin'],
+  },
+  {
+    path: '/admin/ads',
+    limitKb: Number(arg('--limit-admin-ads', '150')),
+    pages: [
+      'admin/ads',
+      'admin/ads/sponsors',
+      'admin/ads/campaigns',
+      'admin/ads/campaigns/[id]',
+      'admin/ads/campaigns/[id]/report',
+      'admin/ads/stats',
+    ],
+  },
 ];
-const ADMIN_LIMIT_KB = Number(arg('--limit-admin', '150'));
 
 function adminScripts(rel) {
   const dir = join(APP, rel);
@@ -157,9 +170,9 @@ function adminScripts(rel) {
   return [...files];
 }
 
-{
+for (const group of ADMIN_GROUPS) {
   let worst = { kb: 0, page: '', count: 0 };
-  for (const rel of ADMIN_PAGES) {
+  for (const rel of group.pages) {
     const srcs = adminScripts(rel);
     if (srcs === null) {
       console.error(`/${rel}: no build manifest. Run \`pnpm build\` first.`);
@@ -176,9 +189,9 @@ function adminScripts(rel) {
     }
     if (bytes / 1024 > worst.kb) worst = { kb: bytes / 1024, page: rel, count: srcs.length };
   }
-  const ok = worst.kb < ADMIN_LIMIT_KB;
+  const ok = worst.kb < group.limitKb;
   console.log(
-    `${ok ? 'ok  ' : 'OVER'} ${'/admin'.padEnd(20)} ${worst.kb.toFixed(1)} KB compressed in ${worst.count} scripts (limit ${ADMIN_LIMIT_KB} KB, heaviest page /${worst.page})`,
+    `${ok ? 'ok  ' : 'OVER'} ${group.path.padEnd(20)} ${worst.kb.toFixed(1)} KB compressed in ${worst.count} scripts (limit ${group.limitKb} KB, heaviest page /${worst.page})`,
   );
   if (ok && worst.kb >= 100) {
     console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');

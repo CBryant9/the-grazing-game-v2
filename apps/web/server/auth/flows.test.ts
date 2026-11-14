@@ -922,6 +922,7 @@ describe('what the new replies send the browser', () => {
     };
     expectKeys(me, [
       'accounts',
+      'ads',
       'community',
       'interestAds',
       'method',

@@ -30,6 +30,7 @@ import { ContractList } from './Contracts';
 import { PaddockChips, TodoBanner, TodoList } from './Todo';
 import { TopBar } from './TopBar';
 import { TourStrip } from './TourStrip';
+import { AdSlot } from '@/components/ads/AdSlot';
 import styles from './play.module.css';
 
 /** A little after last light the map is dusk: the farm goes dark and can still be looked at. */
@@ -170,6 +171,16 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
     !helpOpen &&
     (move !== null || plan !== null || mobId !== null || paddockId !== null);
 
+  // No ad shows while the player is deciding something: a tool, a plan, a move, a card or a sheet is open (PRD 10.1).
+  const adHold =
+    build !== null ||
+    plan !== null ||
+    move !== null ||
+    sow !== null ||
+    mobId !== null ||
+    paddockId !== null ||
+    helpOpen;
+
   // While the move tool asks for a paddock, a tap picks it. Otherwise a tap opens it.
   const picking = move !== null && move.mobId !== null && move.phase !== 'done';
   const mover = move && move.mobId !== null ? snapshot.mobs.find((m) => m.id === move.mobId) : null;
@@ -235,66 +246,71 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             )}
           </aside>
         )}
-        <main id="main" className={styles.stage} tabIndex={-1}>
-          <FarmMap
-            view={snapshot.view}
-            theme={theme}
-            minutes={minutes}
-            selected={move ? move.target : paddockId}
-            pickable={pickables}
-            reduceMotion={reduceMotion}
-            onTapPaddock={
-              picking
-                ? (id) => void moveTargetPicked(id)
-                : move
-                  ? () => {}
-                  : planning
-                    ? planTap
-                    : plan
-                      ? () => {}
-                      : openPaddock
-            }
-            tool={mapTool}
-            draft={draft}
-            contractor={contractor}
-            badges={badges}
-            anchor={anchor}
-            anchorEl={cardRef}
-            floating={pc}
-            onDrag={(e) =>
-              sowing
-                ? sowDrag({ phase: e.phase, square: e.square })
-                : buildDrag({ phase: e.phase, corner: e.corner, square: e.square })
-            }
-            onToolTap={(e) =>
-              void buildTap({
-                square: e.square,
-                edge: e.edge,
-                edgeCode: e.edgeCode,
-                edgeDistPx: e.edgeDistPx,
-                corner: e.corner,
-                hub: e.hub,
-                squareHub: e.squareHub,
-              })
-            }
-            onFenceTap={(e) => void startFix(e.edge)}
-          />
-          <NoticeBar />
-          {snapshot.over && overHidden && <OverStrip />}
-          {!pc && tab === 'farm' && !sheetOpen && !build && !helpOpen && (
-            <TodoBanner snapshot={snapshot} />
-          )}
-          {sheetOpen && <Opened snapshot={snapshot} />}
-          {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
-          {!pc && showBuild && (
-            <div className={styles.buildstack}>
-              <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
-              <BuildBar build={snapshot.build} docked={false} />
-            </div>
-          )}
-          {!pc && helpOpen && <HelpPanel />}
-          {!pc && !helpOpen && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
-        </main>
+        {pc && <AdSlot id="pc_farm_rail" />}
+        <div className={styles.stagecol}>
+          <main id="main" className={styles.stage} tabIndex={-1}>
+            <FarmMap
+              view={snapshot.view}
+              theme={theme}
+              minutes={minutes}
+              selected={move ? move.target : paddockId}
+              pickable={pickables}
+              reduceMotion={reduceMotion}
+              onTapPaddock={
+                picking
+                  ? (id) => void moveTargetPicked(id)
+                  : move
+                    ? () => {}
+                    : planning
+                      ? planTap
+                      : plan
+                        ? () => {}
+                        : openPaddock
+              }
+              tool={mapTool}
+              draft={draft}
+              contractor={contractor}
+              badges={badges}
+              anchor={anchor}
+              anchorEl={cardRef}
+              floating={pc}
+              onDrag={(e) =>
+                sowing
+                  ? sowDrag({ phase: e.phase, square: e.square })
+                  : buildDrag({ phase: e.phase, corner: e.corner, square: e.square })
+              }
+              onToolTap={(e) =>
+                void buildTap({
+                  square: e.square,
+                  edge: e.edge,
+                  edgeCode: e.edgeCode,
+                  edgeDistPx: e.edgeDistPx,
+                  corner: e.corner,
+                  hub: e.hub,
+                  squareHub: e.squareHub,
+                })
+              }
+              onFenceTap={(e) => void startFix(e.edge)}
+            />
+            <NoticeBar />
+            {snapshot.over && overHidden && <OverStrip />}
+            {!pc && tab === 'farm' && !sheetOpen && !build && !helpOpen && (
+              <TodoBanner snapshot={snapshot} />
+            )}
+            {sheetOpen && <Opened snapshot={snapshot} />}
+            {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
+            {!pc && showBuild && (
+              <div className={styles.buildstack}>
+                <AdSlot id="phone_banner" hold={adHold} />
+                <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
+                <BuildBar build={snapshot.build} docked={false} />
+              </div>
+            )}
+            {!pc && helpOpen && <HelpPanel />}
+            {!pc && !helpOpen && tab !== 'farm' && <TabPanel tab={tab} snapshot={snapshot} />}
+          </main>
+          {pc && <AdSlot id="pc_banner" hold={adHold} />}
+        </div>
         {!pc && <Nav />}
       </div>
       {yearEnd && <YearEndCard end={yearEnd} />}
