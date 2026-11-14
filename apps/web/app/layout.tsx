@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Anton, JetBrains_Mono, Silkscreen } from 'next/font/google';
 import { SITE } from '@gg/shared';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 
 // Fonts are downloaded at build time and served from our own site (PRD 14.10).
@@ -22,21 +23,17 @@ const jetbrains = JetBrains_Mono({
   variable: '--font-jetbrains',
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: { default: `${SITE.name}: ${SITE.tagline}`, template: `%s | ${SITE.name}` },
   description: SITE.description,
   applicationName: SITE.name,
-  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     siteName: SITE.name,
     locale: 'en_AU',
     title: SITE.name,
     description: SITE.description,
-    url: '/',
   },
   twitter: { card: 'summary_large_image', title: SITE.name, description: SITE.description },
   icons: { icon: '/icon.svg' },

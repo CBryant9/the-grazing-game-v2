@@ -1,10 +1,13 @@
-import Link from 'next/link';
+import Link from '@/components/site/SiteLink';
 import { SITE } from '@gg/shared';
+import { SITE_PAGES } from '@/lib/site';
 import { ThemeToggle } from './ThemeToggle';
 import styles from './SiteHeader.module.css';
 
 /** The website header. On the farm page the game header sits below it, on a different background (PRD 6.2). */
-export function SiteHeader() {
+export function SiteHeader({ current }: { current?: string } = {}) {
+  // The public pages pass `current` and get the page links on wide screens. The game page passes nothing and keeps its header as it was.
+  const links = current === undefined ? [] : SITE_PAGES.filter((p) => p.header);
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
@@ -15,6 +18,16 @@ export function SiteHeader() {
           <span className="px">THE GRAZING GAME</span>
         </Link>
         <nav className={styles.nav} aria-label="Main">
+          {links.map((p) => (
+            <Link
+              key={p.path}
+              href={p.path}
+              className={styles.link}
+              aria-current={p.path === current ? 'page' : undefined}
+            >
+              {p.title}
+            </Link>
+          ))}
           <ThemeToggle />
           <Link href="/play" className="btn coral">
             Play free

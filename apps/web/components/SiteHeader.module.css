@@ -39,3 +39,27 @@
   gap: 10px;
   margin-left: auto;
 }
+.link {
+  display: none;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 8px;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  text-decoration: none;
+  color: var(--muted);
+}
+.link:hover,
+.link[aria-current='page'] {
+  color: var(--text);
+}
+.link[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-color: var(--accent-line);
+}
+@media (min-width: 760px) {
+  .link {
+    display: inline-flex;
+  }
+}

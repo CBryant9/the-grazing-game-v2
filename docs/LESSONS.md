@@ -175,3 +175,5 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 - **Don't leave out bad runs when quoting a range.** One Top End run at 19.1% sat outside the published 2–5%. Record it and its cause.
 - **Ask Claudia when a rule is unclear,** rather than inventing a grazing rule. She knows the system; the model should follow her, not the other way round.
 - **Check "is this realistic?" from a grazier's view, not just a code view.** Her questions ("is 59 head realistic?", "why is it going brown?") found real model bugs.
+- **A link to the game from a website page pulls in the game's code.** Next.js prefetches the target of a `<Link>` that is on screen, and a link to `/play` fetched the game's JavaScript (34 KB) on the landing page. Every link to `/play` from a public page has `prefetch={false}`. Found by reading the network list in the Lighthouse report, not by the score. (5.4, 14 Nov 2026)
+- **Share images and framing.** Pages send `X-Frame-Options: DENY`, so a test that wraps pages in iframes sees an empty page. Check pages with a headless browser (puppeteer-core ships with the Lighthouse tool in `node_modules`), not iframes.
