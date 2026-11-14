@@ -7,6 +7,7 @@ import { clampQty } from '@/lib/game/lists';
 import { useGame } from '@/lib/game/store';
 import type { MarketWire, MobWire, SellGroupId, SimpleAction, Snapshot } from '@/lib/game/types';
 import { ActJob } from './ActJob';
+import { EmptyState } from './EmptyState';
 import { QtyField } from './QtyField';
 import styles from './play.module.css';
 
@@ -249,7 +250,7 @@ function sellableMobs(mobs: readonly MobWire[]): MobWire[] {
   return mobs.filter((m) => m.sellGroups.length > 0);
 }
 
-function SellForm({ snapshot }: { snapshot: Snapshot }) {
+function SellForm({ snapshot, onBuy }: { snapshot: Snapshot; onBuy: () => void }) {
   const { market, mobs } = snapshot;
   const startAct = useGame((s) => s.startAct);
   const job = useGame((s) => s.acts['market:sell']);
@@ -281,7 +282,9 @@ function SellForm({ snapshot }: { snapshot: Snapshot }) {
   return (
     <div className={styles.stack}>
       {none ? (
-        <p className="muted">No cattle on the farm are free to sell.</p>
+        <EmptyState action="See what is for sale" onAction={onBuy}>
+          No cattle on the farm are free to sell.
+        </EmptyState>
       ) : (
         <>
           <div className={styles.seg} role="group" aria-label="Sell by">
@@ -404,11 +407,11 @@ function Bookings({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
-function SellView({ snapshot }: { snapshot: Snapshot }) {
+function SellView({ snapshot, onBuy }: { snapshot: Snapshot; onBuy: () => void }) {
   return (
     <div className={styles.stack}>
       <p className={styles.hreason}>{snapshot.market.sell.note}</p>
-      <SellForm snapshot={snapshot} />
+      <SellForm snapshot={snapshot} onBuy={onBuy} />
       <Bookings snapshot={snapshot} />
     </div>
   );
@@ -435,7 +438,7 @@ export function MarketPanel({ snapshot }: { snapshot: Snapshot }) {
       </div>
       {view === 'prices' && <PricesView market={market} />}
       {view === 'buy' && <BuyView market={market} />}
-      {view === 'sell' && <SellView snapshot={snapshot} />}
+      {view === 'sell' && <SellView snapshot={snapshot} onBuy={() => setView('buy')} />}
     </section>
   );
 }

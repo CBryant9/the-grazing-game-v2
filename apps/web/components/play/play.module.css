@@ -66,6 +66,8 @@
 }
 .topextra {
   grid-area: theme;
+  display: flex;
+  gap: 6px;
 }
 .topdl {
   grid-area: dl;
@@ -287,12 +289,13 @@
 
 /* PC and tablet: the website header, then the game header in one row, a side panel and the map. */
 .screen[data-layout='pc'] .top {
-  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto;
-  grid-template-areas: 'name dl cash times';
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto auto;
+  grid-template-areas: 'name dl cash times theme';
   padding: 6px var(--gutter);
   gap: 6px 22px;
 }
-.screen[data-layout='pc'] .topextra {
+/* On a PC the theme switch is in the site header; Help stays here. */
+.screen[data-layout='pc'] .themeslot {
   display: none;
 }
 .screen[data-layout='pc'] .times {
