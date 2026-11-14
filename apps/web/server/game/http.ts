@@ -2,6 +2,7 @@ import { logFailure } from '../logging';
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { jarFor, type CookieJar, type CookieToSet } from '../auth/provider';
+import { MAINTENANCE_HEADER } from '@gg/shared';
 import { MAINTENANCE_CODE, maintenanceNotice } from '../admin/maintenance';
 import { identify, type Player } from '../player';
 import { clearCookieText, cookieText, csrfRefusal } from '../security';
@@ -188,6 +189,11 @@ export interface RouteOptions {
    * with a fresh Max-Age, so a farm that is played is never removed as stale.
    */
   renew?: boolean;
+  /**
+   * A `write` route that changes nothing about the farm (a job card preview, choosing which farm
+   * is open). Maintenance mode lets it through; it refuses every other `write` route.
+   */
+  readOnlyOk?: boolean;
 }
 
 export interface RouteContext {
@@ -216,6 +222,14 @@ export function route(
   handler: (ctx: RouteContext) => Promise<unknown>,
 ): (req: Request) => Promise<Response> {
   return async (req) => {
+    // The sign-in provider may refresh an expired session while we work out who is asking. The new
+    // tokens must reach the browser on every answer, including a refusal, or the next request is signed out.
+    const jar = jarFor(req);
+    let maintenance: string | null = null;
+    const finish = (res: Response): Response => {
+      if (maintenance) res.headers.set(MAINTENANCE_HEADER, maintenance);
+      return res;
+    };
     try {
       // One CSRF rule for every state-changing route, game and account (server/security.ts).
       const refusal = options.write ? csrfRefusal(req) : null;
@@ -234,12 +248,18 @@ export function route(
           'Retry-After': '60',
         });
       }
-      const jar = jarFor(req);
       const player = await identify(req, jar, existing);
-      // Maintenance mode (admin switch): everyone but an admin is told the game is down, before
-      // anything on the farm is touched. See server/admin/maintenance.ts.
+      // Maintenance mode (admin switch): the game is read only for everyone but an admin. A route
+      // that changes the farm is refused before anything on the farm is touched; a route that only
+      // reads answers as usual, marked so the game can show the message and hold its buttons off.
+      // See server/admin/maintenance.ts.
       const down = await maintenanceNotice(player.user?.id ?? null);
-      if (down) throw new GameError(503, down, MAINTENANCE_CODE);
+      if (down) {
+        maintenance = down.id;
+        if (options.write && !options.readOnlyOk) {
+          throw new GameError(503, down.text, MAINTENANCE_CODE);
+        }
+      }
       // A signed-in player with a finished account has farms named by the account, so no guest
       // session is made for them. Anyone else (a visitor, a sign-in not finished, a sign-in
       // refused as under 14) plays as a guest, with a session made and renewed as for anyone.
@@ -265,12 +285,23 @@ export function route(
       const res = out instanceof Response ? out : json(out, 200);
       for (const c of setCookies) res.headers.append('Set-Cookie', c);
       res.headers.set('Cache-Control', 'no-store');
-      return res;
+      return finish(res);
     } catch (e) {
-      if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
+      const refused = (res: Response): Response => {
+        for (const c of jar.out) {
+          res.headers.append(
+            'Set-Cookie',
+            c.value === '' || c.maxAge === 0
+              ? clearCookieText(req, c.name)
+              : cookieText(req, c.name, encodeURIComponent(c.value), c.maxAge ?? 400 * 86400),
+          );
+        }
+        return finish(res);
+      };
+      if (e instanceof GameError) return refused(fail(e.status, e.message, {}, e.code));
       // The detail stays in the server log. The player gets a plain line.
       logFailure({ route: `game-${options.name}`, reason: 'game_route_failed' }, e);
-      return fail(500, 'Something went wrong on the server. Try again in a moment.');
+      return refused(fail(500, 'Something went wrong on the server. Try again in a moment.'));
     }
   };
 }

@@ -45,6 +45,12 @@ export interface AuthProvider {
   session(jar: CookieJar): Promise<AuthUser | null>;
   /** The signed-in user, checked with the auth server (never taken from the cookie alone). Null for none. */
   user(jar: CookieJar): Promise<AuthUser | null>;
+  /**
+   * Like `user`, but it never refreshes the session and never spends a refresh token: it checks the
+   * access token in the cookie with the auth server and answers null when that token has run out.
+   * For a page, which can not write cookies, so a refresh there would spend the token and lose the new one.
+   */
+  verify(jar: CookieJar): Promise<AuthUser | null>;
   /** Send a sign-in link. Resolves the same whether or not the address has an account. */
   sendLink(jar: CookieJar, email: string, redirectTo: string): Promise<void>;
   /** The address to send the player to for Google. */

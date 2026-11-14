@@ -361,7 +361,7 @@ export async function userAction(
   userId: unknown,
   act: UserAction,
   deps: UserActionDeps = {},
-): Promise<void> {
+): Promise<{ note?: string }> {
   if (!isUuid(userId)) throw new AdminError(400, 'That is not an account id.');
   const self = userId === adminId;
   if (self && (act.action === 'suspend' || act.action === 'ban' || act.action === 'set_role')) {
@@ -373,8 +373,13 @@ export async function userAction(
     const email = await deps.emailOf(userId).catch(() => null);
     hash = email ? banHash(email, deps.pepper) : null;
   }
+  const notes: string[] = [];
   await sql.transaction(async (tx) => {
-    if (!(await activeAdmin(tx, adminId))) throw new AdminError(403, 'You can not do that now.');
+    // The acting admin's row is locked for the length of the action: an admin banned a moment ago
+    // can not finish what they started, because the ban waits for this transaction or comes first.
+    if (!(await activeAdmin(tx, adminId, true))) {
+      throw new AdminError(403, 'You can not do that now.');
+    }
     if (act.action === 'clear_refusal') {
       const found = await tx.query('select 1 from public.signup_refusals where user_id = $1', [
         userId,
@@ -384,8 +389,8 @@ export async function userAction(
       await tx.query('select public.clear_signup_refusal($1, $2)', [adminId, userId]);
       return;
     }
-    const target = await tx.query<{ role: string }>(
-      'select role from public.account_status where user_id = $1 for update',
+    const target = await tx.query<{ role: string; banned_at: string | null }>(
+      'select role, banned_at from public.account_status where user_id = $1 for update',
       [userId],
     );
     const role = target.rows[0]?.role;
@@ -416,7 +421,9 @@ export async function userAction(
           `insert into public.moderation_actions (user_id, moderator_id, action, until) values ($1, $2, 'suspended', $3::timestamptz)`,
           [userId, adminId, until],
         );
-        await audit(tx, adminId, 'user_suspend', 'account', userId, { until });
+        const ended = await endSessions(tx, userId);
+        if (ended === null) notes.push(SESSIONS_NOTE);
+        await audit(tx, adminId, 'user_suspend', 'account', userId, { until, count: ended ?? 0 });
         return;
       }
       case 'ban': {
@@ -438,10 +445,25 @@ export async function userAction(
           `insert into public.moderation_actions (user_id, moderator_id, action) values ($1, $2, 'banned')`,
           [userId, adminId],
         );
-        await audit(tx, adminId, 'user_ban', 'account', userId);
+        const ended = await endSessions(tx, userId);
+        if (ended === null) notes.push(SESSIONS_NOTE);
+        if (!hash) notes.push(NO_HASH_NOTE);
+        // `value` says whether a hashed record was written; `count` how many sessions were ended.
+        await audit(tx, adminId, 'user_ban', 'account', userId, {
+          value: hash !== null,
+          count: ended ?? 0,
+        });
         return;
       }
       case 'lift': {
+        // A ban may have a kept hashed record. Lifting without being able to find it would leave
+        // it behind for ever, refusing the player if they ever delete and sign up again.
+        if (target.rows[0]?.banned_at && !hash) {
+          throw new AdminError(
+            409,
+            'The ban record kept for this account can not be removed right now, because the sign-in email could not be found. Nothing was changed. Try again in a moment.',
+          );
+        }
         await tx.query(
           'update public.account_status set banned_at = null, suspended_until = null where user_id = $1',
           [userId],
@@ -464,11 +486,40 @@ export async function userAction(
       }
       case 'sign_out_all': {
         // The function checks the admin again, writes its own audit row and ends the sessions.
-        await tx.query('select public.admin_sign_out_everywhere($1, $2)', [adminId, userId]);
+        try {
+          await tx.query('select public.admin_sign_out_everywhere($1, $2)', [adminId, userId]);
+        } catch {
+          throw new AdminError(
+            503,
+            'Could not end their sessions here. Do it in the Supabase dashboard.',
+          );
+        }
         return;
       }
     }
   });
+  return notes.length ? { note: notes.join(' ') } : {};
+}
+
+const SESSIONS_NOTE = 'Their sessions could not be ended here. End them in the Supabase dashboard.';
+const NO_HASH_NOTE =
+  'Banned. The sign-in email could not be found, so no hashed record was kept: this ban will not survive the player deleting their account and signing up again.';
+
+/**
+ * End every session of an account inside the action's transaction, with a savepoint so a refusal
+ * (the database may not allow it on every project) does not undo the ban or suspension. The count,
+ * or null when it could not be done.
+ */
+async function endSessions(tx: SqlRunner, userId: string): Promise<number | null> {
+  await tx.query('savepoint sp_sessions');
+  try {
+    const r = await tx.query<{ n: number }>('select app.end_sessions($1) as n', [userId]);
+    await tx.query('release savepoint sp_sessions');
+    return r.rows[0]?.n ?? 0;
+  } catch {
+    await tx.query('rollback to savepoint sp_sessions');
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------- audit log
@@ -574,7 +625,13 @@ export function describeAudit(
   if (typeof d.enabled === 'boolean') parts.push(d.enabled ? 'turned on' : 'turned off');
   if (typeof d.role === 'string') parts.push(`role ${d.role}`);
   if (typeof d.until === 'string') parts.push(`until ${d.until}`);
-  if (typeof d.count === 'number') parts.push(`count ${d.count}`);
+  if (typeof d.count === 'number') {
+    parts.push(
+      row.action === 'user_ban' || row.action === 'user_suspend'
+        ? `${d.count} session${d.count === 1 ? '' : 's'} ended`
+        : `count ${d.count}`,
+    );
+  }
   if (typeof d.value === 'number' || typeof d.value === 'boolean')
     parts.push(`value ${String(d.value)}`);
   if (Array.isArray(d.ids)) parts.push(`${d.ids.length} account${d.ids.length === 1 ? '' : 's'}`);

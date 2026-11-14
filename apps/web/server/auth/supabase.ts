@@ -1,5 +1,5 @@
 import 'server-only';
-import { createServerClient } from '@supabase/ssr';
+import { combineChunks, createServerClient, stringFromBase64URL } from '@supabase/ssr';
 import { createClient, type User } from '@supabase/supabase-js';
 import type { AuthProvider, AuthUser, CookieJar } from './provider';
 
@@ -70,6 +70,36 @@ export function supabaseProvider(
     async user(jar) {
       const { data, error } = await client(jar).auth.getUser();
       return error || !data.user ? null : toUser(data.user);
+    },
+    async verify(jar) {
+      // Read the access token out of the sign-in cookie (one cookie, or chunks of it) and ask the
+      // auth server about that token alone. Nothing here can refresh the session or spend the
+      // refresh token: a page can not write cookies, so a refresh there would lose the new tokens.
+      // Supabase's docs (supabase.com/docs/guides/auth/server-side/nextjs, read 15 Nov 2026) keep
+      // refreshing in the proxy for that reason.
+      try {
+        const all = jar.getAll();
+        const base = all
+          .map((c) => /^(sb-.+-auth-token)(?:\.\d+)?$/.exec(c.name)?.[1])
+          .find((n) => n !== undefined);
+        if (!base) return null;
+        const raw = await combineChunks(base, (name) => all.find((c) => c.name === name)?.value);
+        if (!raw) return null;
+        const text = raw.startsWith('base64-') ? stringFromBase64URL(raw.slice(7)) : raw;
+        const token = (JSON.parse(text) as { access_token?: unknown }).access_token;
+        if (typeof token !== 'string') return null;
+        const payload = JSON.parse(stringFromBase64URL(token.split('.')[1] ?? '')) as {
+          exp?: unknown;
+        };
+        if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) return null;
+        const checker = createClient(url, publishableKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data, error } = await checker.auth.getUser(token);
+        return error || !data.user ? null : toUser(data.user);
+      } catch {
+        return null;
+      }
     },
     async sendLink(jar, email, redirectTo) {
       const { error } = await client(jar).auth.signInWithOtp({

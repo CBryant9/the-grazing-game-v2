@@ -1,5 +1,5 @@
 import 'server-only';
-import type { FeatureSwitchKey } from '@gg/shared';
+import { MAINTENANCE_WORDINGS, type FeatureSwitchKey, type MaintenanceWordingId } from '@gg/shared';
 
 /**
  * What each feature switch is, in plain words, for the admin screen (PRD 11.7). Typed on
@@ -137,28 +137,8 @@ export const SWITCH_INFO: Record<FeatureSwitchKey, SwitchInfo> = {
   },
 };
 
-/**
- * The wordings the admin chooses from for maintenance mode. A fixed set, so no free text ever
- * goes to a player's browser. Each starts with the same plain sentence.
- */
-export const MAINTENANCE_WORDINGS = [
-  {
-    id: 'short',
-    label: 'Short',
-    text: 'The game is down for maintenance. Your farm is safe.',
-  },
-  {
-    id: 'update',
-    label: 'Updating',
-    text: 'The game is down for maintenance. Your farm is safe. We are updating the game and it will be back soon.',
-  },
-  {
-    id: 'longer',
-    label: 'Longer job',
-    text: 'The game is down for maintenance. Your farm is safe. This one takes a while, so please try again later today.',
-  },
-] as const;
-export type MaintenanceWordingId = (typeof MAINTENANCE_WORDINGS)[number]['id'];
+/** The fixed wordings the admin chooses from live in the shared package, because the game shows them. */
+export { MAINTENANCE_WORDINGS, type MaintenanceWordingId };
 export const DEFAULT_MAINTENANCE_WORDING: MaintenanceWordingId = 'short';
 export const MAINTENANCE_SETTING = 'maintenance_wording';
 

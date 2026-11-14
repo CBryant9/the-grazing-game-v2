@@ -136,6 +136,16 @@ describe('every admin page', () => {
     expect(await Layout({ children: null })).toBeTruthy();
   });
 
+  it('an admin whose access token has run out gets not found from a page, and no refresh token is spent', async () => {
+    auth.expireAccess(cookies.admin!);
+    state.cookie = `${cookies.admin!}; fake_refresh=whatever`;
+    for (const [path, load] of Object.entries(pageModules)) {
+      const Page = ((await load()) as { default: (p: unknown) => Promise<unknown> }).default;
+      await expect(Page(props(ids.admin!)), path).rejects.toThrow('NEXT_NOT_FOUND');
+    }
+    expect(auth.refreshed).toBe(0);
+  });
+
   it('renders for an admin in good standing', async () => {
     state.cookie = cookies.admin!;
     for (const [path, load] of Object.entries(pageModules)) {

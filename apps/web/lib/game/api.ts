@@ -1,3 +1,4 @@
+import { MAINTENANCE_HEADER } from '@gg/shared';
 import type {
   ActionRequest,
   ActRequest,
@@ -43,6 +44,15 @@ export function setSaveRetryDelays(ms: readonly number[]): void {
 }
 
 /** Who wants to know that the game is saving again (the screen shows "Saving again"). */
+/**
+ * Told, after every answer from the game, whether maintenance mode is on: the id of the wording
+ * the server marked the answer with, or null. The play screen uses it to hold its buttons off.
+ */
+let maintenanceWatcher: ((id: string | null) => void) | null = null;
+export function onMaintenance(watch: ((id: string | null) => void) | null): void {
+  maintenanceWatcher = watch;
+}
+
 let savingWatcher: ((again: boolean) => void) | null = null;
 export function onSavingAgain(watch: ((again: boolean) => void) | null): void {
   savingWatcher = watch;
@@ -79,6 +89,7 @@ async function once<T>(path: string, method: string, body?: unknown): Promise<T>
   } catch {
     throw new ApiError(UNREACHABLE);
   }
+  maintenanceWatcher?.(res.headers.get(MAINTENANCE_HEADER));
   let data: unknown = null;
   try {
     data = await res.json();

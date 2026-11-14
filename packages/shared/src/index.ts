@@ -82,6 +82,27 @@ export const FEATURE_SWITCHES = {
 } as const;
 export type FeatureSwitchKey = keyof typeof FEATURE_SWITCHES;
 
+/**
+ * What a player is told while maintenance mode is on (PRD 11.7). A fixed set: the admin chooses one
+ * by id, so no free text ever reaches a player's browser. The server sends the id (header
+ * `x-game-maintenance`) and the game shows the text.
+ */
+export const MAINTENANCE_WORDINGS = [
+  { id: 'short', label: 'Short', text: 'The game is down for maintenance. Your farm is safe.' },
+  {
+    id: 'update',
+    label: 'Updating',
+    text: 'The game is down for maintenance. Your farm is safe. We are updating the game and it will be back soon.',
+  },
+  {
+    id: 'longer',
+    label: 'Longer job',
+    text: 'The game is down for maintenance. Your farm is safe. This one takes a while, so please try again later today.',
+  },
+] as const;
+export type MaintenanceWordingId = (typeof MAINTENANCE_WORDINGS)[number]['id'];
+export const MAINTENANCE_HEADER = 'x-game-maintenance';
+
 export const SITE = {
   name: 'The Grazing Game',
   tagline: 'Run a real grazing business. One day at a time.',

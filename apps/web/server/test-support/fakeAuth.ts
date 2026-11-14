@@ -38,6 +38,16 @@ export class FakeAuth implements AuthProvider {
    * (`session`) until it runs out, while the server-side check (`user`) refuses it at once.
    */
   private readonly revoked = new Set<string>();
+  /**
+   * Access tokens that have run out, and refresh tokens, as Supabase rotates them: a refresh token
+   * works once; it gives a new access token and a new refresh token, and the new pair has to reach
+   * the browser. Using a spent one again ends the whole session (reuse detection).
+   */
+  private readonly expired = new Set<string>();
+  private readonly refreshTokens = new Map<string, string>();
+  private readonly spent = new Set<string>();
+  /** How many refresh tokens have been spent. For tests: a request that must not refresh checks it did not move. */
+  refreshed = 0;
   /** For tests: the text of the error a failing call throws (a real one may carry an address). */
   errorText: string | null = null;
   private n = 0;
@@ -49,13 +59,60 @@ export class FakeAuth implements AuthProvider {
   }
 
   async session(jar: CookieJar): Promise<AuthUser | null> {
-    const id = this.sessions.get(this.cookie(jar, 'fake_session') ?? '');
+    const token = this.cookie(jar, 'fake_session') ?? '';
+    if (this.expired.has(token)) return this.refresh(jar);
+    const id = this.sessions.get(token);
     return id ? (this.users.get(id) ?? null) : null;
   }
 
   async user(jar: CookieJar): Promise<AuthUser | null> {
     if (this.revoked.has(this.cookie(jar, 'fake_session') ?? '')) return null;
     return this.session(jar);
+  }
+
+  /** Checks the access token with the auth server and never refreshes: an expired token is no one. */
+  async verify(jar: CookieJar): Promise<AuthUser | null> {
+    const token = this.cookie(jar, 'fake_session') ?? '';
+    if (this.expired.has(token) || this.revoked.has(token)) return null;
+    const id = this.sessions.get(token);
+    return id ? (this.users.get(id) ?? null) : null;
+  }
+
+  /** Make this cookie string's access token run out (the refresh token stays good). */
+  expireAccess(cookie: string): void {
+    const m = /fake_session=([^;]+)/.exec(cookie);
+    if (m) this.expired.add(m[1]!);
+  }
+
+  private refresh(jar: CookieJar): AuthUser | null {
+    const old = this.cookie(jar, 'fake_refresh') ?? '';
+    const userId = this.refreshTokens.get(old);
+    if (!userId) return null;
+    if (this.spent.has(old)) {
+      // A spent refresh token used again: every session of that account ends.
+      for (const [t, u] of this.sessions) if (u === userId) this.sessions.delete(t);
+      for (const [r, u] of this.refreshTokens) if (u === userId) this.refreshTokens.delete(r);
+      return null;
+    }
+    this.spent.add(old);
+    this.refreshed++;
+    const access = randomBytes(12).toString('hex');
+    const refresh = randomBytes(12).toString('hex');
+    this.sessions.set(access, userId);
+    this.refreshTokens.set(refresh, userId);
+    jar.setAll([
+      { name: 'fake_session', value: access },
+      { name: 'fake_refresh', value: refresh },
+    ]);
+    return this.users.get(userId) ?? null;
+  }
+
+  private newPair(userId: string): { access: string; refresh: string } {
+    const access = randomBytes(12).toString('hex');
+    const refresh = randomBytes(12).toString('hex');
+    this.sessions.set(access, userId);
+    this.refreshTokens.set(refresh, userId);
+    return { access, refresh };
   }
 
   private boom(what: string): Error {
@@ -111,21 +168,28 @@ export class FakeAuth implements AuthProvider {
     if (mine !== l.verifier) return null;
     l.used = true;
     const user = await this.upsert(l.email, l.method);
-    const token = randomBytes(12).toString('hex');
-    this.sessions.set(token, user.id);
+    const pair = this.newPair(user.id);
     jar.setAll([
-      { name: 'fake_session', value: token },
+      { name: 'fake_session', value: pair.access },
+      { name: 'fake_refresh', value: pair.refresh },
       { name: 'fake_verifier', value: '', maxAge: 0 },
     ]);
     return user;
   }
 
   /** Make (or find) a signed-in user without a link, for tests that need one. Returns the cookie. */
-  async signInAs(email: string, method = 'email'): Promise<{ user: AuthUser; cookie: string }> {
+  async signInAs(
+    email: string,
+    method = 'email',
+  ): Promise<{ user: AuthUser; cookie: string; full: string }> {
     const user = await this.upsert(email.toLowerCase(), method);
-    const token = randomBytes(12).toString('hex');
-    this.sessions.set(token, user.id);
-    return { user, cookie: `fake_session=${token}` };
+    const pair = this.newPair(user.id);
+    // `cookie` is the access token alone (what most tests send). `full` also carries the refresh token.
+    return {
+      user,
+      cookie: `fake_session=${pair.access}`,
+      full: `fake_session=${pair.access}; fake_refresh=${pair.refresh}`,
+    };
   }
 
   private async upsert(email: string, method: string): Promise<AuthUser> {
@@ -148,7 +212,10 @@ export class FakeAuth implements AuthProvider {
     if (scope === 'global' && id) {
       for (const [t, u] of this.sessions) if (u === id) this.revoked.add(t);
     } else this.sessions.delete(token);
-    jar.setAll([{ name: 'fake_session', value: '', maxAge: 0 }]);
+    jar.setAll([
+      { name: 'fake_session', value: '', maxAge: 0 },
+      { name: 'fake_refresh', value: '', maxAge: 0 },
+    ]);
   }
 
   async deleteUser(userId: string): Promise<void> {

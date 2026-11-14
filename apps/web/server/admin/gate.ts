@@ -24,7 +24,11 @@ export interface AdminSession {
 export type GateResult = { kind: 'off' } | { kind: 'denied' } | { kind: 'ok'; admin: AdminSession };
 
 /** Is this account an admin in good standing right now? The username when it is, else null. */
-export async function activeAdmin(sql: SqlRunner, userId: string): Promise<string | null> {
+export async function activeAdmin(
+  sql: SqlRunner,
+  userId: string,
+  lock = false,
+): Promise<string | null> {
   const r = await sql.query<{ username: string }>(
     `select p.username
        from public.account_status s
@@ -32,7 +36,8 @@ export async function activeAdmin(sql: SqlRunner, userId: string): Promise<strin
       where s.user_id = $1
         and s.role = 'admin'
         and s.banned_at is null
-        and (s.suspended_until is null or s.suspended_until <= now())`,
+        and (s.suspended_until is null or s.suspended_until <= now())
+      ${lock ? 'for share of s' : ''}`,
     [userId],
   );
   return r.rows[0]?.username ?? null;
@@ -43,11 +48,17 @@ export function readOnlyJar(all: () => { name: string; value: string }[]): Cooki
   return { getAll: all, setAll: () => undefined };
 }
 
-export async function adminGate(jar: CookieJar): Promise<GateResult> {
+export async function adminGate(
+  jar: CookieJar,
+  options: { refresh?: boolean } = {},
+): Promise<GateResult> {
   const deps = authDeps();
   if (!deps) return { kind: 'off' };
   try {
-    const user = await deps.provider.user(jar);
+    // A route may refresh an expired session (it sends the new cookies back). A page may not: it can
+    // not write cookies, so a refresh would spend the refresh token and lose the new one.
+    const user =
+      options.refresh === false ? await deps.provider.verify(jar) : await deps.provider.user(jar);
     if (!user || user.anonymous) return { kind: 'denied' };
     const username = await activeAdmin(deps.sql, user.id);
     if (!username) return { kind: 'denied' };

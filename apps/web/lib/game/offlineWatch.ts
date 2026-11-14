@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { api, UNREACHABLE } from './api';
+import { MAINTENANCE_WORDINGS } from '@gg/shared';
+import { api, onMaintenance, UNREACHABLE } from './api';
 import { useMe } from '../auth/store';
 import {
   GUEST,
@@ -28,8 +29,10 @@ import type { Snapshot } from './types';
 
 interface OfflineState {
   offline: boolean;
+  /** The words shown while maintenance mode is on (one of the fixed wordings), else null. */
+  maintenance: string | null;
 }
-export const useOffline = create<OfflineState>()(() => ({ offline: false }));
+export const useOffline = create<OfflineState>()(() => ({ offline: false, maintenance: null }));
 
 const CHECK_EVERY_MS = 15_000;
 const SAVE_AFTER_MS = 400;
@@ -45,17 +48,46 @@ function hold(on: boolean): void {
   useGame.setState((s) => ({ busy: s.busy + (on ? 1 : -1) }));
 }
 
+/** Buttons are held off while offline or while maintenance mode is on. */
+function sync(): void {
+  const s = useOffline.getState();
+  hold(s.offline || s.maintenance !== null);
+}
+
+let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * The server marks every answer while maintenance mode is on (PRD 11.7: the game is read only and
+ * the message shows). Looking still works; the buttons are held off like offline, and a quiet read
+ * every 15 seconds finds out when it is over.
+ */
+export function setMaintenance(id: string | null): void {
+  const text =
+    id === null
+      ? null
+      : (MAINTENANCE_WORDINGS.find((w) => w.id === id) ?? MAINTENANCE_WORDINGS[0]).text;
+  if (useOffline.getState().maintenance === text) return;
+  useOffline.setState({ maintenance: text });
+  sync();
+  if (text !== null && !maintenanceTimer) {
+    maintenanceTimer = setInterval(() => void api.farm().catch(() => undefined), CHECK_EVERY_MS);
+  } else if (text === null && maintenanceTimer) {
+    clearInterval(maintenanceTimer);
+    maintenanceTimer = null;
+  }
+}
+
 function enter(): void {
   useOffline.setState({ offline: true });
-  hold(true);
+  sync();
   if (!timer) timer = setInterval(() => void check(), CHECK_EVERY_MS);
 }
 
 function leave(): void {
   if (timer) clearInterval(timer);
   timer = null;
-  hold(false);
   useOffline.setState({ offline: false });
+  sync();
 }
 
 /** Show a farm that was kept, as the live one. Read-only until the game answers. */
@@ -162,6 +194,7 @@ export function startOfflineWatch(): () => void {
   const onHide = (): void => {
     if (document.visibilityState === 'hidden') flush();
   };
+  onMaintenance(setMaintenance);
   window.addEventListener('offline', onOffline);
   window.addEventListener('online', onOnline);
   window.addEventListener('pagehide', flush);
@@ -180,6 +213,8 @@ export function startOfflineWatch(): () => void {
     flush();
     if (timer) clearInterval(timer);
     timer = null;
+    onMaintenance(null);
+    setMaintenance(null);
     if (useOffline.getState().offline) leave();
   };
 }

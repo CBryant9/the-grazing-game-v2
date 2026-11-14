@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import styles from './admin.module.css';
 
 /** The admin menu. `later` marks the parts built in a later milestone. */
@@ -19,6 +20,24 @@ export const ADMIN_LINKS = [
 
 export function AdminNav({ username }: { username: string }) {
   const path = usePathname() ?? '';
+  // A page can not refresh a sign-in that has run out (it can not write cookies), but this call can:
+  // it keeps an open admin screen signed in, so the next page does not come up as not found.
+  useEffect(() => {
+    const ping = (): void => {
+      if (document.visibilityState === 'visible') {
+        void fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' }).catch(
+          () => undefined,
+        );
+      }
+    };
+    ping();
+    const timer = setInterval(ping, 5 * 60_000);
+    document.addEventListener('visibilitychange', ping);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', ping);
+    };
+  }, []);
   const here = (href: string): boolean =>
     href === '/admin' ? path === '/admin' : path === href || path.startsWith(`${href}/`);
   return (

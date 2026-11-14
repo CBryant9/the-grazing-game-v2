@@ -35,7 +35,7 @@ const PEPPER = 'pepper-for-tests-'.padEnd(48, 'x');
 const HOST = 'http://localhost:3000';
 
 type Handler = (req: Request) => Promise<Response>;
-const routes: Record<string, { POST?: Handler; GET?: Handler }> = {};
+const routes: Record<string, { POST?: Handler; GET?: Handler; DELETE?: Handler }> = {};
 
 let db: PGlite;
 let auth: FakeAuth;
@@ -204,7 +204,8 @@ describe('the role gate on every admin route', () => {
           `10.2.${ip}.${Math.floor(Math.random() * 250)}`,
         );
         expect(res.status, `${route} as ${who?.username ?? 'nobody'}`).toBe(404);
-        expect(res.headers.get('x-robots-tag')).toContain('noindex');
+        // Nothing that tells it from an unknown address.
+        expect(res.headers.get('x-robots-tag')).toBeNull();
         expect(res.headers.get('cache-control')).toBe('no-store');
         answers.add(await res.text());
       }
@@ -611,7 +612,7 @@ describe('user actions', () => {
       target_type: 'account',
       target_id: p.id,
     });
-    expect(Object.keys(rows[0]!.details)).toEqual(['until']);
+    expect(Object.keys(rows[0]!.details).sort()).toEqual(['count', 'until']);
     const days = (new Date(d.suspendedUntil!).getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(6.9);
     expect(days).toBeLessThan(7.1);
@@ -1010,9 +1011,12 @@ describe('the dashboard counts', () => {
 // ------------------------------------------------------------------ maintenance mode
 
 describe('maintenance mode', () => {
+  // A route that changes the farm (throwing it away). Maintenance mode refuses these; reads still work
+  // (see second.test.ts for every route).
   const farmGet = async (who: Person | null, address = `10.5.0.${ip}`) =>
-    routes.farm!.GET!(
+    routes.farm!.DELETE!(
       new Request(`${HOST}/api/game/farm`, {
+        method: 'DELETE',
         headers: {
           host: 'localhost:3000',
           'x-real-ip': address,

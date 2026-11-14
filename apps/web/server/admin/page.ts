@@ -21,7 +21,10 @@ import { adminGate, readOnlyJar, type AdminSession, type GateResult } from './ga
  */
 const gate = cache(async (): Promise<GateResult> => {
   const jar = await cookies();
-  return adminGate(readOnlyJar(() => jar.getAll().map((c) => ({ name: c.name, value: c.value }))));
+  return adminGate(
+    readOnlyJar(() => jar.getAll().map((c) => ({ name: c.name, value: c.value }))),
+    { refresh: false },
+  );
 });
 
 export interface AdminPage {

@@ -12,12 +12,14 @@ import styles from './shell.module.css';
  */
 export function PlayOffline({ children }: { children: ReactNode }) {
   const offline = useOffline((s) => s.offline);
+  const maintenance = useOffline((s) => s.maintenance);
+  const held = offline || maintenance !== null;
   useEffect(() => startOfflineWatch(), []);
   return (
-    <div className={styles.shell} data-offline={offline}>
-      {offline && (
+    <div className={styles.shell} data-offline={held}>
+      {held && (
         <p className={styles.offline} role="status">
-          {OFFLINE_LINE}
+          {maintenance ?? OFFLINE_LINE}
         </p>
       )}
       <div className={styles.content}>{children}</div>

@@ -29,7 +29,7 @@ export const GET = route({ name: 'farms' }, async ({ player }): Promise<FarmsRes
 
 /** Open one of the account's farms (`{ id }`), or go back to the picker (`{ id: null }`). */
 export const POST = route(
-  { name: 'farms-open', write: true, max: 20 },
+  { name: 'farms-open', write: true, readOnlyOk: true, max: 20 },
   async ({ req, player, setCookies }): Promise<FarmResponse | { ok: true }> => {
     if (!player.user) throw new GameError(401, NEED_SIGN_IN);
     const body = (await readJson(req)) as { id?: unknown } | null;

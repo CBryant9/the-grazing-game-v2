@@ -23,18 +23,7 @@ const nextConfig: NextConfig = {
   // data folder at run time. Make sure a hosted build ships them with the routes.
   outputFileTracingIncludes: { '/api/game/**': ['../../packages/engine/data/raw/**'] },
   async headers() {
-    return [
-      { source: '/:path*', headers: securityHeaders },
-      // The admin pages and routes are never indexed (they are also in robots.txt and out of the sitemap).
-      {
-        source: '/admin/:path*',
-        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
-      },
-      {
-        source: '/api/admin/:path*',
-        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
-      },
-    ];
+    return [{ source: '/:path*', headers: securityHeaders }];
   },
 };
 

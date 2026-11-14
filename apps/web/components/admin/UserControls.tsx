@@ -62,7 +62,7 @@ export function UserControls({
               danger
               endpoint={endpoint}
               body={{ userId, action: 'suspend', days }}
-              explain={`Suspend this account for ${days} ${days === 1 ? 'day' : 'days'}? They can not use the community while it lasts. This is recorded in the audit log.`}
+              explain={`Suspend this account for ${days} ${days === 1 ? 'day' : 'days'}? They can not use the community while it lasts, and their sessions end now. This is recorded in the audit log.`}
             />
           </div>
         </div>
@@ -73,7 +73,7 @@ export function UserControls({
           danger
           endpoint={endpoint}
           body={{ userId, action: 'ban' }}
-          explain="Ban this account with no end date? The sign-in email is kept only as a one-way hash, so the same address can not sign up again while the ban runs. You can lift it later. This is recorded in the audit log."
+          explain="Ban this account with no end date? Their sessions end now. The sign-in email is kept only as a one-way hash, so the same address can not sign up again while the ban runs. If the email can not be found when you confirm, the ban still applies but will not survive the player deleting their account and signing up again, and you will be told. You can lift it later. This is recorded in the audit log."
         />
       )}
       {hasProfile && state !== 'active' && (

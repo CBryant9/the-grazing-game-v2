@@ -28,18 +28,19 @@ import { DEFAULT_MAINTENANCE_WORDING, MAINTENANCE_SETTING, MAINTENANCE_WORDINGS 
 export const MAINTENANCE_CODE = 'maintenance';
 
 /** The wording for an id, or the default. */
-export function wordingText(id: unknown): string {
+export function wording(id: unknown): { id: string; text: string } {
   return (
-    MAINTENANCE_WORDINGS.find((w) => w.id === id)?.text ??
-    MAINTENANCE_WORDINGS.find((w) => w.id === DEFAULT_MAINTENANCE_WORDING)!.text
+    MAINTENANCE_WORDINGS.find((w) => w.id === id) ??
+    MAINTENANCE_WORDINGS.find((w) => w.id === DEFAULT_MAINTENANCE_WORDING)!
   );
 }
+export const wordingText = (id: unknown): string => wording(id).text;
 
-/** The message a player sees, or null when the game is open to this caller. */
+/** The wording a player sees (its id and text), or null when the game is open to this caller. */
 export async function maintenanceNotice(
   userId: string | null,
   sql: SqlClient | null = authDeps()?.sql ?? sqlFromEnv(),
-): Promise<string | null> {
+): Promise<{ id: string; text: string } | null> {
   if (!sql) return null;
   const switches = await featureSwitches(sql);
   if (!switches.maintenance_mode) return null;
@@ -49,9 +50,9 @@ export async function maintenanceNotice(
       'select value from public.site_settings where key = $1',
       [MAINTENANCE_SETTING],
     );
-    return wordingText(r.rows[0]?.value?.id);
+    return wording(r.rows[0]?.value?.id);
   } catch (e) {
     logFailure({ route: 'game-maintenance', reason: 'maintenance_read_failed' }, e);
-    return wordingText(null);
+    return wording(null);
   }
 }

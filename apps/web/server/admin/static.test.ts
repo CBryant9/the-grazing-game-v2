@@ -20,14 +20,14 @@ function walk(dir: string, match: RegExp): string[] {
 }
 
 describe('the admin area is never found, cached or indexed', () => {
-  it('is disallowed in robots.txt, with the api, and is not in the sitemap', () => {
+  it('is not named in robots.txt (that would say it exists), the api is disallowed, and the sitemap has no admin', () => {
     const r = robots();
     const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
     const disallow = rules.flatMap((x) =>
       Array.isArray(x.disallow) ? x.disallow : [x.disallow ?? ''],
     );
-    expect(disallow).toContain('/admin');
     expect(disallow).toContain('/api');
+    expect(JSON.stringify(r)).not.toMatch(/admin/);
     for (const s of sitemap()) expect(s.url).not.toMatch(/admin/);
   });
 
@@ -49,13 +49,13 @@ describe('the admin area is never found, cached or indexed', () => {
     expect(sw).not.toMatch(/\/admin/);
   });
 
-  it('sends noindex on the pages (the layout and the headers) and the routes', () => {
+  it('is noindex only once the role check passes: the layout says so, and next.config sends nothing for /admin', () => {
     expect(read('app/admin/layout.tsx')).toMatch(
       /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/,
     );
-    const cfg = read('next.config.ts');
-    expect(cfg).toMatch(/source: '\/admin\/:path\*'[\s\S]{0,120}X-Robots-Tag/);
-    expect(cfg).toMatch(/source: '\/api\/admin\/:path\*'[\s\S]{0,120}X-Robots-Tag/);
+    // A header on /admin would tell a not found for a visitor apart from one for an unknown address.
+    expect(read('next.config.ts')).not.toMatch(/admin/);
+    expect(read('server/admin/route.ts')).toMatch(/if \(gated\) res\.headers\.set\('X-Robots-Tag'/);
   });
 
   it('checks the role in every page and the layout, and every route goes through adminRoute and exports only POST', () => {
