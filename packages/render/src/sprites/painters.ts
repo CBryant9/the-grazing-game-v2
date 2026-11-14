@@ -9,10 +9,18 @@
  * works out from the model, so one drawn piece serves every pasture state.
  */
 
-import type { ViewCattleKind } from '@gg/shared';
+import type { ViewCattleKind, ViewSheepKind } from '@gg/shared';
 import type { BodyShape } from '../cattle';
 import { css, cssA, shade } from '../colour';
-import { CATTLE, NATURAL, type CattleBreed, type CattleColours } from '../palette';
+import {
+  CATTLE,
+  NATURAL,
+  RAM_HORN,
+  SHEEP,
+  THIN_FLEECE,
+  type CattleBreed,
+  type CattleColours,
+} from '../palette';
 import { scatter } from '../random';
 import { SpriteRegistry, type SpriteDef } from './registry';
 
@@ -200,6 +208,188 @@ function addCattle(reg: SpriteRegistry): void {
             paintBeast(ctx, W, H, { colours: CATTLE[breed][kind], breed, kind, shape, len }),
         });
       }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheep
+// ---------------------------------------------------------------------------
+
+/** The name of a sheep sprite. Lambs have one shape. */
+export const sheepSprite = (kind: ViewSheepKind, thin: boolean): string =>
+  `sheep.${kind}.${kind !== 'lamb' && thin ? 'thin' : 'normal'}`;
+
+/** Texture pixels for one square across, for sheep. A ewe's body is about a quarter of a square long. */
+const SHEEP_PPU = 210;
+
+interface SheepArt {
+  kind: ViewSheepKind;
+  thin: boolean;
+  /** Body length in texture pixels. */
+  len: number;
+}
+
+/**
+ * A sheep seen from the side: a rounded woolly body made of overlapping
+ * lobes, a small dark grey head, thin dark legs. The pieces are outlined as
+ * one shape (dark line, then a thin pale rim outside it), so a flock never
+ * blurs into straw or grass, and the bumpy outline reads as wool at any
+ * zoom, where a cow is a long smooth box.
+ */
+function paintSheep(ctx: Ctx, W: number, H: number, art: SheepArt): void {
+  const L = art.len;
+  const c = SHEEP[art.kind];
+  const lamb = art.kind === 'lamb';
+  const ram = art.kind === 'ram';
+  const thin = art.thin && !lamb;
+  const lw = Math.max(1.5, L * 0.05);
+  const fleece = thin ? shade(c.fleece, THIN_FLEECE) : c.fleece;
+  const ry = L * (thin ? 0.24 : lamb ? 0.33 : 0.3);
+  const rx = L * (thin ? 0.43 : 0.46);
+  const legH = L * (lamb ? 0.3 : thin ? 0.28 : 0.23);
+  const cy = -legH - ry * 0.7;
+  const lobes: [number, number, number][] = thin
+    ? [
+        [-0.2, -0.78, 0.15],
+        [0.12, -0.8, 0.15],
+      ]
+    : [
+        [-0.34, -0.7, 0.17],
+        [-0.12, -0.95, 0.19],
+        [0.14, -0.92, 0.18],
+        [0.34, -0.62, 0.15],
+        [-0.46, 0.05, 0.15],
+        [-0.3, 0.6, 0.15],
+        [0.1, 0.7, 0.16],
+      ];
+
+  ctx.save();
+  ctx.translate(W / 2 - L * 0.1, H - 8);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  shadow(ctx, 0, 1, L * 0.5, L * 0.09, 0.3);
+
+  const wool: (() => void)[] = [
+    () => oval(ctx, 0, cy, rx, ry),
+    // The poll: a cap of wool on the head.
+    () => oval(ctx, L * 0.47, cy - ry * 0.55, L * 0.09, L * 0.075),
+  ];
+  for (const [lx, ly, lr] of lobes) {
+    wool.push(() => oval(ctx, L * lx * 0.92, cy + ry * ly, L * lr, L * lr));
+  }
+  const headX = L * 0.55;
+  const headY = cy - ry * 0.1;
+  const head = (): void => oval(ctx, headX, headY, L * 0.14, L * 0.1, 0.55);
+  const ear = (): void => oval(ctx, headX - L * 0.07, headY - L * 0.1, L * 0.065, L * 0.03, -0.5);
+  const legX = [-0.3, -0.2, 0.19, 0.3];
+  const legs = (): void => {
+    ctx.beginPath();
+    for (const lx of legX) ctx.rect(L * lx - L * 0.03, cy + ry * 0.4, L * 0.06, -cy - ry * 0.4);
+  };
+  const solid: (() => void)[] = [legs, head, ear, ...wool];
+
+  // A thin pale rim outside the dark line, so the sheep reads on dark ground.
+  ctx.strokeStyle = css(N.sheepHalo);
+  ctx.lineWidth = lw * 3.4;
+  for (const p of solid) {
+    p();
+    ctx.stroke();
+  }
+  ctx.strokeStyle = css(N.sheepOutline);
+  ctx.lineWidth = lw * 2;
+  for (const p of solid) {
+    p();
+    ctx.stroke();
+  }
+
+  if (ram) {
+    // Curled horns, drawn behind the head.
+    ctx.strokeStyle = css(N.sheepOutline);
+    ctx.lineWidth = lw * 2.6;
+    ctx.beginPath();
+    ctx.arc(headX - L * 0.06, headY - L * 0.02, L * 0.11, Math.PI * 1.05, Math.PI * 2.2);
+    ctx.stroke();
+    ctx.strokeStyle = css(RAM_HORN);
+    ctx.lineWidth = lw * 1.2;
+    ctx.beginPath();
+    ctx.arc(headX - L * 0.06, headY - L * 0.02, L * 0.11, Math.PI * 1.05, Math.PI * 2.2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = css(c.legs);
+  legs();
+  ctx.fill();
+  ctx.fillStyle = css(c.head);
+  head();
+  ctx.fill();
+  ear();
+  ctx.fill();
+  ctx.fillStyle = css(fleece);
+  for (const p of wool) {
+    p();
+    ctx.fill();
+  }
+
+  // Curls in the wool, so the body reads as wool close up.
+  ctx.strokeStyle = cssA(c.curl, 0.9);
+  ctx.lineWidth = lw * 0.8;
+  const curls: [number, number][] = thin
+    ? [
+        [-0.15, 0.1],
+        [0.12, 0.05],
+      ]
+    : [
+        [-0.28, -0.1],
+        [-0.05, -0.28],
+        [0.2, -0.12],
+        [-0.15, 0.3],
+        [0.12, 0.28],
+      ];
+  for (const [kx, ky] of curls) {
+    ctx.beginPath();
+    ctx.arc(L * kx, cy + ry * ky, L * 0.055, Math.PI * 0.15, Math.PI * 1.3);
+    ctx.stroke();
+  }
+  if (thin) {
+    // Hip bone and backbone showing through thin wool.
+    ctx.strokeStyle = cssA(N.sheepOutline, 0.5);
+    ctx.lineWidth = lw * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-L * 0.38, cy - ry * 0.3);
+    ctx.lineTo(-L * 0.3, cy + ry * 0.15);
+    ctx.moveTo(-L * 0.25, cy - ry * 0.85);
+    ctx.lineTo(L * 0.3, cy - ry * 0.85);
+    ctx.stroke();
+  }
+  // Eye.
+  ctx.fillStyle = '#e9e1cf';
+  oval(ctx, headX + L * 0.07, headY - L * 0.015, L * 0.016, L * 0.016);
+  ctx.fill();
+  ctx.restore();
+}
+
+function addSheep(reg: SpriteRegistry): void {
+  const size: Record<ViewSheepKind, number> = {
+    ewe: 1,
+    wether: 1.04,
+    ram: 1.18,
+    young: 0.82,
+    lamb: 0.52,
+  };
+  for (const kind of ['ewe', 'wether', 'ram', 'young', 'lamb'] as const) {
+    const len = Math.round(50 * size[kind]);
+    const w = Math.round(len * 1.55);
+    const h = Math.round(len * 1.08) + 10;
+    for (const thin of kind === 'lamb' ? [false] : [false, true]) {
+      reg.set(sheepSprite(kind, thin), {
+        w,
+        h,
+        ax: 0.5,
+        ay: (h - 8) / h,
+        ppu: SHEEP_PPU,
+        paint: (ctx, W, H) => paintSheep(ctx, W, H, { kind, thin, len }),
+      });
     }
   }
 }
@@ -657,6 +847,24 @@ function paintMarkerCow(ctx: Ctx, W: number, H: number): void {
   ctx.fillRect(s * 0.66, H * 0.5, s * 0.08, H * 0.42);
 }
 
+/** The sheep on a flock marker: a woolly cloud on thin legs with a small head. Drawn white and tinted to the theme. A cow's is long and smooth, so the two never read alike. */
+function paintMarkerSheep(ctx: Ctx, W: number, H: number): void {
+  ctx.fillStyle = '#ffffff';
+  for (const [x, y, r] of [
+    [0.3, 0.44, 0.2],
+    [0.46, 0.34, 0.22],
+    [0.62, 0.42, 0.2],
+    [0.38, 0.6, 0.2],
+    [0.56, 0.62, 0.19],
+  ] as const) {
+    oval(ctx, W * x, H * y, H * r * 1.15, H * r * 1.15);
+    ctx.fill();
+  }
+  oval(ctx, W * 0.84, H * 0.5, W * 0.07, H * 0.14, 0.5);
+  ctx.fill();
+  for (const x of [0.28, 0.36, 0.54, 0.62]) ctx.fillRect(W * x, H * 0.7, W * 0.045, H * 0.28);
+}
+
 function paintRain(ctx: Ctx, W: number, H: number): void {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, cssA(N.rain, 0));
@@ -718,6 +926,7 @@ function addThings(reg: SpriteRegistry): void {
   );
   def('mark.alert', 40, 40, 0.5, 1, 110, paintAlert);
   def('marker.cow', 36, 24, 0.5, 0.5, 36, paintMarkerCow);
+  def('marker.sheep', 36, 24, 0.5, 0.5, 36, paintMarkerSheep);
   def('rain', 10, 44, 0.5, 0.5, 44, paintRain);
 }
 
@@ -725,6 +934,7 @@ function addThings(reg: SpriteRegistry): void {
 export function defaultSprites(): SpriteRegistry {
   const reg = new SpriteRegistry();
   addCattle(reg);
+  addSheep(reg);
   addGrass(reg);
   addThings(reg);
   return reg;

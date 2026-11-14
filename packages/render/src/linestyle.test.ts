@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_TAG, LINE_PATTERN, TICK, tickOffsets, type LineStyleId } from './linestyle';
+import { CONTRACT_TAG, LINE_PATTERN, MESH, TICK, tickOffsets, type LineStyleId } from './linestyle';
 
 describe("the contractor's fence is told apart without colour", () => {
   const mine: LineStyleId[] = ['contractBuilt', 'contractLeft'];
@@ -34,5 +34,35 @@ describe("the contractor's fence is told apart without colour", () => {
 
   it('carries a short text tag', () => {
     expect(CONTRACT_TAG).toBe('Team fence');
+  });
+});
+
+describe('sheep netting is told apart without colour', () => {
+  const others = (Object.keys(LINE_PATTERN) as LineStyleId[]).filter((k) => k !== 'netting');
+
+  it('has a pattern of its own: a mesh, shared with no other line', () => {
+    expect(LINE_PATTERN.netting).toBe('mesh');
+    for (const o of others) expect(LINE_PATTERN[o], o).not.toBe('mesh');
+  });
+
+  it('is not dashed (tape), not sagging (a fence down) and has no ticks (the contractor)', () => {
+    expect(LINE_PATTERN.netting).not.toBe('dashed');
+    expect(LINE_PATTERN.netting).not.toBe('sag');
+    expect(LINE_PATTERN.netting).not.toContain('ticks');
+  });
+
+  it('every kind of line still has a pattern no other kind shares, except the plain solid ones', () => {
+    // Permanent and electric fence and pipe are the plain solid lines, told apart by colour and posts.
+    const solid = (Object.keys(LINE_PATTERN) as LineStyleId[]).filter(
+      (k) => LINE_PATTERN[k] === 'solid',
+    );
+    expect(solid.sort()).toEqual(['electric', 'permanent', 'pipe']);
+  });
+
+  it('has a mesh fine enough to read as netting and big enough to see', () => {
+    expect(MESH.stepPx).toBeGreaterThanOrEqual(3);
+    expect(MESH.stepPx).toBeLessThanOrEqual(6);
+    expect(MESH.swingPx).toBeGreaterThanOrEqual(1);
+    expect(MESH.widthPx).toBeGreaterThanOrEqual(1);
   });
 });

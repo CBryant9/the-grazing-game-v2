@@ -14,6 +14,7 @@ import {
   VIEW_FENCE,
   VIEW_LAND,
   type FarmView,
+  type FarmViewFlock,
   type FarmViewMob,
   type FarmViewSward,
 } from '@gg/shared';
@@ -72,6 +73,23 @@ export function mob(over: Partial<FarmViewMob> = {}): FarmViewMob {
     cattle: [{ kind: 'steer', n: 40, thin: 0, fat: 0 }],
     seed: 12345,
     status: { noWater: false, dryDays: 0, toMark: 0 },
+    ...over,
+  };
+}
+
+/** A flock of ewes, for the sheep tests. Sits in the left paddock like `mob`. */
+export function flock(over: Partial<FarmViewFlock> = {}): FarmViewFlock {
+  return {
+    id: 2,
+    name: 'Flock 1',
+    where: 'paddock',
+    area: 0,
+    anchor: cell(5, 5),
+    head: 200,
+    lambs: 0,
+    sheep: [{ kind: 'ewe', n: 200, thin: 0 }],
+    seed: 777,
+    status: { noWater: false, dryDays: 0 },
     ...over,
   };
 }
@@ -155,6 +173,44 @@ export function sampleView(): FarmView {
     plantings: [],
     mobs: [],
   };
+  return view;
+}
+
+/**
+ * The sample farm with sheep on it: a flock of 7,000 head (with lambs at foot and
+ * some thin) in the left paddock, and a line of sheep netting across the right
+ * paddock with a small netted pen. The cattle sample is left alone.
+ */
+export function sheepView(): FarmView {
+  const view = sampleView();
+  view.flocks = [
+    flock({
+      head: 7000,
+      lambs: 900,
+      sheep: [
+        { kind: 'ewe', n: 4200, thin: 300 },
+        { kind: 'wether', n: 1800, thin: 100 },
+        { kind: 'ram', n: 60, thin: 0 },
+        { kind: 'young', n: 940, thin: 40 },
+      ],
+    }),
+  ];
+  // A netted pen in the right paddock, with its own small flock.
+  fenceBox(view, 26, 8, 30, 12, VIEW_FENCE.netting);
+  view.flocks.push(
+    flock({
+      id: 3,
+      area: 2,
+      anchor: cell(28, 10),
+      head: 60,
+      lambs: 20,
+      sheep: [
+        { kind: 'ewe', n: 60, thin: 10 },
+        { kind: 'lamb', n: 20, thin: 0 },
+      ],
+      seed: 31,
+    }),
+  );
   return view;
 }
 

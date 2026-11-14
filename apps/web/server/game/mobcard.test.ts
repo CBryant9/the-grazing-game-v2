@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFarm, endDay, husbandryNow, supplementCosts } from '@gg/engine';
+import { DSE_PER_AE, createFarm, endDay, husbandryNow, supplementCosts } from '@gg/engine';
 import type { SetupChoices, Snapshot } from '../../lib/game/types';
 import { GameError, GameServer, parseAction } from './game';
 import { buildSnapshot } from './snapshot';
@@ -108,7 +108,9 @@ describe('the paddock wire', () => {
     const s = await server().create(A, choices());
     for (const p of s.paddocks) {
       expect(s.view.squares.paddock[p.cell]).toBe(p.id);
-      expect(p.dse).toBeCloseTo(p.ae * 8, 0);
+      // One DSE figure, the engine's (8.4 to the AE since engine 0.15): never written here.
+      // AE comes rounded to 0.1, so the DSE worked back from it can be out by half of 0.1 AE.
+      expect(Math.abs(p.dse - p.ae * DSE_PER_AE)).toBeLessThanOrEqual(0.5 + 0.05 * DSE_PER_AE);
       expect(p.carryingDsePerHa).toBeGreaterThan(0);
     }
   });

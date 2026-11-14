@@ -882,7 +882,10 @@ function dryAreasOf(j: Job, tpl: PlanTemplate): string[] {
 function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
   const { farm } = j;
   const m = j.mob(a.mob);
-  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  // A sheep mob makes or changes a plan the same way, then runs it as a sheep plan (sheep/moves.ts),
+  // as pausePlan and resumePlan already do (m2.8: without this a farm with no cattle could not make a plan).
+  const sheepMob = !m && !!j.farm.sheep?.mobs.some((x) => x.id === a.mob);
+  if (!m && !sheepMob) return refuse('no-such-mob', 'That mob is not on the farm.');
   if (!a.plan || typeof a.plan !== 'object') return refuse('bad-request', 'Say which plan.');
   let tpl: PlanTemplate;
   let changed = false;
@@ -938,7 +941,24 @@ function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
       r.round = 0;
       r.waiting = null;
     }
+    for (const o of j.farm.sheep?.mobs ?? []) {
+      const r = o.plan;
+      if (!r || r.template !== tpl.id || o.id === a.mob) continue;
+      if (r.leg >= tpl.legs.length || r.idx >= tpl.legs[r.leg]!.stops.length) {
+        r.leg = 0;
+        r.idx = 0;
+      }
+      r.round = 0;
+      r.waiting = null;
+    }
   }
+  if (!m)
+    return setSheepPlan(farm, j.events, {
+      type: 'setSheepPlan',
+      mob: a.mob,
+      template: tpl.id,
+      step,
+    });
   const joins = joinsOf(j, m, tpl);
   const dryAreas = dryAreasOf(j, tpl);
   // The plan is on the mob before it is put on the stop, so a join keeps it as the old game's did.
@@ -1025,6 +1045,9 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
 
 function clearPlan(j: Job, a: Extract<Action, { type: 'clearPlan' }>): Out {
   const m = j.mob(a.mob);
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob)) {
+    return clearSheepPlan(j.farm, j.events, { type: 'clearSheepPlan', mob: a.mob });
+  }
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);

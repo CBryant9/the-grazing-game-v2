@@ -725,6 +725,9 @@ export type {
   StockingRead,
 } from './sheep/reads';
 export { SHEEP_BUY_CLASSES } from './sheep/market';
+// Milestone 2.8: the contractors' price a head, for "Shearing on 14 November. About $9.81 a head."
+// Server only: the screen gets the sentence. MAX_SHEEP_BUY bounds the Buy card's number field.
+export { SHEEP_BUDGET_COSTS, MAX_SHEEP_BUY } from './data/sheepMarket';
 export type { SheepBuyClassId } from './sheep/market';
 export type { SheepDeathCause, SheepLossReason, SheepNote } from './sheep/notes';
 export type { StartFlock } from './sim/create';

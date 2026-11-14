@@ -75,11 +75,12 @@ export interface MobPlacement {
 }
 
 /** True if stock cannot cross a line with this code. Open gates are handled by the caller. */
-const stops = (code: number): boolean =>
+export const stops = (code: number): boolean =>
   code === VIEW_FENCE.boundary ||
   code === VIEW_FENCE.permanent ||
   code === VIEW_FENCE.electric ||
   code === VIEW_FENCE.tape ||
+  code === VIEW_FENCE.netting ||
   code === VIEW_FENCE.gate;
 
 /** What the placement needs from a view, worked out once for all its mobs. */
@@ -203,7 +204,7 @@ export function standingBox(view: FarmView, square: number): [number, number, nu
 }
 
 /** Share `count` places among groups in proportion to their sizes, each present group getting at least one if there is room. */
-function share(sizes: readonly number[], count: number): number[] {
+export function share(sizes: readonly number[], count: number): number[] {
   const total = sizes.reduce((t, n) => t + n, 0);
   const out = sizes.map(() => 0);
   const places = Math.min(count, total);

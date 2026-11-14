@@ -57,6 +57,7 @@ import {
   type Viewport,
 } from './camera';
 import { placeCattle, placementKey, type MobPlacement } from './cattle';
+import { placeSheep, sheepPlacementKey, type FlockPlacement } from './sheep';
 import { shade } from './colour';
 import { columnsSpanned, fenceRuns, outlineOf, type FenceRun } from './fences';
 import {
@@ -98,12 +99,12 @@ import type { DraftDot, DraftKind, MapDraft } from './draft';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
 import { easeFade, fadeStep, lodMode, type LodMode } from './lod';
-import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, TICK, tickOffsets } from './linestyle';
+import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, MESH, TICK, tickOffsets } from './linestyle';
 import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
 import { NATURAL, breedFor, paletteFor, type MapPalette, type MapTheme } from './palette';
 import { scatter } from './random';
-import { cattleSprite, defaultSprites } from './sprites/painters';
+import { cattleSprite, defaultSprites, sheepSprite } from './sprites/painters';
 import { packAtlas, type SpriteDef, type SpriteRegistry } from './sprites/registry';
 
 export interface FarmMapOptions {
@@ -204,6 +205,9 @@ export interface MapStats {
   /** Head on the farm (calves included) and how many of them are drawn. */
   head: number;
   cattleDrawn: number;
+  /** Sheep on the farm (lambs at foot included) and how many of them are drawn. */
+  sheep: number;
+  sheepDrawn: number;
   /** Grass pieces drawn zoomed in. */
   tuftPieces: number;
   /** Milliseconds the last view took to apply, and where the time went. */
@@ -303,6 +307,7 @@ const DRAFT_COLOUR: Record<DraftKind, number> = {
   contract: NATURAL.fenceContract,
   electric: NATURAL.fenceElectric,
   tape: NATURAL.fenceTape,
+  netting: NATURAL.fenceNetting,
   pipe: NATURAL.pipe,
   mark: 0xffffff,
 };
@@ -315,6 +320,9 @@ const PX = {
   farWire: 1.7,
   farBoundaryCasing: 4.8,
   farBoundaryWire: 2.4,
+  /** Sheep netting is a little bolder than the wires, so its mesh can show. */
+  farNettingCasing: 5.2,
+  farNettingWire: 3.4,
   pipe: 2.6,
   outline: 2,
   highlight: 3,
@@ -337,12 +345,14 @@ const WIRE_LIFT: Record<number, readonly number[]> = {
   [VIEW_FENCE.permanent]: [0.06, 0.12],
   [VIEW_FENCE.electric]: [0.07, 0.13],
   [VIEW_FENCE.tape]: [0.085],
+  [VIEW_FENCE.netting]: [0.04, 0.17],
 };
 const POST_HEIGHT: Record<number, number> = {
   [VIEW_FENCE.boundary]: 0.16,
   [VIEW_FENCE.permanent]: 0.15,
   [VIEW_FENCE.electric]: 0.15,
   [VIEW_FENCE.tape]: 0.105,
+  [VIEW_FENCE.netting]: 0.19,
 };
 
 interface Row {
@@ -464,6 +474,8 @@ class PixiFarmMap implements FarmMap {
   private looks: SquareLook[] = [];
   private raise = new Float32Array(GRID_N);
   private placements: MobPlacement[] = [];
+  private flockPlacements: FlockPlacement[] = [];
+  private sheepDrawn = 0;
   private pinned: PinnedLabel[] = [];
   private padLabels: PadLabel[] = [];
   private keys = { placement: '', things: '', fences: '', labels: '' };
@@ -957,10 +969,12 @@ class PixiFarmMap implements FarmMap {
       this.drawRing();
     }
     lap('fencesAndThings');
-    const placement = placementKey(view) + view.district + this.everyBeast;
+    const placement =
+      placementKey(view) + view.district + this.everyBeast + sheepPlacementKey(view);
     if (placement !== this.keys.placement) {
       this.keys.placement = placement;
       this.placements = placeCattle(view, { everyBeast: this.everyBeast });
+      this.flockPlacements = placeSheep(view, { everyBeast: this.everyBeast });
       this.buildCattle();
     }
     lap('cattle');
@@ -968,6 +982,7 @@ class PixiFarmMap implements FarmMap {
       view.paddocks.map((p) => [p.id, p.name, p.ha, p.labelCell, p.label, p.water]),
       view.plantings.map((p) => [p.id, p.name, p.labelCell, p.squares, p.selfSown, p.oversown]),
       view.mobs.map((m) => [m.id, m.head, m.calves, m.status.noWater]),
+      (view.flocks ?? []).map((f) => [f.id, f.head, f.lambs, f.status.noWater]),
       view.water.troughs.length + view.water.hubs.length,
       placement,
     ]);
@@ -1094,6 +1109,15 @@ class PixiFarmMap implements FarmMap {
         byRow[r]!.push({ x: b.x, y: b.y, id: cattleSprite(breed, b.kind, b.shape), flip: b.flip });
       }
     }
+    // Sheep stand in the same layer, so they sort back to front with the cattle.
+    this.sheepDrawn = 0;
+    for (const p of this.flockPlacements) {
+      for (const s of p.sheep) {
+        const r = Math.min(GRID_H - 1, Math.max(0, Math.floor(s.y)));
+        byRow[r]!.push({ x: s.x, y: s.y, id: sheepSprite(s.kind, s.thin), flip: s.flip });
+        this.sheepDrawn++;
+      }
+    }
     for (let r = 0; r < GRID_H; r++) {
       const beasts = byRow[r]!.sort((a, b) => a.y - b.y);
       const list = this.rows[r]!.cattle.particleChildren;
@@ -1119,6 +1143,10 @@ class PixiFarmMap implements FarmMap {
     // The soft footprint under each mob's marker, zoomed out: the squares it stands on.
     const g = this.footprints.clear();
     for (const p of this.placements) {
+      for (const c of p.cells) g.rect(colOf(c), rowOf(c) * K, 1.02, K + 0.02);
+      g.fill({ color: 0x281a0a, alpha: 0.14 });
+    }
+    for (const p of this.flockPlacements) {
       for (const c of p.cells) g.rect(colOf(c), rowOf(c) * K, 1.02, K + 0.02);
       g.fill({ color: 0x281a0a, alpha: 0.14 });
     }
@@ -1218,12 +1246,39 @@ class PixiFarmMap implements FarmMap {
       [VIEW_FENCE.tape]: N.fenceTape,
       [VIEW_FENCE.electricDown]: N.fenceDown,
       [VIEW_FENCE.tapeDown]: N.fenceDown,
+      [VIEW_FENCE.netting]: N.fenceNetting,
     };
     const post: Record<number, number> = {
       [VIEW_FENCE.boundary]: N.fencePostBoundary,
       [VIEW_FENCE.permanent]: N.fencePost,
       [VIEW_FENCE.electric]: N.fencePostElectric,
       [VIEW_FENCE.tape]: N.fencePostTape,
+      [VIEW_FENCE.netting]: N.fencePost,
+    };
+    const nettingRuns = runs.filter((r) => r.code === VIEW_FENCE.netting);
+    /**
+     * A zigzag worked along a run, `amp` either side of the line and `lift`
+     * above the ground: the mesh of sheep netting. Two with opposite phases
+     * cross and make diamonds. On a run down the map the swing is sideways.
+     */
+    const zigzag = (
+      g: Graphics,
+      r: FenceRun,
+      amp: number,
+      lift: number,
+      step: number,
+      phase: number,
+    ): void => {
+      const len = Math.hypot(r.x1 - r.x0, (r.y1 - r.y0) * K);
+      const n = Math.max(2, Math.round(len / step));
+      for (let k = 0; k <= n; k++) {
+        const a = k / n;
+        const side = (k + phase) % 2 === 0 ? 1 : -1;
+        const x = r.x0 + (r.x1 - r.x0) * a + (r.across ? 0 : side * amp);
+        const y = (r.y0 + (r.y1 - r.y0) * a) * K - lift + (r.across ? side * amp : 0);
+        if (k === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
     };
     const down = (r: FenceRun): boolean =>
       r.code === VIEW_FENCE.tapeDown || r.code === VIEW_FENCE.electricDown;
@@ -1267,6 +1322,15 @@ class PixiFarmMap implements FarmMap {
     far.stroke({ color: N.fenceCasing, width: PX.farCasing * px, alpha: 0.85, cap: 'round' });
     for (const r of runs) if (r.code === VIEW_FENCE.boundary) path(far, r, 0, false);
     far.stroke({ color: N.fenceCasing, width: PX.farBoundaryCasing * px, cap: 'round' });
+    if (nettingRuns.length) {
+      for (const r of nettingRuns) path(far, r, 0, false);
+      far.stroke({
+        color: N.fenceCasing,
+        width: PX.farNettingCasing * px,
+        alpha: 0.9,
+        cap: 'round',
+      });
+    }
     for (const code of Object.keys(wire).map(Number)) {
       let any = false;
       for (const r of runs) {
@@ -1277,9 +1341,19 @@ class PixiFarmMap implements FarmMap {
       if (!any) continue;
       far.stroke({
         color: wire[code]!,
-        width: (code === VIEW_FENCE.boundary ? PX.farBoundaryWire : PX.farWire) * px,
+        width:
+          (code === VIEW_FENCE.boundary
+            ? PX.farBoundaryWire
+            : code === VIEW_FENCE.netting
+              ? PX.farNettingWire
+              : PX.farWire) * px,
         cap: 'round',
       });
+    }
+    // The mesh: a fine dark zigzag worked along the netting, a chain-link band zoomed out.
+    if (nettingRuns.length) {
+      for (const r of nettingRuns) zigzag(far, r, MESH.swingPx * px, 0, MESH.stepPx * px, 0);
+      far.stroke({ color: N.fenceCasing, width: MESH.widthPx * px, alpha: 0.9, cap: 'butt' });
     }
 
     // ---- Zoomed in: a ground shadow, posts every half square, and the wires standing above the ground.
@@ -1311,6 +1385,23 @@ class PixiFarmMap implements FarmMap {
       near.stroke({ color: N.fenceCasing, width: w * 2.3 * heavy, alpha: 0.8, cap: 'round' });
       for (const lift of lifts) for (const r of mine) path(near, r, lift, code === VIEW_FENCE.tape);
       near.stroke({ color: wire[code]!, width: w * heavy, cap: 'round' });
+    }
+    // Netting: a mesh of crossing zigzags between its two wires (diamonds), the pattern no other fence has.
+    if (nettingRuns.length) {
+      const lifts = WIRE_LIFT[VIEW_FENCE.netting]!;
+      const mid = (lifts[0]! + lifts[1]!) / 2;
+      for (const phase of [0, 1]) {
+        for (const r of nettingRuns) {
+          zigzag(near, r, r.across ? (lifts[1]! - lifts[0]!) / 2 : 0.04, mid, 0.09, phase);
+        }
+      }
+      near.stroke({ color: N.fenceCasing, width: w * 1.5, alpha: 0.55, cap: 'butt' });
+      for (const phase of [0, 1]) {
+        for (const r of nettingRuns) {
+          zigzag(near, r, r.across ? (lifts[1]! - lifts[0]!) / 2 : 0.04, mid, 0.09, phase);
+        }
+      }
+      near.stroke({ color: N.fenceNetting, width: w * 0.7, alpha: 0.95, cap: 'butt' });
     }
     this.invalidate();
   }
@@ -1560,6 +1651,38 @@ class PixiFarmMap implements FarmMap {
         this.pill(small, { line: dry ? ui.noWater : ui.markerLine, pad: 6, gap: 4 }),
         p.centre.x,
         (p.centre.y - p.spread.y) * K - 0.5,
+        { when: 'near', lift: 8 },
+      );
+    }
+
+    // ---- Flocks: a woolly marker with the head count and the word "sheep" zoomed out, so a flock is never taken for cattle.
+    const flocks = new Map((view.flocks ?? []).map((f) => [f.id, f]));
+    for (const p of this.flockPlacements) {
+      const flock = flocks.get(p.flock);
+      if (!flock) continue;
+      const dry = flock.status.noWater;
+      const count = flock.head.toLocaleString('en-AU');
+      const icon = (size: number): Sprite => {
+        const s = new Sprite(this.tex('marker.sheep'));
+        s.tint = ui.markerText;
+        s.setSize(size * 1.5, size);
+        return s;
+      };
+      const big: Container[] = [icon(12), this.text(count, 12, ui.markerText)];
+      big.push(this.text('sheep', 10, ui.labelMuted, '500'));
+      if (dry) big.push(this.text('no water', 10, ui.noWater));
+      pin(
+        this.pill(big, { line: dry ? ui.noWater : ui.markerLine, pad: 8 }),
+        p.centre.x,
+        p.centre.y * K,
+        { when: 'far' },
+      );
+      const small: Container[] = [icon(9), this.text(count, 10, ui.markerText)];
+      if (dry) small.push(this.text('no water', 10, ui.noWater));
+      pin(
+        this.pill(small, { line: dry ? ui.noWater : ui.markerLine, pad: 6, gap: 4 }),
+        p.centre.x,
+        (p.centre.y - p.spread.y) * K - 0.35,
         { when: 'near', lift: 8 },
       );
     }
@@ -2063,6 +2186,24 @@ class PixiFarmMap implements FarmMap {
       g.stroke({ color: N.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
       trace(edges, dashed);
       g.stroke({ color: style === 'remove' ? 0xffffff : colour, width: 4 * u, cap: 'round' });
+      if (d.kind === 'netting' && style !== 'remove') {
+        // The same fine zigzag as the finished netting, so the draft reads as netting, not as a plain line.
+        for (const e of edges) {
+          const [x0, y0, x1, y1] = edgeEnds(e);
+          const len = Math.hypot(x1 - x0, (y1 - y0) * K);
+          const n = Math.max(2, Math.round(len / (MESH.stepPx * u)));
+          const across = y0 === y1;
+          for (let k = 0; k <= n; k++) {
+            const a = k / n;
+            const swing = (k % 2 === 0 ? 1 : -1) * 1.2 * u;
+            const px = x0 + (x1 - x0) * a + (across ? 0 : swing);
+            const py = (y0 + (y1 - y0) * a) * K + (across ? swing : 0);
+            if (k === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          }
+        }
+        g.stroke({ color: N.fenceCasing, width: 1.1 * u, alpha: 0.9, cap: 'butt' });
+      }
     }
     // Squares (pipe, or a place for a trough): a tint, then a line through their middles.
     for (const style of ['ok', 'late', 'remove'] as const) {
@@ -2216,15 +2357,17 @@ class PixiFarmMap implements FarmMap {
   }
 
   stats(): MapStats {
-    let cattleDrawn = 0;
+    let animalsDrawn = 0;
     let tuftPieces = 0;
     for (const row of this.rows) {
-      cattleDrawn += row.cattle.particleChildren.length;
+      animalsDrawn += row.cattle.particleChildren.length;
       tuftPieces += row.tuftCount;
     }
     return {
       head: this.view ? this.view.mobs.reduce((t, m) => t + m.head + m.calves, 0) : 0,
-      cattleDrawn,
+      cattleDrawn: animalsDrawn - this.sheepDrawn,
+      sheep: this.view ? (this.view.flocks ?? []).reduce((t, f) => t + f.head + f.lambs, 0) : 0,
+      sheepDrawn: this.sheepDrawn,
       tuftPieces,
       lastViewMs: Math.round(this.lastViewMs * 10) / 10,
       lastViewParts: { ...this.lastViewParts },

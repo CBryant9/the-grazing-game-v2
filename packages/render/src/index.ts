@@ -71,6 +71,21 @@ export {
 } from './cattle';
 export type { Beast, BodyShape, MobPlacement, PlacementOptions } from './cattle';
 
+export {
+  SHEEP_MAX_CROWDED,
+  SHEEP_MAX_PER_SQUARE,
+  SHEEP_SPREAD_PER_SQUARE,
+  SHEEP_STAND_BACK,
+  SHEEP_YARDS_DRAWN,
+  placeSheep,
+  sheepPlacementKey,
+} from './sheep';
+export type { FlockPlacement, Sheep } from './sheep';
+export { SHEEP } from './palette';
+export type { SheepColours } from './palette';
+export { LINE_PATTERN } from './linestyle';
+export type { LinePattern, LineStyleId } from './linestyle';
+
 export { squareLook, squareTufts, TUFTS_PER_SQUARE } from './grass';
 export type { SquareLook, Tuft } from './grass';
 
@@ -79,7 +94,7 @@ export type { BenchResult, FrameStats } from './bench';
 
 export { SpriteRegistry, packAtlas } from './sprites/registry';
 export type { SpriteDef } from './sprites/registry';
-export { cattleSprite, defaultSprites } from './sprites/painters';
+export { cattleSprite, defaultSprites, sheepSprite } from './sprites/painters';
 
 export { drawSward, swardCaption, swardParts, swardPlan } from './sward';
 export type { SwardPart, SwardPictureOptions, SwardPlan } from './sward';

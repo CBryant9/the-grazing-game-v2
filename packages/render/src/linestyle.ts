@@ -11,11 +11,21 @@
  *   sleepers on a railway (the contractor's fence, built).
  * - `dashed-ticks`: the same bars along a dashed line (the contractor's fence,
  *   still to build).
+ * - `mesh`: a solid line with a fine zigzag worked along it, like the diamonds
+ *   of wire netting (sheep netting). Zoomed in the zigzag crosses itself
+ *   between two wires, so the diamonds show.
  */
-export type LinePattern = 'solid' | 'dashed' | 'sag' | 'ticks' | 'dashed-ticks';
+export type LinePattern = 'solid' | 'dashed' | 'sag' | 'ticks' | 'dashed-ticks' | 'mesh';
 
 export type LineStyleId =
-  'permanent' | 'electric' | 'tape' | 'pipe' | 'fenceDown' | 'contractBuilt' | 'contractLeft';
+  | 'permanent'
+  | 'electric'
+  | 'tape'
+  | 'pipe'
+  | 'fenceDown'
+  | 'netting'
+  | 'contractBuilt'
+  | 'contractLeft';
 
 export const LINE_PATTERN: Record<LineStyleId, LinePattern> = {
   permanent: 'solid',
@@ -23,6 +33,7 @@ export const LINE_PATTERN: Record<LineStyleId, LinePattern> = {
   tape: 'dashed',
   pipe: 'solid',
   fenceDown: 'sag',
+  netting: 'mesh',
   contractBuilt: 'ticks',
   contractLeft: 'dashed-ticks',
 };
@@ -32,6 +43,13 @@ export const CONTRACT_TAG = 'Team fence';
 
 /** Cross ticks along the contractor's fence: spacing and length, in screen pixels at every zoom. */
 export const TICK = { spacingPx: 13, lengthPx: 11 } as const;
+
+/**
+ * The mesh on sheep netting zoomed out, in screen pixels: how far the zigzag
+ * swings either side of the line, how far apart its turns are, and how thick
+ * its dark stroke is. Zoomed in the mesh is sized in squares (see map.ts).
+ */
+export const MESH = { swingPx: 1.25, stepPx: 3.6, widthPx: 1.1 } as const;
 
 /** Pixels per square from which the "Team fence" tag is drawn: wide enough to read. */
 export const CONTRACT_TAG_MIN_PX = 30;

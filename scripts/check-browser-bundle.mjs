@@ -80,6 +80,18 @@ const ENGINE_ONLY = [
   'teamMetresPerDay',
   'newPerWeek',
   'listedDays',
+  // The sheep model (milestones 2.3 and 2.4, src/data/sheep.ts, src/data/sheepMarket.ts,
+  // src/sheep/): its random streams and table keys. A screen gets finished words and rounded
+  // figures (milestone 2.8), never a lambing chance, a ram rule or a cost table.
+  'gen:flock',
+  'sheep:breeding',
+  'sheep:deaths',
+  'sheep:flies',
+  'eweYearDse',
+  'csAtLambing',
+  'ramYears',
+  'scanDays',
+  'lambRisk',
 ];
 
 /**

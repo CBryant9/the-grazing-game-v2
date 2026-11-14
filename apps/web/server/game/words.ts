@@ -3,6 +3,7 @@ import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engi
 import type { TodoWire } from '../../lib/game/types';
 import { layoutWord } from './buildwords';
 import { labourMessage, type DateOf } from './labourwords';
+import { isSheepEvent, sheepMessage } from './sheepwords';
 
 /** Why water matters, as a fact. Said in the things to do and on the paddock sheet: written once, here. */
 export const NO_WATER_WHY = 'Cattle die on the fourth day without water.';
@@ -239,6 +240,8 @@ export function doneWord(events: readonly FarmEvent[], dateOf?: DateOf): string 
         if (dateOf) parts.push(labourMessage(e, dateOf));
         break;
       default:
+        // A sheep job says its result in the same words as the inbox.
+        if (dateOf && isSheepEvent(e)) parts.push(sheepMessage(e, dateOf).text);
         break;
     }
   }

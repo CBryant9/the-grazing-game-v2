@@ -2,6 +2,7 @@ import { authDeps } from '@/server/auth/deps';
 import { BROKEN_MESSAGE, GameError, gameServer } from '@/server/game/game';
 import { readJson, route } from '@/server/game/http';
 import { parseSetup } from '@/server/game/setup';
+import { sheepSwitchOn } from '@/server/game/switches';
 import { FARM_COOKIE, newFarm } from '@/server/player';
 import { clearCookieText, cookieText } from '@/server/security';
 import type { FarmResponse } from '@/lib/game/types';
@@ -34,7 +35,7 @@ export const GET = route(
 export const POST = route(
   { name: 'create', mint: true, write: true, max: 10 },
   async ({ req, sessionId, player, setCookies }): Promise<FarmResponse> => {
-    const parsed = parseSetup(await readJson(req));
+    const parsed = parseSetup(await readJson(req), await sheepSwitchOn());
     if (!parsed.ok) throw new GameError(400, parsed.message);
     const deps = authDeps();
     // A finished account starts an account farm. Anyone else (a visitor, a sign-in not finished,

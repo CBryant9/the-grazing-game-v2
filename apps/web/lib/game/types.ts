@@ -9,8 +9,12 @@
 
 import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
-/** 3 added `workforce` and `contracts` (milestone 2.2). A saved offline farm of an older version is not shown. */
-export const SNAPSHOT_VERSION = 4;
+/**
+ * 3 added `workforce` and `contracts` (milestone 2.2). 5 added sheep (milestone 2.8): a mob's
+ * `species` and `sheep`, the sheep market, the setup's stock. A saved offline farm of an older
+ * version is not shown.
+ */
+export const SNAPSHOT_VERSION = 5;
 
 export interface DateParts {
   year: number;
@@ -24,6 +28,8 @@ export type SetupYears = 'real-in-order' | 'real-random' | 'random';
 export type SetupStart = 'running' | 'scratch';
 export type SetupDifficulty = 'easy' | 'medium' | 'hard';
 export type SetupEnterprise = 'grazing' | 'mixed';
+/** The stock a running farm starts with. Sheep or a mix only with the sheep switch on, never in Central Queensland. */
+export type SetupStock = 'cattle' | 'sheep' | 'mix';
 
 /** What the player chose at setup, in words the screens can show. No dollar figures. */
 export interface SetupSummary {
@@ -33,6 +39,8 @@ export interface SetupSummary {
   size: SetupSize;
   farmHa: number;
   enterprise: SetupEnterprise;
+  /** Cattle, sheep or a mix. Cattle on every farm made before sheep. */
+  stock: SetupStock;
   arablePct: number;
   years: SetupYears;
   startType: SetupStart;
@@ -108,8 +116,54 @@ export interface SellGroupWire {
   head: number;
 }
 
+export type SheepFeedId = 'none' | 'lick' | 'grain' | 'hay';
+
+/** A sheep feed and what it costs this mob a day, dollars. */
+export interface SheepFeedOptionWire {
+  id: SheepFeedId;
+  label: string;
+  perDay: number;
+}
+
+/** Sheep of one class (and sex where it matters) in a mob that can be sold. */
+export interface SheepSellWire {
+  /** Sent back with Sell: "ewe:F", "hogget:W". */
+  id: string;
+  label: string;
+  head: number;
+}
+
+/** What a sheep mob's card shows beyond what every mob shows. Words and rounded figures. */
+export interface SheepWire {
+  /** Where the mob is up to, in plain words: "Ewes with lambs at foot." */
+  stage: string;
+  /** "About 7 months of wool: 2.4 kg clean a head, 18.1 micron." Null with no weaned sheep. */
+  wool: string | null;
+  /** "Shearing on 14 November. About $9.81 a head." Null when none is booked. */
+  shearing: string | null;
+  /** "Crutching on 10 July. About $1.92 a head." Null when none is booked. */
+  crutching: string | null;
+  /** The shearing day, for the date chooser. Null when none is booked. */
+  shearOn: { month: number; date: number } | null;
+  /** The joining and its counts on the record, one line each. */
+  joining: string[];
+  feed: SheepFeedId;
+  /** The feeds to pick from, with today's cost for this mob. Empty off pasture. */
+  feedOptions: SheepFeedOptionWire[];
+  /** Why feeding is off, or null. */
+  feedReason: string | null;
+  sell: SheepSellWire[];
+  sellReason: string | null;
+  /** "Paddock 4 has cattle fence on part of its edge. A cattle fence does not hold sheep." Null when it holds them. */
+  fence: string | null;
+}
+
 export interface MobWire {
   id: number;
+  /** Cattle or sheep. A sheep mob carries `sheep`, and the cattle-only fields are empty on it. */
+  species: 'cattle' | 'sheep';
+  /** Sheep only: null for cattle. */
+  sheep: SheepWire | null;
   name: string;
   where: 'paddock' | 'lot' | 'yards';
   area: string | null;
@@ -238,7 +292,33 @@ export interface SellClassWire {
   cKg: number;
 }
 
+/** A class of sheep for the Buy card. */
+export interface SheepBuyWire {
+  id: string;
+  label: string;
+  /** About what one head costs with the head fee, dollars. */
+  perHead: number;
+}
+
+/** The sheep side of the Market tab. */
+export interface SheepMarketWire {
+  buy: SheepBuyWire[];
+  maxQty: number;
+  /** Why Buy is off, or null on a sale day. */
+  reason: string | null;
+  /** MLA indicators, c/kg carcase weight, whole, with their names. */
+  prices: { id: string; label: string; cKg: number }[];
+  /** "MLA indicators, 12 November 2026." */
+  dated: string;
+  /** Clean wool, c/kg, by micron. */
+  wool: { micron: number; cKg: number }[];
+  /** Plain facts: how sheep are bought and sold, and that wool sells at shearing. */
+  notes: string[];
+}
+
 export interface MarketWire {
+  /** Sheep classes, prices and wool. Null on a farm that does not show sheep. */
+  sheep: SheepMarketWire | null;
   isSaleDay: boolean;
   nextSale: SaleDayWire | null;
   booked: { date: DateParts; daysAway: number; head: number }[];
@@ -262,7 +342,7 @@ export interface MarketWire {
   };
 }
 
-export type InboxKind = 'cattle' | 'sale' | 'crop' | 'plan' | 'water' | 'farm' | 'work';
+export type InboxKind = 'cattle' | 'sheep' | 'sale' | 'crop' | 'plan' | 'water' | 'farm' | 'work';
 
 export interface InboxWire {
   seq: number;
@@ -282,7 +362,7 @@ export interface EdgeWire {
   index: number;
 }
 
-export type FenceKindId = 'permanent' | 'electric' | 'tape';
+export type FenceKindId = 'permanent' | 'electric' | 'tape' | 'netting';
 export type BuildToolId = 'fence' | 'gate' | 'pipe' | 'trough' | 'portable' | 'hub' | 'remove';
 
 /** A fence the player can draw: what a metre costs and what it does. From the server. */
@@ -707,7 +787,11 @@ export interface SummaryWire {
     contract: number;
     /** Wages and super paid. They are in `running` too. */
     wages: number;
+    /** Wool sold at shearing, after selling costs. 0 with none. */
+    wool: number;
   };
+  /** What the sheep did, one line each: lambs, deaths with causes, weaning, shearing. Empty with no sheep. */
+  sheepLines: string[];
   arrived: { head: number; calves: number };
   bookedSold: { head: number; net: number };
   /** Where a grazing plan moved a mob, one line for each mob. */
@@ -781,6 +865,8 @@ export interface PastDaysResponse {
 // ---- Setup
 
 export interface SetupOptions {
+  /** Cattle, sheep or a mix. Empty when the sheep switch is off: every farm then starts with cattle. */
+  stocks: { id: SetupStock; label: string; text: string }[];
   districts: {
     id: DistrictId;
     name: string;
@@ -788,6 +874,10 @@ export interface SetupOptions {
     state: string;
     sizes: { id: SetupSize; label: string; ha: number }[];
     mixed: { arablePcts: number[]; croppedPcts: number[] };
+    /** True where sheep may be chosen: the switch is on and the district runs sheep. */
+    sheep: boolean;
+    /** The start flock in plain facts, for sheep and for a mix. Empty where sheep can not be chosen. */
+    flock: { stock: SetupStock; text: string }[];
   }[];
   enterprises: { id: SetupEnterprise; label: string; text: string }[];
   years: { id: SetupYears; label: string; text: string }[];
@@ -800,6 +890,8 @@ export interface SetupChoices {
   district: DistrictId;
   size: SetupSize;
   enterprise: SetupEnterprise;
+  /** Left out (cattle) on every farm made before sheep. */
+  stock?: SetupStock;
   arablePct?: number;
   croppedPct?: number;
   years: SetupYears;
@@ -879,6 +971,12 @@ export type SimpleAction =
   | { type: 'hireHand'; person: string }
   | { type: 'letHandGo'; hand: string }
   | { type: 'orderContractFence'; edges: EdgeWire[]; team: 1 | 2 }
-  | { type: 'cancelContractFence'; run: number };
+  | { type: 'cancelContractFence'; run: number }
+  // Sheep (milestone 2.8): only on a farm that shows sheep. Moves and plans use moveMob,
+  // moveCattle (with a sheep class), setPlan, pausePlan, resumePlan and clearPlan.
+  | { type: 'setSheepFeed'; mob: number; feed: SheepFeedId }
+  | { type: 'setShearing'; mob: number; month: number; date: number }
+  | { type: 'buySheep'; cls: string; qty: number }
+  | { type: 'sellSheep'; mob: number; pick: string; qty: number };
 
 export type SkipRequestLength = 'week' | 'month' | 'year';

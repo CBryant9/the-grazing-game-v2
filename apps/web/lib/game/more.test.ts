@@ -9,6 +9,7 @@ const setup: SetupSummary = {
   size: 'medium',
   farmHa: 812.4,
   enterprise: 'mixed',
+  stock: 'cattle',
   arablePct: 39.6,
   years: 'real-in-order',
   startType: 'running',

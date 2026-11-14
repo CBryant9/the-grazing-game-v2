@@ -15,7 +15,8 @@ const CORNERS = (FARM_GRID_W + 1) * (FARM_GRID_H + 1);
 /** The longest line a request may carry: a fence round the whole farm and then some. */
 export const MAX_LINE_PIECES = 400;
 
-const FENCES: readonly string[] = ['permanent', 'electric', 'tape'];
+/** Netting is allowed through here; the game server refuses it on a farm that does not show sheep. */
+const FENCES: readonly string[] = ['permanent', 'electric', 'tape', 'netting'];
 
 const int = (v: unknown, min: number, max: number): number | null =>
   typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null;

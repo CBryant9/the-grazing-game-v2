@@ -86,6 +86,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'enterprise',
     'farmHa',
     'size',
+    'stock',
     'startType',
     'state',
     'town',
@@ -94,6 +95,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'inbox[]': ['date', 'day', 'kind', 'seq', 'text', 'time', 'unread'],
   'inbox[].date': ['date', 'month', 'year'],
   market: [
+    'sheep',
     'booked',
     'buy',
     'chart',
@@ -120,7 +122,31 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'market.prices[]': ['cKg', 'changeCKg', 'changeDays', 'id', 'label', 'perHead', 'typicalKg'],
   'market.sell': ['classes', 'note'],
   'market.sell.classes[]': ['cKg', 'head', 'id', 'label'],
+  // Sheep (milestone 2.8): on a farm that shows sheep only.
+  'market.sheep': ['buy', 'dated', 'maxQty', 'notes', 'prices', 'reason', 'wool'],
+  'market.sheep.buy[]': ['id', 'label', 'perHead'],
+  'market.sheep.prices[]': ['cKg', 'id', 'label'],
+  'market.sheep.wool[]': ['cKg', 'micron'],
+  'mobs[].sheep': [
+    'crutching',
+    'feed',
+    'feedOptions',
+    'feedReason',
+    'fence',
+    'joining',
+    'sell',
+    'sellReason',
+    'shearOn',
+    'shearing',
+    'stage',
+    'wool',
+  ],
+  'mobs[].sheep.feedOptions[]': ['id', 'label', 'perDay'],
+  'mobs[].sheep.sell[]': ['head', 'id', 'label'],
+  'mobs[].sheep.shearOn': ['date', 'month'],
   'mobs[]': [
+    'sheep',
+    'species',
     'adgKg',
     'ae',
     'area',
@@ -301,6 +327,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'planMoves',
     'report',
     'reportFirst',
+    'sheepLines',
     'stops',
     'to',
   ],
@@ -324,6 +351,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'running',
     'sales',
     'wages',
+    'wool',
   ],
   'day.summary.report[]': ['date', 'seq', 'text', 'who'],
   'day.summary.report[].date': ['date', 'month', 'year'],
@@ -389,6 +417,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'planMoves',
     'report',
     'reportFirst',
+    'sheepLines',
     'stops',
     'to',
   ],
@@ -412,6 +441,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'running',
     'sales',
     'wages',
+    'wool',
   ],
   'skip.summary.report[]': ['date', 'seq', 'text', 'who'],
   'skip.summary.report[].date': ['date', 'month', 'year'],
@@ -618,6 +648,57 @@ async function serverFixtures(): Promise<{
   return { snaps: [snap, last!], replies };
 }
 
+/** A sheep farm with the sheep switch on: the sheep mob card, the sheep market, feeding, buying and selling. */
+async function sheepFixtures(): Promise<{ snaps: Snapshot[]; replies: Record<string, unknown[]> }> {
+  const game = new GameServer({
+    store: new MemoryFarmStore(),
+    seed: () => 7,
+    sheepOn: async () => true,
+  });
+  const replies: Record<string, unknown[]> = {
+    preview: [],
+    act: [],
+    day: [],
+    skip: [],
+    record: [],
+  };
+  let snap = await game.create(A, {
+    district: 'wv',
+    size: 'small',
+    enterprise: 'grazing',
+    years: 'random',
+    startType: 'running',
+    difficulty: 'easy',
+    name: 'Sheep keys',
+    stock: 'mix',
+  });
+  const week = await game.skip(A, 'week');
+  replies.skip!.push(week);
+  snap = week.snapshot;
+  const flock = snap.mobs.find((m) => m.species === 'sheep')!;
+  replies.preview!.push(
+    await game.preview(A, { action: { type: 'setSheepFeed', mob: flock.id, feed: 'lick' } }),
+  );
+  replies.act!.push(
+    await game.act(A, { action: { type: 'setSheepFeed', mob: flock.id, feed: 'lick' } }),
+  );
+  for (let i = 0; i < 20 && !snap.market.isSaleDay; i++) {
+    const d = await game.endDay(A);
+    replies.day!.push(d);
+    snap = d.snapshot;
+  }
+  const buy = { action: { type: 'buySheep' as const, cls: 'merinoWethers', qty: 10 } };
+  replies.preview!.push(await game.preview(A, buy));
+  replies.act!.push(await game.act(A, buy));
+  const pick = snap.mobs.find((m) => m.species === 'sheep')!.sheep!.sell[0]!;
+  const sell = { action: { type: 'sellSheep' as const, mob: flock.id, pick: pick.id, qty: 3 } };
+  replies.preview!.push(await game.preview(A, sell));
+  replies.act!.push(await game.act(A, sell));
+  replies.record!.push(await game.record(A));
+  const last = await game.snapshot(A);
+  return { snaps: [snap, last!], replies };
+}
+
 const SETUP = {
   district: 'nsw' as const,
   size: 'small' as const,
@@ -686,6 +767,9 @@ function engineFixtures(): Snapshot[] {
 describe('what the game routes send holds only the keys on the lists', () => {
   it('snapshots and replies over several farms: nothing unlisted, and every listed key seen', async () => {
     const { snaps, replies } = await serverFixtures();
+    const sheep = await sheepFixtures();
+    snaps.push(...sheep.snaps);
+    for (const [k, list] of Object.entries(sheep.replies)) replies[k]!.push(...list);
     const [engine, onWay, owing] = engineFixtures();
     expect(engine!.market.booked.length).toBeGreaterThan(0);
     expect(engine!.mobs.some((m) => m.bookedDate !== null)).toBe(true);

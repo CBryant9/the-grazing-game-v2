@@ -127,6 +127,15 @@ export const SWITCH_INFO: Record<FeatureSwitchKey, SwitchInfo> = {
     whenOff: 'No notifications are sent. The in-game inbox still works.',
     rebuild: false,
   },
+  sheep: {
+    label: 'Sheep',
+    what: 'Sheep, wool and the netting fence, in Northern Tablelands, Central West and Western Victoria farms.',
+    whenOn:
+      'New farms in those districts can start with cattle, sheep or a mix. The sheep market, shearing, wool and netting show on farms there.',
+    whenOff:
+      'New farms start with cattle only, and nothing about sheep shows. A farm that already has sheep keeps them and still shows them.',
+    rebuild: false,
+  },
   maintenance_mode: {
     label: 'Maintenance mode',
     what: 'Puts the game into a “down for maintenance” state while you work on it.',

@@ -8,7 +8,7 @@
  * The natural colours are the ones in docs/VISUALS.md.
  */
 
-import type { ViewCattleKind } from '@gg/shared';
+import type { ViewCattleKind, ViewSheepKind } from '@gg/shared';
 import { rgb } from './colour';
 
 export type MapTheme = 'light' | 'dark';
@@ -65,6 +65,13 @@ export const NATURAL = {
    * amber (a fence down), not any of the fence kinds' own colours.
    */
   fenceContract: 0xff5cc8,
+  /**
+   * Sheep netting: a deep sea-green (teal), darker than young leaf and straw so it stands out from them. Not red (only "does not fit today"), not
+   * purple (no water), not amber (a fence down), not the contractor's pink, not
+   * the brown, yellow or white of the other fences, not the blues of water. It
+   * is also told apart by its pattern, a fine zigzag mesh (linestyle.ts).
+   */
+  fenceNetting: 0x16b890,
   /** A job to take something away: a lilac glow round a white line. */
   removeMark: 0xc39bff,
   fencePost: 0x3e2612,
@@ -114,6 +121,12 @@ export const NATURAL = {
   /** A thin pale rim outside the dark line, so a beast reads on dark ground too. */
   cattleHalo: 0xfffaf0,
 
+  // ---- Sheep
+  /** The dark line round every sheep, the same as the cattle's. */
+  sheepOutline: 0x120d0a,
+  /** The thin pale rim outside it, so a sheep reads on dark ground too. */
+  sheepHalo: 0xfffaf0,
+
   // ---- Layers
   layerWaterNear: rgb(70, 160, 240),
   layerWaterMid: rgb(240, 200, 60),
@@ -159,6 +172,34 @@ export const CATTLE: Record<CattleBreed, Record<ViewCattleKind, CattleColours>> 
     calf: { body: 0xc9a57a, head: 0xb8946a, legs: 0x7a6044, underline: -1, topline: -1 },
   },
 };
+
+export interface SheepColours {
+  /** The wool. A thin sheep is drawn a little darker (see THIN_FLEECE). */
+  fleece: number;
+  /** A darker curl drawn in the wool, so the body reads as wool and not a smooth blob. */
+  curl: number;
+  /** The face: small and dark grey. */
+  head: number;
+  legs: number;
+}
+
+/**
+ * Sheep colours by kind (Merino style: cream wool, dark grey face and legs).
+ * Rams are a little darker in the wool and carry curled horns. Lambs are paler.
+ */
+export const SHEEP: Record<ViewSheepKind, SheepColours> = {
+  ewe: { fleece: 0xf1ead6, curl: 0xc9bfa2, head: 0x4a4642, legs: 0x37332f },
+  wether: { fleece: 0xece3cc, curl: 0xc4b99b, head: 0x4a4642, legs: 0x37332f },
+  ram: { fleece: 0xe6dcc2, curl: 0xbcb08e, head: 0x4f4640, legs: 0x37302a },
+  young: { fleece: 0xf3edda, curl: 0xccc3a6, head: 0x514c47, legs: 0x3a3631 },
+  lamb: { fleece: 0xf6f1e2, curl: 0xd2c9ad, head: 0x55504a, legs: 0x3e3a35 },
+};
+
+/** A thin sheep's wool is this much darker (lean, patchy and dull). */
+export const THIN_FLEECE = 0.84;
+
+/** The horn colour on a ram. */
+export const RAM_HORN = 0xb9a98a;
 
 /** The parts of the map that change with the theme. */
 export interface ThemeColours {
@@ -220,6 +261,7 @@ export interface MapPalette {
   theme: MapTheme;
   natural: typeof NATURAL;
   cattle: typeof CATTLE;
+  sheep: typeof SHEEP;
   ui: ThemeColours;
 }
 
@@ -228,6 +270,7 @@ export const paletteFor = (theme: MapTheme): MapPalette => ({
   theme,
   natural: NATURAL,
   cattle: CATTLE,
+  sheep: SHEEP,
   ui: THEMES[theme],
 });
 

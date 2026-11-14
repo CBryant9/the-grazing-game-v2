@@ -78,6 +78,12 @@ export const FEATURE_SWITCHES = {
   adsense: false,
   purchases: false,
   push_notifications: true,
+  /**
+   * Sheep, wool and the netting fence (milestone 2.8). Off until Claudia rules on the sheep
+   * model's open benchmark gaps (docs/DEVELOPMENT_LOG.md, "m2.8 Sheep screens"). Never offered
+   * in Central Queensland, on or off.
+   */
+  sheep: false,
   maintenance_mode: false,
 } as const;
 export type FeatureSwitchKey = keyof typeof FEATURE_SWITCHES;
@@ -127,6 +133,9 @@ export type {
   FarmViewBuilding,
   FarmViewCattle,
   FarmViewFences,
+  FarmViewFlock,
+  FarmViewSheep,
+  ViewSheepKind,
   FarmViewGate,
   FarmViewJob,
   FarmViewMob,

@@ -169,6 +169,8 @@ export function marketWire(farm: FarmState, view: MarketView): MarketWire {
     : null;
   const chart = priceChart(farm);
   return {
+    // The snapshot fills this in on a farm that shows sheep.
+    sheep: null,
     isSaleDay: view.isSaleDay,
     nextSale,
     booked: view.booked.map((b) => ({

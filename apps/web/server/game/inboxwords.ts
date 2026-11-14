@@ -5,6 +5,7 @@ import { isLabourEvent, labourMessage, type DateOf } from './labourwords';
 import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText } from './planwords';
+import { isSheepEvent, sheepMessage } from './sheepwords';
 import { causeWord, gameOverWord } from './words';
 
 /**
@@ -83,6 +84,8 @@ const sold = (e: Extract<FarmEvent, { type: 'cattle-sold' }>): string =>
 export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
   const msg = (kind: InboxKind, text: string): Message => ({ kind, text });
   if (isLabourEvent(e)) return msg('work', labourMessage(e, dateOf));
+  // Every sheep event has words (`sheepMessage` is exhaustive over them).
+  if (isSheepEvent(e)) return sheepMessage(e, dateOf);
   switch (e.type) {
     case 'farm-started':
       return msg('farm', `The farm is set up: ${Math.round(e.farmHa).toLocaleString('en-AU')} ha.`);

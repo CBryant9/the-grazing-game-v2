@@ -61,12 +61,19 @@ export function growthLine(grownKg: number, eatenKg: number, fine = false): stri
 /** Plain sentences from the year's figures. */
 export function yearFacts(y: Closed): string[] {
   const out = [`Net worth went from ${dollars(y.worth0)} to ${dollars(y.worth1)}.`];
+  // A year with sheep in it says so: its gain and births count sheep and lambs too.
+  const sheep = y.sheepDeaths !== undefined || !!y.wool || !!y.sheepSales || !!y.sheepBuys;
+  const stock = sheep ? 'Cattle and sheep' : 'Cattle';
   out.push(
     y.gain < 0
-      ? `Cattle lost ${n0(-y.gain)} kg of live weight, birth weights included.`
-      : `Cattle gained ${n0(y.gain)} kg of live weight, birth weights included.`,
+      ? `${stock} lost ${n0(-y.gain)} kg of live weight, birth weights included.`
+      : `${stock} gained ${n0(y.gain)} kg of live weight, birth weights included.`,
   );
-  out.push(`${plural(y.births, 'birth')}. ${plural(y.deaths, 'death')}.`);
+  out.push(
+    sheep
+      ? `${plural(y.births, 'birth')}, lambs included. ${plural(y.deaths, 'cattle death')}. ${plural(y.sheepDeaths ?? 0, 'sheep death')}, lambs included.`
+      : `${plural(y.births, 'birth')}. ${plural(y.deaths, 'death')}.`,
+  );
   // Tonnes, with both totals. What was eaten can top what grew (feed carried over counts as eaten),
   // so no percentage is shown. The score uses its own figure, uncapped.
   if (y.grown > 0 || y.eaten > 0) {
@@ -87,6 +94,10 @@ export function yearMoney(y: YearTotals): { label: string; dollars: number }[] {
   const rows: { label: string; dollars: number }[] = [
     { label: 'Cattle sales', dollars: y.sales },
     { label: 'Cattle bought', dollars: -y.buys },
+    // Sheep and wool are their own lines (milestone 2.8). Zero, and so left out, on a cattle farm.
+    { label: 'Sheep sales', dollars: y.sheepSales ?? 0 },
+    { label: 'Sheep bought', dollars: -(y.sheepBuys ?? 0) },
+    { label: 'Wool', dollars: y.wool ?? 0 },
     { label: 'Supplements', dollars: -y.feed },
     { label: 'Grain', dollars: y.grain },
     { label: 'Crops', dollars: -y.crops },

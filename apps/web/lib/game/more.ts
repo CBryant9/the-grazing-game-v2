@@ -22,6 +22,12 @@ const DIFFICULTY: Record<SetupSummary['difficulty'], string> = {
   hard: 'Hard',
 };
 
+const STOCK: Record<SetupSummary['stock'], string> = {
+  cattle: 'Cattle',
+  sheep: 'Sheep',
+  mix: 'Cattle and sheep',
+};
+
 export interface FarmFact {
   label: string;
   value: string;
@@ -31,6 +37,8 @@ export interface FarmFact {
 export function setupFacts(s: SetupSummary): FarmFact[] {
   const ha = Math.round(s.farmHa).toLocaleString('en-AU');
   const size = s.size.charAt(0).toUpperCase() + s.size.slice(1);
+  // A farm that started with sheep says so. A cattle farm reads as it always has.
+  const stock = STOCK[s.stock ?? 'cattle'];
   return [
     { label: 'District', value: `${s.districtName}, around ${s.town}, ${s.state}` },
     { label: 'Size', value: `${size}, ${ha} ha` },
@@ -38,8 +46,8 @@ export function setupFacts(s: SetupSummary): FarmFact[] {
       label: 'Enterprise',
       value:
         s.enterprise === 'mixed'
-          ? `Cattle and crops, ${Math.round(s.arablePct)}% arable`
-          : 'Cattle grazing',
+          ? `${stock} and crops, ${Math.round(s.arablePct)}% arable`
+          : `${stock} grazing`,
     },
     { label: 'Seasons', value: YEARS[s.years] },
     { label: 'Start', value: START[s.startType] },
@@ -49,6 +57,7 @@ export function setupFacts(s: SetupSummary): FarmFact[] {
 
 const KIND: Record<InboxKind, string> = {
   cattle: 'Cattle',
+  sheep: 'Sheep',
   sale: 'Market',
   crop: 'Crops',
   plan: 'Plan',

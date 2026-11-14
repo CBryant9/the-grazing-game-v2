@@ -1,5 +1,12 @@
 import 'server-only';
-import { COSTS, COST_PER_M, type FarmEvent, type JobCard, type MaterialsOnHand } from '@gg/engine';
+import {
+  COSTS,
+  COST_PER_M,
+  fenceKindsRead,
+  type FarmEvent,
+  type JobCard,
+  type MaterialsOnHand,
+} from '@gg/engine';
 import type { BuildWire, FenceOptionWire } from '../../lib/game/types';
 
 /**
@@ -25,21 +32,40 @@ const FENCE_TEXT = {
   tape: 'Cheap and quick. Roll it up and use it again. Hungry or thirsty stock can push through.',
 } as const;
 
-/** The fences a player can draw, with the price a metre and what each does. */
-export function fenceOptions(): FenceOptionWire[] {
-  return (['permanent', 'electric', 'tape'] as const).map((id) => ({
-    id,
-    name: FENCE_NAME[id],
-    perM: COST_PER_M[id],
-    price: perMetre(COST_PER_M[id]),
-    text: FENCE_TEXT[id],
+/** The rule a farm with sheep reads on each fence (milestone 2.8), from the engine's `fenceKindsRead`. */
+export const NOT_FOR_SHEEP = 'A cattle fence does not hold sheep.';
+const NETTING_TEXT = 'Sheep netting. It holds sheep and cattle.';
+
+/**
+ * The fences a player can draw, with the price a metre and what each does. With sheep shown,
+ * netting is offered too, and each cattle fence says it does not hold sheep.
+ */
+export function fenceOptions(sheep = false): FenceOptionWire[] {
+  if (!sheep) {
+    return (['permanent', 'electric', 'tape'] as const).map((id) => ({
+      id,
+      name: FENCE_NAME[id],
+      perM: COST_PER_M[id],
+      price: perMetre(COST_PER_M[id]),
+      text: FENCE_TEXT[id],
+    }));
+  }
+  return fenceKindsRead().map((k) => ({
+    id: k.kind,
+    name: k.kind === 'netting' ? 'Netting' : FENCE_NAME[k.kind],
+    perM: k.perM,
+    price: perMetre(k.perM),
+    text:
+      k.kind === 'netting'
+        ? NETTING_TEXT
+        : `${FENCE_TEXT[k.kind]}${k.holdsSheep ? '' : ` ${NOT_FOR_SHEEP}`}`,
   }));
 }
 
 /** The tool bar's content: one short help line and one price line for each tool. */
-export function buildWire(onHand?: MaterialsOnHand): BuildWire {
+export function buildWire(onHand?: MaterialsOnHand, sheep = false): BuildWire {
   return {
-    fences: fenceOptions(),
+    fences: fenceOptions(sheep),
     onHand: onHand ? onHandWords(onHand) : null,
     noneFits: NONE_FITS,
     tools: [
@@ -127,6 +153,7 @@ const FENCE_WORD = {
   permanent: 'permanent fence',
   electric: 'electric fence',
   tape: 'tape',
+  netting: 'sheep netting',
 } as const;
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);

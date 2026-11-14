@@ -1,9 +1,9 @@
 import { PADDOCK_LABELS, VIEW_LAND } from '@gg/shared';
 import { describe, expect, it } from 'vitest';
-import { contrast, lit, luminance } from './colour';
+import { contrast, lit, luminance, shade } from './colour';
 import { squareLook } from './grass';
 import { lightTint, mapTint, weatherTint } from './light';
-import { CATTLE, NATURAL, THEMES, breedFor, paletteFor } from './palette';
+import { CATTLE, NATURAL, SHEEP, THEMES, THIN_FLEECE, breedFor, paletteFor } from './palette';
 import { cell, sampleView, setSquare } from './testing/sampleView';
 
 /*
@@ -129,6 +129,56 @@ describe('cattle never blur into the grass', () => {
   });
 });
 
+describe('sheep never blur into the grass', () => {
+  const grass = grassColours();
+
+  it.each(LIGHTS)(
+    'the outline or the pale rim stands out at 3 to 1 or better on every grass colour: %s',
+    (_name, light) => {
+      const outline = lit(NATURAL.sheepOutline, light);
+      const halo = lit(NATURAL.sheepHalo, light);
+      let worst = Infinity;
+      for (const g of grass) {
+        const ground = lit(g, light);
+        worst = Math.min(worst, Math.max(contrast(outline, ground), contrast(halo, ground)));
+      }
+      expect(worst).toBeGreaterThanOrEqual(CATTLE_CONTRAST);
+    },
+  );
+
+  it('the outline stands out from every fleece, thin ones too, and from every head and leg', () => {
+    for (const [kind, c] of Object.entries(SHEEP)) {
+      for (const wool of [c.fleece, shade(c.fleece, THIN_FLEECE)]) {
+        expect(contrast(NATURAL.sheepOutline, wool), `${kind} fleece`).toBeGreaterThanOrEqual(
+          CATTLE_CONTRAST,
+        );
+      }
+      // The face and legs are dark, so it is the pale rim that carries them.
+      expect(contrast(NATURAL.sheepHalo, c.head), `${kind} head`).toBeGreaterThanOrEqual(
+        CATTLE_CONTRAST,
+      );
+      expect(contrast(NATURAL.sheepHalo, c.legs), `${kind} legs`).toBeGreaterThanOrEqual(
+        CATTLE_CONTRAST,
+      );
+      // The dark face stands out from the wool beside it.
+      expect(contrast(c.head, c.fleece), `${kind} face`).toBeGreaterThanOrEqual(CATTLE_CONTRAST);
+    }
+  });
+
+  it('wool is pale and a thin sheep is drawn darker than a sound one', () => {
+    for (const c of Object.values(SHEEP)) {
+      expect(luminance(c.fleece)).toBeGreaterThan(0.7);
+      expect(luminance(shade(c.fleece, THIN_FLEECE))).toBeLessThan(luminance(c.fleece));
+    }
+  });
+
+  it('uses the same outline and rim as the cattle, in both themes', () => {
+    expect(NATURAL.sheepOutline).toBe(NATURAL.cattleOutline);
+    expect(NATURAL.sheepHalo).toBe(NATURAL.cattleHalo);
+    expect(paletteFor('light').sheep).toBe(paletteFor('dark').sheep);
+  });
+});
+
 describe('labels and markers can be read in both themes (WCAG AA, 4.5 to 1)', () => {
   it.each(['dark', 'light'] as const)('%s theme', (theme) => {
     const ui = THEMES[theme];
@@ -185,6 +235,7 @@ describe('red means one thing: the part of a line that does not fit today (Claud
     fenceDown: NATURAL.fenceDown,
     removeMark: NATURAL.removeMark,
     fenceContract: NATURAL.fenceContract,
+    fenceNetting: NATURAL.fenceNetting,
     fencePostTape: NATURAL.fencePostTape,
     gateOpen: NATURAL.gateOpen,
     gateShut: NATURAL.gateShut,
@@ -258,6 +309,66 @@ describe('red means one thing: the part of a line that does not fit today (Claud
     // And it stands out from the grass it is drawn on.
     for (const grass of [NATURAL.leafYoung, NATURAL.leafOld, NATURAL.strawFresh, NATURAL.soil]) {
       expect(contrast(mine, grass), String(grass)).toBeGreaterThan(1.3);
+    }
+  });
+
+  it('sheep netting has its own colour: not red, not purple, not amber, not pink, and apart from every other line', () => {
+    const hue = (c: number): number => {
+      const r = ((c >> 16) & 255) / 255;
+      const g = ((c >> 8) & 255) / 255;
+      const b = (c & 255) / 255;
+      const max = Math.max(r, g, b);
+      const d = max - Math.min(r, g, b);
+      if (d === 0) return 0;
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const apart = (a: number, b: number): number => {
+      const d = Math.abs(hue(a) - hue(b));
+      return Math.min(d, 360 - d);
+    };
+    const mine = NATURAL.fenceNetting;
+    expect(isRed(mine)).toBe(false);
+    // Readable on the dark casing every wire sits on, and on the post.
+    expect(contrast(mine, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+    expect(contrast(mine, NATURAL.fencePost)).toBeGreaterThanOrEqual(3);
+    const others: Record<string, number> = {
+      notToday: NATURAL.notToday,
+      fenceDown: NATURAL.fenceDown,
+      fenceContract: NATURAL.fenceContract,
+      noWaterDark: THEMES.dark.noWater,
+      noWaterLight: THEMES.light.noWater,
+      layerWaterNone: NATURAL.layerWaterNone,
+      removeMark: NATURAL.removeMark,
+      pipe: NATURAL.pipe,
+      water: NATURAL.water,
+      gateOpen: NATURAL.gateOpen,
+      fenceElectric: NATURAL.fenceElectric,
+      fencePermanent: NATURAL.fencePermanent,
+    };
+    for (const [name, c] of Object.entries(others)) {
+      expect(apart(mine, c), name).toBeGreaterThanOrEqual(30);
+    }
+    // Not the white of tape, and not any line colour outright.
+    expect(mine).not.toBe(NATURAL.fenceTape);
+    for (const c of Object.values(others)) expect(c).not.toBe(mine);
+    // On every ground it is drawn on it differs in brightness or in hue (a mid-tone colour
+    // always meets some ground of its own brightness, so hue must then carry it).
+    for (const ground of [
+      NATURAL.leafYoung,
+      NATURAL.leafOld,
+      NATURAL.strawFresh,
+      NATURAL.strawWeathered,
+      NATURAL.soil,
+      NATURAL.fallow,
+      NATURAL.shaded,
+    ]) {
+      const differs = contrast(mine, ground) > 1.3 || apart(mine, ground) >= 45;
+      expect(differs, String(ground)).toBe(true);
+    }
+    // And the casing carries it on every ground, as for every wire.
+    for (const ground of [NATURAL.leafYoung, NATURAL.strawFresh, NATURAL.stubble, NATURAL.litter]) {
+      expect(contrast(NATURAL.fenceCasing, ground)).toBeGreaterThanOrEqual(4.5);
     }
   });
 

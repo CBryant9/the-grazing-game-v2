@@ -198,6 +198,8 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
 
   return {
     id: s.id,
+    species: 'cattle',
+    sheep: null,
     name: s.name,
     where: s.where.kind,
     area: s.area,

@@ -56,6 +56,12 @@ export const VIEW_FENCE = {
   tapeDown: 6,
   /** A gate. Whether it is open, and what kind it is, is in `gates`. */
   gate: 7,
+  /**
+   * Sheep netting (milestone 2.8): holds sheep and cattle. The engine's view draws it as
+   * permanent fence; the game server sets this code on the netting segments before the
+   * view is sent, so a map given an engine view alone still draws a fence there.
+   */
+  netting: 8,
 } as const;
 export type ViewFence = (typeof VIEW_FENCE)[keyof typeof VIEW_FENCE];
 
@@ -303,6 +309,44 @@ export interface FarmViewMob {
   };
 }
 
+/** How the map draws a sheep: a ewe, a wether, a ram, a young sheep (weaner or hogget), a lamb at foot. */
+export type ViewSheepKind = 'ewe' | 'wether' | 'ram' | 'young' | 'lamb';
+
+/** The sheep of one kind in a flock, with how many look thin (under CS 2). */
+export interface FarmViewSheep {
+  kind: ViewSheepKind;
+  n: number;
+  thin: number;
+}
+
+/**
+ * A sheep mob, for the map (milestone 2.8). Kept apart from `mobs` (cattle) so a
+ * map or a test that knows only cattle is unchanged.
+ */
+export interface FarmViewFlock {
+  id: number;
+  name: string;
+  /** On pasture or in the stock yards. */
+  where: 'paddock' | 'yards';
+  /** The grazing area it is on, or -1 off pasture. */
+  area: number;
+  /** The square it was put on, or -1 off pasture. */
+  anchor: number;
+  /** Head, not counting lambs at foot. */
+  head: number;
+  /** Lambs at foot. */
+  lambs: number;
+  /** The flock by kind, for the map to draw. */
+  sheep: FarmViewSheep[];
+  /** A number from the mob's id alone, so each sheep stands in the same place every time. */
+  seed: number;
+  status: {
+    noWater: boolean;
+    /** Days in a row without water. */
+    dryDays: number;
+  };
+}
+
 /**
  * A job under way, such as a half-built fence line. Jobs arrive in a later
  * milestone. The field is here so the map can be built to expect it.
@@ -349,6 +393,11 @@ export interface FarmView {
   areas: FarmViewArea[];
   plantings: FarmViewPlanting[];
   mobs: FarmViewMob[];
+  /**
+   * Sheep mobs (milestone 2.8). Added by the game server on a farm that shows sheep, and left
+   * out otherwise, so the view version is unchanged (a past day's view still draws).
+   */
+  flocks?: FarmViewFlock[];
   /** Jobs under way. Left out until jobs are built. */
   jobs?: FarmViewJob[];
 }

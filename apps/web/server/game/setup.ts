@@ -1,6 +1,15 @@
 import 'server-only';
-import { ARABLE_SHARES, DIFFICULTY, FARM_SIZES, FIRST_REAL_YEAR } from '@gg/engine';
-import { DISTRICTS, DISTRICT_IDS } from '@gg/shared';
+import {
+  ARABLE_SHARES,
+  DIFFICULTY,
+  FARM_SIZES,
+  FIRST_REAL_YEAR,
+  createFarm,
+  dateOn,
+  sheepDistrict,
+  sheepMobsRead,
+} from '@gg/engine';
+import { DISTRICTS, DISTRICT_IDS, type DistrictId } from '@gg/shared';
 import type {
   SetupChoices,
   SetupDifficulty,
@@ -8,8 +17,10 @@ import type {
   SetupOptions,
   SetupSize,
   SetupStart,
+  SetupStock,
   SetupYears,
 } from '../../lib/game/types';
+import { startFlockText } from './sheepwords';
 
 export const NAME_MAX = 40;
 const SIZES: readonly SetupSize[] = ['small', 'medium', 'large'];
@@ -17,6 +28,39 @@ const YEARS: readonly SetupYears[] = ['real-in-order', 'real-random', 'random'];
 const STARTS: readonly SetupStart[] = ['running', 'scratch'];
 const DIFFICULTIES: readonly SetupDifficulty[] = ['easy', 'medium', 'hard'];
 const ENTERPRISES: readonly SetupEnterprise[] = ['grazing', 'mixed'];
+const STOCKS: readonly SetupStock[] = ['cattle', 'sheep', 'mix'];
+
+/** The month every farm starts in (September, as `START_MONTH` in game.ts), for the start flock's facts. */
+const FLOCK_PROBE_MONTH = 8;
+
+const flockFacts = new Map<DistrictId, string>();
+
+/**
+ * What a district's start flock is on the first day, in plain facts. Read from a small farm the
+ * engine sets up once per district and kept, so the words follow the model and hold no figure
+ * a screen should not have (no chance, no share, no table).
+ */
+function startFlockFacts(district: DistrictId): string {
+  const known = flockFacts.get(district);
+  if (known) return known;
+  const farm = createFarm({
+    seed: 1,
+    district,
+    size: 'small',
+    start: { year: 2026, month: FLOCK_PROBE_MONTH },
+    startType: 'running',
+    difficulty: 'medium',
+    stock: 'sheep',
+  });
+  const mob = sheepMobsRead(farm, dateOn(farm).month)[0];
+  const text = startFlockText(mob ?? null);
+  flockFacts.set(district, text);
+  return text;
+}
+
+/** True where sheep may be chosen: the switch is on and the district runs sheep (never Central Queensland). */
+export const sheepChoice = (sheepOn: boolean, district: DistrictId): boolean =>
+  sheepOn && sheepDistrict(district);
 
 /** Shares of the arable land that can be in the cropping rotation at the start, %. */
 const CROPPED = [25, 50, 75, 100];
@@ -33,11 +77,40 @@ const DIFFICULTY_TEXT: Record<SetupDifficulty, string> = {
  * so the browser holds no tables. No dollar figures: they are shown once
  * the farm is taken.
  */
-export function setupOptions(): SetupOptions {
+export function setupOptions(sheepOn = false): SetupOptions {
   // The difficulty table is read so the list can never name a level the engine lacks.
   const levels = DIFFICULTIES.filter((d) => d in DIFFICULTY);
   return {
+    stocks: sheepOn
+      ? [
+          {
+            id: 'cattle',
+            label: 'Cattle',
+            text: 'A breeding herd of cows and bulls, and weaners.',
+          },
+          {
+            id: 'sheep',
+            label: 'Sheep',
+            text: 'A self-replacing Merino flock: ewes, ewe hoggets kept as replacements, and rams.',
+          },
+          {
+            id: 'mix',
+            label: 'Cattle and sheep',
+            text: 'Half the stocking in cattle and half in sheep, by DSE, in separate paddocks.',
+          },
+        ]
+      : [],
     districts: DISTRICT_IDS.map((id) => ({
+      sheep: sheepChoice(sheepOn, id),
+      flock: sheepChoice(sheepOn, id)
+        ? [
+            { stock: 'sheep' as const, text: startFlockFacts(id) },
+            {
+              stock: 'mix' as const,
+              text: `${startFlockFacts(id)} The flock is half the size it would be on its own.`,
+            },
+          ]
+        : [],
       id,
       name: DISTRICTS[id].name,
       town: DISTRICTS[id].town,
@@ -121,7 +194,7 @@ export function cleanName(raw: string): string {
 }
 
 /** Check the setup choices a browser sent. Anything wrong gets a plain message. */
-export function parseSetup(body: unknown): Parsed<SetupChoices> {
+export function parseSetup(body: unknown, sheepOn = false): Parsed<SetupChoices> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return bad('The farm choices were not sent properly.');
   }
@@ -161,6 +234,16 @@ export function parseSetup(body: unknown): Parsed<SetupChoices> {
     }
     out.arablePct = b.arablePct;
     out.croppedPct = b.croppedPct;
+  }
+  // Cattle, sheep or a mix. Left out means cattle. Sheep only with the switch on, in a sheep
+  // district, on a running farm (a farm from scratch starts with no stock either way).
+  if (b.stock !== undefined && b.stock !== 'cattle') {
+    const stock = pick(b.stock, STOCKS, 'cattle, sheep or both');
+    if (!stock.ok) return stock;
+    if (!sheepChoice(sheepOn, district.value)) {
+      return bad('Sheep are not offered on this farm. Choose cattle.');
+    }
+    if (startType.value === 'running') out.stock = stock.value;
   }
   return { ok: true, value: out };
 }

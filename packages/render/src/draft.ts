@@ -14,7 +14,8 @@
 import type { FarmView, ViewEdge } from '@gg/shared';
 import { cornerJoinsFence, edgeKey, type Corner } from './lines';
 
-export type DraftKind = 'permanent' | 'contract' | 'electric' | 'tape' | 'pipe' | 'mark';
+export type DraftKind =
+  'permanent' | 'contract' | 'electric' | 'tape' | 'netting' | 'pipe' | 'mark';
 export type DraftStyle = 'ok' | 'late' | 'remove';
 
 export interface DraftSegment {
@@ -83,7 +84,7 @@ export function snapDots(view: FarmView, path: readonly Corner[]): DraftDot[] {
 /** A draft of a fence or tape line. */
 export function fenceDraft(
   view: FarmView,
-  kind: 'permanent' | 'contract' | 'electric' | 'tape',
+  kind: 'permanent' | 'contract' | 'electric' | 'tape' | 'netting',
   path: readonly Corner[],
   edges: readonly ViewEdge[],
   notFit: NotFit | 'all' | null,

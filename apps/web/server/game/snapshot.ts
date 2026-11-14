@@ -9,6 +9,9 @@ import {
   farmView,
   marketView,
   paddockSummaries,
+  sheepDistrict,
+  sheepMobsOf,
+  stockingRead,
   thingsToDo,
   type CalendarDate,
   type FarmState,
@@ -40,7 +43,23 @@ import { marketWire } from './market';
 import { buildMobs } from './mobs';
 import { plansWire, planForm } from './plans';
 import { movedText } from './planwords';
+import {
+  addSheepStocking,
+  sheepMarketWire,
+  sheepMobWires,
+  sheepReads,
+  sheepTodo,
+  viewWithSheep,
+} from './sheepmobs';
+import { sheepSummaryLines } from './sheepwords';
 import { NO_WATER_WHY, causeWord, stopWord, todoWire } from './words';
+
+/**
+ * Whether a farm shows sheep: in a sheep district (never Central Queensland), with the sheep
+ * switch on, or on a farm that already has sheep (they stay on screen if the switch goes off).
+ */
+export const sheepShown = (farm: FarmState, sheepOn: boolean): boolean =>
+  sheepDistrict(farm.district) && (sheepOn || sheepMobsOf(farm).length > 0);
 import { growthLine, liveScore, overWire } from './years';
 
 /** Messages the snapshot carries. The browser shows these; older ones stay on the server. */
@@ -89,6 +108,7 @@ export function setupSummary(farm: FarmState, setup: SetupChoices): SetupSummary
     size: setup.size,
     farmHa: farm.layout.scale.farmHa,
     enterprise: setup.enterprise,
+    stock: setup.stock ?? 'cattle',
     arablePct: round(farm.arablePct),
     years: setup.years,
     startType: setup.startType,
@@ -115,17 +135,23 @@ export function buildSnapshot(
     missedWages?: readonly number[];
   },
   env: SourceEnv,
+  /** The sheep switch. Sheep show where it is on (or the farm already has sheep), never in Central Queensland. */
+  sheepOn = false,
 ): Snapshot {
-  const view = farmView(farm, env);
+  const shown = sheepShown(farm, sheepOn);
+  const sr = shown ? sheepReads(farm, env) : null;
+  const view = viewWithSheep(farmView(farm, env), farm, sr);
   const totals = farmTotals(farm, env);
   const clock = clockView(farm);
   const market = marketView(farm, env);
+  const dateOfDay = (day: number): DateParts => dateParts(dateOn(farm, day));
 
   const mixed = stored.setup.enterprise === 'mixed';
   const arable = arableHaByPaddock(farm, mixed);
   const haOf = new Map(view.paddocks.map((p) => [p.id, p.ha]));
   const cellOf = new Map(view.paddocks.map((p) => [p.id, p.labelCell]));
-  const paddocks: PaddockWire[] = paddockSummaries(farm, env).map((p) => ({
+  const summaries = paddockSummaries(farm, env);
+  const paddocks: PaddockWire[] = summaries.map((p) => ({
     id: p.id,
     name: p.name,
     ha: round(haOf.get(p.id) ?? 0, 1),
@@ -155,8 +181,17 @@ export function buildSnapshot(
   }));
 
   const mobs: MobWire[] = buildMobs(farm, env, market);
+  let sheepHead = 0;
+  if (sr) {
+    addSheepStocking(paddocks, new Map(summaries.map((p) => [p.id, p.areaId])), sr);
+    mobs.push(...sheepMobWires(farm, sr, dateOfDay));
+    sheepHead = sr.reads.reduce((t, r) => t + r.head, 0);
+  }
+  const stocking = stockingRead(farm);
+  const marketOut = marketWire(farm, market);
+  if (shown) marketOut.sheep = sheepMarketWire(farm, marketOut.buy.reason);
 
-  const dateOf = (day: number): DateParts => dateParts(dateOn(farm, day));
+  const dateOf = dateOfDay;
   const read = stored.inboxRead ?? 0;
   const worded: InboxWire[] = [];
   for (let i = farm.inbox.length - 1; i >= 0; i--) {
@@ -188,10 +223,11 @@ export function buildSnapshot(
     date: dateParts(clock.date),
     season: totals.season.label,
     totals: {
-      head: totals.head,
+      // Sheep count in head and in the stocking (one DSE figure, the engine's); calves stay calves.
+      head: totals.head + sheepHead,
       calves: totals.calves,
-      ae: round(totals.ae, 1),
-      dse: round(totals.dse),
+      ae: round(stocking.totalAe, 1),
+      dse: round(stocking.totalDse),
       cash: round(totals.cash),
       netWorth: round(totals.netWorth.total),
       massKgHa: round(totals.massKgHa, -1),
@@ -209,14 +245,18 @@ export function buildSnapshot(
       evening: clock.evening,
     },
     view,
-    todo: [...thingsToDo(farm).map(todoWire), ...workforceTodo(farm)],
-    market: marketWire(farm, market),
+    todo: [
+      ...thingsToDo(farm).map(todoWire),
+      ...(sr ? sheepTodo(farm, sr) : []),
+      ...workforceTodo(farm),
+    ],
+    market: marketOut,
     plans: plansWire(farm),
     planForm: planForm(),
     cropping: cropsWire(farm, mixed),
     mobs,
     paddocks,
-    build: buildWire(materialsOnHand(farm)),
+    build: buildWire(materialsOnHand(farm), shown),
     workforce: workforceWire(farm, stored.missedWages ?? []),
     contracts: contractsWire(farm),
     inbox,
@@ -271,6 +311,8 @@ export function buildSummary(
   for (const [cause, n] of Object.entries(s.deathsByCause)) {
     if (n) deathsByCause[causeWord(cause)] = n;
   }
+  // The engine's period figures are the cattle's; the sheep's come from the day's events.
+  const sheep = sheepSummaryLines(ticks);
   return {
     kind,
     from: dateParts(s.fromDate),
@@ -297,7 +339,9 @@ export function buildSummary(
       interest: round(s.money.interest),
       contract: labour.pay.contract,
       wages: labour.pay.wages,
+      wool: round(sheep.wool),
     },
+    sheepLines: sheep.lines,
     arrived: { head: s.arrived.head, calves: s.arrived.calves },
     bookedSold: { head: s.bookedSold.head, net: round(s.bookedSold.net) },
     planMoves: planMoveLines(ticks),

@@ -120,9 +120,55 @@ export function plansWire(farm: FarmState): PlanWire[] {
       after: p.after,
       afterText: afterText(p.after),
       editable: p.legs.length === 1,
-      mobs: p.mobs.map(mobWire(farm, p, reasons)),
+      mobs: [...p.mobs.map(mobWire(farm, p, reasons)), ...sheepOnPlan(farm, p)],
     };
   });
+}
+
+/**
+ * Sheep mobs on a plan (milestone 2.8). The engine's plan read covers cattle, so the sheep's
+ * place on the plan is put in words here from the mob's own run: the stop, the round, and
+ * whether it is paused or waiting.
+ */
+function sheepOnPlan(farm: FarmState, p: PlanView): PlanMobWire[] {
+  const tpl = farm.plans.find((t) => t.id === p.id);
+  if (!tpl) return [];
+  const survey = surveyOf(farm);
+  const topo = survey.topology;
+  const stops = p.legs.flatMap((l) => l.stops);
+  const out: PlanMobWire[] = [];
+  for (const m of farm.sheep?.mobs ?? []) {
+    const run = m.plan;
+    if (!run || run.template !== p.id) continue;
+    const step = stepOf(tpl, run.leg, run.idx);
+    const here = stops[step]?.area ?? 'a paddock';
+    const areaId = areaIdOf(survey, m);
+    const area = areaId >= 0 ? topo.areas[areaId]!.name : null;
+    const waitArea = run.waiting ? topo.areas[topo.areaOf[run.waiting.target]!]?.name : null;
+    const head = m.sheep.reduce((t, s) => t + (s.weaned ? s.n : 0), 0);
+    out.push({
+      mob: m.id,
+      mobName: m.name,
+      head,
+      area,
+      step,
+      stepText: stepText(step, p.steps, here),
+      roundText: roundText(run.round, tpl.legs[run.leg]?.rounds ?? 0),
+      paused: run.paused,
+      pausedText: run.paused ? pausedText(null, area !== null && area !== here) : null,
+      waitingText:
+        run.waiting && waitArea
+          ? run.waiting.why === 'no-water'
+            ? waitingText(waitArea)
+            : `The plan can not move the mob into ${waitArea}, because ${run.waiting.why === 'cattle-there' ? 'cattle' : 'other sheep'} are there. It tries again each day.`
+          : null,
+      nextText: run.paused ? 'Nothing, while it is paused.' : ruleText(tpl.legs[run.leg]!.rule),
+      report: [
+        `${run.moves} ${run.moves === 1 ? 'move' : 'moves'} and ${run.rounds} full ${run.rounds === 1 ? 'round' : 'rounds'} in ${Math.max(0, farm.day - run.start)} days.`,
+      ],
+    });
+  }
+  return out;
 }
 
 const int = (v: unknown, min: number, max: number): number | null =>
@@ -191,7 +237,9 @@ export function parsePlanAction(a: Record<string, unknown>): Action | null {
 /** The lines on the plan card: where the mob goes now, what the plan does after, and the time. */
 export function planLines(farm: FarmState, action: Action, card: JobCard): string[] {
   if (action.type !== 'setPlan' && action.type !== 'resumePlan') return [];
-  const m = farm.mobs.find((x) => x.id === action.mob);
+  // A sheep mob's card reads the same (milestone 2.8).
+  const m =
+    farm.mobs.find((x) => x.id === action.mob) ?? farm.sheep?.mobs.find((x) => x.id === action.mob);
   if (!m) return [];
   const survey = surveyOf(farm);
   const topo = survey.topology;

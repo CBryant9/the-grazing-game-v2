@@ -19,6 +19,7 @@ import {
   portableRefund,
   previewAction,
   saveFarm,
+  sheepDistrict,
   skipDays,
   surveyOf,
   thingsToDo,
@@ -96,6 +97,17 @@ import {
   type StoredFarm,
 } from './store';
 import { setupOptions } from './setup';
+import {
+  fenceRuleNotes,
+  isSheepAction,
+  parseSheepAction,
+  refusalWords,
+  sheepFeedPerDay,
+  sheepMarketLines,
+  sheepMoveNotes,
+} from './sheepacts';
+import { sheepShown } from './snapshot';
+import { sheepSwitchOn } from './switches';
 import { configuredStore } from '../db/farmstore';
 import { dateText, doneWord, todoKey } from './words';
 import { pastYears, soFarView, yearView } from './years';
@@ -213,6 +225,8 @@ interface Held {
   farm: FarmState;
   /** The snapshot of this farm as it stands, built once. */
   snap?: Snapshot;
+  /** The sheep switch the snapshot was built with: it is built again when the switch changes. */
+  snapSheep?: boolean;
 }
 
 /** What an act request carries beyond the job: the farm it was shown on, and its one-use id. */
@@ -233,6 +247,8 @@ export interface GameServerOptions {
   now?: () => number;
   /** Waits (ms) between the tries of a save that fails. One more try for each. Tests set zeros. */
   saveRetryMs?: readonly number[];
+  /** The sheep switch (milestone 2.8). The admin's switch unless a test sets it. */
+  sheepOn?: () => Promise<boolean>;
 }
 
 const realYears = (c: SetupChoices): boolean => c.years !== 'random';
@@ -249,6 +265,7 @@ function createOptions(c: SetupChoices, seed: number): CreateFarmOptions {
     start: realYears(c) ? { month: START_MONTH } : { year: RANDOM_START_YEAR, month: START_MONTH },
     years,
     startType: c.startType,
+    stock: c.stock ?? 'cattle',
     mixed:
       c.enterprise === 'mixed'
         ? { arablePct: c.arablePct ?? 0, croppedPct: c.croppedPct ?? 0 }
@@ -275,6 +292,10 @@ const HEAD_MAX = 100_000;
 export function parseAction(body: unknown, farm?: FarmState): Action | null {
   if (typeof body !== 'object' || body === null) return null;
   const a = body as Record<string, unknown>;
+  // Sheep jobs, and moves named by a sheep mob (milestone 2.8).
+  const sheep = parseSheepAction(a, farm);
+  if (sheep === false) return null;
+  if (sheep) return sheep;
   const mob = int(a.mob, 1, 1e6);
   switch (a.type) {
     case 'sellGroup': {
@@ -526,8 +547,12 @@ export class GameServer {
   private readonly now: () => number;
   private readonly retryMs: readonly number[];
   private readonly touched = new Map<string, number>();
+  private readonly sheepSwitch: () => Promise<boolean>;
+  /** The sheep switch as last read, at the start of each call. */
+  private sheepOn = false;
 
   constructor(options: GameServerOptions) {
+    this.sheepSwitch = options.sheepOn ?? sheepSwitchOn;
     this.retryMs = options.saveRetryMs ?? [150, 600];
     this.store = options.store;
     this.seed = options.seed ?? (() => randomInt(1, 2 ** 31 - 1));
@@ -542,6 +567,12 @@ export class GameServer {
    * delete. This is the store's own owner check, not the cookie being cleared.
    */
   private async idFor(sessionId: string): Promise<string> {
+    // Every call that reaches a farm starts here: read the sheep switch once for it.
+    try {
+      this.sheepOn = await this.sheepSwitch();
+    } catch {
+      this.sheepOn = false;
+    }
     const id = farmIdFor(sessionId);
     if (isSessionId(sessionId) && this.store.guestAccess) {
       if ((await this.store.guestAccess(id, sessionId)) === 'denied') {
@@ -756,7 +787,10 @@ export class GameServer {
   }
 
   private snapshotOf(held: Held): Snapshot {
-    held.snap ??= buildSnapshot(held.farm, held.stored, envFor(held.stored.setup));
+    if (!held.snap || held.snapSheep !== this.sheepOn) {
+      held.snap = buildSnapshot(held.farm, held.stored, envFor(held.stored.setup), this.sheepOn);
+      held.snapSheep = this.sheepOn;
+    }
     return held.snap;
   }
 
@@ -821,6 +855,13 @@ export class GameServer {
       }
       if (there) {
         throw new GameError(409, 'You already have a farm. Start a new one from the farm screen.');
+      }
+      // Sheep only with the switch on, in a sheep district (the route checks this too).
+      if (
+        (choices.stock ?? 'cattle') !== 'cattle' &&
+        !(this.sheepOn && sheepDistrict(choices.district))
+      ) {
+        throw new GameError(400, 'Sheep are not offered on this farm. Choose cattle.');
       }
       await this.makeRoom();
       const farm = createFarm(createOptions(choices, this.seed()), envFor(choices));
@@ -891,11 +932,21 @@ export class GameServer {
       }
       throw new GameError(400, 'That job is not one the game can do yet.');
     }
+    if (isSheepAction(action) && !sheepShown(farm, this.sheepOn)) {
+      throw new GameError(400, 'Sheep are not part of this farm.');
+    }
     return action;
   }
 
   /** The notes and daily price a job card carries beyond the engine's own. */
   private extras(farm: FarmState, stored: StoredFarm, action: Action): Extras {
+    if (action.type === 'setSheepFeed') {
+      return {
+        notes: [],
+        perDay: sheepFeedPerDay(farm, envFor(stored.setup), action.mob, action.feed),
+        summary: [],
+      };
+    }
     if (action.type === 'setSupplement') {
       return {
         notes: [],
@@ -913,7 +964,13 @@ export class GameServer {
       };
     }
     return {
-      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action), ...water],
+      notes: [
+        ...moveNotesFor(farm, action),
+        ...sheepMoveNotes(farm, action),
+        ...fenceRuleNotes(farm, action),
+        ...gateNotesFor(farm, action),
+        ...water,
+      ],
       perDay: null,
       summary: [],
     };
@@ -996,6 +1053,9 @@ export class GameServer {
         return contractLines(farm, card);
       case 'cancelContractFence':
         return cancelContractLines(events);
+      case 'buySheep':
+      case 'sellSheep':
+        return sheepMarketLines(farm, action, events);
       default:
         return [];
     }
@@ -1008,7 +1068,9 @@ export class GameServer {
       action.type !== 'sellGroup' &&
       action.type !== 'cancelSale' &&
       action.type !== 'letHandGo' &&
-      action.type !== 'cancelContractFence'
+      action.type !== 'cancelContractFence' &&
+      action.type !== 'buySheep' &&
+      action.type !== 'sellSheep'
     ) {
       return null;
     }
@@ -1035,7 +1097,7 @@ export class GameServer {
         return {
           ok: false,
           reason: result.reason,
-          message: result.message,
+          message: refusalWords(farm, action, result.reason, result.message),
           version,
           ...(teams.length ? { teams } : {}),
         };
@@ -1092,7 +1154,13 @@ export class GameServer {
         }
         const action = this.resolve(held.farm, req);
         const x = this.extras(held.farm, held.stored, action);
-        const result = applyAction(held.farm, action, envFor(held.stored.setup));
+        const applied = applyAction(held.farm, action, envFor(held.stored.setup));
+        const result = applied.ok
+          ? applied
+          : {
+              ...applied,
+              message: refusalWords(held.farm, action, applied.reason, applied.message),
+            };
         if (!result.ok) {
           let shown = held;
           if (meta.requestId) {

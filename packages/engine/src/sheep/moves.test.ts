@@ -180,6 +180,35 @@ describe('moving sheep', () => {
     expect(cleared.ok).toBe(true);
     expect(applyInstantly(t.farm, { type: 'clearSheepPlan', mob: t.mob }).ok).toBe(false);
   });
+
+  it('setPlan makes a plan for a sheep mob and runs it as a sheep plan; clearPlan takes it off (m2.8 fix)', () => {
+    const t = setup();
+    const set = applyInstantly(t.farm, {
+      type: 'setPlan',
+      mob: t.mob,
+      plan: {
+        legs: [{ stops: [t.sheepCell, t.emptyCells[0]!], rule: { mode: 'days', every: 2 } }],
+        after: 'repeat',
+      },
+      step: 1,
+    });
+    expect(set.ok ? 'ok' : set.message).toBe('ok');
+    if (!set.ok) return;
+    expect(set.farm.plans.length).toBe(1);
+    expect(set.events.some((e) => e.type === 'sheep-plan-set')).toBe(true);
+    expect(sheepMobsOf(set.farm)[0]!.plan?.template).toBe(set.farm.plans[0]!.id);
+    expect(mobArea(set.farm)).toBe(areaOf(set.farm, t.emptyCells[0]!));
+    const cleared = applyInstantly(set.farm, { type: 'clearPlan', mob: t.mob });
+    expect(cleared.ok).toBe(true);
+    if (cleared.ok) expect(sheepMobsOf(cleared.farm)[0]!.plan).toBeUndefined();
+    // Still refused for a mob that is on neither list.
+    const none = applyInstantly(t.farm, {
+      type: 'setPlan',
+      mob: 999,
+      plan: { legs: [{ stops: [t.sheepCell], rule: { mode: 'days', every: 2 } }], after: 'stay' },
+    });
+    expect(none.ok ? 'ok' : none.reason).toBe('no-such-mob');
+  });
 });
 
 describe('sheep plans cost and warn as cattle plans do (review of the third pass, items 2 and 7)', () => {
