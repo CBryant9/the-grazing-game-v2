@@ -150,6 +150,9 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 ` as `
 ` on Windows | Open files for writing with `newline='
 '`, and check for `` before committing. Prettier would have caught it, but only at the end |
+| P1 | The first plan comparison with the old game failed before the first day: year buys, infrastructure and opening net worth differed | The farm was set up with the instant path (pipe, fences, troughs, cattle), so its year totals held that spending. The old game's fresh game had none | Start the comparison from a year with nothing spent: `farm.year = newYear(farm)` after the set-up. **Rule: a comparison starts from a state both sides agree on, however the farm was built** |
+| P2 | In the 180-day play test the ordinary player's rotation plan never moved on the seed 1 farms, and ended with plans waiting. The test passed | Each farm had as many mobs as paddocks with water (2 and 2, then 3 and 3 once the weaners were weaned). One mob to a paddock means every move is into a paddock with a mob in it, so every plan waits | Reported as a fact and as a question for Claudia: a rotation needs a spare paddock. **Rule: read what a passing test leaves undone (here, things to do left at the end), not only that it passed** |
+| P3 | A patch to `state.ts` ran its backticked comments as shell commands and left the file half changed | The patch was a `node -e "..."` string in double quotes, and the shell runs backticks inside them | Reverted from git. Patches go in a script file written with the editor and run by name. Same family as D12 and S3 |
 
 ## Process lessons
 

@@ -1067,6 +1067,48 @@ Head at the start: 223 and 221.
 
 **Not tested here:** real years played at random through the calibration suites (the wiring is tested at random in `sim/realYears.test.ts`, the suites only in order). May starts for herds. Mixed farms and crops on real years. More than three steer blocks or two herds a year.
 
+### 14 Nov 2026, milestone 1.5c: 180 days with three kinds of player
+
+Engine 0.9.0. BUILD_PLAN row 1.5 asks for a test that plays ordinary, careless and absent players for 180 days and reports who goes under and why. The players are plain functions over the public engine API (`packages/engine/test-support/players.ts`, with their rules written at the top of that file). Each ran a medium running farm on medium difficulty, from 1 September 2023 with random seasons, for 180 days, in each of the four districts on two seeds (1 and 2). The absent player does nothing but press Next day. The careless player looks at the farm once every 21 days (days 0, 21, 42 and so on). On a day it looks it does each thing in the things-to-do list that has an action ready (mark calves, harvest, refill a portable trough, fix a fence) and moves any mob that has no water to a paddock with water, and on every other day it only presses Next day. The ordinary player acts every day: on a sale day it sells every steer of 300 kg or more, it does what things to do lists where an action is ready (it does not pause plans), it moves any mob without water to a paddock with water, it moves stock out of the yards, and it puts each mob on a rotation plan round the paddocks that have water, moving every 7 days for ever. None of them builds, buys, weans or changes a supplement. Two seeds were used, not more, so the test (`day/players.test.ts`) runs in about 11 seconds, which includes a second run of one seed for each player and district to check that the same run gives the same result. Run `GG_PLAYERS_RUN=1 pnpm exec vitest run packages/engine/src/day/players.test.ts` to print this table.
+
+| District | Seed | Player | Head, start to end | Deaths | Live weight gained | Cash, start to end | Net worth, start to end | Game ended | Days a mob had no water | Things to do left |
+|---|---|---|---|---|---|---|---|---|---|---|
+| cq | 1 | absent | 894 to 1101 | 11 natural, 1 orphaned | 68,954 kg | $148,000 to $114,026 | $623,556 to $1,017,852 | no, 180 days | 0 | 1 |
+| cq | 1 | careless | 894 to 1101 | 11 natural, 1 orphaned | 68,954 kg | $148,000 to $113,312 | $623,556 to $1,017,138 | no, 180 days | 0 | 0 |
+| cq | 1 | ordinary | 894 to 1086 | 11 natural, 1 orphaned | 68,877 kg | $148,000 to $127,781 | $623,556 to $1,017,397 | no, 180 days | 0 | 2 |
+| cq | 2 | absent | 889 to 1088 | 12 natural | 69,163 kg | $148,000 to $115,491 | $620,701 to $987,934 | no, 180 days | 0 | 1 |
+| cq | 2 | careless | 889 to 1088 | 12 natural | 69,163 kg | $148,000 to $114,826 | $620,701 to $987,268 | no, 180 days | 0 | 0 |
+| cq | 2 | ordinary | 889 to 1057 | 12 natural | 71,166 kg | $148,000 to $138,590 | $620,701 to $989,377 | no, 180 days | 0 | 3 |
+| nsw | 1 | absent | 307 to 379 | 4 natural | 29,275 kg | $50,000 to $43,586 | $213,239 to $366,486 | no, 180 days | 0 | 1 |
+| nsw | 1 | careless | 307 to 379 | 4 natural | 29,275 kg | $50,000 to $43,386 | $213,239 to $366,286 | no, 180 days | 0 | 0 |
+| nsw | 1 | ordinary | 307 to 346 | 4 natural | 28,861 kg | $50,000 to $76,356 | $213,239 to $367,169 | no, 180 days | 0 | 2 |
+| nsw | 2 | absent | 304 to 371 | 5 natural, 2 orphaned | 31,289 kg | $50,000 to $43,633 | $212,775 to $359,733 | no, 180 days | 0 | 1 |
+| nsw | 2 | careless | 304 to 371 | 5 natural, 2 orphaned | 31,289 kg | $50,000 to $43,417 | $212,775 to $359,516 | no, 180 days | 0 | 0 |
+| nsw | 2 | ordinary | 304 to 328 | 5 natural, 2 orphaned | 30,293 kg | $50,000 to $84,289 | $212,775 to $358,583 | no, 180 days | 0 | 3 |
+| cw | 1 | absent | 473 to 584 | 6 natural | 38,823 kg | $78,000 to $69,058 | $330,778 to $550,893 | no, 180 days | 0 | 1 |
+| cw | 1 | careless | 473 to 584 | 6 natural | 38,823 kg | $78,000 to $68,689 | $330,778 to $550,524 | no, 180 days | 0 | 0 |
+| cw | 1 | ordinary | 473 to 557 | 6 natural | 38,645 kg | $78,000 to $95,825 | $330,778 to $552,733 | no, 180 days | 0 | 2 |
+| cw | 2 | absent | 471 to 576 | 7 natural | 39,868 kg | $78,000 to $69,101 | $329,054 to $536,309 | no, 180 days | 0 | 1 |
+| cw | 2 | careless | 471 to 576 | 7 natural | 39,868 kg | $78,000 to $68,732 | $329,054 to $535,940 | no, 180 days | 0 | 0 |
+| cw | 2 | ordinary | 471 to 537 | 7 natural, 1 orphaned | 38,731 kg | $78,000 to $106,963 | $329,054 to $535,477 | no, 180 days | 0 | 3 |
+| wv | 1 | absent | 252 to 307 | 4 natural | 27,445 kg | $43,000 to $37,504 | $177,929 to $309,799 | no, 180 days | 0 | 1 |
+| wv | 1 | careless | 252 to 307 | 4 natural | 27,445 kg | $43,000 to $37,320 | $177,929 to $309,614 | no, 180 days | 0 | 0 |
+| wv | 1 | ordinary | 252 to 256 | 4 natural | 26,177 kg | $43,000 to $88,412 | $177,929 to $307,330 | no, 180 days | 0 | 2 |
+| wv | 2 | absent | 250 to 307 | 4 natural, 1 orphaned | 27,976 kg | $43,000 to $37,504 | $176,242 to $302,798 | no, 180 days | 0 | 1 |
+| wv | 2 | careless | 250 to 307 | 4 natural, 1 orphaned | 27,976 kg | $43,000 to $37,311 | $176,242 to $302,605 | no, 180 days | 0 | 0 |
+| wv | 2 | ordinary | 250 to 260 | 4 natural | 25,526 kg | $43,000 to $81,629 | $176,242 to $297,971 | no, 180 days | 0 | 3 |
+
+What the table shows, as facts:
+
+- No run ended early: no farm reached the bank's limit or was eaten out in 180 days, for any player. Every run kept all 180 days.
+- No mob was without water on the day it ended, in any run. Deaths were natural causes and orphaned calves only. None was from no water or poor condition.
+- The absent and careless players ended with the same head, deaths and live weight gained in every run. Cash and net worth differ by the same few hundred dollars, which is the cost of marking calves, the only job the careless player did.
+- The things-to-do count left at the end is 1 for the absent player (calves to mark) and 0 for the careless player. For the ordinary player it is the number of mobs, each a plan that is waiting: a plan waits when the next paddock has another mob in it ("one mob to a paddock"). On the seed 1 farms there were 2 paddocks with water and 2 mobs, so both plans waited from the first day and made no moves in 180 days. On the seed 2 farms there were 3 paddocks with water. Two mobs rotated for a time (40 plan moves) until the weaners were weaned into a third mob, after which every paddock with water had a mob in it and all three plans waited.
+- The ordinary player sold steers over 300 kg on sale days, so in every run its head is lower and its cash higher than the others'. Net worth at the end is within about 1% of the absent player's in each run.
+- Live weight gained is the cattle step's total for the 180 days (birth weights are added). Net worth is the engine's own sum (cash, stock at today's price and infrastructure in place).
+
+The play test asserts only what must hold: nothing throws, every figure on the farm is finite, no mob shares a paddock with another and no animal is in two mobs or on its way as well, the farm has run all 180 days or the game ended with a reason, and the same run gives the same result again. It does not assert who does well.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**
