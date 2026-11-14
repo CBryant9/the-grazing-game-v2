@@ -195,14 +195,19 @@ export function sheepYearRun(
         const young = h > 0 && w.every((x) => x.age < 365);
         const adg = h ? w.reduce((t, x) => t + x.adg * x.n, 0) / h : 0;
         let want = sm.feed;
-        if (young) want = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
+        if (young)
+          want = adg < WEANER_FEED_FROM ? 'grain' : adg >= WEANER_FEED_TO ? 'none' : sm.feed;
         else if (cs < FEED_FROM_CS) want = 'grain';
         else if (cs >= FEED_TO_CS) want = 'none';
         if (want !== sm.feed) feedChanges.push({ mob: sm.id, feed: want });
       }
       // Fed through the player's own action, as a player would set it.
       for (const ch of feedChanges.splice(0)) {
-        const done = applyInstantly(farm, { type: 'setSheepFeed', mob: ch.mob, feed: ch.feed }, env);
+        const done = applyInstantly(
+          farm,
+          { type: 'setSheepFeed', mob: ch.mob, feed: ch.feed },
+          env,
+        );
         if (!done.ok) throw new Error('setSheepFeed was refused: ' + done.message);
         farm = done.farm;
       }

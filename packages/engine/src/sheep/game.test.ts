@@ -302,7 +302,11 @@ describe('netting fence', () => {
         expect(v.fences[e.line][e.index]).toBe(VIEW_FENCE.permanent);
       }
       const plain = farmView(farm);
-      expect(nettingEdges(done.farm).every((e) => plain.fences[e.line][e.index] !== VIEW_FENCE.permanent)).toBe(true);
+      expect(
+        nettingEdges(done.farm).every(
+          (e) => plain.fences[e.line][e.index] !== VIEW_FENCE.permanent,
+        ),
+      ).toBe(true);
     }
     expect(NETTING_PER_M).toBeGreaterThan(COST_PER_M.permanent);
     const kinds = fenceKindsRead();

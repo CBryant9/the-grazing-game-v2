@@ -156,7 +156,8 @@ export function sheepBuyPrice(id: SheepBuyClassId): number {
 export function woolOnBack(s: Pick<Sheep, 'fleece' | 'micronKg' | 'sex'>): number {
   if (s.fleece <= 0) return 0;
   const gross = woolValue(s.fleece, s.micronKg / s.fleece) * (1 - WOOL_HARVEST.levyShare);
-  const shear = (s.sex === 'M' ? SHEARING_RATE.ram : SHEARING_RATE.sheep) + WOOL_HARVEST.shedStaffPerHead;
+  const shear =
+    (s.sex === 'M' ? SHEARING_RATE.ram : SHEARING_RATE.sheep) + WOOL_HARVEST.shedStaffPerHead;
   return Math.max(0, gross - shear);
 }
 

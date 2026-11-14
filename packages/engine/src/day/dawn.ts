@@ -70,13 +70,25 @@ export function dawn(farm: FarmState, env: ActionEnv = {}): FarmEvent[] {
     for (const a of sheepDue) {
       let mob = state.mobs.find((m) => m.where.kind === 'yards' && m.sheep.length > 0);
       if (!mob) {
-        mob = createSheepMob(farm.nextMobId++, '', { kind: 'yards', since: farm.day }, farm.district);
+        mob = createSheepMob(
+          farm.nextMobId++,
+          '',
+          { kind: 'yards', since: farm.day },
+          farm.district,
+        );
         mob.name = 'Sheep ' + mob.id;
         state.mobs.push(mob);
       }
       for (const s of a.sheep) mob.sheep.push(s);
       const head = a.sheep.reduce((t, s) => t + s.n, 0);
-      events.push({ type: 'sheep-arrived', cls: a.cls, head, cost: a.total, mob: mob.id, mobName: mob.name });
+      events.push({
+        type: 'sheep-arrived',
+        cls: a.cls,
+        head,
+        cost: a.total,
+        mob: mob.id,
+        mobName: mob.name,
+      });
     }
   }
 

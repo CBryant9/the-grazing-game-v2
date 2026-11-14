@@ -145,25 +145,38 @@ export function buySheep(
   const group: SheepGroupSpec = { cls, head: a.qty, sex: c.sex, ageDays: c.age, wt: boughtKg(c) };
   if (clocked) {
     // On the farm clock: paid for now, in the stock yards at first light tomorrow, as cattle are.
-    if (!spend(farm, total)) return refuse('bank-limit', "The bank won't lend that much for sheep.");
+    if (!spend(farm, total))
+      return refuse('bank-limit', "The bank won't lend that much for sheep.");
     farm.year.sheepBuys = (farm.year.sheepBuys ?? 0) + total;
     const state = ensureSheepState(farm);
     const x = groupRecord(farm.animalIds, c.breed, srwOf(c.breed), group);
     x.paid = each;
     x.cost = each;
     (state.arrivals ??= []).push({ arriveDay: farm.day + 1, cls: a.cls, total, sheep: [x] });
-    events.push({ type: 'sheep-on-the-way', cls: a.cls, qty: a.qty, total, arriveDay: farm.day + 1 });
+    events.push({
+      type: 'sheep-on-the-way',
+      cls: a.cls,
+      qty: a.qty,
+      total,
+      arriveDay: farm.day + 1,
+    });
     return null;
   }
   const s = surveyOf(farm);
   const areaId = s.topology.areaOf[a.to?.cell ?? -1];
-  if (areaId === undefined || areaId < 0) return refuse('bad-request', 'That square is off the farm.');
+  if (areaId === undefined || areaId < 0)
+    return refuse('bad-request', 'That square is off the farm.');
   const cattleThere = farm.mobs.some(
     (m) =>
-      m.where.kind === 'paddock' && m.animals.length && s.topology.areaOf[m.where.anchor] === areaId,
+      m.where.kind === 'paddock' &&
+      m.animals.length &&
+      s.topology.areaOf[m.where.anchor] === areaId,
   );
   if (cattleThere) {
-    return refuse('cattle-there', 'Cattle are grazing there. Cattle and sheep run in separate paddocks.');
+    return refuse(
+      'cattle-there',
+      'Cattle are grazing there. Cattle and sheep run in separate paddocks.',
+    );
   }
   if (!spend(farm, total)) return refuse('bank-limit', "The bank won't lend that much for sheep.");
   farm.year.sheepBuys = (farm.year.sheepBuys ?? 0) + total;

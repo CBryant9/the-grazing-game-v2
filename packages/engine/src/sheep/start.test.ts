@@ -65,7 +65,14 @@ function firstYear(district: 'nsw' | 'cw' | 'wv'): Year {
       }
     }
   }
-  const y = { atFoot, born, clipDay, cleanKgHead, micron, perDse: farm.years[0]!.score.profit / dse };
+  const y = {
+    atFoot,
+    born,
+    clipDay,
+    cleanKgHead,
+    micron,
+    perDse: farm.years[0]!.score.profit / dse,
+  };
   cache.set(district, y);
   return y;
 }
@@ -86,11 +93,15 @@ describe('start flock, first year with no hands', () => {
       expect(y.micron).toBeGreaterThan(16.5);
       expect(y.micron).toBeLessThan(19.5);
     });
-    it(`${district}: no windfall and no wipe-out (-$50 to $200 a DSE)`, { timeout: 120_000 }, () => {
-      const y = firstYear(district);
-      expect(y.perDse).toBeGreaterThan(-50);
-      expect(y.perDse).toBeLessThan(200);
-    });
+    it(
+      `${district}: no windfall and no wipe-out (-$50 to $200 a DSE)`,
+      { timeout: 120_000 },
+      () => {
+        const y = firstYear(district);
+        expect(y.perDse).toBeGreaterThan(-50);
+        expect(y.perDse).toBeLessThan(200);
+      },
+    );
   }
   // Known gap: an unmanaged year is not the DPIRD managed gross margin. Measured (seed 7):
   // Northern Tablelands $11.6/DSE (897 deaths, nobody fed through winter); Central West

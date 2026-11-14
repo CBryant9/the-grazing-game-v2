@@ -194,7 +194,11 @@ export function startFlock(farm: FarmState, rng: Rng, scale: number): StartFlock
   // The flock as it stands on the start date: ages, pregnancy or lambs, replacements, wool.
   buildStartFlock(r.mob, ewes, dateAt(farm.start, farm.day), farm.animalIds, rng);
   for (const s of r.mob.sheep) {
-    s.paid = !s.weaned ? 0 : s.sex === 'M' ? sheepBuyPrice('merinoRams') : sheepBuyPrice('merinoEwes');
+    s.paid = !s.weaned
+      ? 0
+      : s.sex === 'M'
+        ? sheepBuyPrice('merinoRams')
+        : sheepBuyPrice('merinoEwes');
     s.cost = s.paid;
   }
   return { ewes, rams, dse: ewes * START_FLOCK.eweYearDse, share };

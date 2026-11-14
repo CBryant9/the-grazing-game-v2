@@ -9,7 +9,15 @@
  * first year plays on from where a real flock would be.
  */
 
-import { BIRTH_KG, CYCLE_DAYS, GESTATION_DAYS, JOIN_DAYS, LAMBING_TIMES, MICRON, START_FLOCK } from '../data/sheep';
+import {
+  BIRTH_KG,
+  CYCLE_DAYS,
+  GESTATION_DAYS,
+  JOIN_DAYS,
+  LAMBING_TIMES,
+  MICRON,
+  START_FLOCK,
+} from '../data/sheep';
 import type { Rng } from '../rng';
 import type { CalendarDate } from '../calendar';
 import { litterMean, litterShares, lambSurvival, pregnantShare, ramsNeeded } from './breeding';
@@ -143,7 +151,16 @@ export function buildStartFlock(
               [lambAge >= LAMBING_TIMES.markDays ? 'W' : 'M', lambs - ewesL],
             ] as const) {
               if (!n) continue;
-              const l = makeSheep(ids.next++, { sex, breed, srw, age: lambAge, cs, wt, weaned: false, n });
+              const l = makeSheep(ids.next++, {
+                sex,
+                breed,
+                srw,
+                age: lambAge,
+                cs,
+                wt,
+                weaned: false,
+                n,
+              });
               l.dam = e.id;
               l.reared = lit;
               fleeceOn(l, Math.min(lambAge, wool));
@@ -176,7 +193,8 @@ export function buildStartFlock(
       }
     }
     if (join.lambingStart >= 0 || d >= GESTATION_DAYS + LAMBING_TIMES.markDays) {
-      if (d - GESTATION_DAYS >= LAMBING_TIMES.markDays) join.marked = out.filter((s) => !s.weaned).reduce((t, s) => t + s.n, 0);
+      if (d - GESTATION_DAYS >= LAMBING_TIMES.markDays)
+        join.marked = out.filter((s) => !s.weaned).reduce((t, s) => t + s.n, 0);
       if (d - GESTATION_DAYS >= LAMBING_TIMES.weanDays) {
         join.weaned = weanedLambs;
       }

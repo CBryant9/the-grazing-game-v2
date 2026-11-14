@@ -1112,7 +1112,7 @@ Branch `m2.3-sheep-model`, from `m2.1-hands-and-contractors` (fd01165), with `do
 
 **Calls for Claudia** (each is one constant in `packages/engine/src/data/sheep.ts` unless it says otherwise):
 
-1. **C18, sheep through a Tablelands or Central West winter.** Unsupplemented ewes on native pasture lamb at CS 1.4 (Tablelands) and 2.2 (Central West), so marking is 53% and 67% and the Tablelands loses 19% of its ewes. Three ways to fix it, all yours: the grass model's winter green on native pasture, a sheep supplement (hay or grain, milestone 2.4), or running the benchmark on sown pasture and crops. Nothing was changed.
+1. **C18, sheep through a Tablelands or Central West winter.** Unsupplemented ewes on native pasture lamb at CS 1.4 (Tablelands) and 2.2 (Central West), so marking is 53% and 67% and the Tablelands loses 19% of its ewes (first-pass figures; the third pass re-measured 48.8% and 71.1% marking and 31.7% of Tablelands ewes lost, eight seeds). Three ways to fix it, all yours: the grass model's winter green on native pasture, a sheep supplement (hay or grain, milestone 2.4), or running the benchmark on sown pasture and crops. Nothing was changed.
 2. **C18, carrying capacity.** The rule's 26% of growth eaten is far under what 13 to 23 DSE/ha eats on improved pasture (45 to 80%). The growth itself matches EverGraze. To change: the district or planting safe use in the grass model.
 3. **C3, DSE per AE.** Sheep use 8.4 (`DSE_PER_AE`); the cattle screens still say AE × 8 (`DSE_PER_AE` in `cattle/animal.ts`). `stockingRead` adds them at 8.4. Pick one figure and change the other constant.
 4. **C21, Merinos unmulesed.** 17% of Merino ewes struck a year with one shearing and one crutch (`FLYSTRIKE.daily`). For mulesed Merinos, lower `FLYSTRIKE.daily.merino`. Strikes apply to every weaned sheep, though only ewes were measured.
@@ -1144,7 +1144,7 @@ Same branch. The hands review fixes (b4e8b75) merged in first. Engine 0.15.0, sa
 
 **Calls for Claudia (second pass), added to the list above:**
 
-18. **The Tablelands winter (the top grass question, C18).** Unfed ewes there lamb at CS 1.4 and 19% die, whatever the stocking. The grass model's native July and August give sheep 24 to 44 kg/ha green, about 1,000 kg/ha dead at 50% digestibility, ME 7.0, CP 5.5%. S57 says unimproved native pasture there carries 5 DSE/ha. The grass model was not changed; the year rows run with winter feeding. Evidence in CALIBRATION (15 Nov 2026, second pass).
+18. **The Tablelands winter (the top grass question, C18).** Unfed ewes there lamb at CS 1.4 and 32% die (31.7% over eight seeds, re-measured in the third pass; the 19% first written here was three seeds on the 0.4% adult rate), whatever the stocking. The grass model's native July and August give sheep 24 to 44 kg/ha green, about 1,000 kg/ha dead at 50% digestibility, ME 7.0, CP 5.5%. S57 says unimproved native pasture there carries 5 DSE/ha. The grass model was not changed; the year rows run with winter feeding. Evidence in CALIBRATION (15 Nov 2026, second pass).
 19. **One DSE figure, 8.4, for every display (C3).** `data/stocking.ts`. The cattle screens' DSE figures move by 5% (AE × 8.4, not × 8): `mobSummaries`, `farmTotals` and the paddock summary's DSE per ha. No cattle benchmark moved. To go back: set `DSE_PER_AE` to 8.
 20. **Breakouts across species.** Cattle never push into a paddock with sheep, sheep never into one with cattle; they take another fence or stay put. The other option was letting them box up together.
 21. **Sheep get through every cattle fence** (permanent, electric, tape) when hungry or thirsty, by the cattle rule and chance; only netting, gates and the boundary hold them. Gates holding sheep is a builder's call.
@@ -1160,6 +1160,32 @@ Same branch. The hands review fixes (b4e8b75) merged in first. Engine 0.15.0, sa
 31. **Flystrike counts strikes**, so a ewe struck twice in a year counts twice (records do not keep which ewe).
 
 **Not done.** Real-year sheep prices (the indicators are pulled; the loader is not wired); booking sheep onto a later sale; Dubbo and Hamilton sheep sale days (the cattle calendar stands in); the marking job and its cost; the map and screens (another milestone). Timings were taken on a busy machine.
+
+### 15 Nov 2026: m2.3 Sheep model, third pass
+
+Same branch, engine and docs only, save format 11. After a second review.
+
+**Built.** Start flocks as they stand on the start date (age classes, pregnant or with lambs at foot by the district's joining day, replacements, wool since shearing); sheep in the year totals (eaten, gain, deaths by size); moving sheep (whole mob, part, plans) with the species and fence rules; adult deaths back to the derived 0.8% and a wether rate; SB-43 per block; the year harness feeds through the player's action; grain at a sourced price; CS floor facts for the to-do list; feed cost a day per mob; the flystrike note at most weekly; shed staff, selling costs and oddments on the clip; the dated EMI; ewe micron 17.8; saves read by format number with real format 9 and 10 fixtures; sheep sales and wool on their own money lines; bought sheep land in the yards next morning; wool on backs in net worth; netting tellable beside the map view.
+
+**Tested.** A test for each item (start flock per district, score, moves and each refusal, feeding, facts, costs, fly note, clip, market, arrivals, money lines, old saves, netting); every year row before and after in CALIBRATION.
+
+**Calls for Claudia (third pass), added to the list above:**
+
+32. **Sheep deaths score by size, sheep only.** (live weight ÷ 450)^0.75 AE a death, so a lamb is about 0.03 of a beast and a ewe 0.2 (replaces call 25's ÷ 8.4). Cattle still count one each: weighing cattle deaths by size too would change every cattle score.
+33. **Adult and wether deaths 0.8% a year, derived** (call 28's 0.4% refit undone). SB-43 Merino then misses: Western Victoria 4.63% mean, and single blocks over 4.5% in the Tablelands (4.67) and Central West (5.00 to 5.53). Known gaps.
+34. **Tablelands winter feeding costs about $19.76 a ewe a year** at feed barley's $330 a tonne (re-measured; it rides on the grass question, call 18).
+35. **Ewe micron 17.8** (males 19.0): the coarsest that keeps SB-51's 1-micron gap, since the districts grow medium wool.
+36. **Wool on backs counts in net worth**, net of the levy and the cost to shear, so a first year does not count wool grown before it.
+37. **Lambs at foot are priced on their own** (MLA's lamb indicators by weight), not with the ewe: MLA has no ewe-and-lamb unit indicator. At the start they cost nothing on the books.
+38. **Past the overdraft** a day's sheep costs come off cash as cattle supplements do, and the bank's limit ends the game; buying sheep is refused.
+39. **The start flock**: ewes 1.5 to 5.5 years, cast for age at 6 (stand-in); this year's wether lambs counted as sold before the start.
+40. **Wool selling costs are stand-ins** (shed staff $1.50 a head, levy 1.5%, $40 a bale selling, $16 cartage, $14 pack, 180 kg bales, oddments 22% of the clip): the pages refused automatic reading. The oddments price (0.9 of fleece) is from Mecardo.
+41. **Several plan moves a day move sheep once a day.**
+42. **The fly season is the same in every district** (known simplification: no district fly season page was read).
+43. **Start-flock first-year profit is a known gap** against DPIRD's $50.46/DSE gross margin: Tablelands $11.6 (unfed winter), Central West $124.7 and Western Victoria $149.9/DSE (no sales, so the lamb crop is valued at 2026 prices; running costs are shearing, feed and health only).
+44. **Netting on the map** waits for a `netting` code in `packages/shared` (outside this milestone's scope); `nettingEdges` tells it until then.
+
+**Not done.** The netting look on the map (VISUALS proposal only). Re-reading the Central West June-lambing page by hand. Overhead costs a year for sheep. The web test `mobcard.test.ts` (DSE × 8) still fails, as agreed.
 
 ## Ideas raised but not built yet
 

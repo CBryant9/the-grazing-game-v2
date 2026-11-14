@@ -1133,6 +1133,44 @@ No grass, cattle, crop, season or price formula changed, and the daily tick (`st
 - **Real-year calibration:** the herd and steer files (`calibration/realYearHerds.{cq,nsw,cw,wv}.test.ts`, `calibration/realYearSteers.{cqLick,cqNoLick,nsw,cw,wv}.test.ts`) were run on this branch: 9 files, 55 tests, all pass, with no band changed.
 - The whole suite (`pnpm test`) passes, with no `*.mvp.test.ts` file or calibration band changed.
 
+### 15 Nov 2026, milestone 2.3 third pass: engine 0.15.0, save format 11
+
+What changed in the model: adult deaths outside lambing put back to 0.8% a year, now derived from the document (`ADULT_DAILY`: Lifetime Wool's 3.2% a year at CS 3, S19, less 1.95% at lambing, S67, leaves 1.25%; less flystrike, 17% struck × 2% dying = 0.34%, S37, leaves about 0.8%); wethers get their own rate by the same working (`WETHER_DAILY`, 0.8%); Merino ewe micron 17.8 (was 17.0); grain charged at feed barley's $330 a tonne (was the pellet price); the year harness feeds through the player's action (`setSheepFeed`), not by setting the mob's feed. No cattle or grass figure moved, and no band was changed.
+
+**The year rows, before (second pass) and after** (mean of eight seeds, with winter feeding; Tablelands / Central West / Western Victoria):
+
+| Row | Band | Before | After |
+|---|---|---|---|
+| SB-40 Merino marking | 75–90% | 89.9 / 88.6 / 85.8 | 89.5 / 87.1 / 85.2 |
+| SB-41 first-cross marking | 100–120% | 114.9 / 111.7 / 116.9 | 115.2 / 111.1 / 115.9 |
+| SB-43 Merino ewe deaths | 2–4%, no block over 4.5% | 2.21 / 3.29 / 3.82 | 3.10 / 3.98 / **4.63** |
+| SB-43 first-cross ewe deaths | 2–4% | 4.22 / 4.74 / 4.57 (gaps) | 4.50 / 5.76 / 5.13 (gaps) |
+| SB-47 weaner deaths | 2–6% | 5.41 / 2.19 / 1.65 (gap) | 5.41 / 2.21 / 1.66 (gap) |
+| SB-52 wether fleece, micron | 3.8–4.6 kg; 18–20 | 4.36, 19.3 / 4.20, 19.1 | unchanged |
+| SB-52a ewe fleece | 3.3–4.7 kg | 4.43 / 4.13 / 4.27 | 4.42 / 4.13 / 4.27 |
+| SB-52b first fleece | 1.0–1.5 kg | 1.25 | 1.25 |
+| SB-52c first-cross share | 65–85% | 75.5% | 75.6% |
+| SB-53 struck that die | 1.8–2.2% | 2.14% | 2.09% (18.35% struck) |
+| SB-54 | as before | — | 5.10% |
+
+**SB-43 is now tested per block** ("never over 4.5%" on every 675-ewe block, not the mean). Known open gaps, expected failures with the figures in their names: Merino, Tablelands, one block of eight at 4.67% (mean 3.10, passes); Central West, blocks at 5.26, 5.00 and 5.53% (mean 3.98, passes); Western Victoria, mean 4.63%. First-cross as before. With the derived 0.8% put back, the Merino rows sit at the top of the band or over it. The second pass's 0.4% passed them only because it was fitted to them.
+
+**Western Victoria's movement, explained.** Three seeds against eight on the same code: in lamb 90.9 against 90.3%, scanning 124.3 against 123.2%, marked 86.3 against 85.2%, ewe deaths 4.25 against 4.63%. So about a point of marking is sampling (three seeds to eight). The deaths rise is mostly the adult rate going from 0.4% back to 0.8% (0.4 of a point), and the rest is sampling. Weaning: **21.9 kg on day 245 from 1 April, 2 December** (22.3 kg on three seeds).
+
+**Unfed winter, re-measured (eight seeds, average year).** Tablelands: ewe deaths **31.7%**, marking 48.8%, CS at lambing 1.41. Central West: deaths 6.41%, marking 71.1%, CS 2.42. (The second pass's "19%" was three seeds on the 0.4% adult rate.) With winter feeding: Tablelands deaths 3.10% and **$19.76 a ewe** of grain a year; Central West 3.98% and $9.26 a ewe. The Tablelands figure rides on the grass question (C18, below): it is the cost of the grass model's native winter.
+
+**Start flocks, the first year with no hands** (`sheep/start.test.ts`; seed 7, medium farm, from 1 September, average year). Profit is the change in net worth, wool on the sheep's backs counted (net of the levy and the cost to shear it) so that wool grown before the start is not counted as the year's:
+
+| District | Head at start (at foot) | DSE | Lambs born | First shearing | Profit |
+|---|---|---|---|---|---|
+| Tablelands | 1,150 (0) | 1,712 | 1,217 | day 80: 3.69 kg clean, 17.7 µm | $19,925, $11.6/DSE (897 deaths, nobody fed) |
+| Central West | 3,256 (1,481) | 3,127 | 628 | day 353: 3.86 kg, 17.9 µm | $389,837, $124.7/DSE |
+| Western Victoria | 947 (0) | 1,439 | 1,280 | day 74: 4.07 kg, 17.9 µm | $215,731, $149.9/DSE |
+
+Compared with NSW DPIRD's 2025 self-replacing 20-micron Merino gross margin of **$50.46/DSE** (DPIRD release, 6 Aug 2026). Tested: lambs, a clip of 3 to 5 kg clean at 16.5 to 19.5 µm, and a profit between −$50 and $200 a DSE. Known gap (expected failure): none of the three is within half to twice the gross margin. The Tablelands loses its unfed winter; Central West and Western Victoria keep every lamb (nothing is sold, so the whole crop is valued at 2026 market prices, which are high) and carry only shearing, feed and health as running costs.
+
+**Construction notes.** The start flock is built with the model's own figures (conception at CS 3, litters, lamb survival, birth weight, 0.198 kg a day lamb growth, S68; 50 g a day after weaning, S17), so the first year plays on from where it stands; it is not fitted to anything. Cast for age at 6 years is a stand-in.
+
 ### 15 Nov 2026, milestone 2.3 second pass and the engine half of 2.4: engine 0.15.0
 
 After a review (an Opus run of its own flocks). What changed in the model: sheep run as records of like animals with head counts, drawn from the seeded streams (the year tests then went from 35 s to 8 s); adult deaths outside lambing refitted from 0.8% to 0.4% a year (`ADULT_DAILY`, fitted to SB-43, which it was fitted to before: as records the year runs gave Merino ewes 4.2%); the Central West and Tablelands joining dates sourced (Central West 5 January for June lambing, Tablelands 7 April for September lambing: NSW DPIRD); sheep feeding added, and every year row now runs with the district's winter feeding (grain to fill the energy gap whenever a mob's CS falls under 2.7, Lifetime Wool's target, S18; weaners while they grow under 50 g a day, MMFS S17). Year rows are the mean over eight seeds (three before). No cattle or grass figure moved; the one DSE display figure (8.4, call C3) is read by no cattle formula, and every cattle band and `*.mvp.test.ts` passes as before.
@@ -1169,7 +1207,7 @@ The known open gaps are vitest expected failures (`it.fails`), with the reason a
 
 **Speed.** The largest flock the game holds (Western Victoria, 1,500 ha, stocked as the year benchmarks: 3,897 ewes and their lambs, 7,012 head after lambing) now runs at **2.65 ms a day** (`calibration/sheepSpeed.timed.ts`, `pnpm test:speed`, the cattle limit of 5 ms). Before, with every sheep on its own, the same flock did not get through its 170 warm-up days in three minutes: about a second a day or more. The machine was busy with another session's work for every timing that night (the cattle test read 5.6 to 8.8 ms on both this branch and the base commit), so these are upper figures.
 
-**The grass question for Claudia (the top one).** Without feed, the Tablelands winter on native pasture takes ewes from CS 3 to 1.4 at lambing and kills 19% of them in a year, and it does not move with stocking rate (60% and 100% of carrying capacity give the same). The cause is the grass model's native winter, not the sheep rules. In July and August on the Tablelands block the sheep's diet is 24 to 44 kg/ha green and about 1,000 to 1,300 kg/ha dead at 50% digestibility: ME about 7.0 MJ/kg, CP 5.3 to 5.8%, intake about 1.3% of live weight. Dry cows on the same block also fall, from CS 2.8 to 2.1 (the review's run, not repeated here). Against it, S57 (MLA L.PDS.2003) has unimproved native pasture on the Northern Tablelands carrying 5 DSE/ha year round; the game's carrying capacity rule gives 3.55 DSE/ha there and its winter will not hold a dry sheep without feed. Nothing in the grass model was changed (C18). The year rows pass only with winter feeding.
+**The grass question for Claudia (the top one).** Without feed, the Tablelands winter on native pasture takes ewes from CS 3 to 1.4 at lambing and kills 19% of them in a year (three seeds; re-measured in the third pass on eight seeds and the 0.8% adult rate: 31.7%), and it does not move with stocking rate (60% and 100% of carrying capacity give the same). The cause is the grass model's native winter, not the sheep rules. In July and August on the Tablelands block the sheep's diet is 24 to 44 kg/ha green and about 1,000 to 1,300 kg/ha dead at 50% digestibility: ME about 7.0 MJ/kg, CP 5.3 to 5.8%, intake about 1.3% of live weight. Dry cows on the same block also fall, from CS 2.8 to 2.1 (the review's run, not repeated here). Against it, S57 (MLA L.PDS.2003) has unimproved native pasture on the Northern Tablelands carrying 5 DSE/ha year round; the game's carrying capacity rule gives 3.55 DSE/ha there and its winter will not hold a dry sheep without feed. Nothing in the grass model was changed (C18). The year rows pass only with winter feeding.
 
 ### 15 Nov 2026, milestone 2.3 (the sheep model): engine 0.14.0
 
