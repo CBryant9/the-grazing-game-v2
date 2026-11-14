@@ -13,7 +13,7 @@ import { reusedSegmentCost, segmentCost } from '../money/costs';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
 import { contractDone, runMetresLeft } from './contract';
-import { labourOf } from './help';
+import { earnedOn, labourOf } from './help';
 import { labourPool } from './pool';
 import type { ContractRun, Hand } from './types';
 
@@ -80,7 +80,7 @@ export function hireHand(
   return null;
 }
 
-/** Let a hand go. What they are owed is paid now. */
+/** Let a hand go. What they are owed, today included, is paid now. */
 export function letHandGo(
   farm: FarmState,
   events: FarmEvent[],
@@ -89,18 +89,26 @@ export function letHandGo(
   const labour = farm.labour;
   const hand = labour?.hands.find((h) => h.id === a.hand);
   if (!labour || !hand) return refuse('no-such-hand', 'There is no such hand on the farm.');
-  if (farm.cash - hand.owed < farm.overdraft) {
+  // What they are owed to the end of today: wages are otherwise added at the next first light.
+  const paid = hand.owed + earnedOn(farm, hand, farm.day);
+  if (farm.cash - paid < farm.overdraft) {
     return refuse(
       'bank-limit',
-      `The bank won't lend enough to pay what ${hand.name} is owed. It is ${dollars(hand.owed)} and the overdraft limit is ${dollars(farm.overdraft)}.`,
+      `The bank won't lend enough to pay what ${hand.name} is owed. It is ${dollars(paid)} and the overdraft limit is ${dollars(farm.overdraft)}.`,
     );
   }
-  const paid = hand.owed;
   farm.cash -= paid;
   farm.year.running += paid;
   labour.hands = labour.hands.filter((h) => h.id !== hand.id);
   if (!labour.hands.length) labour.nextPayDay = null;
-  events.push({ type: 'hand-left', hand: hand.id, name: hand.name, why: 'let-go', paid });
+  events.push({
+    type: 'hand-left',
+    hand: hand.id,
+    name: hand.name,
+    why: 'let-go',
+    paid,
+    stillOwed: 0,
+  });
   return null;
 }
 

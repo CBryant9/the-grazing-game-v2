@@ -21,10 +21,50 @@ import { dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
 import { contractDone, runMetresLeft } from './contract';
-import { weeklyWage } from './day';
-import { handShare, onDuty, usedToday, worksOn } from './help';
-import { standingOf } from './pool';
+import { handShare, onDuty, usedToday, weeklyWage, worksOn } from './help';
+import { labourPool, standingOf } from './pool';
 import type { HandKind, HandSkills } from './types';
+
+/**
+ * A person looking for work, as the player may see them: who they are, how
+ * they would be employed, their days, the skills and dogs they bring, and
+ * what they ask from this farm. Left out on purpose: when they will leave
+ * the list (`until`), when they joined it, and the award rate behind their
+ * asking rate (a data table; the asking rate is what the player pays).
+ */
+export interface JobSeeker {
+  id: number;
+  name: string;
+  kind: HandKind;
+  level: number;
+  skills: HandSkills;
+  /** See `HandView.dogs` for what dogs change. */
+  dogs: boolean;
+  /** Weekdays they would work, 0 for Sunday. */
+  days: number[];
+  /** What they ask, dollars before super: a week (salaried) or a day worked (casual, contract). */
+  rate: number;
+  /** What they would cost in a full week, wages and super, dollars. */
+  weekCost: number;
+  /** For a short contract, its length in days; null otherwise. */
+  contractDays: number | null;
+}
+
+/** The people looking for work today, for the player. Hire one with `hireHand` and their `id`. */
+export function jobSeekers(farm: FarmState): JobSeeker[] {
+  return labourPool(farm).map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: p.kind,
+    level: p.level,
+    skills: { ...p.skills },
+    dogs: p.dogs,
+    days: [...p.days],
+    rate: p.rate,
+    weekCost: weeklyWage(p) * (1 + LABOUR.superRate.value),
+    contractDays: p.kind === 'contract' ? LABOUR.contractDays.value : null,
+  }));
+}
 
 /** Where a hand is today. */
 export type HandStatus =
@@ -44,6 +84,13 @@ export interface HandView {
   kind: HandKind;
   level: number;
   skills: HandSkills;
+  /**
+   * True if they bring a team of dogs. What it changes: the hand's share of
+   * the player's stock jobs (moving a mob or part of one, putting a mob on
+   * a plan's stop, weaning, marking, drafting and loading for a sale) is
+   * 2.5 / 1.5 times bigger, so those jobs take less of the player's own
+   * light. Nothing else.
+   */
   dogs: boolean;
   /** Weekdays they work, 0 for Sunday. */
   days: number[];
@@ -74,8 +121,13 @@ export interface WorkforceView {
   /** The next pay day, or null with no hands. */
   nextPayDay: number | null;
   nextPayDate: CalendarDate | null;
-  /** Wages and super owed to all hands now, dollars. */
+  /** Wages and super owed to the hands on the farm now (earned up to the start of today), dollars. */
   owedNow: number;
+  /**
+   * Wages and claim costs the farm could not pay when due, dollars. Never
+   * forgiven: paid by itself at first light as soon as the bank can cover it.
+   */
+  wagesOwedFromBefore: number;
   /** The super rate paid on top of wages (0.12 is 12%). */
   superRate: number;
   /** The most hands the farm can have at once. */
@@ -121,6 +173,7 @@ export function workforceView(farm: FarmState): WorkforceView {
     nextPayDay: next,
     nextPayDate: next === null ? null : dateOn(farm, next),
     owedNow: hands.reduce((t, h) => t + h.owed, 0),
+    wagesOwedFromBefore: labour?.wagesOwed ?? 0,
     superRate: LABOUR.superRate.value,
     maxHands: LABOUR.maxHands.value,
   };
@@ -188,6 +241,7 @@ export interface WorkerReportItem {
 
 const LABOUR_TYPES = new Set<FarmEvent['type']>([
   'hand-hired',
+  'wages-owed-paid',
   'hand-left',
   'wages-paid',
   'wages-missed',
@@ -202,21 +256,24 @@ const LABOUR_TYPES = new Set<FarmEvent['type']>([
 /**
  * The worker report (PRD 5.11): what was done on the farm since the inbox
  * message numbered `sinceSeq`, one item for each speech bubble. It holds the
- * workforce's messages, and the moves a grazing plan made on days a hand was
- * on the farm (a farm hand does the planned moves, PRD 5.2). Each item is
+ * workforce's messages, and the moves a grazing plan made on days a hand
+ * worked, credited to that hand when the move happened (a farm hand does the
+ * planned moves, PRD 5.2). A hand on a day off, injured or gone is never
+ * credited. Each item is
  * also in the inbox. Oldest first.
  */
 export function workerReport(farm: FarmState, sinceSeq = -1): WorkerReportItem[] {
-  const hands = farm.labour?.hands ?? [];
+  const credited = new Map((farm.labour?.planMoves ?? []).map((p) => [p.seq, p]));
   const out: WorkerReportItem[] = [];
   for (const m of farm.inbox) {
     if (m.seq <= sinceSeq) continue;
     const e = m.event;
     let hand: { id: number; name: string } | null = null;
     if (e.type === 'plan-moved') {
-      const on = hands.find((h) => onDuty(h, m.day));
-      if (!on) continue;
-      hand = { id: on.id, name: on.name };
+      // Credited when it happened, to a hand who worked that day; otherwise not in the report.
+      const by = credited.get(m.seq);
+      if (!by) continue;
+      hand = { id: by.hand, name: by.name };
     } else if (!LABOUR_TYPES.has(e.type)) continue;
     else if ('hand' in e && typeof e.hand === 'number' && 'name' in e) {
       hand = { id: e.hand, name: String(e.name) };

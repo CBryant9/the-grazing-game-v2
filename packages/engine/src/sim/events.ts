@@ -439,10 +439,18 @@ export type LabourEvent =
       why: HandLeftWhy;
       /** Dollars paid to them as they left (what they were owed), 0 if it could not be paid. */
       paid: number;
+      /** Dollars they are still owed, kept as wages owed on the farm. 0 when paid in full. */
+      stillOwed: number;
     }
   /** Pay day: wages and super paid to every hand who could be paid. */
   | { type: 'wages-paid'; hands: number; wages: number; superannuation: number; total: number }
-  /** A hand's wages could not be paid: the bank would not cover them. The farm's standing fell. */
+  /** Wages owed from before (to hands who have left, or a claim's cost) were paid now the bank can cover them. */
+  | { type: 'wages-owed-paid'; amount: number }
+  /**
+   * A hand's wages could not be paid: the bank would not cover them. The
+   * farm's standing fell. What they are owed stays owed by the farm and is
+   * paid as soon as the bank can cover it.
+   */
   | {
       type: 'wages-missed';
       hand: number;
@@ -454,7 +462,8 @@ export type LabourEvent =
   /**
    * A hand was hurt at work. `fencing` is true if they were fencing that
    * day. They are off until `backDay`, paid by workers compensation; the
-   * farm pays its share (`cost`).
+   * farm pays its share (`cost`): now if the bank can cover it
+   * (`paidNow`), otherwise it is owed and paid as soon as it can be.
    */
   | {
       type: 'hand-injured';
@@ -464,6 +473,7 @@ export type LabourEvent =
       fencing: boolean;
       backDay: number;
       cost: number;
+      paidNow: boolean;
     }
   /** A hand is back at work after an injury. */
   | { type: 'hand-back'; hand: number; name: string }

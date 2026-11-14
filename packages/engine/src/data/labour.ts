@@ -28,6 +28,11 @@ const fig = <T>(value: T, source: LabourFigureSource, note: string): Figure<T> =
 /** Award levels a hand can be on: Farm and livestock hand level 1 to level 8. */
 export type AwardLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+/**
+ * The workforce figures. Exported for the server and tests only: the
+ * browser must never receive this table (CLAUDE.md rule 14). Screens get
+ * figures ready to show from the reads in ../labour/reads.ts.
+ */
 export const LABOUR = {
   /**
    * Minimum weekly rates for a full-time adult farm and livestock hand,
@@ -150,6 +155,14 @@ export const dayHours = (): number => LABOUR.weekHours.value / LABOUR.daysPerWee
 /** The casual day rate at a level, dollars: the hourly rate with the casual loading, for a day's hours. */
 export const casualDayRate = (level: AwardLevel): number =>
   awardHourly(level) * (1 + LABOUR.casualLoading.value) * dayHours();
+
+/**
+ * The day rate for a fixed-term contract hand at a level, dollars: the
+ * full-time weekly rate over 5 days. A fixed-term employee is not a casual
+ * under the award, so there is no casual loading.
+ */
+export const contractDayRate = (level: AwardLevel): number =>
+  LABOUR.awardWeekly.value[level - 1]! / LABOUR.daysPerWeek.value;
 
 /** A short list of given names and family names for the people looking for work. Made up. */
 export const FIRST_NAMES = [

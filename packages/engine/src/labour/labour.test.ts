@@ -10,9 +10,18 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { openFarm } from '../../test-support/wholeFarm';
-import { across, busyFarm, turnedDown, work } from '../../test-support/workingDay';
+import {
+  across,
+  busyFarm,
+  down,
+  setUp as setUpOff,
+  turnedDown,
+  work,
+} from '../../test-support/workingDay';
 import { previewAction } from '../day/act';
 import { endDay, skipDays } from '../day/days';
+import { netWorth } from '../money/worth';
+import { applyInstantly } from '../../test-support/instant';
 import { LABOUR, casualDayRate } from '../data/labour';
 import { EDGE, getEdge, setEdge, cloneFences } from '../farm/topology';
 import { weekdayOf } from '../market/saleCalendar';
@@ -20,7 +29,7 @@ import { farmHash, loadFarm, saveFarm } from '../save/save';
 import { dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
-import { contractView, workerReport, workforceView } from './reads';
+import { contractView, jobSeekers, workerReport, workforceView } from './reads';
 import { labourPool } from './pool';
 import type { Hand } from './types';
 
@@ -86,7 +95,11 @@ describe('the labour pool', () => {
         if (p.kind !== 'salaried') expect(p.days).toEqual([1, 2, 3, 4, 5]);
         expect(p.rate).toBeGreaterThanOrEqual(p.awardRate);
         const award =
-          p.kind === 'salaried' ? LABOUR.awardWeekly.value[p.level - 1]! : casualDayRate(p.level);
+          p.kind === 'salaried'
+            ? LABOUR.awardWeekly.value[p.level - 1]!
+            : p.kind === 'contract'
+              ? LABOUR.awardWeekly.value[p.level - 1]! / 5
+              : casualDayRate(p.level);
         expect(p.awardRate).toBeCloseTo(award, 9);
         expect(p.from).toBeLessThanOrEqual(d);
         expect(p.until).toBeGreaterThanOrEqual(d);
@@ -142,9 +155,12 @@ describe('hiring and letting go', () => {
   it('letting a hand go pays what they are owed, at once', () => {
     let { farm } = hireOne(openFarm('nsw'), AVERAGE);
     farm = skipDays(farm, 6).farm;
-    const owed = farm.labour!.hands[0]!.owed;
-    expect(owed).toBeGreaterThan(0);
-    const done = work(farm, { type: 'letHandGo', hand: farm.labour!.hands[0]!.id });
+    const h = farm.labour!.hands[0]!;
+    expect(h.owed).toBeGreaterThan(0);
+    // Owed to the start of today, and today's wage if today is one of their days.
+    const owed =
+      h.owed + (WEEKDAYS.includes(weekday(farm)) ? h.rate * (1 + LABOUR.superRate.value) : 0);
+    const done = work(farm, { type: 'letHandGo', hand: h.id });
     expect(farm.cash - done.farm.cash).toBeCloseTo(owed, 6);
     expect(done.farm.labour!.hands.length).toBe(0);
     expect(done.events[0]).toMatchObject({ type: 'hand-left', why: 'let-go', paid: owed });
@@ -204,6 +220,12 @@ describe('pay day', () => {
     const missed = events(s.dawn, 'wages-missed')[0];
     expect(missed).toMatchObject({ standingBefore: 80, standingAfter: 60 });
     expect(events(s.dawn, 'hand-left')[0]).toMatchObject({ why: 'not-paid', paid: 0 });
+    // What they were owed is not thrown away: the farm still owes it.
+    if (missed?.type !== 'wages-missed') throw new Error('no missed wages');
+    expect(missed.owed).toBeGreaterThan(0);
+    expect(s.farm.labour!.wagesOwed).toBeCloseTo(missed.owed, 9);
+    expect(events(s.dawn, 'hand-left')[0]).toMatchObject({ stillOwed: missed.owed });
+    expect(workforceView(s.farm).wagesOwedFromBefore).toBeCloseTo(missed.owed, 9);
     expect(events(s.dawn, 'wages-paid')).toEqual([]);
     expect(s.farm.labour!.standing).toBe(60);
     expect(workforceView(s.farm).standing).toBe(60);
@@ -544,5 +566,175 @@ describe('wording', () => {
     ]) {
       expect(text, word).not.toContain(word);
     }
+  });
+});
+
+describe('second pass: money owed is never lost or made', () => {
+  const restore: (() => void)[] = [];
+  afterEach(() => {
+    while (restore.length) restore.pop()!();
+  });
+
+  it('letting a hand go pays what is owed including today', () => {
+    let { farm } = hireOne(openFarm('nsw'), AVERAGE);
+    farm = toWeekday(endDay(farm).farm, [2, 3, 4]);
+    const hand = farm.labour!.hands[0]!;
+    const today = hand.rate * (1 + LABOUR.superRate.value);
+    const done = work(farm, { type: 'letHandGo', hand: hand.id });
+    expect(done.events[0]).toMatchObject({ paid: hand.owed + today, stillOwed: 0 });
+    expect(farm.cash - done.farm.cash).toBeCloseTo(hand.owed + today, 6);
+  });
+
+  it('unpaid wages stay owed and are paid by themselves when the bank can cover them: no money made', () => {
+    let { farm } = hireOne(openFarm('nsw'), AVERAGE);
+    farm = skipDays(farm, 13).farm;
+    farm.cash = farm.overdraft + 1;
+    let s = skipDays(farm, 1);
+    const missed = events(s.dawn, 'wages-missed')[0];
+    if (missed?.type !== 'wages-missed') throw new Error('no missed wages');
+    // Still short: nothing is paid and nothing is forgiven.
+    s = skipDays(s.farm, 3);
+    expect(events(s.dawn, 'wages-owed-paid')).toEqual([]);
+    expect(s.farm.labour!.wagesOwed).toBeCloseTo(missed.owed, 9);
+    // Money in: the debt is paid at the next first light, once, in full.
+    const f = s.farm;
+    f.cash += 100_000;
+    const day = endDay(f);
+    expect(events(day.dawn, 'wages-owed-paid')).toEqual([
+      { type: 'wages-owed-paid', amount: missed.owed },
+    ]);
+    expect(day.farm.labour!.wagesOwed).toBe(0);
+    // Net worth already carried the debt, so paying it moves net worth only by the day's other flows.
+    const twin = structuredClone(f);
+    twin.labour!.wagesOwed = 0;
+    twin.cash -= missed.owed;
+    expect(netWorth(f)).toBeCloseTo(netWorth(twin), 6);
+  });
+
+  it('net worth takes off wages owed: across pay day it moves only by that day’s wage', () => {
+    const base = openFarm('nsw');
+    const { farm: hired } = hireOne(base, AVERAGE);
+    const lead = 12; // the day before pay day is hired + 13
+    const a0 = skipDays(hired, lead).farm;
+    const b0 = skipDays(base, lead).farm;
+    const a1 = endDay(a0).farm;
+    const b1 = endDay(b0).farm;
+    const a2 = endDay(a1).farm; // pay day
+    const b2 = endDay(b1).farm;
+    expect(a2.labour!.hands[0]!.owed).toBe(0);
+    // The day before pay day's wage, added at pay day's first light.
+    const hand = a1.labour!.hands[0]!;
+    const yesterday = WEEKDAYS.includes(weekdayOf(dateOn(a1, a1.day)))
+      ? hand.rate * (1 + LABOUR.superRate.value)
+      : 0;
+    const withHand = netWorth(a2) - netWorth(a1);
+    const without = netWorth(b2) - netWorth(b1);
+    // Interest on a slightly smaller balance is the only other difference: well under a dollar.
+    expect(Math.abs(withHand - (without - yesterday))).toBeLessThan(1);
+  });
+
+  it('an injury cost the bank can not cover is owed, not taken past the limit', () => {
+    const rate = LABOUR.injuryPerHour as { value: number };
+    const was = rate.value;
+    restore.push(() => {
+      rate.value = was;
+    });
+    rate.value = 1;
+    let farm = hireOne(openFarm('nsw'), AVERAGE).farm;
+    farm = toWeekday(endDay(farm).farm, [1, 2, 3, 4]);
+    farm.cash = farm.overdraft + 1;
+    const day = endDay(farm);
+    const hurt = events(day.dawn, 'hand-injured')[0];
+    expect(hurt).toMatchObject({ paidNow: false });
+    expect(day.farm.labour!.wagesOwed).toBeGreaterThanOrEqual(
+      hurt!.type === 'hand-injured' ? hurt.cost : Infinity,
+    );
+  });
+});
+
+describe('second pass: contracts, plan moves and the player view', () => {
+  it('the hands’ day is not used when the contractor cannot build', () => {
+    let farm = hireOne(openFarm('nsw'), AVERAGE).farm;
+    farm = toWeekday(endDay(farm).farm, [1]);
+    farm = work(farm, {
+      type: 'orderContractFence',
+      edges: across(12, 0, 39),
+      team: 1,
+      handsHelp: true,
+    }).farm;
+    farm.cash = farm.overdraft + 10;
+    const day = endDay(farm);
+    expect(events(day.dawn, 'contract-stopped')[0]).toMatchObject({ why: 'no-money' });
+    expect(workforceView(day.farm).hands[0]!.dayLeft).toBe(1);
+  });
+
+  it('a contractor fence through a paddock splits the mob as the player building it does, seeded', () => {
+    const open = openFarm('nsw');
+    const stocked = setUpOff(open, {
+      type: 'buyCattle',
+      cls: 'yearSteer',
+      qty: 60,
+      to: { cell: open.layout.water.bore },
+    });
+    const mon = toWeekday(stocked, [1]);
+    const wall = down(20, 0, 25); // 26 segments, 1,300 m: a 2-man team takes two days
+    // The contractor.
+    let a = work(mon, { type: 'orderContractFence', edges: wall, team: 2 }).farm;
+    a = endDay(a).farm;
+    expect(a.mobs.length).toBe(1);
+    a = endDay(a).farm;
+    expect(a.mobs.length).toBe(2);
+    // The same fence built the same days, at first light, off the clock.
+    let b = endDay(mon).farm;
+    b = setUpOff(b, { type: 'buildFence', edges: wall.slice(0, 20), fence: 'permanent' });
+    b = endDay(b).farm;
+    const rest = applyInstantly(b, {
+      type: 'buildFence',
+      edges: wall.slice(20),
+      fence: 'permanent',
+    });
+    if (!rest.ok) throw new Error(rest.message);
+    b = rest.farm;
+    const herds = (f: FarmState): number[][] =>
+      f.mobs.map((m) => m.animals.map((x) => x.id).sort((p, q) => p - q));
+    expect(herds(a)).toEqual(herds(b));
+    expect(a.rng.strays).toEqual(b.rng.strays);
+  });
+
+  it('plan moves are credited only to a hand who worked that day', () => {
+    const b = busyFarm();
+    let farm = hireOne(b.farm, AVERAGE).farm;
+    farm = work(farm, {
+      type: 'setPlan',
+      mob: b.steers,
+      plan: {
+        legs: [{ stops: [b.steerCell, b.emptyCell], rule: { mode: 'days', every: 1 }, rounds: 0 }],
+        after: 'repeat',
+      },
+    }).farm;
+    const s = skipDays(farm, 21, {}, { anyway: true });
+    const hand = s.farm.labour!.hands[0]!;
+    const moves = s.farm.inbox.filter((m) => m.event.type === 'plan-moved');
+    expect(moves.length).toBeGreaterThan(10);
+    const credited = workerReport(s.farm).filter((r) => r.event.type === 'plan-moved');
+    expect(credited.length).toBeGreaterThan(5);
+    expect(credited.length).toBeLessThan(moves.length);
+    for (const r of credited) {
+      expect(r.hand!.id).toBe(hand.id);
+      expect(WEEKDAYS).toContain(weekdayOf(dateOn(s.farm, r.day)));
+      expect(r.day).toBeGreaterThanOrEqual(hand.startDay);
+    }
+  });
+
+  it('the player view of the list leaves out when people leave it and the award behind the rate', () => {
+    const farm = openFarm('nsw');
+    const seekers = jobSeekers(farm);
+    expect(seekers.map((p) => p.id)).toEqual(labourPool(farm).map((p) => p.id));
+    for (const p of seekers) {
+      expect(p).not.toHaveProperty('until');
+      expect(p).not.toHaveProperty('from');
+      expect(p).not.toHaveProperty('awardRate');
+    }
+    expect(jobSeekers.length).toBe(1);
   });
 });

@@ -302,6 +302,11 @@ function upgrade(f: Record<string, unknown>): void {
   // Farm hands and contract fencing (format 9): a farm saved before had none. `labour` is
   // left out until the first hire or order, so there is nothing to fill in.
   if (farm.labour === null) delete farm.labour;
+  // Within format 9 (not yet released): wages owed and plan moves credited to a hand came later.
+  if (farm.labour) {
+    farm.labour.wagesOwed ??= 0;
+    farm.labour.planMoves ??= [];
+  }
 }
 
 /**

@@ -797,7 +797,7 @@ Every figure is one constant in `packages/engine/src/data/labour.ts` (`LABOUR`),
 | Pay cycle | every 14 days | Builder | The award allows weekly or fortnightly (clause 16.1, https://awards.fairwork.gov.au/MA000035.html, read through a page summary). Fortnightly chosen |
 | Superannuation guarantee | 12% on top of wages | Sourced | ATO, "The final SG rate increase is coming on 1 July" (12% from 1 July 2025). https://www.ato.gov.au/businesses-and-organisations/small-business-newsroom/the-final-sg-rate-increase-is-coming-on-1-july (read through a search result) |
 
-The game uses the 2026 rates on every farm, as its other costs (fence, troughs) are today's prices. Salaried hands are paid the weekly rate; casual and contract hands the casual day rate (hourly × 1.25 × 7.6) for each day worked. Weekend penalty rates, overtime, leave, allowances and the keep deduction are not modelled.
+The game uses the 2026 rates on every farm, as its other costs (fence, troughs) are today's prices; they match the cattle prices only under the default `REAL_PRICE_DOLLARS = 'today'`. Salaried hands are paid the weekly rate. Casual hands are paid the casual day rate (hourly × 1.25 × 7.6) for each day worked. Contract hands are fixed-term employees, not casuals under the award, so they are paid the weekly rate over 5 days (no casual loading) for each day worked (Builder: the award's pay guide gives the weekly and casual rates; a day rate for a fixed-term employee is the builder's reading). Weekend penalty rates, overtime, leave, allowances and the keep deduction are not modelled.
 
 ### A hand's share of the work
 

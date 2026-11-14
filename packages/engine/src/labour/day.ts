@@ -30,19 +30,8 @@ import { dayMinutes } from '../sim/clock';
 import type { FarmEvent, HandDuty } from '../sim/events';
 import type { FarmState } from '../sim/state';
 import { contractDone, contractorWorks, runMetresLeft } from './contract';
-import { handsCan, onDuty, useHands, worksOn } from './help';
+import { earnedOn, handsCan, useHands, weeklyWage, worksOn } from './help';
 import type { ContractRun, Hand, LabourState } from './types';
-
-/** A hand's weekly wage before super, dollars: the salary, or five days at the day rate. */
-export const weeklyWage = (hand: Pick<Hand, 'kind' | 'rate'>): number =>
-  hand.kind === 'salaried' ? hand.rate : hand.rate * LABOUR.daysPerWeek.value;
-
-/** Wages and super a hand earns on a farm day, dollars: nothing on a day off for a day-rate hand, or while off injured. */
-export function earnedOn(farm: FarmState, hand: Hand, day: number): number {
-  if (!onDuty(hand, day)) return 0;
-  const wage = hand.kind === 'salaried' ? hand.rate / 7 : worksOn(farm, hand, day) ? hand.rate : 0;
-  return wage * (1 + LABOUR.superRate.value);
-}
 
 function clampStanding(v: number): number {
   return Math.max(0, Math.min(100, v));
@@ -58,6 +47,26 @@ function payOwed(farm: FarmState, hand: Hand): boolean {
   return true;
 }
 
+/**
+ * Money the farm owes and could not pay: it is kept as wages owed on the
+ * farm (never forgiven) and paid by itself at first light as soon as the
+ * bank can cover it.
+ */
+function owe(labour: LabourState, amount: number): void {
+  labour.wagesOwed += amount;
+}
+
+/** Pay what the farm still owes from before, if the bank can cover it all now. */
+function payDebt(farm: FarmState, labour: LabourState, events: FarmEvent[]): void {
+  const owed = labour.wagesOwed;
+  if (owed <= 0 || farm.cash - owed < farm.overdraft) return;
+  farm.cash -= owed;
+  farm.year.running += owed;
+  labour.wagesOwed = 0;
+  events.push({ type: 'wages-owed-paid', amount: owed });
+}
+
+/** A hand's wages could not be paid: the standing falls, and what they are owed stays owed by the farm. */
 function missed(farm: FarmState, labour: LabourState, hand: Hand, events: FarmEvent[]): void {
   const before = labour.standing;
   labour.standing = clampStanding(before - LABOUR.standingMissedPay.value);
@@ -69,6 +78,8 @@ function missed(farm: FarmState, labour: LabourState, hand: Hand, events: FarmEv
     standingBefore: before,
     standingAfter: labour.standing,
   });
+  owe(labour, hand.owed);
+  hand.owed = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,8 +102,13 @@ function yesterday(farm: FarmState, labour: LabourState, events: FarmEvent[]): v
     const backDay = farm.day + LABOUR.injuryDaysOff.value;
     const cost = weeklyWage(hand) * LABOUR.injuryCostWeeks.value;
     hand.offUntil = backDay;
-    farm.cash -= cost;
-    farm.year.running += cost;
+    // The farm's share of the claim goes the same way as wages: paid if the bank can cover it,
+    // otherwise owed by the farm and paid as soon as it can.
+    const paidNow = farm.cash - cost >= farm.overdraft;
+    if (paidNow) {
+      farm.cash -= cost;
+      farm.year.running += cost;
+    } else owe(labour, cost);
     events.push({
       type: 'hand-injured',
       hand: hand.id,
@@ -101,9 +117,33 @@ function yesterday(farm: FarmState, labour: LabourState, events: FarmEvent[]): v
       fencing,
       backDay,
       cost,
+      paidNow,
     });
   }
   labour.rng = rng.state();
+}
+
+/** The worker report keeps this many plan moves credited to a hand. */
+const PLAN_MOVES_KEPT = 120;
+
+/**
+ * The plan moves yesterday's tick made, credited to the first hand (in hire
+ * order) who worked yesterday. Recorded now, as it happened, so the worker
+ * report never credits a hand on a day off, injured, or gone.
+ */
+function creditPlanMoves(farm: FarmState, labour: LabourState): void {
+  const y = farm.day - 1;
+  const by = labour.hands.find((h) => worksOn(farm, h, y));
+  if (by) {
+    const known = new Set(labour.planMoves.map((p) => p.seq));
+    for (const m of farm.inbox) {
+      if (m.day !== y || m.event.type !== 'plan-moved' || known.has(m.seq)) continue;
+      labour.planMoves.push({ seq: m.seq, hand: by.id, name: by.name });
+    }
+  }
+  if (labour.planMoves.length > PLAN_MOVES_KEPT) {
+    labour.planMoves.splice(0, labour.planMoves.length - PLAN_MOVES_KEPT);
+  }
 }
 
 function backs(farm: FarmState, labour: LabourState, events: FarmEvent[]): void {
@@ -128,6 +168,7 @@ function contractsEnd(farm: FarmState, labour: LabourState, events: FarmEvent[])
       name: hand.name,
       why: 'contract-finished',
       paid: paid ? owed : 0,
+      stillOwed: paid ? 0 : owed,
     });
   }
 }
@@ -149,7 +190,14 @@ function payDay(farm: FarmState, labour: LabourState, events: FarmEvent[]): void
     anyMissed = true;
     missed(farm, labour, hand, events);
     labour.hands = labour.hands.filter((h) => h.id !== hand.id);
-    events.push({ type: 'hand-left', hand: hand.id, name: hand.name, why: 'not-paid', paid: 0 });
+    events.push({
+      type: 'hand-left',
+      hand: hand.id,
+      name: hand.name,
+      why: 'not-paid',
+      paid: 0,
+      stillOwed: owed,
+    });
   }
   if (paidHands) {
     const wages = total / (1 + LABOUR.superRate.value);
@@ -283,13 +331,12 @@ function runDay(
   const dayMin = dayMinutes(farm);
   const teamM = LABOUR.teamMetresPerDay.value[run.team];
   let handsM = 0;
+  let handsMin = 0;
   if (run.handsHelp && handsFree) {
-    // The hands' fencing day, in metres of permanent fence at the player's pace.
-    const minutes = handsCan(farm, 'fencing', dayMin).reduce((t, p) => t + p.minutes, 0);
-    if (minutes > 0) {
-      useHands(farm, 'fencing', dayMin, minutes);
-      handsM = minutes * metresPerMinute('permanent', dayMin);
-    }
+    // The hands' fencing day, in metres of permanent fence at the player's pace. It is used only
+    // if something is built today.
+    handsMin = handsCan(farm, 'fencing', dayMin).reduce((t, p) => t + p.minutes, 0);
+    handsM = handsMin * metresPerMinute('permanent', dayMin);
   }
   let progress = run.progressM + teamM + handsM;
   const left = [...run.left];
@@ -328,6 +375,7 @@ function runDay(
     }
     res.farm.labour = farm.labour;
     Object.assign(farm, res.farm);
+    if (handsMin > 0) useHands(farm, 'fencing', dayMin, handsMin);
     farm.cash -= labourCost;
     farm.year.infra += labourCost;
     dayCost = materials + labourCost;
@@ -335,6 +383,8 @@ function runDay(
     run.built.push(...build);
     events.push(...res.events);
   }
+  // With nothing built today, the hands' day was not used, so it does not count.
+  if (!build.length) progress -= handsM;
   run.left = left;
   run.was = was;
   run.progressM = left.length ? progress : 0;
@@ -375,9 +425,11 @@ export function labourDawn(farm: FarmState, env: ActionEnv = {}): FarmEvent[] {
   const events: FarmEvent[] = [];
   const labour = farm.labour;
   if (!labour || farm.over) return events;
+  creditPlanMoves(farm, labour);
   yesterday(farm, labour, events);
   backs(farm, labour, events);
   contractsEnd(farm, labour, events);
+  payDebt(farm, labour, events);
   payDay(farm, labour, events);
   if (!labour.hands.length) labour.nextPayDay = null;
   labour.help = { day: farm.day, used: {}, fenced: {} };
