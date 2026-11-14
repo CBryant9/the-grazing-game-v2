@@ -55,6 +55,7 @@ export const api = {
   preview: (req: ActionRequest) => request<PreviewResponse>('preview', 'POST', req),
   act: (req: ActionRequest) => request<ActResponse>('act', 'POST', req),
   day: () => request<DayResponse>('day', 'POST', {}),
+  inboxRead: (upTo: number) => request<FarmResponse>('inbox', 'POST', { upTo }),
   skip: (length: SkipRequestLength, anyway = false) =>
     request<DayResponse>('skip', 'POST', { length, anyway }),
 };

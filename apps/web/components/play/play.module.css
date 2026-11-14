@@ -1357,3 +1357,147 @@
     animation: none;
   }
 }
+
+/* ---- Market, plans, crops and the inbox ---------------------------------- */
+
+/* Buttons that sit in a job card or a row are 44 px tall, so a thumb finds them. */
+.jobbtns > :global(.btn),
+.hbtn > :global(.btn) {
+  min-height: var(--tap);
+}
+.stack {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.saleline {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.seg3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--ghost);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.seg3 button {
+  min-height: var(--tap);
+  padding: 4px 8px;
+  background: var(--panel2);
+  font-size: 0.75rem;
+  border: 0;
+}
+.seg3 button[aria-pressed='true'] {
+  background: var(--sel);
+  font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.seg button {
+  border: 0;
+}
+.pickrow[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.pickrow:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.notes {
+  list-style: none;
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.75rem;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.credit {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.kgnote {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.qty {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.qtyrow {
+  display: grid;
+  grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap);
+  gap: 6px;
+  align-items: center;
+}
+.qtyrow :global(.btn) {
+  padding: 0;
+  min-height: var(--tap);
+  font-size: 1rem;
+}
+.qtyrow .field {
+  text-align: center;
+}
+
+/* The price chart. Colours pass 3:1 on the dark and the light panel, and each line has its own dash. */
+.chartbox {
+  --chart-1: #2f80ed;
+  --chart-2: #e8590c;
+  --chart-3: #2f9e44;
+  --chart-4: #ae3ec9;
+  --chart-5: #d6336c;
+  --chart-6: #0c8599;
+  --chart-7: #a07a00;
+  --chart-8: #7d8597;
+  display: grid;
+  gap: 8px;
+}
+.chartchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chartchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+.chartchip[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+  font-weight: 700;
+}
+.chartchip[aria-pressed='false'] {
+  color: var(--muted);
+}
+.swatch {
+  flex: none;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.gridline {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.axis {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: var(--font-body);
+}

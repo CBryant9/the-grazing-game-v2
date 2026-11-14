@@ -1,25 +1,27 @@
 import 'server-only';
 import {
-  CLASS_LABELS,
+  clockText,
   clockView,
+  dateOn,
   farmTotals,
   DSE_PER_AE,
   farmView,
   marketView,
   paddockSummaries,
-  plansView,
   thingsToDo,
   type CalendarDate,
   type FarmState,
   type PeriodSummary,
   type SkipStop,
   type SourceEnv,
+  type TickEvent,
 } from '@gg/engine';
 import { DISTRICTS } from '@gg/shared';
 import {
   SNAPSHOT_VERSION,
   type ChangeWire,
   type DateParts,
+  type InboxWire,
   type MobWire,
   type PaddockWire,
   type SetupChoices,
@@ -28,11 +30,16 @@ import {
   type SummaryWire,
 } from '../../lib/game/types';
 import { buildWire } from './buildwords';
+import { arableHaByPaddock, cropsWire } from './crops';
+import { inboxMessage } from './inboxwords';
+import { marketWire } from './market';
 import { buildMobs } from './mobs';
-import { causeWord, gameOverWord, inboxWord, stopWord, todoWire } from './words';
+import { plansWire, planForm } from './plans';
+import { movedText } from './planwords';
+import { causeWord, gameOverWord, stopWord, todoWire } from './words';
 
-/** Messages the snapshot carries. The browser shows a few; older ones stay on the server. */
-export const INBOX_SHOWN = 15;
+/** Messages the snapshot carries. The browser shows these; older ones stay on the server. */
+export const INBOX_SHOWN = 40;
 
 const round = (n: number, places = 0): number => {
   const k = 10 ** places;
@@ -66,12 +73,13 @@ export function setupSummary(farm: FarmState, setup: SetupChoices): SetupSummary
  * Build the snapshot: the one JSON object the screens are drawn from.
  *
  * It holds what is on screen and nothing else. It never holds the farm's
- * state, its seed, its random streams, its price series, its action log or
- * any data table, and nothing about days to come (CLAUDE.md, rule 14).
+ * state, its seed, its random streams, its action log or any data table, and
+ * nothing about days to come (CLAUDE.md, rule 14). The Market tab's chart is
+ * the last month of prices the farm has lived, never a price still to come.
  */
 export function buildSnapshot(
   farm: FarmState,
-  stored: { name: string; setup: SetupChoices },
+  stored: { name: string; setup: SetupChoices; inboxRead?: number },
   env: SourceEnv,
 ): Snapshot {
   const view = farmView(farm, env);
@@ -79,6 +87,8 @@ export function buildSnapshot(
   const clock = clockView(farm);
   const market = marketView(farm, env);
 
+  const mixed = stored.setup.enterprise === 'mixed';
+  const arable = arableHaByPaddock(farm, mixed);
   const haOf = new Map(view.paddocks.map((p) => [p.id, p.ha]));
   const cellOf = new Map(view.paddocks.map((p) => [p.id, p.labelCell]));
   const paddocks: PaddockWire[] = paddockSummaries(farm, env).map((p) => ({
@@ -106,15 +116,29 @@ export function buildSnapshot(
     growKgHaDay: round(p.ha > 0 ? p.grow / p.ha : 0),
     carryingDsePerHa: round(p.cc * DSE_PER_AE, 1),
     cell: cellOf.get(p.id) ?? 0,
+    arableHa: round(arable.get(p.id) ?? 0, 1),
   }));
 
   const mobs: MobWire[] = buildMobs(farm, env, market);
 
-  const inbox = [...farm.inbox]
-    .reverse()
-    .map((m) => ({ seq: m.seq, day: m.day, text: inboxWord(m.event) }))
-    .filter((m): m is { seq: number; day: number; text: string } => m.text !== null)
-    .slice(0, INBOX_SHOWN);
+  const read = stored.inboxRead ?? 0;
+  const worded: InboxWire[] = [];
+  for (let i = farm.inbox.length - 1; i >= 0; i--) {
+    const m = farm.inbox[i]!;
+    const words = inboxMessage(m.event);
+    if (!words) continue;
+    worded.push({
+      seq: m.seq,
+      day: m.day,
+      date: dateParts(dateOn(farm, m.day)),
+      time: m.at === undefined ? null : clockText(m.at),
+      kind: words.kind,
+      text: words.text,
+      unread: m.seq > read,
+    });
+  }
+  const inbox = worded.slice(0, INBOX_SHOWN);
+  const inboxUnread = worded.filter((m) => m.unread).length;
 
   return {
     version: SNAPSHOT_VERSION,
@@ -149,30 +173,45 @@ export function buildSnapshot(
     },
     view,
     todo: thingsToDo(farm).map(todoWire),
-    market: {
-      isSaleDay: market.isSaleDay,
-      nextSale: market.nextSale
-        ? { date: dateParts(market.nextSale.date), daysAway: market.nextSale.daysAway }
-        : null,
-      booked: market.booked.map((b) => ({
-        date: dateParts(b.date),
-        daysAway: b.daysAway,
-        head: b.head,
-      })),
-      onTheWay: market.onTheWay.map((a) => ({
-        date: dateParts(a.date),
-        daysAway: a.daysAway,
-        cls: CLASS_LABELS[a.cls as keyof typeof CLASS_LABELS] ?? 'Cattle',
-        head: a.head,
-      })),
-    },
-    plans: plansView(farm) as unknown as Record<string, unknown>[],
+    market: marketWire(farm, market),
+    plans: plansWire(farm),
+    planForm: planForm(),
+    cropping: cropsWire(farm, mixed),
     mobs,
     paddocks,
     build: buildWire(),
     inbox,
+    inboxUnread,
     over: farm.over ? { text: gameOverWord(farm.over.reason) } : null,
   };
+}
+
+/**
+ * Where grazing plans moved mobs over the days that ran: one line for each
+ * mob. One move says where and why. Several say how many, and the first and
+ * last paddock.
+ */
+export function planMoveLines(ticks: readonly TickEvent[]): string[] {
+  const byMob = new Map<number, Extract<TickEvent, { type: 'plan-moved' }>[]>();
+  for (const e of ticks) {
+    if (e.type !== 'plan-moved') continue;
+    const list = byMob.get(e.mob) ?? [];
+    list.push(e);
+    byMob.set(e.mob, list);
+  }
+  const out: string[] = [];
+  for (const moves of byMob.values()) {
+    const first = moves[0]!;
+    const last = moves[moves.length - 1]!;
+    if (moves.length === 1) out.push(movedText(first));
+    else {
+      const from = first.from ? ` from ${first.from}` : '';
+      out.push(
+        `${last.mobName} moved ${moves.length} times by its grazing plan,${from} to ${last.to}.`,
+      );
+    }
+  }
+  return out;
 }
 
 /** What happened over a day or a skip, for the card the player dismisses. */
@@ -181,6 +220,7 @@ export function buildSummary(
   s: PeriodSummary,
   stops: readonly SkipStop[],
   asked: number,
+  ticks: readonly TickEvent[] = [],
 ): SummaryWire {
   const deathsByCause: Record<string, number> = {};
   for (const [cause, n] of Object.entries(s.deathsByCause)) {
@@ -212,6 +252,7 @@ export function buildSummary(
     },
     arrived: { head: s.arrived.head, calves: s.arrived.calves },
     bookedSold: { head: s.bookedSold.head, net: round(s.bookedSold.net) },
+    planMoves: planMoveLines(ticks),
     stops: stops.map(stopWord),
     canRunAnyway:
       s.daysRun === 0 &&

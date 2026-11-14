@@ -78,6 +78,8 @@ export function aboutTime(minutes: number): string {
 
 /** What a job card says, as short facts: time, cost, and the light left after it. */
 export function cardLines(card: JobCardWire): string[] {
+  // A market, plan or crop job comes with its own lines from the server.
+  if (card.summary?.length) return [...card.summary, ...card.notes];
   const lines: string[] = [];
   lines.push(
     card.outcome === 'free' ? 'Takes none of the day.' : `Takes ${aboutTime(card.workMin)}.`,

@@ -83,6 +83,23 @@ const DENY = [
   'predict',
   'future',
   'nextDay',
+  // Added with the market, plans and crops: no price series, sale calendar or crop table.
+  'priceSeries',
+  'series',
+  'forwardPrice',
+  'saleCalendar',
+  'calendar',
+  'schedule',
+  'mature',
+  'matureDays',
+  'estab',
+  'yieldT',
+  'curve',
+  'curves',
+  'table',
+  'sowDays',
+  'latestPrice',
+  'nextSales',
 ];
 /**
  * The map's mob list carries a number the map uses to stand each beast in
@@ -325,11 +342,30 @@ describe('parseAction', () => {
       { type: 'markCalves', mob: 1.5 },
       { type: 'markCalves', mob: -1 },
       { type: 'moveMob', mob: 1, cell: 5000 },
-      { type: 'buyCattle', cls: 'bull', qty: 5 },
-      { type: 'sellClass', cls: 'bull', qty: 5 },
+      { type: 'buyCattle', cls: 'moon', qty: 5 },
+      { type: 'buyCattle', cls: 'bull', qty: 0 },
+      { type: 'buyCattle', cls: 'bull', qty: 5001 },
+      { type: 'sellClass', cls: 'moon', qty: 5 },
+      { type: 'sellClass', cls: 'weanerSteer', qty: 5 },
+      { type: 'sow', species: 'wheat', cells: [] },
+      { type: 'sow', species: 'wheat', cells: [1, 1.5] },
+      { type: 'sow', species: 'moon', cells: [1] },
+      { type: 'sow', species: 'wheat', cells: [99999] },
+      { type: 'resumePlan', mob: 1, step: -1 },
+      { type: 'setPlan', mob: 1 },
     ]) {
       expect(parseAction(bad)).toBeNull();
     }
+    expect(parseAction({ type: 'buyCattle', cls: 'bull', qty: 5 })).toEqual({
+      type: 'buyCattle',
+      cls: 'bull',
+      qty: 5,
+    });
+    expect(parseAction({ type: 'sellClass', cls: 'bull', qty: 5 })).toEqual({
+      type: 'sellClass',
+      cls: 'bull',
+      qty: 5,
+    });
   });
 });
 

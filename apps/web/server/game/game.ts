@@ -5,6 +5,10 @@ import {
   CLASS_LABELS,
   EDGE,
   GRID_N,
+  GROUPS,
+  MARKET_CLASSES,
+  MAX_BUY,
+  SALE_CLASSES,
   SUPPLEMENTS,
   areaIdOf,
   createFarm,
@@ -21,6 +25,7 @@ import {
   type CattleClassId,
   type CreateFarmOptions,
   type EdgeRef,
+  type FarmEvent,
   type FarmState,
   type GroupId,
   type JobCard,
@@ -42,8 +47,11 @@ import type {
 } from '../../lib/game/types';
 import { parseBuildAction } from './build';
 import { gateNotes, lineWords } from './buildwords';
+import { cropLines, parseSow } from './crops';
+import { buyLines, cancelLines, sellLines } from './marketwords';
 import { buildMobs } from './mobs';
 import { moveNotes } from './mobwords';
+import { parsePlanAction, planLines } from './plans';
 import { buildSnapshot, buildSummary } from './snapshot';
 import { FileFarmStore, type FarmStore, type StoredFarm } from './store';
 import { dateText, doneWord, todoKey } from './words';
@@ -136,6 +144,26 @@ export function parseAction(body: unknown, farm?: FarmState): Action | null {
       if (mob === null || qty === null || !SELL_GROUPS.includes(a.group as string)) return null;
       return { type: 'sellGroup', mob, group: a.group as GroupId, qty };
     }
+    case 'sellClass': {
+      const qty = int(a.qty, 1, HEAD_MAX);
+      if (qty === null || typeof a.cls !== 'string' || !Object.hasOwn(MARKET_CLASSES, a.cls)) {
+        return null;
+      }
+      return { type: 'sellClass', cls: a.cls as keyof typeof MARKET_CLASSES, qty };
+    }
+    case 'buyCattle': {
+      const qty = int(a.qty, 1, MAX_BUY);
+      if (qty === null || typeof a.cls !== 'string' || !Object.hasOwn(SALE_CLASSES, a.cls)) {
+        return null;
+      }
+      // In the game cattle come to the stock yards, so there is no place to name.
+      return { type: 'buyCattle', cls: a.cls as keyof typeof SALE_CLASSES, qty };
+    }
+    case 'setPlan':
+    case 'resumePlan':
+      return parsePlanAction(a);
+    case 'sow':
+      return parseSow(a);
     case 'setSupplement':
       if (mob === null || !SUPPLEMENTS.includes(a.supp as Supplement)) return null;
       return { type: 'setSupplement', mob, supp: a.supp as Supplement };
@@ -243,23 +271,38 @@ export function moveNotesFor(farm: FarmState, action: Action): string[] {
   return moveNotes(area.name, survey.points.areaTroughs[areaId]!.length > 0, others);
 }
 
-function cardWire(card: JobCard, extra: string[] = [], perDay: number | null = null): JobCardWire {
-  const notes: string[] = [...extra];
-  if (card.booking) {
+/** What a job card carries beyond the engine's own: notes, a daily price, and the ready-made lines of a market, plan or crop job. */
+interface Extras {
+  notes: string[];
+  perDay: number | null;
+  summary: string[];
+}
+
+const noExtras: Extras = { notes: [], perDay: null, summary: [] };
+
+function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
+  const notes: string[] = [...extra.notes];
+  const perDay = extra.perDay;
+  // A market job says all this in its own lines.
+  if (card.booking && extra.summary.length === 0) {
     const b = card.booking;
     notes.push(
       `${b.head} head are booked onto the sale on ${dateText(b.date)}. Nothing is paid today. The price is set on the sale day.`,
     );
   }
-  if (card.arrival) {
+  if (card.arrival && extra.summary.length === 0) {
     notes.push(
       `${card.arrival.head} head arrive in the stock yards at first light on ${dateText(card.arrival.date)}.`,
     );
   }
   if (card.plan) {
-    for (const area of card.plan.dryAreas) notes.push(`${area} has no water.`);
+    for (const area of card.plan.dryAreas) {
+      notes.push(`${area} has no water. The plan waits there until it has water.`);
+    }
     for (const j of card.plan.joins) {
-      notes.push(`${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join.`);
+      notes.push(
+        `${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join when the plan gets there.`,
+      );
     }
   }
   if (card.action === 'markCalves') {
@@ -290,6 +333,7 @@ function cardWire(card: JobCard, extra: string[] = [], perDay: number | null = n
     costToday: Math.round(card.costToday),
     perDay,
     notes,
+    ...(extra.summary.length ? { summary: extra.summary } : {}),
     line,
   };
 }
@@ -422,18 +466,105 @@ export class GameServer {
   }
 
   /** The notes and daily price a job card carries beyond the engine's own. */
-  private extras(
-    farm: FarmState,
-    stored: StoredFarm,
-    action: Action,
-  ): { notes: string[]; perDay: number | null } {
+  private extras(farm: FarmState, stored: StoredFarm, action: Action): Extras {
     if (action.type === 'setSupplement') {
       const market = marketView(farm, envFor(stored.setup));
       const mob = buildMobs(farm, envFor(stored.setup), market).find((m) => m.id === action.mob);
       const option = mob?.suppOptions.find((o) => o.id === action.supp);
-      return { notes: [], perDay: option ? option.perDay : null };
+      return { notes: [], perDay: option ? option.perDay : null, summary: [] };
     }
-    return { notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)], perDay: null };
+    return {
+      notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)],
+      perDay: null,
+      summary: [],
+    };
+  }
+
+  /**
+   * The ready-made lines on a market, plan or crop card: the money, where
+   * the stock go and what is left in the bank. The figures are the engine's
+   * (the job card, the events); this only puts them in words. `farm` is the
+   * farm as it stands before the job. `events` are what the job did, from a
+   * trial run (a preview) or the real one.
+   */
+  private summary(
+    farm: FarmState,
+    stored: StoredFarm,
+    action: Action,
+    card: JobCard,
+    events: readonly FarmEvent[] | null,
+  ): string[] {
+    const env = envFor(stored.setup);
+    switch (action.type) {
+      case 'buyCattle': {
+        const c = SALE_CLASSES[action.cls];
+        return buyLines({
+          qty: action.qty,
+          one: c.one,
+          label: c.label,
+          total: Math.round(card.cost),
+          cashBefore: Math.round(farm.cash),
+          units: 'calf' in c,
+        });
+      }
+      case 'sellClass':
+      case 'sellGroup': {
+        const sold = events?.find((e) => e.type === 'cattle-sold');
+        const what =
+          action.type === 'sellClass'
+            ? MARKET_CLASSES[action.cls].toLowerCase()
+            : `${GROUPS[action.group].name.toLowerCase()} from ${farm.mobs.find((m) => m.id === action.mob)?.name ?? 'the mob'}`;
+        if (sold?.type === 'cattle-sold') {
+          return sellLines({
+            head: sold.head,
+            calves: sold.calvesAtFoot,
+            what,
+            today: true,
+            net: Math.round(sold.net),
+            cashBefore: Math.round(farm.cash),
+            sale: null,
+          });
+        }
+        const b = card.booking;
+        if (b) {
+          return sellLines({
+            head: b.head,
+            calves: b.calvesAtFoot,
+            what,
+            today: false,
+            net: 0,
+            cashBefore: Math.round(farm.cash),
+            sale: { date: b.date, daysAway: b.daysAway },
+          });
+        }
+        return [];
+      }
+      case 'cancelSale': {
+        const e = events?.find((x) => x.type === 'sale-cancelled');
+        return e?.type === 'sale-cancelled' ? cancelLines(e.head, { date: e.saleDate }) : [];
+      }
+      case 'sow':
+      case 'harvest':
+        return cropLines(farm, env, action);
+      case 'setPlan':
+      case 'resumePlan':
+        return planLines(farm, action);
+      default:
+        return [];
+    }
+  }
+
+  /** Sell and cancel cards need the head the engine would sell: a trial run of the job gives them. */
+  private trialEvents(farm: FarmState, stored: StoredFarm, action: Action): FarmEvent[] | null {
+    if (
+      action.type !== 'sellClass' &&
+      action.type !== 'sellGroup' &&
+      action.type !== 'cancelSale'
+    ) {
+      return null;
+    }
+    const trial = applyAction(farm, action, envFor(stored.setup));
+    return trial.ok ? trial.events : null;
   }
 
   /** The job card for an action: time, cost and light left. Nothing changes. */
@@ -445,7 +576,14 @@ export class GameServer {
       const result = previewAction(farm, action, envFor(stored.setup));
       if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
       const x = this.extras(farm, stored, action);
-      return { ok: true, card: cardWire(result.card, x.notes, x.perDay) };
+      x.summary = this.summary(
+        farm,
+        stored,
+        action,
+        result.card,
+        this.trialEvents(farm, stored, action),
+      );
+      return { ok: true, card: cardWire(result.card, x) };
     });
   }
 
@@ -458,13 +596,33 @@ export class GameServer {
       const x = this.extras(held.farm, held.stored, action);
       const result = applyAction(held.farm, action, envFor(held.stored.setup));
       if (!result.ok) return { ok: false, reason: result.reason, message: result.message };
+      if (result.job) {
+        x.summary = this.summary(held.farm, held.stored, action, result.job, result.events);
+      }
       const next = await this.save(id, held, result.farm);
       return {
         ok: true,
         message: doneWord(result.events),
-        card: result.job ? cardWire(result.job, x.notes, x.perDay) : null,
+        card: result.job ? cardWire(result.job, x) : null,
         snapshot: this.snapshotOf(next),
       };
+    });
+  }
+
+  /** The player has opened the inbox: every message up to this number is read. */
+  async markRead(sessionId: string, upTo: number): Promise<Snapshot> {
+    const id = farmIdFor(sessionId);
+    return this.locked(id, async () => {
+      const held = await this.need(id);
+      const newest = held.farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0);
+      // Never past the newest message there is, and never backwards.
+      const to = Math.max(held.stored.inboxRead ?? 0, Math.min(upTo, newest));
+      if (to === (held.stored.inboxRead ?? 0)) return this.snapshotOf(held);
+      const stored: StoredFarm = { ...held.stored, inboxRead: to };
+      await this.store.put(id, stored);
+      const next = { stored, farm: held.farm };
+      this.remember(id, next);
+      return this.snapshotOf(next);
     });
   }
 
@@ -477,7 +635,7 @@ export class GameServer {
       const next = await this.save(id, held, end.farm);
       return {
         snapshot: this.snapshotOf(next),
-        summary: buildSummary('day', end.summary, end.stops, 1),
+        summary: buildSummary('day', end.summary, end.stops, 1, end.day.events),
       };
     });
   }
@@ -491,7 +649,13 @@ export class GameServer {
       const next = result.daysRun > 0 ? await this.save(id, held, result.farm) : held;
       return {
         snapshot: this.snapshotOf(next),
-        summary: buildSummary('skip', result.summary, result.stops, result.asked),
+        summary: buildSummary(
+          'skip',
+          result.summary,
+          result.stops,
+          result.asked,
+          result.days.flatMap((d) => d.events),
+        ),
       };
     });
   }

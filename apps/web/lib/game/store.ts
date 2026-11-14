@@ -35,6 +35,8 @@ export interface JobState {
   phase: 'previewing' | 'confirm' | 'applying' | 'done' | 'refused';
   card?: JobCardWire;
   message?: string;
+  /** The job as it was checked, so Confirm sends exactly what the card showed. */
+  action?: SimpleAction;
 }
 
 /**
@@ -96,7 +98,8 @@ interface GameState {
   confirmJob: (key: string) => Promise<void>;
   dismissJob: (key: string) => void;
   startAct: (slot: string, label: string, action: SimpleAction) => Promise<void>;
-  confirmAct: (slot: string, action: SimpleAction) => Promise<void>;
+  /** With no action, it sends the one that was checked. */
+  confirmAct: (slot: string, action?: SimpleAction) => Promise<void>;
   dismissAct: (slot: string) => void;
   openPaddock: (id: number) => void;
   closePaddock: () => void;
@@ -407,7 +410,10 @@ export const useGame = create<GameState>()((set, get) => {
       const now = get().acts[slot]?.phase;
       if (now === 'previewing' || now === 'applying') return;
       set((s) => ({
-        acts: { ...s.acts, [slot]: { key: slot, text: label, button: label, phase: 'previewing' } },
+        acts: {
+          ...s.acts,
+          [slot]: { key: slot, text: label, button: label, phase: 'previewing', action },
+        },
       }));
       try {
         const r = await api.preview({ action });
@@ -418,12 +424,13 @@ export const useGame = create<GameState>()((set, get) => {
       }
     },
 
-    async confirmAct(slot, action) {
-      if (get().acts[slot]?.phase !== 'confirm' || get().busy > 0) return;
+    async confirmAct(slot, given) {
+      const send = given ?? get().acts[slot]?.action;
+      if (!send || get().acts[slot]?.phase !== 'confirm' || get().busy > 0) return;
       setAct(slot, { phase: 'applying' });
       set((s) => ({ busy: s.busy + 1 }));
       try {
-        const r = await api.act({ action });
+        const r = await api.act({ action: send });
         if (r.ok) {
           set({ ...adopt(r.snapshot) });
           setAct(slot, {

@@ -11,6 +11,7 @@ import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
 import { FarmMap } from './FarmMap';
 import { HerdList, PaddockList } from './Lists';
+import { MarketPanel } from './MarketPanel';
 import { MobCard } from './MobCard';
 import { MoveFlow } from './MoveFlow';
 import { ComingSoon, Nav } from './Nav';
@@ -109,6 +110,7 @@ function FarmPanel({ snapshot }: { snapshot: Snapshot }) {
 function TabPanel({ tab, snapshot }: { tab: Tab; snapshot: Snapshot }) {
   if (tab === 'herd') return <HerdList snapshot={snapshot} />;
   if (tab === 'paddocks') return <PaddockList snapshot={snapshot} />;
+  if (tab === 'market') return <MarketPanel snapshot={snapshot} />;
   return <ComingSoon tab={tab} />;
 }
 

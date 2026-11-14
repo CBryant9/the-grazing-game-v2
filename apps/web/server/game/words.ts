@@ -148,34 +148,6 @@ export function gameOverWord(reason: 'bank' | 'feed'): string {
     : 'The whole farm was eaten out for ten days with cattle on it. The game is over.';
 }
 
-/** A few lines for the inbox: only the events that have words here. */
-export function inboxWord(e: FarmEvent): string | null {
-  switch (e.type) {
-    case 'births':
-      return `${e.mobName}: ${plural(e.count, 'calf', 'calves')} born.`;
-    case 'deaths':
-      return `${e.mobName}: ${plural(e.count, 'head', 'head')} died, from ${causeWord(e.cause)}.`;
-    case 'breakout':
-      return `${e.mobName} pushed through a fence in ${e.area}, because they were ${e.reason}.`;
-    case 'no-water':
-      return `${e.mobName} has no water in ${e.area}.`;
-    case 'out-of-feed':
-      return `The farm has about ${plural(e.daysLeft, 'day')} of feed left.`;
-    case 'new-season':
-      return `New season: ${e.label}.`;
-    case 'calves-marked':
-      return `${e.mobName}: ${plural(e.count, 'calf', 'calves')} marked.`;
-    case 'harvested':
-      return `Harvested ${Math.round(e.t * 10) / 10} t of ${SPECIES[e.sp].short}.`;
-    case 'cattle-arrived':
-      return 'Bought cattle have arrived in the stock yards.';
-    case 'game-over':
-      return gameOverWord(e.reason);
-    default:
-      return null;
-  }
-}
-
 /** What a done action did, in a sentence, from the events it made. */
 export function doneWord(events: readonly FarmEvent[]): string {
   const parts: string[] = [];
@@ -227,6 +199,24 @@ export function doneWord(events: readonly FarmEvent[]): string {
         break;
       case 'weaned':
         parts.push(`${plural(e.count, 'calf', 'calves')} weaned from ${e.mobName}.`);
+        break;
+      case 'plan-set':
+        parts.push(
+          `${e.mobName} is on the plan ${e.templateName}${e.area ? `, in ${e.area}` : ''}.`,
+        );
+        break;
+      case 'plan-resumed':
+        parts.push(`${e.mobName}'s plan is running again${e.area ? `, from ${e.area}` : ''}.`);
+        break;
+      case 'sown':
+        parts.push(
+          `Sowed ${SPECIES[e.sp].short} on ${Math.round(e.ha * 10) / 10} ha. It cost ${money(e.cost)}.`,
+        );
+        break;
+      case 'cattle-on-the-way':
+        parts.push(
+          `Bought ${plural(e.qty, 'head', 'head')} for ${money(e.total)}, freight included. They are on the way and arrive tomorrow morning in the stock yards.`,
+        );
         break;
       case 'plan-paused':
         parts.push('The plan is paused.');

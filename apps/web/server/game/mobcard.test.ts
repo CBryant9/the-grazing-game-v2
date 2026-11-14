@@ -207,10 +207,10 @@ describe('the job card for the new buttons', () => {
     const preview = await game.preview(A, { action });
     expect(preview.ok).toBe(true);
     if (preview.ok) {
-      const text = preview.card.notes.join(' ');
-      expect(text).toMatch(/booked onto the sale on \d+ \w{3} \d{4}/);
-      expect(text).toContain('Nothing is paid today.');
-      expect(text).toContain('The price is set on the sale day.');
+      const text = [...(preview.card.summary ?? []), ...preview.card.notes].join(' ');
+      expect(text).toMatch(/go down for the next sale on \w+day \d+ \w+, (tomorrow|in \d+ days)\./);
+      expect(text).toContain('Nothing is paid now.');
+      expect(text).toContain('The price is set on the day of the sale.');
     }
     const done = await game.act(A, { action });
     expect(done.ok).toBe(true);

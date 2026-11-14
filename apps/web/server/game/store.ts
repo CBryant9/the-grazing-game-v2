@@ -9,6 +9,8 @@ export interface StoredFarm {
   name: string;
   setup: SetupChoices;
   saved: SavedFarm;
+  /** The newest inbox message the player has seen. Left out until the inbox is first opened. */
+  inboxRead?: number;
 }
 
 /**

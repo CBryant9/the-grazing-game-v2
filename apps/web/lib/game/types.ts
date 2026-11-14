@@ -180,6 +180,8 @@ export interface PaddockWire {
   carryingDsePerHa: number;
   /** A square in the paddock, which the move action names. */
   cell: number;
+  /** Arable land in the paddock, ha. 0 when it has none. */
+  arableHa: number;
 }
 
 export interface SaleDayWire {
@@ -187,17 +189,84 @@ export interface SaleDayWire {
   daysAway: number;
 }
 
+/** One class's price today: c/kg live weight, and $ a head for a typical beast of the class. */
+export interface PriceRowWire {
+  id: string;
+  label: string;
+  /** c/kg live weight, whole. */
+  cKg: number;
+  /** The weight of the typical beast, kg, or null where the game has no typical beast. */
+  typicalKg: number | null;
+  /** Dollars a head for that beast, before selling costs. Null with no typical beast. */
+  perHead: number | null;
+  /** Change in c/kg since the first day of the chart, or null with less than two days of prices. */
+  changeCKg: number | null;
+  changeDays: number;
+}
+
+/** The last month of prices the farm has lived, c/kg for each class, one point a day. Never a future price. */
+export interface PriceChartWire {
+  from: DateParts | null;
+  to: DateParts | null;
+  classes: { id: string; label: string; points: number[] }[];
+}
+
+/** A class the saleyard sells, for the Buy card. */
+export interface BuyClassWire {
+  id: string;
+  label: string;
+  /** "190 to 235 kg". */
+  weightText: string;
+  /** c/kg of its market class, or null for bulls, which are priced by the head. */
+  cKg: number | null;
+  /** About what one head costs with fees and freight, dollars. */
+  perHead: number;
+}
+
+/** A market class on the farm, with the head that are free to sell. */
+export interface SellClassWire {
+  id: string;
+  label: string;
+  head: number;
+  cKg: number;
+}
+
 export interface MarketWire {
   isSaleDay: boolean;
   nextSale: SaleDayWire | null;
   booked: { date: DateParts; daysAway: number; head: number }[];
   onTheWay: { date: DateParts; daysAway: number; cls: string; head: number }[];
+  /** "Cattle sale today." or "Next cattle sale: Thursday 14 March, in 3 days." */
+  saleLine: string;
+  /** The credit line for real prices, or null for a farm with random seasons. */
+  credit: string | null;
+  prices: PriceRowWire[];
+  chart: PriceChartWire;
+  buy: {
+    classes: BuyClassWire[];
+    maxQty: number;
+    /** Why Buy is off, or null on a sale day. */
+    reason: string | null;
+  };
+  sell: {
+    classes: SellClassWire[];
+    /** What selling does today: paid now, or booked onto the next sale. */
+    note: string;
+  };
 }
+
+export type InboxKind = 'cattle' | 'sale' | 'crop' | 'plan' | 'water' | 'farm';
 
 export interface InboxWire {
   seq: number;
   day: number;
+  date: DateParts;
+  /** "6:10 am" for a message made by a job, null for what the day's tick reports. */
+  time: string | null;
+  kind: InboxKind;
   text: string;
+  /** True until the player has opened the inbox. */
+  unread: boolean;
 }
 
 /** One side of a square, as the map and the engine number it. */
@@ -235,6 +304,119 @@ export interface BuildWire {
   fences: FenceOptionWire[];
 }
 
+/** The rule a plan moves by, as the plan form takes it. */
+export type PlanTriggerWire =
+  { mode: 'days'; every: number } | { mode: 'kg'; kg: number; maxDays: number };
+
+export interface PlanStopWire {
+  /** A square in the paddock, which the plan names. */
+  cell: number;
+  /** The paddock, or null when the grazing area is more than one paddock. */
+  paddock: number | null;
+  name: string;
+  hasWater: boolean;
+}
+
+/** One mob on a plan: where it is on it, and what the plan will do next. */
+export interface PlanMobWire {
+  mob: number;
+  mobName: string;
+  head: number;
+  area: string | null;
+  step: number;
+  /** "Step 2 of 3: Paddock 2". */
+  stepText: string;
+  /** "Round 1 of 2", "Round 3", "Round 1, keeps going". */
+  roundText: string;
+  paused: boolean;
+  /** Why it is paused, in a sentence, or null. */
+  pausedText: string | null;
+  /** Why the plan can not move the mob now, or null. */
+  waitingText: string | null;
+  /** What it will do next, in a sentence. */
+  nextText: string;
+  /** The plan's report as the engine gives it, in sentences. */
+  report: string[];
+  /** Moves made, full rounds done, tonnes of feed eaten (DM) and kg gained. */
+  moves: number;
+  rounds: number;
+  eatenT: number;
+  gainKg: number;
+}
+
+export interface PlanLegWire {
+  stops: PlanStopWire[];
+  trigger: PlanTriggerWire;
+  /** "Move every 3 days." */
+  ruleText: string;
+  rounds: number;
+  /** "2 rounds", "Keeps going". */
+  roundsText: string;
+}
+
+export interface PlanWire {
+  id: number;
+  name: string;
+  legs: PlanLegWire[];
+  steps: number;
+  after: 'repeat' | 'stay';
+  afterText: string;
+  /** True for a plan with one leg, which the form can change. */
+  editable: boolean;
+  mobs: PlanMobWire[];
+}
+
+/** The figures the plan form works within, from the server. */
+export interface PlanFormWire {
+  defaultEvery: number;
+  defaultKg: number;
+  defaultRounds: number;
+  everyMax: number;
+  kgMin: number;
+  kgMax: number;
+  maxDaysMax: number;
+  roundsMax: number;
+  maxStops: number;
+  /** The most times a day a plan can move a mob. */
+  timesADayMax: number;
+}
+
+/** What a sowing option is, what it costs a hectare and when it can be sown. From the server. */
+export interface SowOptionWire {
+  id: string;
+  name: string;
+  /** "Grain crop", "Forage crop" or "Pasture". */
+  kindText: string;
+  /** Dollars a hectare, whole. */
+  costPerHa: number;
+  /** "Apr to Jun". */
+  window: string;
+  open: boolean;
+  /** Why it is off, or null. */
+  reason: string | null;
+  /** A plain line on what it is for. */
+  about: string;
+}
+
+/** A planting on the farm, for the paddock sheet. */
+export interface FieldWire {
+  id: number;
+  name: string;
+  ha: number;
+  /** Where it is up to, in plain words. */
+  stage: string;
+  /** True when it can be harvested now. */
+  ready: boolean;
+  /** The paddocks it covers. */
+  paddocks: number[];
+}
+
+/** The cropping side of a mixed farm. Null for a farm that is not mixed. */
+export interface CropsWire {
+  options: SowOptionWire[];
+  fields: FieldWire[];
+}
+
 export interface Snapshot {
   version: typeof SNAPSHOT_VERSION;
   farm: {
@@ -251,13 +433,19 @@ export interface Snapshot {
   view: FarmView;
   todo: TodoWire[];
   market: MarketWire;
-  /** Grazing plans, for the Plans panel (a later piece), as the engine reports them. */
-  plans: Record<string, unknown>[];
+  /** Grazing plans, with each mob on them. */
+  plans: PlanWire[];
+  planForm: PlanFormWire;
+  /** The cropping side of a mixed farm, or null. */
+  cropping: CropsWire | null;
   mobs: MobWire[];
   paddocks: PaddockWire[];
   /** The build tools, with prices and help lines. */
   build: BuildWire;
+  /** The newest messages, newest first. */
   inbox: InboxWire[];
+  /** Messages the player has not opened, counting the ones past those shown. */
+  inboxUnread: number;
   over: { text: string } | null;
 }
 
@@ -276,6 +464,8 @@ export interface JobCardWire {
   perDay: number | null;
   /** Plain sentences about this job, for example that stock are booked onto a sale. */
   notes: string[];
+  /** Ready-made lines for a market, plan or crop job: money, where, and what is left. They replace the time and cost lines when present. */
+  summary?: string[];
   /** For a line of fence, tape or pipe: the pieces that fit today and the pieces that do not. */
   line: LineWire | null;
 }
@@ -331,6 +521,8 @@ export interface SummaryWire {
   money: { sales: number; buys: number; feed: number; running: number; interest: number };
   arrived: { head: number; calves: number };
   bookedSold: { head: number; net: number };
+  /** Where a grazing plan moved a mob, one line for each mob. */
+  planMoves: string[];
   /** Plain facts about why a skip stopped early, or something to know. */
   stops: string[];
   /** True when nothing ran because of water, and a "run anyway" is allowed. */
@@ -407,6 +599,24 @@ export type SimpleAction =
   | { type: 'movePortable'; port: number; cell: number }
   | { type: 'removePortable'; port: number }
   | { type: 'pausePlan'; mob: number }
-  | { type: 'clearPlan'; mob: number };
+  | { type: 'clearPlan'; mob: number }
+  | { type: 'resumePlan'; mob: number; step?: number }
+  | { type: 'buyCattle'; cls: string; qty: number }
+  | { type: 'sellClass'; cls: string; qty: number }
+  | {
+      type: 'setPlan';
+      mob: number;
+      /** The paddocks in order, each named by a square in it. */
+      stops: number[];
+      trigger: PlanTriggerWire;
+      /** 0 keeps going. */
+      rounds: number;
+      after: 'repeat' | 'stay';
+      /** The step to start from, counting from the first stop. */
+      step: number;
+      /** Set to change a plan that exists. */
+      planId?: number;
+    }
+  | { type: 'sow'; species: string; cells: number[] };
 
 export type SkipRequestLength = 'week' | 'month' | 'year';
