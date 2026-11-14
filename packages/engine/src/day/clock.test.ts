@@ -226,6 +226,8 @@ describe('looking is free', () => {
       clockView: (f) => engine.clockView(f),
       jobsToday: (f) => engine.jobsToday(f),
       thingsToDo: (f) => engine.thingsToDo(f),
+      // The numbers the map is drawn from. Looking at the map is free.
+      farmView: (f, env) => engine.farmView(f, env),
     };
     // These change the farm they are given. That is their job: the tick, and its helpers.
     const CHANGES = [
