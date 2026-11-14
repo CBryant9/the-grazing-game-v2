@@ -14,7 +14,7 @@ export const ADMIN_LINKS = [
   { href: '/admin/audit', label: 'Audit log', later: false },
   { href: '/admin/moderation', label: 'Moderation', later: true },
   { href: '/admin/ads', label: 'Ads and sponsors', later: true },
-  { href: '/admin/purchases', label: 'Purchases', later: true },
+  { href: '/admin/purchases', label: 'Purchases', later: false },
   { href: '/admin/challenges', label: 'Challenges', later: true },
 ] as const;
 

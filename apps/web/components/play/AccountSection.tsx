@@ -7,6 +7,7 @@ import { goTo } from '@/lib/auth/nav';
 import { useMe } from '@/lib/auth/store';
 import { clearAllLastFarms } from '@/lib/game/offline';
 import { useGame } from '@/lib/game/store';
+import { StoreLink } from '@/components/billing/StoreLink';
 import styles from './play.module.css';
 
 /**
@@ -50,6 +51,7 @@ export function AccountSection() {
             <Link href="/account" className="btn ghost">
               Your account
             </Link>
+            <StoreLink label="Store" />
             <button
               type="button"
               className="btn ghost"

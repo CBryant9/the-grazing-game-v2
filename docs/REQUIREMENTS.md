@@ -225,9 +225,9 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 ### Farms, payments and game over
 
 - [ ] Free accounts get 2 Daily Farms and 2 Fast Farms *(3.2: the two Fast Farm slots and the farm picker are built and enforced by the database. Daily Farm slots exist in the data and stay behind the switch, off, until the rollover (3.3).)* ("one where they start from 0 and one where they start with a lot"). *(Changed: the PRD had 1 Daily and 3 Fast.)*
-- [ ] One-off payments, not a subscription: about $30 for 5 of each farm plus perks; about $50 for 5 of each farm, no ads and more perks. *(Changed: the PRD had a monthly or yearly subscription.)*
-- [ ] Nothing in the game can be bought for an advantage: "they can't pay for perks in the game".
-- [ ] On game over, a player can pay to keep going. It clears the debt and puts the farm back to "small modest funds", with a penalty that fits their situation (for example they may have had to sell all their stock). The offer shows exactly what they get for the money.
+- [x] One-off payments, not a subscription: about $30 for 5 of each farm plus perks; about $50 for 5 of each farm, no ads and more perks. *(Changed: the PRD had a monthly or yearly subscription.)* *(5.2: built on Stripe Checkout, tested with a fake Stripe. Off until Claudia adds Stripe test keys and switches it on; the real Stripe call has not been run.)*
+- [x] Nothing in the game can be bought for an advantage: "they can't pay for perks in the game". *(5.2: what is sold is farm slots, no ads, a badge and the full diary only. The rescue is the one exception to look at: it is offered only at game over and does exactly what its card says.)*
+- [ ] On game over, a player can pay to keep going. *(5.2: the offer card, the purchase and the once-only application are built behind a port. The engine function that does the rescue does not exist yet, so the products stay off. See the m5.2 log entry.)* It clears the debt and puts the farm back to "small modest funds", with a penalty that fits their situation (for example they may have had to sell all their stock). The offer shows exactly what they get for the money.
 - [ ] Price to keep going: $5 on a Fast Farm. On a Daily Farm it scales with how long the farm has run: about $25 at 6 months, $50 at 1 year, $100 over 2 years. *(details open: the price under 6 months, and whether $35 is a minimum.)*
 - [ ] A Daily Farm shouldn't reach game over within the first 3 to 6 months of ordinary play. *(To be tested with the engine.)*
 

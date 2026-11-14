@@ -236,3 +236,13 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | M10 | A rate limit keyed on the `sb-*` cookie text gave a fresh count for every made-up cookie, and each try cost a call to the auth server | The key was built from something the caller writes | Visitors by address (the trusted header), admins by account id. **Rule: key a limit on what the caller can not choose** |
 | M11 | "Hide that `/admin` exists" while `robots.txt` named it and its not found carried a header an unknown address does not | Each piece was added for its own reason | `robots.txt` does not name it, the headers are the same, and `noindex` comes only after the role check passes. **Rule: when the aim is to hide something, compare the whole answer with an unknown address, not only the status** |
 
+### m5.2 Purchases
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| P1 | Every test in the file failed after the first one failed | The set-up deleted accounts, and a test's banned account makes that delete refuse (`ban_hash_required`), so each next test failed in set-up | The set-up clears bans first, as the admin tests do. **Rule: a test file's reset must cope with every state a test in it can leave** |
+| P2 | A farm id from the game is 32 hex characters and the database wants a uuid | The game's routes use the id without dashes | One `farmUuid()` turns either form into a uuid, and a bad one is a plain 400 before any query can throw. **Rule: an id that came from the browser is checked for shape before it reaches a typed column** |
+| P3 | The Stripe event for a refund can arrive before the one that says the payment was made | Stripe does not order events | The refund waits as an unfinished event row, and the paid event asks Stripe for the payment's true state. **Rule: an event handler that needs another event first must park it, not drop it** |
+| P4 | A payments library was an option, and Stripe's own docs describe the signature check and the Checkout call in a few lines | A library adds weight and hides the check | `verify.ts` and `stripe.ts` follow the docs read on the day, and the fake signs with the same code, so the tests exercise the real check. **Rule: say plainly what a test double can not prove (here, Stripe itself: owed in test mode)** |
+| P5 | An upgrade test bought the upgrade for an account that already had no ads, and was refused | The test reused one account for a second case | A second account for the second case. **Rule: a test that needs a clean owner state makes a new owner** |
+

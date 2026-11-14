@@ -88,7 +88,16 @@ const ENGINE_ONLY = [
  * pulled server code in (the secret key, the database connection or the ban pepper with it).
  * Each is also looked for in apps/web/server, so the list can not go stale.
  */
-const SERVER_ONLY = ['SUPABASE_SECRET_KEY', 'SUPABASE_DB_POOLER_URL', 'BAN_HASH_PEPPER'];
+const SERVER_ONLY = [
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_DB_POOLER_URL',
+  'BAN_HASH_PEPPER',
+  // Stripe (milestone 5.2): the secret key and the webhook signing secret, and the prefix of a
+  // signing secret, which nothing in the browser may ever hold.
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'whsec_',
+];
 const SERVER_SRC = join(ROOT, 'apps/web/server');
 
 /** Text the browser code does hold. Seeing it proves the scan read the right files. */

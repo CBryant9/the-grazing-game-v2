@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useGame } from '@/lib/game/store';
+import { StoreLink } from '@/components/billing/StoreLink';
 import type { FarmListItem } from '@/lib/game/types';
 import styles from './accounts.module.css';
 
@@ -72,6 +73,11 @@ export function FarmPicker() {
         <p className="muted">
           You have the most farms this account can have ({limit}). Delete one to start another.
         </p>
+      )}
+      {farms.length >= limit && (
+        <div className={styles.row}>
+          <StoreLink label="Get more farm slots" />
+        </div>
       )}
     </section>
   );
