@@ -329,11 +329,15 @@ describe('fence materials and water hubs (milestone 1.7f)', () => {
     expect(moved.ok ? 'ok' : moved.message).toBe('ok');
     if (!moved.ok) return;
     expect(moved.snapshot.view.water.squareHubs).toEqual([cells[4]]);
+    expect(moved.message).toMatch(/^Moved the water hub\./);
     // Each job on a day of its own, so the light is never short.
     await game.endDay(A);
     const out = await game.act(A, { action: { type: 'removeSquareHub', cell: cells[4]! } });
     expect(out.ok).toBe(true);
-    if (out.ok) expect(out.snapshot.view.water.squareHubs).toEqual([]);
+    if (out.ok) {
+      expect(out.snapshot.view.water.squareHubs).toEqual([]);
+      expect(out.message).toBe('Took out the water hub. Its gates stay.');
+    }
 
     // A hub on a fence corner over the pipe.
     const by = Math.floor(bore / W);

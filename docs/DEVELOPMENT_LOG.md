@@ -890,7 +890,7 @@ What was looked at in a real browser (the pane's browser, not a phone, on a scra
 Not done:
 
 - Drawing a fence or pipe by keyboard. The tools and the card buttons are reachable and have focus rings, but the line is drawn with a finger or the mouse.
-- Half-built lines and pegs on the map (still the working day's piece). The farmer and the ute.
+- Half-built lines and pegs on the map (still the working day's piece). (The farmer and the ute were listed here too. Driving was reversed on 14 Nov 2026, so they are not to be built.)
 - Moving a square water hub, and taking out a square hub as one job (Remove takes out a trough or a corner hub).
 - The card on a PC sits beside the end of the line and can cover part of it.
 - Lighthouse was not run.
@@ -962,6 +962,47 @@ Questions for Claudia:
 4. **Moving a hub** costs what moving a trough costs ($300). Right?
 5. **The pregnancy premium.** A cow's sale value rises by $320 at 400c (about $304 after commission) on her 50th day in calf, tested or not. It doesn't move the day she conceives, but on day 50 it moves her mob's sale value and the farm's net worth, so a player watching those can count cows reaching 50 days: up to 13 days before the preg test. Leave it, or apply the premium only to cows known to be PTIC? (Late pregnancy shows the same way in AE at 190 days, well after the test. Selling the "PTIC cows" group also picks by live pregnancy.)
 6. **A running farm's starting cows that come PTIC** are treated as known in calf, as if the previous owner's preg test came with them. Right?
+
+### 14 Nov 2026: milestone 1.7f, fixes after the screens review
+
+Branch `m1.7f-review-fixes`: `m1.7d-market-and-plans` with `m1.7x-engine-rules` merged in (conflicts in this log and LESSONS only, both kept). After the merge the farm view went to version 4 (`water.squareHubs` required), the map fixtures were made again (the fixture script now buys on a sale day and moves the stock out of the yards), and the map draws a hub on a square as a hub and reports a tap on one. Nothing else under `packages/engine/src` or `packages/shared/src` changed. No new package or outside service.
+
+Each item from the review:
+
+1. **Farm creation rate limit: done.** The limit's key is worked out before any session is made. Creation is keyed on the caller's address as the platform reports it: a header is trusted only when `GG_TRUSTED_IP_HEADER` names the one a trusted proxy sets (in `.env.example`); unset, every caller with no session shares one count. A forged cookie or `x-forwarded-for` gets no fresh count. Backstops: `CREATES_PER_ADDRESS` (5 in 10 minutes), `CREATES_PER_MINUTE` (30 for the whole server), `MAX_FARMS` (10,000 files) and `FARM_STALE_DAYS` (90: a farm not used for that long is removed, looked for every 6 hours and when full). Tests for each.
+2. **Body size: done.** Refused on `content-length` before reading (413), and read with a hard cap so a body with no length or a false one is cut off. Tests with an oversized body, no length and a false length. The stale "4 KB" in this log now says 32 KB.
+3. **Told only what was reported: done.** The mob card's breeding comes from `breedingReports`: the joining (its length from `JOINING_DAYS`), the latest joining report and preg test with their dates, and the head known in calf. Class rows and the sale groups count PTIC only when known (`knownClassOf`). The market's sell classes never read pregnancy. Net worth still carries the engine's pregnancy premium (a question already with Claudia, not changed); no new per-mob sale value was added. The deny list gained the live fields, and a test walks a joining day by day: on a day with no report the known figures never go up (it fails with the old live count).
+4. **The card and the job agree: done.** The snapshot carries `farmVersion`, new at every change. `preview` returns the version it was made on. `act`, `day` and `skip` must send the version shown and are refused with "The farm has changed since this was shown. Here is the latest." and the fresh snapshot. Every act carries a one-use request id; the server keeps the last 12 for the farm with the farm and answers a repeat with the first answer. After a failed or refused act the browser takes the farm sent back, or fetches it again. The browser drops answers to older previews (each preview has a ticket), and Confirm sends exactly the request the visible card was made for (the mob card's Sell no longer reads the picker at Confirm). Tests: two tabs, a double confirm, a lost reply then a retry, a stale card, supplement A then B.
+5. **A corrupt save: done.** The stored farm has `format` 2 with defaults for older ones. A farm that can not be read gives "Your farm could not be opened. Try again, or start a new farm. The old farm is kept aside." with Try again and Start a new farm (behind a confirm). The broken file is renamed `<id>.broken-<time>.json`, not deleted. Tests with a corrupt file through the routes and the store.
+6. **Red means one thing: done.** Red (`notToday`) is drawn only for the part of a line that does not fit today. Knocked-down fence: amber, with an amber "!". Remove: lilac round white. Shut gate flag: slate. Low portable trough: orange. Water layer "no water" and the pickable no-water paddock: purple (and the move tool's key says so). Quality layer: purple to green. Grazed layer: orange. Tape stays white and dashed. Palette tests: nothing on a line or square but "not today" is red, amber is told apart from red and from the casing. REQUIREMENTS and VISUALS updated, marked "Claudia, 14 Nov 2026".
+7. **None of a line fits: done.** "You don't have enough time to do this today. Draw it again another day." (from the server).
+8. **Default fence: done.** Permanent.
+9. **No tool zooms by itself: done.** Nothing in the play screen changes the zoom; tests show the wheel and a two-finger pinch zoom in both the pan and the drawing tools and that drawing leaves the zoom alone.
+10. **Fence materials: done.** The fence card says how many metres come from materials on hand today and what that saves, the take-down card says "You keep the materials: 240 m of permanent fence. Fence built from them is half price.", and the fence tool shows what is on hand. Words on the server.
+11. **Hubs removed and moved: done.** Both kinds, with `moveHub`, `removeSquareHub` and `moveSquareHub`: tap a hub with the hub tool (or a square hub with the trough tool) for Move or Take out; Remove takes out either kind.
+12. **44 px touch targets: done.** On a touch screen (`pointer: coarse`) every button, select, summary, `.btn.sm`, `.padchip`, `.linkbtn` and `.sortbtn` is at least 44 px high. The PC layout is unchanged.
+13. **Wording: done.** "Growth, last day: X kg DM/ha a day". Remove never offers the boundary.
+14. **Stop copying the engine: done, with one exception.** Supplement prices (`supplementCosts`), marking and weaning with their reasons (`husbandryNow`), the portable refund (`portableRefund` on the card, the job's own figure in the result) and water on an area (`areaWatered`). `NO_WATER_WHY` is written once, in `words.ts`. Kept: a small `landOf` and `areaOf` in `mobs.ts`, because `predictGains` (the reasons a mob is not gaining) needs a land and an area and the engine does not export its own.
+15. **Plans data: done.** Only what the Plans tab shows, typed; the rule's figures rounded.
+16. **Bundle check: done.** Ten terms that survive minifying (district figure keys, random stream names, engine messages a player never sees), searched in `.next/static` and in the `/play` HTML and page data. A test plants a term in a pretend build in each place and sees it fail.
+17. **Snapshot allow-list: done.** Every key at every depth is listed (`snapshotkeys.test.ts`); a test shows a planted field is caught.
+18. **Docs: done.** The ute line, LESSONS S3, this entry, and LESSONS F1 and F2.
+
+How it was tested: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` (2,267 tests in 117 files, up from 2,142 on the engine branch), `pnpm test:speed`, `pnpm build` and `pnpm check:browser-bundle` pass.
+
+What was looked at in a real browser (the pane's browser on `next dev`, a running Central West farm): at 375 by 812 (touch emulated) the mob card during a joining shows "Joining: 1 Sep 2026 to 3 Nov 2026 (9 weeks). A report comes every 3 weeks." and the 31 cows known in calf, with no running count; every visible button measured 44 px or more by script and there is no sideways scroll. A double click on the supplement card's Confirm sent one act request and did the job once. At 1280 by 800 the fence tool starts on Permanent, shows "On hand: 277 m of permanent fence. Fence built from it is half price." after a fence was taken down, the take-down card said the materials are kept and the next fence card said 277 m came from them and saved $970 (half the $1,940); the PC buttons stay 36 px. A hub on a square was moved through the server (that showed the result line was missing; "Moved the water hub." was added and tested). Not looked at: a knocked-down fence on screen (none happened; the palette test covers its colour), tapping a hub on the map by hand, the broken-farm screen by eye, dark theme. The dev server was stopped.
+
+Not done:
+
+- Moving a mob or selling a group by the known classes can ask for more "not in calf" cows than the engine's live classes hold (the engine picks by live pregnancy). The engine then moves or sells fewer, or refuses. A fix needs an engine change.
+- Lighthouse was not run.
+
+Questions for Claudia:
+
+1. **Selling and moving by what is known.** The mob card now shows cows as PTIC only when a preg test said so, but the engine still picks "PTIC cows" and "cows not in calf" by live pregnancy. Should the engine pick by what the player knows?
+2. **The no-water colour.** No water on the water layer and in the move tool is now purple, not red. Right, or another colour?
+3. **The Short label chip** is a red-orange (`#ec6a48`). It is a word chip, not a line, so it was left. Change it too?
+4. **Stale farms.** A farm not played for 90 days is removed (the session cookie lasts 90 days). Right?
 
 ## Ideas raised but not built yet
 

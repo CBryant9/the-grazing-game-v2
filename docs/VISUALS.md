@@ -211,7 +211,7 @@ All of this is drawn on two layers above everything else on the farm, so a draft
 
 For Claudia to know before she looks at it. Each is from the spec above.
 
-- Trees. The profit layer. The selected mob and picked animals. The farmer and the ute.
+- Trees. The profit layer. The selected mob and picked animals. (The farmer and the ute are gone: driving was reversed on 14 Nov 2026.)
 - Keyboard drawing on the map. The build tools can be picked and confirmed by keyboard, but a fence or a pipe is drawn with a finger or the mouse.
 - The "drag to see more" hint on a phone held upright.
 - Animation: cattle walking and grazing, time-lapse, the hand-over between days.

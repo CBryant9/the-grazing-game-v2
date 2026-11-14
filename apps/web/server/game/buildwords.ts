@@ -177,6 +177,11 @@ export function layoutWord(e: Extract<FarmEvent, { type: 'layout-job' }>): strin
       return `Put in a water hub.${cost}`;
     case 'removeHub':
       return 'Took out the water hub.';
+    case 'moveHub':
+    case 'moveSquareHub':
+      return `Moved the water hub.${cost}`;
+    case 'removeSquareHub':
+      return 'Took out the water hub. Its gates stay.';
     case 'placePortable':
       return `Set down a portable trough.${cost}`;
     case 'movePortable':

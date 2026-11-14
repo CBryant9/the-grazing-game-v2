@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/src/**/*.test.ts', 'apps/*/**/*.test.ts'],
+    include: ['packages/*/src/**/*.test.ts', 'apps/*/**/*.test.ts', 'scripts/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/.next/**'],
     environment: 'node',
     // The engine's long tests (29 years of days, year-long herds) take a few
