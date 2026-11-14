@@ -352,6 +352,7 @@ describe('a tap in a tool', () => {
       edgeDistPx: 5,
       corner: null,
       hub: false,
+      squareHub: false,
     });
     expect(api.preview.mock.calls[0]![0].action).toEqual({
       type: 'placeGate',
@@ -384,6 +385,7 @@ describe('a tap in a tool', () => {
       edgeDistPx: Infinity,
       corner: null,
       hub: false,
+      squareHub: false,
     });
     expect(build().phase).toBe('blocked');
     expect(build().message).toMatch(/^A trough needs water/);
@@ -400,6 +402,7 @@ describe('a tap in a tool', () => {
       edgeDistPx: Infinity,
       corner: null,
       hub: false,
+      squareHub: false,
     });
     expect(build().message).toMatch(/fence line/);
     expect(api.preview).not.toHaveBeenCalled();

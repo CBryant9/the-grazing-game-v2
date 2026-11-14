@@ -20,6 +20,8 @@ export interface TapInfo {
   edgeDistPx: number;
   corner: Corner | null;
   hub: boolean;
+  /** True when the tapped square holds a water hub (a trough with a gate on every side). */
+  squareHub: boolean;
 }
 
 export type TapOutcome =
@@ -37,8 +39,33 @@ const none = (message: string): TapOutcome => ({ kind: 'none', message });
 
 const corner = (c: Corner): number => c.vy * 41 + c.vx;
 
+/** The square below and right of a corner, kept on the farm: where a hub choice's card sits. */
+const cellNear = (c: Corner): number => Math.min(25, c.vy) * 40 + Math.min(39, c.vx);
+
+const hubChoice = (c: Corner): TapOutcome => ({
+  kind: 'choice',
+  choice: { kind: 'hub', cell: cellNear(c), port: 0, corner: c },
+});
+const squareHubChoice = (cell: number): TapOutcome => ({
+  kind: 'choice',
+  choice: { kind: 'squareHub', cell, port: 0, corner: null },
+});
+
+/** The job for taking out a water hub on a square: the trough comes out, the gates stay. */
+const removeSquareHubJob = (cell: number): PickedJob => ({
+  action: { type: 'removeSquareHub', cell },
+  title: 'Take out this water hub',
+  confirm: 'Take it out',
+  edges: [],
+  cells: [cell],
+  corner: null,
+  style: 'remove',
+});
+
 function removeEdge(view: FarmView, edge: EdgeWire, code: number): TapOutcome {
   const base = { cells: [], corner: null, style: 'remove' } as const;
+  // The boundary can not be taken down: nothing is offered for it.
+  if (code === BOUNDARY) return none('The boundary fence can not be taken down.');
   if (code === GATE) {
     return {
       kind: 'job',
@@ -68,7 +95,7 @@ function removeEdge(view: FarmView, edge: EdgeWire, code: number): TapOutcome {
     job: {
       ...base,
       action: { type: 'removeFence', edges: [edge] },
-      title: code === BOUNDARY ? 'Take down the boundary' : 'Take down this fence',
+      title: 'Take down this fence',
       confirm: 'Take it down',
       edges: [edge],
     },
@@ -116,6 +143,7 @@ export function tapOutcome(
     case 'trough':
     case 'portable': {
       if (tap.square < 0) return none('Tap a square on the farm.');
+      if (tool === 'trough' && tap.squareHub) return squareHubChoice(tap.square);
       if (tool === 'trough' && trough?.kind === 'fixed') {
         return { kind: 'choice', choice: { kind: 'trough', cell: tap.square, port: 0 } };
       }
@@ -139,9 +167,11 @@ export function tapOutcome(
       };
     }
     case 'hub': {
+      // Tapping a hub that is there: move it or take it out, as with a trough.
+      if (tap.hub && tap.corner) return hubChoice(tap.corner);
+      if (tap.squareHub && tap.square >= 0) return squareHubChoice(tap.square);
       if (hubOn === 'corner') {
         if (!tap.corner) return none('Tap a fence corner.');
-        if (tap.hub) return none('There is a water hub here already. Use Remove to take it out.');
         return {
           kind: 'job',
           job: {
@@ -184,8 +214,11 @@ export function tapOutcome(
           },
         };
       }
-      // A segment right under the finger wins. Then a trough on the square, then a segment a little way off.
+      // A segment right under the finger wins. Then a hub or trough on the square, then a segment a little way off.
       if (tap.edge && tap.edgeDistPx <= 10) return removeEdge(view, tap.edge, tap.edgeCode);
+      if (tap.squareHub && tap.square >= 0) {
+        return { kind: 'job', job: removeSquareHubJob(tap.square) };
+      }
       if (trough) {
         const portable = trough.kind === 'portable';
         return {
@@ -211,8 +244,20 @@ export function tapOutcome(
   }
 }
 
-/** The job for a choice made on a trough: refill it, or take it away. */
+/** The job for a choice made on a trough or hub: refill it, or take it away. */
 export function choiceJob(c: TroughChoice, what: 'refill' | 'remove'): PickedJob {
+  if (c.kind === 'squareHub') return removeSquareHubJob(c.cell);
+  if (c.kind === 'hub' && c.corner) {
+    return {
+      action: { type: 'removeHub', vertex: corner(c.corner) },
+      title: 'Take out this water hub',
+      confirm: 'Take it out',
+      edges: [],
+      cells: [],
+      corner: c.corner,
+      style: 'remove',
+    };
+  }
   const portable = c.kind === 'portable';
   if (what === 'refill') {
     return {
@@ -238,8 +283,33 @@ export function choiceJob(c: TroughChoice, what: 'refill' | 'remove'): PickedJob
   };
 }
 
-/** The job for moving a trough to a square the player tapped. */
+/** The job for moving a hub on a corner to the corner the player tapped. */
+export function moveHubJob(c: TroughChoice, to: Corner): PickedJob | null {
+  if (c.kind !== 'hub' || !c.corner) return null;
+  return {
+    action: { type: 'moveHub', from: corner(c.corner), to: corner(to) },
+    title: 'Move this water hub here',
+    confirm: 'Move it',
+    edges: [],
+    cells: [],
+    corner: to,
+    style: 'ok',
+  };
+}
+
+/** The job for moving a trough, or a hub on a square, to a square the player tapped. */
 export function moveJob(c: TroughChoice, to: number): PickedJob {
+  if (c.kind === 'squareHub') {
+    return {
+      action: { type: 'moveSquareHub', from: c.cell, to },
+      title: 'Move this water hub here',
+      confirm: 'Move it',
+      edges: [],
+      cells: [to],
+      corner: null,
+      style: 'ok',
+    };
+  }
   return {
     action:
       c.kind === 'portable'

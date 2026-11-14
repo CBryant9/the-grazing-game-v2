@@ -86,14 +86,21 @@ export function parseBuildAction(a: Record<string, unknown>): Action | null {
     case 'placeTrough':
     case 'removeTrough':
     case 'placeSquareHub':
+    case 'removeSquareHub':
     case 'placePortable': {
       const cell = int(a.cell, 0, FARM_GRID_N - 1);
       return cell === null ? null : ({ type: a.type, cell } as Action);
     }
-    case 'moveTrough': {
+    case 'moveTrough':
+    case 'moveSquareHub': {
       const from = int(a.from, 0, FARM_GRID_N - 1);
       const to = int(a.to, 0, FARM_GRID_N - 1);
-      return from === null || to === null ? null : { type: 'moveTrough', from, to };
+      return from === null || to === null ? null : ({ type: a.type, from, to } as Action);
+    }
+    case 'moveHub': {
+      const from = int(a.from, 0, CORNERS - 1);
+      const to = int(a.to, 0, CORNERS - 1);
+      return from === null || to === null ? null : { type: 'moveHub', from, to };
     }
     case 'placeFenceHub':
     case 'removeHub': {

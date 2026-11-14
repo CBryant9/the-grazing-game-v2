@@ -20,7 +20,7 @@ import {
   type PlanDraft,
 } from './plans';
 import { dragPick, newPick, type SowPick } from './sow';
-import { choiceJob, moveJob, tapOutcome, type TapInfo } from './taps';
+import { choiceJob, moveHubJob, moveJob, tapOutcome, type TapInfo } from './taps';
 import type {
   ActionRequest,
   ActResponse,
@@ -934,6 +934,11 @@ export const useGame = create<GameState>()((set, get) => {
       const { build: b, snapshot } = get();
       if (!b || !snapshot || b.phase === 'applying' || b.phase === 'done') return;
       if (b.moving) {
+        if (b.moving.kind === 'hub') {
+          const job = tap.corner ? moveHubJob(b.moving, tap.corner) : null;
+          if (job) await previewPicked(job);
+          return;
+        }
         if (tap.square < 0) return;
         await previewPicked(moveJob(b.moving, tap.square));
         return;
@@ -1056,6 +1061,7 @@ export const useGame = create<GameState>()((set, get) => {
         edgeDistPx: 0,
         corner: null,
         hub: false,
+        squareHub: false,
       });
       if (out.kind === 'job') await previewPicked(out.job);
     },

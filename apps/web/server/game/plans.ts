@@ -33,7 +33,10 @@ import {
   waitingText,
 } from './planwords';
 
-const round1 = (n: number): number => Math.round(n * 10) / 10;
+const round = (n: number, places = 0): number => {
+  const k = 10 ** places;
+  return Math.round(n * k) / k;
+};
 
 /** The figures the plan form works within. They are the engine's own limits on a plan. */
 export function planForm(): PlanFormWire {
@@ -83,10 +86,6 @@ function mobWire(farm: FarmState, p: PlanView, reasons: Map<number, 'asked' | 'm
       waitingText: m.waiting ? waitingText(m.waiting.area) : null,
       nextText: nextText(m.next, farm.day),
       report: reportLines(m),
-      moves: m.moves,
-      rounds: m.roundsDone,
-      eatenT: round1(m.eatenKg / 1000),
-      gainKg: Math.round(m.gainKg),
     };
   };
 }
@@ -106,9 +105,10 @@ export function plansWire(farm: FarmState): PlanWire[] {
         hasWater: s.hasWater,
       })),
       trigger:
+        // Rounded as everywhere else: days to two places (a plan can move more than once a day), kg DM/ha whole.
         l.rule.mode === 'days'
-          ? { mode: 'days', every: l.rule.every }
-          : { mode: 'kg', kg: l.rule.kg, maxDays: l.rule.maxDays },
+          ? { mode: 'days', every: round(l.rule.every, 2) }
+          : { mode: 'kg', kg: round(l.rule.kg), maxDays: round(l.rule.maxDays) },
       ruleText: ruleText(l.rule),
       rounds: l.rounds,
       roundsText: roundsText(l.rounds),
@@ -117,7 +117,6 @@ export function plansWire(farm: FarmState): PlanWire[] {
       id: p.id,
       name: p.name,
       legs,
-      steps: p.steps,
       after: p.after,
       afterText: afterText(p.after),
       editable: p.legs.length === 1,

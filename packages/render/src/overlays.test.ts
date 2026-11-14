@@ -7,7 +7,7 @@ import { NATURAL } from './palette';
 import { cell, hEdge, sampleView, vEdge } from './testing/sampleView';
 
 describe('the water reach layer', () => {
-  it('blue fading out to 1.5 km, yellow to 3 km, orange past it, red for no water', () => {
+  it('blue fading out to 1.5 km, yellow to 3 km, orange past it, purple for no water', () => {
     const view = sampleView();
     const set = (i: number, hundredsOfMetres: number): void => {
       view.squares.waterDist[i] = hundredsOfMetres;
@@ -31,7 +31,7 @@ describe('the water reach layer', () => {
 });
 
 describe('the pasture quality layer', () => {
-  it('red at ME 6.5 and below, green at ME 9.8 and above, at 45%', () => {
+  it('purple at ME 6.5 and below, green at ME 9.8 and above, at 45%', () => {
     const view = sampleView();
     view.squares.me10[0] = 65;
     view.squares.me10[1] = 98;
@@ -80,7 +80,7 @@ describe('the recently grazed and arable layers', () => {
     const out = new Uint8ClampedArray(40 * 26 * 4);
     paintWash(view, 'grazed', out);
     const p = cell(3, 2) * 4;
-    expect([out[p], out[p + 1], out[p + 2], out[p + 3]]).toEqual([255, 60, 40, 140]);
+    expect([out[p], out[p + 1], out[p + 2], out[p + 3]]).toEqual([240, 130, 30, 140]);
     expect(out[3]).toBe(0);
   });
 });

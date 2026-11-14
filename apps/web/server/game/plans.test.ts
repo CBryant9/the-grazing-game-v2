@@ -253,7 +253,7 @@ describe('a plan on a running farm', () => {
     );
     const after = day.snapshot.plans[0]!.mobs[0]!;
     expect(after.area).toBe(three[1]!.name);
-    expect(after.moves).toBe(1);
+    expect(after.report[0]).toMatch(/^1 move and /);
     expect(after.stepText).toBe(`Step 2 of 2: ${three[1]!.name}`);
     expect(day.snapshot.inbox.some((m) => m.kind === 'plan' && /moved from/.test(m.text))).toBe(
       true,

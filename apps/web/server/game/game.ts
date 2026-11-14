@@ -11,11 +11,12 @@ import {
   SALE_CLASSES,
   SUPPLEMENTS,
   areaIdOf,
+  areaWatered,
   createFarm,
   endDay,
   getEdge,
   loadFarm,
-  marketView,
+  portableRefund,
   previewAction,
   saveFarm,
   skipDays,
@@ -47,10 +48,16 @@ import type {
   StaleResponse,
 } from '../../lib/game/types';
 import { parseBuildAction } from './build';
-import { gateNotes, lineWords } from './buildwords';
+import {
+  fenceMaterialsNotes,
+  gateNotes,
+  lineWords,
+  materialsKeptNotes,
+  refundNote,
+} from './buildwords';
 import { cropLines, parseSow } from './crops';
 import { buyLines, cancelLines, sellLines } from './marketwords';
-import { buildMobs } from './mobs';
+import { suppPerDay } from './mobs';
 import { moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
 import { buildSnapshot, buildSummary } from './snapshot';
@@ -310,7 +317,7 @@ export function moveNotesFor(farm: FarmState, action: Action): string[] {
       (m) => m.where.kind === 'paddock' && areaIdOf(survey, m) === areaId && !moving.has(m.id),
     )
     .map((m) => ({ name: m.name, head: m.animals.filter((a) => a.kind !== 'calf').length }));
-  return moveNotes(area.name, survey.points.areaTroughs[areaId]!.length > 0, others);
+  return moveNotes(area.name, areaWatered(survey.points, areaId), others);
 }
 
 /** What a job card carries beyond the engine's own: notes, a daily price, and the ready-made lines of a market, plan or crop job. */
@@ -340,6 +347,8 @@ function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
   if (card.action === 'markCalves') {
     notes.push('Marking covers every bull calf and young bull in the mob that is not marked yet.');
   }
+  if (card.fenceMaterials) notes.push(...fenceMaterialsNotes(card.fenceMaterials));
+  if (card.materialsKept) notes.push(...materialsKeptNotes(card.materialsKept));
   if (card.notToday) notes.push(card.notToday.message);
   let line: JobCardWire['line'] = null;
   if (card.line) {
@@ -602,10 +611,19 @@ export class GameServer {
   /** The notes and daily price a job card carries beyond the engine's own. */
   private extras(farm: FarmState, stored: StoredFarm, action: Action): Extras {
     if (action.type === 'setSupplement') {
-      const market = marketView(farm, envFor(stored.setup));
-      const mob = buildMobs(farm, envFor(stored.setup), market).find((m) => m.id === action.mob);
-      const option = mob?.suppOptions.find((o) => o.id === action.supp);
-      return { notes: [], perDay: option ? option.perDay : null, summary: [] };
+      return {
+        notes: [],
+        perDay: suppPerDay(farm, envFor(stored.setup), action.mob, action.supp),
+        summary: [],
+      };
+    }
+    if (action.type === 'removePortable') {
+      const back = portableRefund(farm, action.port);
+      return {
+        notes: back === null ? [] : [refundNote(back)],
+        perDay: null,
+        summary: [],
+      };
     }
     return {
       notes: [...moveNotesFor(farm, action), ...gateNotesFor(farm, action)],

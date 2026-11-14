@@ -121,7 +121,6 @@ describe('the plan form', () => {
           roundsText: '',
         },
       ],
-      steps: 2,
       after: 'stay',
       afterText: '',
       editable: true,

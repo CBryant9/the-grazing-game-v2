@@ -169,6 +169,59 @@ describe('fences read against the ground', () => {
   });
 });
 
+describe('red means one thing: the part of a line that does not fit today (Claudia, 14 Nov 2026)', () => {
+  /** Strongly red: a red channel well above green and blue. */
+  const isRed = (c: number): boolean => {
+    const r = (c >> 16) & 255;
+    const g = (c >> 8) & 255;
+    const b = c & 255;
+    return r >= 170 && g <= 110 && b <= 110;
+  };
+  /** Every colour drawn as a line, a square tint or a marker on a line or square. */
+  const onLinesAndSquares: Record<string, number> = {
+    fencePermanent: NATURAL.fencePermanent,
+    fenceElectric: NATURAL.fenceElectric,
+    fenceTape: NATURAL.fenceTape,
+    fenceDown: NATURAL.fenceDown,
+    removeMark: NATURAL.removeMark,
+    fencePostTape: NATURAL.fencePostTape,
+    gateOpen: NATURAL.gateOpen,
+    gateShut: NATURAL.gateShut,
+    pipe: NATURAL.pipe,
+    pipeDry: NATURAL.pipeDry,
+    levelLow: NATURAL.levelLow,
+    layerWaterNear: NATURAL.layerWaterNear,
+    layerWaterMid: NATURAL.layerWaterMid,
+    layerWaterFar: NATURAL.layerWaterFar,
+    layerWaterNone: NATURAL.layerWaterNone,
+    layerQualityLow: NATURAL.layerQualityLow,
+    layerGrazed: NATURAL.layerGrazed,
+  };
+
+  it('the "does not fit today" colour is red, and nothing else on a line or square is', () => {
+    expect(isRed(NATURAL.notToday)).toBe(true);
+    for (const [name, colour] of Object.entries(onLinesAndSquares)) {
+      expect(isRed(colour), name).toBe(false);
+    }
+  });
+
+  it('a knocked-down fence is amber, told apart from "does not fit today" and from the casing', () => {
+    const r = (NATURAL.fenceDown >> 16) & 255;
+    const g = (NATURAL.fenceDown >> 8) & 255;
+    expect(r).toBeGreaterThan(200);
+    expect(g).toBeGreaterThan(130);
+    expect(contrast(NATURAL.fenceDown, NATURAL.notToday)).toBeGreaterThan(1.5);
+    expect(contrast(NATURAL.fenceDown, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+    expect(contrast(NATURAL.notToday, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+    // The take-away mark stands out from the casing too.
+    expect(contrast(NATURAL.removeMark, NATURAL.fenceCasing)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('new tape is white, never red', () => {
+    expect(NATURAL.fenceTape).toBe(0xffffff);
+  });
+});
+
 describe('time of day and weather', () => {
   const first = 330;
   const last = 1110;

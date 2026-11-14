@@ -1066,7 +1066,7 @@
   border-radius: 2px;
 }
 .keydry {
-  border-top-color: var(--bad);
+  border-top-color: var(--nowater-line);
   margin-left: 6px;
 }
 .partset {
@@ -1690,4 +1690,22 @@
   font-family: var(--font-px);
   font-size: 0.8125rem;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Touch screens: every tappable control at least 44 px high --------- */
+
+@media (pointer: coarse) {
+  .screen button,
+  .plain button,
+  .screen select,
+  .screen summary,
+  .padchip,
+  .linkbtn,
+  .sortbtn {
+    min-height: var(--tap);
+  }
+  .linkbtn {
+    display: inline-flex;
+    align-items: center;
+  }
 }

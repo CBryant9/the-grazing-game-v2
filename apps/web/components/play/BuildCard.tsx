@@ -59,9 +59,12 @@ export function BuildCard({
   // ---- A trough was tapped: what to do with it.
   if (b.choice) {
     const portable = b.choice.kind === 'portable';
+    const hub = b.choice.kind === 'hub' || b.choice.kind === 'squareHub';
     return wrap(
       <>
-        <h3 className={styles.cardhead}>{portable ? 'Portable trough' : 'Trough'}</h3>
+        <h3 className={styles.cardhead}>
+          {portable ? 'Portable trough' : hub ? 'Water hub' : 'Trough'}
+        </h3>
         <div className={styles.jobbtns}>
           {portable && (
             <button type="button" className="btn sm" onClick={() => void refill()}>
@@ -79,13 +82,17 @@ export function BuildCard({
           </button>
         </div>
       </>,
-      'Trough choices',
+      hub ? 'Water hub choices' : 'Trough choices',
     );
   }
   if (b.moving) {
     return wrap(
       <>
-        <p>Tap the square to move it to.</p>
+        <p>
+          {b.moving.kind === 'hub'
+            ? 'Tap the corner to move it to.'
+            : 'Tap the square to move it to.'}
+        </p>
         <div className={styles.jobbtns}>
           <button type="button" className="btn sm ghost" onClick={end}>
             Cancel
@@ -146,9 +153,8 @@ export function BuildCard({
       <>
         <h3 className={styles.cardhead}>{title}</h3>
         <p role="alert" className={styles.cardreason}>
-          {b.message}
+          {line && b.allLate ? build.noneFits : b.message}
         </p>
-        {line && <p className="muted">Draw it a different way to try again.</p>}
         <div className={styles.jobbtns}>
           <button type="button" className="btn sm coral" disabled>
             {line ? 'Build' : b.picked!.confirm}
@@ -189,6 +195,9 @@ export function BuildCard({
             </li>
           ))}
           {facts.fullDay && <li>{facts.fullDay}</li>}
+          {card.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
         </ul>
       ) : card ? (
         <ul className={styles.joblines}>

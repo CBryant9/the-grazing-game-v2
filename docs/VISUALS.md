@@ -57,9 +57,9 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 
 | Layer | Look |
 |---|---|
-| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; red = no water |
-| Pasture quality | red (ME 6.5) → green (ME 9.8) wash at 45% |
-| Recently grazed | red wash, stronger where more was eaten |
+| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; purple = no water *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Pasture quality | purple (ME 6.5) → green (ME 9.8) wash at 45% *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Recently grazed | orange wash, stronger where more was eaten *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
 | Arable land | pale yellow wash (stronger on cropped squares). Also shown while using the Sow tool. |
 | Pipe | blue `#5ab4f0` lines when connected to the bore, grey `#7e8a96` when not |
 | Labels | paddock name (big paddocks in capitals), ha, "no water" in salmon or "water via gate"; planting name under crops |
@@ -73,21 +73,21 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 | Electric fence | yellow wire `#ffe14a`, two strands |
 | Temporary tape | white dashed tape, one strand, orange posts, shorter |
 | Boundary | heavier brown wire |
-| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; red flag when shut, green when open |
-| Knocked-down fence | sagging, flashing red line with a "!" marker. Clicking it puts it back up. |
+| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; slate flag when shut, green when open *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
+| Knocked-down fence | sagging amber line with an amber "!" marker. Clicking it puts it back up. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
 | Bore | a windmill about 3× a cow's height with a turning fan and red tail vane. A pulsing gold ring and a "BORE: PUT A TROUGH OR WATER HUB HERE" pointer until the first water is built. |
 | Trough | grey concrete with blue water |
 | Water hub | round trough straddling the fence line or corner |
-| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, red below) |
+| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, orange below) *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* |
 | Trees | 16 dark green pixel trees |
 | Yards | feedlot and sale yards in a strip on the right of the map |
 
 Drawing aids:
 
-- Fence drag preview: a dashed line with the length and cost. For tape, white = off your roll and red = new tape you'll buy.
+- Fence drag preview: a dashed line with the length and cost. Tape is white and dashed, whether it comes off the roll or is new; the card says how much comes off the roll. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
 - Snap dots: green = joins an existing fence, white ring = open ground.
 - A hovered fence segment is highlighted white when it can be clicked.
-- While a tool asks for a paddock (moving a mob), every paddock that can be picked has a light tint and outline, and a paddock with no water is tinted and outlined red. The paddock sheet lists the same paddocks, with "No water" in words, so colour is never the only signal.
+- While a tool asks for a paddock (moving a mob), every paddock that can be picked has a light tint and outline, and a paddock with no water is tinted and outlined purple (the water layer's no-water colour).*(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* The paddock sheet lists the same paddocks, with "No water" in words, so colour is never the only signal.
 
 ## Cattle sprites
 
@@ -181,20 +181,20 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 ### Fences, gates and water
 
 - **Fences keep the colours above.** Every wire has a dark casing under it so it reads on any ground **(builder)**. Zoomed out they are bold lines. Zoomed in they have a ground shadow, posts every half square and wires standing above the ground. The boundary is heavier. Tape is white and dashed with orange posts.
-- **Knocked-down fence:** a sagging red line with a red "!" marker. It is steady, not flashing **(builder)**.
-- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is red when shut and green when open, drawn large so it reads zoomed out.
+- **Knocked-down fence:** a sagging amber line with an amber "!" marker. It is steady, not flashing **(builder)**. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
+- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is slate when shut and green when open, drawn large so it reads zoomed out. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
 - **Bore:** a windmill about 1.9 squares tall, which is about 7 cow heights. *(The spec above says about 3 times a cow. It is drawn bigger so the bore is easy to find zoomed out.)* **(builder)** A gold ring and "Bore: put a trough or water hub here" until the first trough or hub is built. The fan turns and the ring pulses only when ambient motion is switched on **(builder)**. A paddock label that would sit over the windmill steps to one side.
-- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, red below.
+- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, orange below. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)*
 - **The stock yards** are drawn on their square (no homestead: REQUIREMENTS, 14 Nov 2026). The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.**
 
 ### The build tools on the map (milestone 1.7c)
 
 All of this is drawn on two layers above everything else on the farm, so a draft or a hover redraws only those and never the grass or the cattle. Line widths are set in screen pixels and follow the zoom.
 
-- **Draft line:** the fence's own colour on a dark casing (permanent brown, electric yellow, tape white and dashed, pipe blue). Pipe draws a tint on each square and a line through their middles. **The part that does not fit today is red** (the red the map uses for a knocked-down fence), solid, on the same casing. The card beside it says the same in words, so colour is never the only signal. Red goes with the server's job card: the first pieces drawn that fit are the line's colour, the rest are red. If none fits, all of it is red.
+- **Draft line:** the fence's own colour on a dark casing (permanent brown, electric yellow, tape white and dashed, pipe blue). Pipe draws a tint on each square and a line through their middles. **The part that does not fit today is red**, solid, on the same casing. It is the only red on a line or square on the map (Claudia, 14 Nov 2026). The card beside it says the same in words, so colour is never the only signal. Red goes with the server's job card: the first pieces drawn that fit are the line's colour, the rest are red. If none fits, all of it is red.
 - **Snap dots:** at each end of a fence line, green and filled where it joins an existing fence, a gate or the boundary, a white ring on open ground. A dot also shows at the corner under the mouse in the Fence and Water hub tools.
 - **Hover (PC):** in a tool the thing under the pointer is highlighted: a fence segment or gate in white with a dark casing, a square outlined and tinted lightly, a corner as a dot.
-- **Remove:** what is about to go is marked in red with a white core. Tape marks the whole straight run that is rolled up.
+- **Remove:** what is about to go is marked with a lilac glow round a white core. *(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* Tape marks the whole straight run that is rolled up.
 - **A knocked-down fence** is tapped in Look. It offers the card "Put this fence back up", marked on the map, and a tap anywhere else still opens the paddock.
 - **Panning in a tool:** a drag draws, so the map is moved with two fingers, the space bar held, or the middle mouse button. Wheel and pinch still zoom. In Look nothing changed: one finger pans, a tap opens the paddock.
 - **Builder's choices (not in the spec above):** the dashed white for draft tape, the 7 px dark casing, the 7 px dot, a trough or hub picked is marked with a white square or dot, and a tap in a tool reaches the nearest fence within 22 px (10 px counts as "right under the finger" in Remove, so a trough beside a fence can still be picked).

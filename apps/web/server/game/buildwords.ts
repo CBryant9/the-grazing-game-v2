@@ -1,5 +1,5 @@
 import 'server-only';
-import { COSTS, COST_PER_M, PORTABLE_RESALE_SHARE, type FarmEvent } from '@gg/engine';
+import { COSTS, COST_PER_M, type FarmEvent, type JobCard, type MaterialsOnHand } from '@gg/engine';
 import type { BuildWire, FenceOptionWire } from '../../lib/game/types';
 
 /**
@@ -37,9 +37,11 @@ export function fenceOptions(): FenceOptionWire[] {
 }
 
 /** The tool bar's content: one short help line and one price line for each tool. */
-export function buildWire(): BuildWire {
+export function buildWire(onHand?: MaterialsOnHand): BuildWire {
   return {
     fences: fenceOptions(),
+    onHand: onHand ? onHandWords(onHand) : null,
+    noneFits: NONE_FITS,
     tools: [
       {
         id: 'fence',
@@ -74,7 +76,7 @@ export function buildWire(): BuildWire {
       {
         id: 'hub',
         name: 'Water hub',
-        help: 'Tap a fence corner to put a water hub there. Tap a square on water to make it a hub with a gate on each side.',
+        help: 'Tap a fence corner, or a square on water, to put a hub there. Tap a hub to move it or take it out.',
         price: `${money(COSTS.trough + COSTS.fenceHubExtra)} on a corner`,
       },
       {
@@ -182,8 +184,54 @@ export function layoutWord(e: Extract<FarmEvent, { type: 'layout-job' }>): strin
     case 'refillPortable':
       return `Refilled the portable trough.${cost}`;
     case 'removePortable':
-      return `Sold the portable trough back for ${money(COSTS.portable * PORTABLE_RESALE_SHARE)}.`;
+      // The refund is the job's own figure: it comes in as a negative cost.
+      return `Sold the portable trough back for ${money(Math.max(0, -e.cost))}.`;
     default:
       return null;
   }
+}
+
+/** The note on the card for selling a portable trough back: the engine's refund. */
+export const refundNote = (dollars: number): string => `You get ${money(dollars)} back for it.`;
+
+/** What a line card says when none of the line fits in today's light. */
+export const NONE_FITS = "You don't have enough time to do this today. Draw it again another day.";
+
+/** Fence materials on hand, in one sentence, or null when there are none. */
+export function onHandWords(m: MaterialsOnHand): string | null {
+  const parts: string[] = [];
+  if (m.permanentM > 0) parts.push(`${metres(m.permanentM)} of permanent fence`);
+  if (m.electricM > 0) parts.push(`${metres(m.electricM)} of electric fence`);
+  if (m.tapeM > 0) parts.push(`${metres(m.tapeM)} of tape on the roll`);
+  if (!parts.length) return null;
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `On hand: ${list}. Fence built from it is half price.`;
+}
+
+/**
+ * What a fence card says about materials on hand: how many metres come from
+ * them and what that saves, for the part built today. The figures are the
+ * engine's job card (`fenceMaterials`).
+ */
+export function fenceMaterialsNotes(f: NonNullable<JobCard['fenceMaterials']>): string[] {
+  if (f.fromStockTodayM <= 0) {
+    return f.onHandM > 0
+      ? [`${metres(f.onHandM)} of ${FENCE_WORD[f.fence]} on hand. None of it is used today.`]
+      : [];
+  }
+  return [
+    `${metres(f.fromStockTodayM)} comes from the ${FENCE_WORD[f.fence]} on hand, at half price. That saves ${money(f.savingToday)}.`,
+  ];
+}
+
+/** What a take-down card says about the materials kept (`materialsKept` on the job card). */
+export function materialsKeptNotes(k: NonNullable<JobCard['materialsKept']>): string[] {
+  const parts: string[] = [];
+  if (k.permanentM > 0) parts.push(`${metres(k.permanentM)} of permanent fence`);
+  if (k.electricM > 0) parts.push(`${metres(k.electricM)} of electric fence`);
+  if (!parts.length) return [];
+  return [`You keep the materials: ${parts.join(' and ')}. Fence built from them is half price.`];
 }

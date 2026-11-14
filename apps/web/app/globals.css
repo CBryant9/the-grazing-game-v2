@@ -31,6 +31,8 @@
   --gamehdr-line: #2f4f86;
   --ok: #7fe05a;
   --bad: #ff8a70;
+  /* The no-water outline on the map key: the map's no-water purple, never red (red means "does not fit today"). */
+  --nowater-line: #b07ae0;
   --sel: #1b2846;
   --shadow: rgba(0, 0, 0, 0.45);
   --ghost: #34425f;
@@ -75,6 +77,7 @@
     --gamehdr-line: #b5c693;
     --ok: #2c7a1c;
     --bad: #b3372a;
+    --nowater-line: #7832aa;
     --sel: #f0e3c8;
     --shadow: rgba(70, 50, 20, 0.18);
     --ghost: #cdbf9f;
@@ -110,6 +113,7 @@
   --gamehdr-line: #b5c693;
   --ok: #2c7a1c;
   --bad: #b3372a;
+  --nowater-line: #7832aa;
   --sel: #f0e3c8;
   --shadow: rgba(70, 50, 20, 0.18);
   --ghost: #cdbf9f;
@@ -384,4 +388,15 @@ html.play-lock,
 html.play-lock body {
   overflow: hidden;
   height: 100dvh;
+}
+
+/* Touch screens: every tappable control is at least a finger high (44 px). The PC layout keeps its compact sizes. */
+@media (pointer: coarse) {
+  .btn.sm,
+  select,
+  summary,
+  input[type='number'],
+  input[type='text'] {
+    min-height: var(--tap);
+  }
 }

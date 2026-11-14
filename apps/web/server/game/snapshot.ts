@@ -4,6 +4,7 @@ import {
   clockView,
   dateOn,
   farmTotals,
+  materialsOnHand,
   DSE_PER_AE,
   farmView,
   marketView,
@@ -36,7 +37,7 @@ import { marketWire } from './market';
 import { buildMobs } from './mobs';
 import { plansWire, planForm } from './plans';
 import { movedText } from './planwords';
-import { causeWord, gameOverWord, stopWord, todoWire } from './words';
+import { NO_WATER_WHY, causeWord, gameOverWord, stopWord, todoWire } from './words';
 
 /** Messages the snapshot carries. The browser shows these; older ones stay on the server. */
 export const INBOX_SHOWN = 40;
@@ -114,6 +115,7 @@ export function buildSnapshot(
     dsePerHa: round(p.dsePerHa, 1),
     feedDays: Number.isFinite(p.feedDays) ? round(p.feedDays) : null,
     growKgHaDay: round(p.ha > 0 ? p.grow / p.ha : 0),
+    noWaterWhy: p.water === 'none' ? NO_WATER_WHY : null,
     carryingDsePerHa: round(p.cc * DSE_PER_AE, 1),
     cell: cellOf.get(p.id) ?? 0,
     arableHa: round(arable.get(p.id) ?? 0, 1),
@@ -180,7 +182,7 @@ export function buildSnapshot(
     cropping: cropsWire(farm, mixed),
     mobs,
     paddocks,
-    build: buildWire(),
+    build: buildWire(materialsOnHand(farm)),
     inbox,
     inboxUnread,
     over: farm.over ? { text: gameOverWord(farm.over.reason) } : null,

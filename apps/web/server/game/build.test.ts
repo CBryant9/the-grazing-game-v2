@@ -271,3 +271,131 @@ describe('the build tools through the server', () => {
     }
   });
 });
+
+describe('fence materials and water hubs (milestone 1.7f)', () => {
+  it('a fence taken down keeps its materials, and a fence drawn after shows them and the half price', async () => {
+    const game = server();
+    await game.create(A, choices());
+    const line = row(10, 5, 9);
+    const built = await game.act(A, {
+      action: { type: 'buildFence', edges: line, fence: 'permanent' },
+    });
+    expect(built.ok).toBe(true);
+    const take = await game.preview(A, { action: { type: 'removeFence', edges: line } });
+    expect(take.ok).toBe(true);
+    if (!take.ok) return;
+    expect(take.card.notes.join(' ')).toMatch(
+      /^You keep the materials: [\d,]+ m of permanent fence\. Fence built from them is half price\.$/,
+    );
+    const down = await game.act(A, { action: { type: 'removeFence', edges: line } });
+    expect(down.ok).toBe(true);
+    if (!down.ok) return;
+    // The tool bar says what is on hand.
+    expect(down.snapshot.build.onHand).toMatch(
+      /^On hand: [\d,]+ m of permanent fence\. Fence built from it is half price\.$/,
+    );
+    const again = await game.preview(A, {
+      action: { type: 'buildFence', edges: row(12, 5, 9), fence: 'permanent' },
+    });
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    const note = again.card.notes.find((n) => /on hand/.test(n));
+    expect(note).toMatch(
+      /^[\d,]+ m comes from the permanent fence on hand, at half price\. That saves \$[\d,]+\.$/,
+    );
+    // An electric fence uses none of it: nothing is said.
+    const electric = await game.preview(A, {
+      action: { type: 'buildFence', edges: row(14, 5, 9), fence: 'electric' },
+    });
+    if (electric.ok) expect(electric.card.notes.some((n) => /on hand/.test(n))).toBe(false);
+  });
+
+  it('a hub on a square and a hub on a corner can be moved and taken out', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices());
+    const bore = s0.view.water.bore;
+    const dir = bore % W < W / 2 ? 1 : -1;
+    const cells = [1, 2, 3, 4, 5].map((k) => bore + dir * k);
+    expect((await game.act(A, { action: { type: 'layPipe', cells } })).ok).toBe(true);
+    const placed = await game.act(A, { action: { type: 'placeSquareHub', cell: cells[2]! } });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    expect(placed.snapshot.view.water.squareHubs).toEqual([cells[2]]);
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    const moved = await game.act(A, {
+      action: { type: 'moveSquareHub', from: cells[2]!, to: cells[4]! },
+    });
+    expect(moved.ok ? 'ok' : moved.message).toBe('ok');
+    if (!moved.ok) return;
+    expect(moved.snapshot.view.water.squareHubs).toEqual([cells[4]]);
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    const out = await game.act(A, { action: { type: 'removeSquareHub', cell: cells[4]! } });
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.snapshot.view.water.squareHubs).toEqual([]);
+
+    // A hub on a fence corner over the pipe.
+    const by = Math.floor(bore / W);
+    const bx = bore % W;
+    const fence = [1, 2, 3, 4, 5].map((k) => h(by, bx + dir * k));
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    await game.act(A, { action: { type: 'buildFence', edges: fence, fence: 'electric' } });
+    const at = (k: number): number => by * (W + 1) + bx + dir * k + (dir < 0 ? 1 : 0);
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    const hub = await game.act(A, { action: { type: 'placeFenceHub', vertex: at(2) } });
+    expect(hub.ok).toBe(true);
+    if (!hub.ok) return;
+    expect(hub.snapshot.view.water.hubs).toEqual([at(2)]);
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    const shifted = await game.act(A, { action: { type: 'moveHub', from: at(2), to: at(3) } });
+    expect(shifted.ok).toBe(true);
+    if (!shifted.ok) return;
+    expect(shifted.snapshot.view.water.hubs).toEqual([at(3)]);
+    // Each job on a day of its own, so the light is never short.
+    await game.endDay(A);
+    const gone = await game.act(A, { action: { type: 'removeHub', vertex: at(3) } });
+    expect(gone.ok).toBe(true);
+    if (gone.ok) expect(gone.snapshot.view.water.hubs).toEqual([]);
+  });
+
+  it('checks the hub move and remove requests', () => {
+    expect(parseAction({ type: 'moveHub', from: 10, to: 11 })).toEqual({
+      type: 'moveHub',
+      from: 10,
+      to: 11,
+    });
+    expect(parseAction({ type: 'moveSquareHub', from: 10, to: 11 })).toEqual({
+      type: 'moveSquareHub',
+      from: 10,
+      to: 11,
+    });
+    expect(parseAction({ type: 'removeSquareHub', cell: 3 })).toEqual({
+      type: 'removeSquareHub',
+      cell: 3,
+    });
+    expect(parseAction({ type: 'moveHub', from: -1, to: 11 })).toBeNull();
+    expect(parseAction({ type: 'removeSquareHub', cell: 99_999 })).toBeNull();
+  });
+
+  it('the portable trough card says the refund, the engine figure', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices());
+    const placed = await game.act(A, {
+      action: { type: 'placePortable', cell: s0.view.water.bore + 1 },
+    });
+    if (!placed.ok) return;
+    const port = placed.snapshot.view.water.troughs.find((t) => t.kind === 'portable')!;
+    const card = await game.preview(A, { action: { type: 'removePortable', port: port.id } });
+    expect(card.ok).toBe(true);
+    if (!card.ok) return;
+    const note = card.card.notes.find((n) => /back for it/.test(n))!;
+    const done = await game.act(A, { action: { type: 'removePortable', port: port.id } });
+    if (!done.ok) return;
+    const amount = (t: string) => t.match(/\$[\d,]+/)![0];
+    expect(amount(note)).toBe(amount(done.message));
+  });
+});

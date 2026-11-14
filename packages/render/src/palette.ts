@@ -50,10 +50,17 @@ export const NATURAL = {
   cropSeed: 0xe6c35a,
 
   // ---- Fences and gates
+  // Red on a line or a square means one thing: the part of a line that does
+  // not fit today (Claudia, 14 Nov 2026). Nothing else on the map is red.
+  /** The part of a line being drawn that does not fit in today's light. The only red. */
+  notToday: 0xff5032,
   fencePermanent: 0xa06a38,
   fenceElectric: 0xffe14a,
   fenceTape: 0xffffff,
-  fenceDown: 0xff5032,
+  /** A fence that has been knocked down: amber, with its "!" marker. */
+  fenceDown: 0xffa62b,
+  /** A job to take something away: a lilac glow round a white line. */
+  removeMark: 0xc39bff,
   fencePost: 0x3e2612,
   fencePostBoundary: 0x2e1c0c,
   fencePostElectric: 0x5a4a30,
@@ -63,7 +70,7 @@ export const NATURAL = {
   gateRail: 0xdfe5e8,
   gatePost: 0x3b2c1c,
   gateOpen: 0x5fd04a,
-  gateShut: 0xe8503a,
+  gateShut: 0x6f86a0,
 
   // ---- Water
   pipe: 0x5ab4f0,
@@ -77,7 +84,7 @@ export const NATURAL = {
   portableTank: 0xe8e4da,
   levelHigh: 0x7fe05a,
   levelMid: 0xf0b43a,
-  levelLow: 0xff5a3a,
+  levelLow: 0xff8c1a,
   boreRing: 0xffd75a,
   windmill: 0xd8d2c4,
   windmillDark: 0x8e9196,
@@ -104,11 +111,11 @@ export const NATURAL = {
   // ---- Layers
   layerWaterNear: rgb(70, 160, 240),
   layerWaterMid: rgb(240, 200, 60),
-  layerWaterFar: rgb(230, 110, 30),
-  layerWaterNone: rgb(200, 40, 30),
-  layerQualityLow: rgb(225, 50, 40),
+  layerWaterFar: rgb(235, 140, 40),
+  layerWaterNone: rgb(120, 50, 170),
+  layerQualityLow: rgb(150, 70, 190),
   layerQualityHigh: rgb(40, 210, 60),
-  layerGrazed: rgb(255, 60, 40),
+  layerGrazed: rgb(240, 130, 30),
   layerArable: rgb(255, 240, 170),
   layerArableCropped: rgb(255, 214, 90),
 

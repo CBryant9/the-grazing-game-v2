@@ -3,6 +3,9 @@ import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engi
 import type { TodoWire } from '../../lib/game/types';
 import { layoutWord } from './buildwords';
 
+/** Why water matters, as a fact. Said in the things to do and on the paddock sheet: written once, here. */
+export const NO_WATER_WHY = 'Cattle die on the fourth day without water.';
+
 /**
  * The words for what the engine reports. Plain Australian English, short
  * sentences, facts only: nothing here praises or criticises (CLAUDE.md,
@@ -53,7 +56,7 @@ export function todoWire(t: ThingToDo): TodoWire {
       return {
         ...base,
         mob: t.mob,
-        text: `${t.mobName} has no water${t.area ? ` in ${t.area}` : ''}. ${plural(t.dryDays, 'day')} without so far. Cattle die on the fourth day without water.`,
+        text: `${t.mobName} has no water${t.area ? ` in ${t.area}` : ''}. ${plural(t.dryDays, 'day')} without so far. ${NO_WATER_WHY}`,
         button: null,
         urgent: true,
       };

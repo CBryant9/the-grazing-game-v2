@@ -18,9 +18,6 @@ const WATER: Record<PaddockWire['water'], string> = {
   none: 'No water',
 };
 
-/** Why water matters, said once, as a fact. */
-const NO_WATER_WHY = 'Cattle in a paddock with no water die on the fourth day.';
-
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -69,7 +66,7 @@ export function PaddockSheet({
       </p>
       <Sward paddock={vp} plantings={snapshot.view.plantings} />
       <p className={`${styles.waterline} ${p.water === 'none' ? styles.nowater : ''}`}>
-        <b>{WATER[p.water]}.</b> {p.water === 'none' ? NO_WATER_WHY : ''}
+        <b>{WATER[p.water]}.</b> {p.noWaterWhy ?? ''}
       </p>
       <h3 className={`px ${styles.minihead}`}>{here.length > 1 ? 'Mobs here' : 'Mob here'}</h3>
       {here.length === 0 ? (
@@ -121,7 +118,7 @@ export function PaddockSheet({
           <Fact label="Feed energy" value={`ME ${num(p.me, 1)} MJ/kg`} />
           <Fact label="Feed protein" value={`CP ${num(p.cp, 1)}%`} />
           <Fact label="Ground cover" value={`${p.coverPct}%`} />
-          <Fact label="Growth, last day" value={`${num(p.growKgHaDay)} kg DM/ha`} />
+          <Fact label="Growth, last day" value={`${num(p.growKgHaDay)} kg DM/ha a day`} />
           <Fact label="Stocking now" value={`${num(p.ae, 1)} AE, ${num(p.dse)} DSE`} />
           <Fact
             label="Per hectare"

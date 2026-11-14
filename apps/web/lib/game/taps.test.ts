@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FarmView } from '@gg/shared';
-import { choiceJob, moveJob, tapOutcome, type TapInfo } from './taps';
+import { choiceJob, moveHubJob, moveJob, tapOutcome, type TapInfo } from './taps';
 
 const view = {
   squares: { paddock: new Array(1040).fill(0) },
@@ -29,6 +29,7 @@ const tap = (over: Partial<TapInfo> = {}): TapInfo => ({
   edgeDistPx: Infinity,
   corner: null,
   hub: false,
+  squareHub: false,
   ...over,
 });
 const edge = { line: 'h' as const, index: 300 };
@@ -95,9 +96,43 @@ describe('what a tap picks', () => {
     expect(tapOutcome('hub', 'square', view, tap({ square: 88 }))).toMatchObject({
       job: { action: { type: 'placeSquareHub', cell: 88 } },
     });
+    // Tapping a hub that is there offers to move it or take it out, as with a trough (Claudia, 14 Nov 2026).
     expect(tapOutcome('hub', 'corner', view, tap({ corner, hub: true }))).toMatchObject({
-      kind: 'none',
+      kind: 'choice',
+      choice: { kind: 'hub', corner },
     });
+    expect(tapOutcome('hub', 'corner', view, tap({ square: 88, squareHub: true }))).toMatchObject({
+      kind: 'choice',
+      choice: { kind: 'squareHub', cell: 88 },
+    });
+  });
+
+  it('a hub can be moved and taken out, both kinds, with the engine actions', () => {
+    const corner = { vx: 4, vy: 3 };
+    const onCorner = { kind: 'hub' as const, cell: 124, port: 0, corner };
+    const onSquare = { kind: 'squareHub' as const, cell: 88, port: 0, corner: null };
+    expect(choiceJob(onCorner, 'remove').action).toEqual({ type: 'removeHub', vertex: 3 * 41 + 4 });
+    expect(choiceJob(onSquare, 'remove').action).toEqual({ type: 'removeSquareHub', cell: 88 });
+    expect(moveHubJob(onCorner, { vx: 6, vy: 3 })!.action).toEqual({
+      type: 'moveHub',
+      from: 3 * 41 + 4,
+      to: 3 * 41 + 6,
+    });
+    expect(moveJob(onSquare, 90).action).toEqual({ type: 'moveSquareHub', from: 88, to: 90 });
+    // In Remove, a hub on a square comes out as a hub, not as a plain trough.
+    expect(
+      tapOutcome('remove', 'corner', view, tap({ square: 50, squareHub: true })),
+    ).toMatchObject({ job: { action: { type: 'removeSquareHub', cell: 50 }, style: 'remove' } });
+    // In the trough tool, a hub on a square opens the hub's choices.
+    expect(
+      tapOutcome('trough', 'corner', view, tap({ square: 50, squareHub: true })),
+    ).toMatchObject({ kind: 'choice', choice: { kind: 'squareHub' } });
+  });
+
+  it('Remove never offers to take down the boundary', () => {
+    const out = tapOutcome('remove', 'corner', view, tap({ edge, edgeCode: 1, edgeDistPx: 3 }));
+    expect(out.kind).toBe('none');
+    expect(JSON.stringify(out)).not.toMatch(/Take down the boundary/);
   });
 
   it('Remove: a fence is taken down, tape is rolled up, a gate is taken out', () => {

@@ -29,16 +29,20 @@ export interface PickedJob {
   edges: readonly EdgeWire[];
   cells: readonly number[];
   corner: Corner | null;
-  /** 'remove' marks it red. */
+  /** 'remove' marks it lilac round white (red is only for what does not fit today). */
   style: 'ok' | 'remove';
 }
 
-/** A trough that was tapped: the player says what to do with it. */
+/** A trough or water hub that was tapped: the player says what to do with it. */
 export interface TroughChoice {
-  kind: 'portable' | 'trough';
+  /** 'hub' is a hub on a fence line or corner; 'squareHub' a hub on a square. */
+  kind: 'portable' | 'trough' | 'hub' | 'squareHub';
+  /** The square, or for a hub on a corner the square below and right of it (for the card's place). */
   cell: number;
-  /** A portable trough's id. 0 for a fixed trough. */
+  /** A portable trough's id. 0 for anything else. */
   port: number;
+  /** A hub on a corner: its corner. Null for anything else. */
+  corner?: Corner | null;
 }
 
 export type BuildPhase =
@@ -124,6 +128,9 @@ export function mapToolFor(b: BuildState | null): MapToolName {
     case 'portable':
       return 'square';
     case 'hub':
+      // Moving a hub on a corner asks for a corner; anything else on the hub tool as picked.
+      if (b.moving?.kind === 'hub') return 'corner';
+      if (b.moving?.kind === 'squareHub') return 'square';
       return b.hubOn === 'corner' ? 'corner' : 'square';
     case 'fix':
       return 'look';
@@ -155,6 +162,8 @@ export function buildDraft(b: BuildState | null, view: FarmView): MapDraft | nul
     }
   }
   const c = b.choice ?? b.moving;
+  if (c?.corner)
+    return { kind: 'mark', segments: [], squares: [], dots: [{ ...c.corner, joins: true }] };
   return c ? markSquares([c.cell], 'ok') : null;
 }
 
@@ -186,6 +195,7 @@ export function buildAnchor(b: BuildState | null): { gx: number; gy: number } | 
     if (p.corner) return { gx: p.corner.vx, gy: p.corner.vy };
   }
   const c = b.choice ?? b.moving;
+  if (c?.corner) return { gx: c.corner.vx, gy: c.corner.vy };
   return c ? cellAt(c.cell) : null;
 }
 

@@ -17,7 +17,7 @@ export type WashLayer = 'waterReach' | 'quality' | 'grazed' | 'arable';
 export const WATER_NEAR_M = 1500;
 /** Past here water is a long walk, in metres. */
 export const WATER_FAR_M = 3000;
-/** The pasture quality wash runs from this energy (red) to the other (green), ME in MJ/kg DM. */
+/** The pasture quality wash runs from this energy (purple) to the other (green), ME in MJ/kg DM. */
 export const QUALITY_RANGE = { low: 6.5, high: 9.8 } as const;
 
 /** One square's wash: a colour and how strongly it shows, 0 to 1. */

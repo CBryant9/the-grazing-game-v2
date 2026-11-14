@@ -297,8 +297,10 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
 
 - [ ] **Fence materials are kept, and reused fence is half price.** "If they remove a fence, they can have so many discounted fence fees because they would already have some of the materials, but they still don't get the full amount. They would get some discount on fencing for using stuff that they already had." On the figure: "half price is fine." *(Built in the engine: permanent and electric fence taken down is kept by the metre and by kind, and fence of that kind uses it first at half price. MODEL section 5 and 8, DATA "Fence materials kept and reused".)*
 - [ ] **Water hubs can be removed and moved.** "Water hub can be removed or moved." Both kinds: the hub on a fence line or corner, and the hub on a square. *(Built in the engine.)*
-- [ ] **The default fence is the permanent one.** "They have to specifically choose electrical." *(For the screens: the fence tool starts on permanent fence.)*
-- [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)*
+- [ ] **The default fence is the permanent one.** "A normal fence is the one that they would go for. They have to specifically choose electrical." *(Built in milestone 1.7f: the fence tool starts on permanent fence.)*
+- [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)* *(Built in milestone 1.7f: no tool changes the zoom by itself; pinch and wheel zoom work in every tool.)*
+- [ ] **Red means one thing.** Her words: red "means doesn't fit today when building, so use other colours for other stuff". On the map and the cards, red on a line or a square is used only for the part of a line that does not fit today. A knocked-down fence is amber with its "!" marker. New tape is white and dashed, never red. The no-water salmon stays for words and markers, not as a red line. *(Built in milestone 1.7f. Reverses the red knocked-down fence, the red new tape and the red remove mark in VISUALS.)*
+- [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
 
 ### For the game screens milestone
 

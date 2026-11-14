@@ -129,10 +129,10 @@ export interface MobWire {
   classes: MobClassWire[];
   /** Plain sentences on why the mob is losing weight or short of feed or water. Empty when there is nothing to say. */
   why: string[];
-  /** Females in calf (PTIC). */
+  /** Females known to be in calf (PTIC): a preg test or the saleyard said so. Never the live count. */
   ptic: number;
-  /** A fact about the joining under way, or null. */
-  joining: string | null;
+  /** The joining, the latest joining report and the latest preg test, each with its date. Empty with none. */
+  breeding: string[];
   supp: SuppId;
   /** The supplements to pick from. Empty when the mob is not on pasture. */
   suppOptions: SuppOptionWire[];
@@ -174,8 +174,10 @@ export interface PaddockWire {
   dsePerHa: number;
   /** Days of feed with stock on it, or null with no stock. */
   feedDays: number | null;
-  /** Feed grown on the last day, kg DM/ha. */
+  /** Feed grown on the last day, kg DM/ha a day. */
   growKgHaDay: number;
+  /** Why no water matters, as a fact, for a paddock with none. Null with water. */
+  noWaterWhy: string | null;
   /** What the soil carries over the long term, DSE/ha. */
   carryingDsePerHa: number;
   /** A square in the paddock, which the move action names. */
@@ -304,6 +306,10 @@ export interface BuildToolWire {
 export interface BuildWire {
   tools: BuildToolWire[];
   fences: FenceOptionWire[];
+  /** Fence materials on hand, in words ("On hand: 240 m of permanent fence."), or null with none. */
+  onHand: string | null;
+  /** What the card says when none of a line fits today. */
+  noneFits: string;
 }
 
 /** The rule a plan moves by, as the plan form takes it. */
@@ -337,13 +343,8 @@ export interface PlanMobWire {
   waitingText: string | null;
   /** What it will do next, in a sentence. */
   nextText: string;
-  /** The plan's report as the engine gives it, in sentences. */
+  /** The plan's report as the engine gives it, in sentences, with figures rounded. */
   report: string[];
-  /** Moves made, full rounds done, tonnes of feed eaten (DM) and kg gained. */
-  moves: number;
-  rounds: number;
-  eatenT: number;
-  gainKg: number;
 }
 
 export interface PlanLegWire {
@@ -360,7 +361,6 @@ export interface PlanWire {
   id: number;
   name: string;
   legs: PlanLegWire[];
-  steps: number;
   after: 'repeat' | 'stay';
   afterText: string;
   /** True for a plan with one leg, which the form can change. */
@@ -635,6 +635,9 @@ export type SimpleAction =
   | { type: 'placeFenceHub'; vertex: number }
   | { type: 'placeSquareHub'; cell: number }
   | { type: 'removeHub'; vertex: number }
+  | { type: 'moveHub'; from: number; to: number }
+  | { type: 'removeSquareHub'; cell: number }
+  | { type: 'moveSquareHub'; from: number; to: number }
   | { type: 'placePortable'; cell: number }
   | { type: 'movePortable'; port: number; cell: number }
   | { type: 'removePortable'; port: number }

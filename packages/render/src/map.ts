@@ -241,7 +241,7 @@ export interface FarmMap {
   setWeather(weather: MapWeather): void;
   /** Outline a paddock, or null to clear it. */
   setHighlight(paddock: number | null): void;
-  /** Outline the paddocks a tool can pick (light), and mark those with no water (red). Null clears it. */
+  /** Outline the paddocks a tool can pick (light), and mark those with no water (purple, as the water layer). Null clears it. */
   setPickable(paddocks: readonly PickablePaddock[] | null): void;
   /**
    * What the pointer does: Look, or one of the build tools (see `MapTool`).
@@ -1138,7 +1138,7 @@ class PixiFarmMap implements FarmMap {
         continue;
       }
       things.addChild(this.sprite('trough.portable', x, y));
-      // The level bar: green over half, gold over a quarter, red below.
+      // The level bar: green over half, gold over a quarter, orange below.
       const f = Math.max(0, Math.min(1, t.levelPct / 100));
       const bar = new Graphics()
         .roundRect(x - 0.3, y - 0.68, 0.6, 0.1, 0.03)
@@ -1350,7 +1350,7 @@ class PixiFarmMap implements FarmMap {
       }
       g.stroke({ color: colour, width: width * px, alpha, cap: 'round' });
     };
-    // Paddocks a tool can pick: a light tint and outline, and red where stock would have no water.
+    // Paddocks a tool can pick: a light tint and outline, and the no-water colour where stock would have none.
     const tint = (paddock: number, colour: number, alpha: number): void => {
       const own = view.squares.paddock;
       for (let i = 0; i < own.length; i++) {
@@ -1904,14 +1904,17 @@ class PixiFarmMap implements FarmMap {
         }
       }
     };
+    // Red is only for what does not fit today. Taking something away is lilac round white.
+    const styleColour = (style: 'ok' | 'late' | 'remove'): number =>
+      style === 'ok' ? own : style === 'late' ? N.notToday : N.removeMark;
     for (const style of ['ok', 'late', 'remove'] as const) {
       const edges = d.segments.filter((s) => s.style === style).map((s) => s.edge);
       if (!edges.length) continue;
-      const colour = style === 'ok' ? own : N.fenceDown;
+      const colour = styleColour(style);
       const dashed = style === 'ok' && d.kind === 'tape';
       if (style === 'remove') {
         trace(edges, false);
-        g.stroke({ color: N.fenceDown, width: 11 * u, alpha: 0.45, cap: 'round' });
+        g.stroke({ color: N.removeMark, width: 11 * u, alpha: 0.45, cap: 'round' });
       }
       trace(edges, dashed);
       g.stroke({ color: N.fenceCasing, width: 7 * u, alpha: 0.9, cap: 'round' });
@@ -1922,7 +1925,7 @@ class PixiFarmMap implements FarmMap {
     for (const style of ['ok', 'late', 'remove'] as const) {
       const list = d.squares.filter((s) => s.style === style);
       if (!list.length) continue;
-      const colour = style === 'ok' ? own : N.fenceDown;
+      const colour = styleColour(style);
       for (const s of list) g.rect(colOf(s.cell), rowOf(s.cell) * K, 1, K);
       g.fill({ color: colour, alpha: 0.3 });
     }
@@ -1944,7 +1947,7 @@ class PixiFarmMap implements FarmMap {
         }
       }
       if (!ring.length) continue;
-      const colour = style === 'ok' ? own : N.fenceDown;
+      const colour = styleColour(style);
       const body = (): void => {
         for (const [a, b] of links) {
           g.moveTo(colOf(a) + 0.5, (rowOf(a) + 0.5) * K).lineTo(

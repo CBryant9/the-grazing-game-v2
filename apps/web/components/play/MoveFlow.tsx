@@ -142,7 +142,7 @@ export function MoveFlow({ snapshot }: { snapshot: Snapshot }) {
         <p>Tap a paddock on the map, or pick one from the list.</p>
         <p className={styles.legend}>
           <span className={styles.keylight} aria-hidden="true" /> Paddocks you can pick.{' '}
-          <span className={styles.keydry} aria-hidden="true" /> Red: no water.
+          <span className={styles.keydry} aria-hidden="true" /> Purple: no water.
         </p>
         <PartPicker mob={mob} />
         {move.message && (

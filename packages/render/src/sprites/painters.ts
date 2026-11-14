@@ -616,7 +616,7 @@ function gatePanel(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, ope
   }
 }
 
-/** Green when open, red when shut. Drawn large so it still reads zoomed out. */
+/** Green when open, slate when shut (red means only "does not fit today"). Drawn large so it still reads zoomed out. */
 function gateFlag(ctx: Ctx, x: number, y: number, open: boolean): void {
   ctx.fillStyle = css(open ? N.gateOpen : N.gateShut);
   ctx.strokeStyle = css(N.cattleOutline);

@@ -112,6 +112,7 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
             <p className="muted">
               {tool === 'fence' && fence ? `${fence.name}: ${fence.text}` : info.price}
             </p>
+            {tool === 'fence' && build.onHand && <p className="muted">{build.onHand}</p>}
           </>
         ) : (
           <p className="muted">Look: drag to move the map. Tap a paddock to open it.</p>

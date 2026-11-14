@@ -38,12 +38,12 @@ export interface MapLayerInfo {
 export const MAP_LAYER_INFO: Record<MapLayerId, MapLayerInfo> = {
   waterReach: {
     name: 'Water reach',
-    shows: 'How far each square is from water. Red has no water.',
+    shows: 'How far each square is from water. Purple has no water.',
     drawn: true,
   },
   quality: {
     name: 'Pasture quality',
-    shows: 'Feed quality by energy, from red (ME 6.5) to green (ME 9.8).',
+    shows: 'Feed quality by energy, from purple (ME 6.5) to green (ME 9.8).',
     drawn: true,
   },
   grazed: {

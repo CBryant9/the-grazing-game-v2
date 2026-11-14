@@ -272,6 +272,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
                 edgeDistPx: e.edgeDistPx,
                 corner: e.corner,
                 hub: e.hub,
+                squareHub: e.squareHub,
               })
             }
             onFenceTap={(e) => void startFix(e.edge)}
