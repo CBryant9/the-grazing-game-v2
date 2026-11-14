@@ -187,7 +187,11 @@ export async function runSender(
       } catch (e) {
         // One failing row never blocks the others. It tries again later, up to the limit.
         logFailure({ route: 'notify-send', reason: 'send_row_failed' }, e);
-        outcome = { state: 'retry', afterSec: BACKOFF_SEC[Math.min(row.attempts, 4) - 1] ?? 7200, reason: 'send_error' };
+        outcome = {
+          state: 'retry',
+          afterSec: BACKOFF_SEC[Math.min(row.attempts, 4) - 1] ?? 7200,
+          reason: 'send_error',
+        };
       }
       await record(nd, row, outcome, report);
     }
@@ -250,7 +254,10 @@ async function record(
         );
         break;
     }
-    if (row.channel === 'push' && (o.state === 'sent' || o.state === 'failed' || o.state === 'dropped')) {
+    if (
+      row.channel === 'push' &&
+      (o.state === 'sent' || o.state === 'failed' || o.state === 'dropped')
+    ) {
       await settleEmail(tx, row, o, now);
     }
   });
@@ -271,7 +278,10 @@ async function settleEmail(tx: SqlRunner, row: Claimed, o: Outcome, now: number)
   if (!fallback) {
     await tx.query(
       `update public.notification_sends set state = 'dropped', reason = $2 where id = $1`,
-      [waiting.rows[0].id, o.state === 'sent' ? 'push_sent' : o.state === 'dropped' ? o.reason : 'push_sent'],
+      [
+        waiting.rows[0].id,
+        o.state === 'sent' ? 'push_sent' : o.state === 'dropped' ? o.reason : 'push_sent',
+      ],
     );
     return;
   }
@@ -296,7 +306,12 @@ async function settleEmail(tx: SqlRunner, row: Claimed, o: Outcome, now: number)
   );
   await tx.query(
     `update public.notification_sends set state = $2, not_before = $3, reason = $4 where id = $1`,
-    [waiting.rows[0].id, when.state, new Date(when.notBefore).toISOString(), when.reason ?? 'push_failed'],
+    [
+      waiting.rows[0].id,
+      when.state,
+      new Date(when.notBefore).toISOString(),
+      when.reason ?? 'push_failed',
+    ],
   );
 }
 
@@ -340,9 +355,7 @@ async function processRow(
   );
   if (Number(cap.rows[0]!.n) >= DAILY_CAP) return { state: 'dropped', reason: 'daily_cap' };
 
-  return row.channel === 'push'
-    ? sendPush(nd, row, c, hosts, report)
-    : sendEmail(nd, row, c);
+  return row.channel === 'push' ? sendPush(nd, row, c, hosts, report) : sendEmail(nd, row, c);
 }
 
 async function sendPush(

@@ -21,7 +21,12 @@ import {
 } from '../test-support/notifyWorld';
 import { setNotifyIntegrations } from './deps';
 import { queueEvent, queueNotification } from './queue';
-import { runReminders, type DailyFarmReader, type ReminderFarm, sqlDailyFarmReader } from './reminders';
+import {
+  runReminders,
+  type DailyFarmReader,
+  type ReminderFarm,
+  sqlDailyFarmReader,
+} from './reminders';
 import { DAILY_CAP, MAX_ATTEMPTS, hostAllowed, runSender } from './sender';
 import { addDevice, parseDevice } from './store';
 
@@ -114,8 +119,12 @@ describe('the types, each on and off', () => {
   it('is made once for the same dedupe key', async () => {
     const p = await addPerson(w, 'ann');
     await addDeviceFor(w, p.id);
-    expect((await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'rain:1' })).status).toBe('queued');
-    expect(await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'rain:1' })).toEqual({ status: 'duplicate' });
+    expect(
+      (await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'rain:1' })).status,
+    ).toBe('queued');
+    expect(
+      await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'rain:1' }),
+    ).toEqual({ status: 'duplicate' });
     expect((await db.query('select 1 from public.notifications')).rows).toHaveLength(1);
   });
 });
@@ -123,19 +132,41 @@ describe('the types, each on and off', () => {
 describe('what may be queued', () => {
   it('refuses a link that is not a path on this site', async () => {
     const p = await addPerson(w, 'ann');
-    for (const link of ['//evil.test', 'https://evil.test', '/\\evil.test', '/ x', '/a\tb', 'javascript:alert(1)', '/' + 'x'.repeat(400)]) {
-      expect(await alert(p.id, 'Fact.', { link }), link).toEqual({ status: 'skipped', reason: 'invalid_link' });
+    for (const link of [
+      '//evil.test',
+      'https://evil.test',
+      '/\\evil.test',
+      '/ x',
+      '/a\tb',
+      'javascript:alert(1)',
+      '/' + 'x'.repeat(400),
+    ]) {
+      expect(await alert(p.id, 'Fact.', { link }), link).toEqual({
+        status: 'skipped',
+        reason: 'invalid_link',
+      });
     }
     expect((await alert(p.id, 'Fact.', { link: '/account/notifications' })).status).toBe('queued');
   });
 
   it('refuses wording that nags, a bad kind, empty or long text', async () => {
     const p = await addPerson(w, 'ann');
-    for (const title of ["Don't forget your cattle!", 'Day 5 streak', 'Great job today', 'Only 2 hours left']) {
-      expect(await alert(p.id, title), title).toEqual({ status: 'skipped', reason: 'invalid_wording' });
+    for (const title of [
+      "Don't forget your cattle!",
+      'Day 5 streak',
+      'Great job today',
+      'Only 2 hours left',
+    ]) {
+      expect(await alert(p.id, title), title).toEqual({
+        status: 'skipped',
+        reason: 'invalid_wording',
+      });
     }
     expect(await alert(p.id, '')).toEqual({ status: 'skipped', reason: 'invalid_text' });
-    expect(await alert(p.id, 'x'.repeat(121))).toEqual({ status: 'skipped', reason: 'invalid_text' });
+    expect(await alert(p.id, 'x'.repeat(121))).toEqual({
+      status: 'skipped',
+      reason: 'invalid_text',
+    });
     expect(
       await queueNotification(w.nd, { userId: p.id, kind: 'bogus' as NotifyKind, title: 'x' }),
     ).toEqual({ status: 'skipped', reason: 'invalid_kind' });
@@ -166,7 +197,10 @@ describe('what may be queued', () => {
     expect(
       await queueEvent(w.nd, kid.id, { type: 'challenge_started', challenge: 'Spring challenge' }),
     ).toMatchObject({ status: 'queued' });
-    const inbox = await db.query('select 1 from public.notifications where user_id = $1 and kind = $2', [kid.id, 'social']);
+    const inbox = await db.query(
+      'select 1 from public.notifications where user_id = $1 and kind = $2',
+      [kid.id, 'social'],
+    );
     expect(inbox.rows).toHaveLength(0);
   });
 
@@ -189,13 +223,20 @@ describe('quiet hours', () => {
     expect(row.reason).toBe('quiet_hours');
     expect(iso(row.not_before!)).toBe('2026-11-17T19:00:00.000Z'); // 06:00 on the 18th
     // A reminder is no use later: dropped, and it leaves no inbox row.
-    const r = await queueEvent(w.nd, p.id, { type: 'morning_reminder', farm: 'Kooringa', toCheck: 3 }, { dedupeKey: 'm1' });
+    const r = await queueEvent(
+      w.nd,
+      p.id,
+      { type: 'morning_reminder', farm: 'Kooringa', toCheck: 3 },
+      { dedupeKey: 'm1' },
+    );
     expect(r).toMatchObject({ status: 'queued', push: 'dropped' });
     const shown = await db.query('select kind from public.notifications where show_in_inbox');
     expect(shown.rows.map((x) => (x as { kind: string }).kind)).toEqual(['farm_alert']);
     // Outside the hours, pending as normal.
     w.clock.t = NOON;
-    expect(await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'x' })).toMatchObject({ push: 'pending' });
+    expect(
+      await alert(p.id, 'Rain overnight at Wattle Flat: 12 mm.', { dedupeKey: 'x' }),
+    ).toMatchObject({ push: 'pending' });
   });
 
   it('are worked out in the farm time zone when a farm is named', async () => {
@@ -208,7 +249,10 @@ describe('quiet hours', () => {
     // A farm that is not theirs is refused.
     const other = await addPerson(w, 'bob');
     const theirs = await addFarm(w, other.id);
-    expect(await alert(p.id, 'Fact C.', { farmId: theirs })).toEqual({ status: 'skipped', reason: 'invalid_farm' });
+    expect(await alert(p.id, 'Fact C.', { farmId: theirs })).toEqual({
+      status: 'skipped',
+      reason: 'invalid_farm',
+    });
   });
 
   it('keep the clock across the start and end of daylight saving', async () => {
@@ -268,7 +312,9 @@ describe('email as the fallback', () => {
     expect(m.to).toBe(p.email);
     expect(m.subject).toBe('Trough low in Home paddock at Kooringa.');
     expect(m.from).toBe(w.integ.from);
-    expect(m.headers['List-Unsubscribe']).toMatch(/^<https:\/\/game\.example\.test\/api\/notify\/u\?t=[A-Za-z0-9_-]+>$/);
+    expect(m.headers['List-Unsubscribe']).toMatch(
+      /^<https:\/\/game\.example\.test\/api\/notify\/u\?t=[A-Za-z0-9_-]+>$/,
+    );
     expect(m.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
     expect(m.idempotencyKey).toMatch(/^[0-9a-f]{64}$/);
     expect(m.text).toContain('https://game.example.test/play');
@@ -327,7 +373,11 @@ describe('sending', () => {
     expect(rep).toMatchObject({ claimed: 1, sent: 1, failed: 0 });
     expect(w.push.sent.map((s) => s.endpoint).sort()).toEqual([e1, e2].sort());
     const m = w.push.sent[0]!;
-    expect(m.message).toMatchObject({ title: 'Rain overnight at Wattle Flat: 12 mm.', link: '/play', body: null });
+    expect(m.message).toMatchObject({
+      title: 'Rain overnight at Wattle Flat: 12 mm.',
+      link: '/play',
+      body: null,
+    });
     expect(m.options.topic).toHaveLength(32);
     await runSender(w.nd);
     expect(w.push.sent).toHaveLength(2);
@@ -368,7 +418,12 @@ describe('sending', () => {
     const e = await addDeviceFor(w, p.id);
     w.push.plan.set(
       e,
-      Array.from({ length: 10 }, () => ({ ok: false as const, gone: false, retry: true, reason: 'push_network' })),
+      Array.from({ length: 10 }, () => ({
+        ok: false as const,
+        gone: false,
+        retry: true,
+        reason: 'push_network',
+      })),
     );
     await alert(p.id);
     // Each step is past the longest backoff (2 hours), and the whole is inside the 12 hours a notification stays worth sending.
@@ -377,7 +432,11 @@ describe('sending', () => {
       await runSender(w.nd);
     }
     await runSender(w.nd);
-    expect((await sends(w, p.id))[0]).toMatchObject({ state: 'failed', reason: 'retries_exhausted', attempts: MAX_ATTEMPTS });
+    expect((await sends(w, p.id))[0]).toMatchObject({
+      state: 'failed',
+      reason: 'retries_exhausted',
+      attempts: MAX_ATTEMPTS,
+    });
     expect(w.push.attempts).toHaveLength(MAX_ATTEMPTS);
   });
 
@@ -389,7 +448,9 @@ describe('sending', () => {
     await alert(p.id);
     const rep = await runSender(w.nd);
     expect(rep).toMatchObject({ sent: 1, devicesRemoved: 1 });
-    const left = await db.query<{ endpoint: string }>('select endpoint from public.push_subscriptions');
+    const left = await db.query<{ endpoint: string }>(
+      'select endpoint from public.push_subscriptions',
+    );
     expect(left.rows.map((r) => r.endpoint)).toEqual([good]);
   });
 
@@ -435,12 +496,15 @@ describe('sending', () => {
   it('caps what reaches a phone at six a day for one account, and the inbox keeps them all', async () => {
     const p = await addPerson(w, 'ann');
     await addDeviceFor(w, p.id);
-    for (let i = 0; i < DAILY_CAP + 3; i++) await alert(p.id, `Fact number ${i}.`, { dedupeKey: `k${i}` });
+    for (let i = 0; i < DAILY_CAP + 3; i++)
+      await alert(p.id, `Fact number ${i}.`, { dedupeKey: `k${i}` });
     const rep = await runSender(w.nd);
     expect(rep).toMatchObject({ sent: DAILY_CAP, dropped: 3 });
     const rows = await sends(w, p.id);
     expect(rows.filter((r) => r.reason === 'daily_cap')).toHaveLength(3);
-    expect((await db.query('select 1 from public.notifications where show_in_inbox')).rows).toHaveLength(DAILY_CAP + 3);
+    expect(
+      (await db.query('select 1 from public.notifications where show_in_inbox')).rows,
+    ).toHaveLength(DAILY_CAP + 3);
     // A day later the allowance is back.
     w.clock.t += 25 * HOUR;
     await alert(p.id, 'Fact tomorrow.', { dedupeKey: 'tomorrow' });
@@ -483,7 +547,10 @@ describe('sending', () => {
       await alert(p.id);
       people.push(p.id);
     }
-    const [r1, r2] = await Promise.all([runSender(w.nd, { batch: 2 }), runSender(w.nd, { batch: 2 })]);
+    const [r1, r2] = await Promise.all([
+      runSender(w.nd, { batch: 2 }),
+      runSender(w.nd, { batch: 2 }),
+    ]);
     expect(r1.sent + r2.sent).toBe(6);
     expect(w.push.sent).toHaveLength(6);
     expect(new Set(w.push.sent.map((s) => s.message.id)).size).toBe(6);
@@ -523,9 +590,13 @@ describe('sending', () => {
     const p = await addPerson(w, 'ann');
     await addDeviceFor(w, p.id);
     await alert(p.id);
-    await db.exec("update public.feature_switches set enabled = false where key = 'push_notifications'");
+    await db.exec(
+      "update public.feature_switches set enabled = false where key = 'push_notifications'",
+    );
     expect((await runSender(w.nd)).skipped).toBe('switch_off');
-    await db.exec("update public.feature_switches set enabled = true where key = 'push_notifications'");
+    await db.exec(
+      "update public.feature_switches set enabled = true where key = 'push_notifications'",
+    );
     await db.exec(
       `insert into public.site_settings (key, value) values ('notify_paused', '{"paused": true}')`,
     );
@@ -571,8 +642,14 @@ describe('the morning reminder and the one later reminder', () => {
     const { p, reader } = await setup();
     expect(await runReminders(w.nd, reader, local(6, 59))).toMatchObject({ morning: 0 });
     expect(await runReminders(w.nd, reader, local(7, 0))).toMatchObject({ morning: 1 });
-    expect(await runReminders(w.nd, reader, local(7, 15))).toMatchObject({ morning: 0, skipped: 1 });
-    const r = await db.query<{ title: string }>('select title from public.notifications where user_id = $1', [p.id]);
+    expect(await runReminders(w.nd, reader, local(7, 15))).toMatchObject({
+      morning: 0,
+      skipped: 1,
+    });
+    const r = await db.query<{ title: string }>(
+      'select title from public.notifications where user_id = $1',
+      [p.id],
+    );
     expect(r.rows.map((x) => x.title)).toEqual(['First light at Kooringa. 3 things to check.']);
   });
 
@@ -603,7 +680,9 @@ describe('the morning reminder and the one later reminder', () => {
     expect(await runReminders(w.nd, reader, local(12, 59))).toMatchObject({ nudge: 0 });
     expect(await runReminders(w.nd, reader, local(13, 0))).toMatchObject({ nudge: 1 });
     expect(await runReminders(w.nd, reader, local(13, 30))).toMatchObject({ nudge: 0 });
-    const t = await db.query<{ title: string }>("select title from public.notifications where kind = 'later_nudge'");
+    const t = await db.query<{ title: string }>(
+      "select title from public.notifications where kind = 'later_nudge'",
+    );
     expect(t.rows[0]!.title).toBe('Kooringa: 3 things to check.');
     await db.exec('truncate public.notifications cascade');
     await setPrefs(w, p.id, 'later_nudge', false);
@@ -612,12 +691,18 @@ describe('the morning reminder and the one later reminder', () => {
 
   it('never makes more than two in a day, never for a missed day, and none when the farm is off the list', async () => {
     const { reader } = await setup();
-    for (let m = 0; m < 24 * 60; m += 15) await runReminders(w.nd, reader, local(0, 0) + m * 60_000);
+    for (let m = 0; m < 24 * 60; m += 15)
+      await runReminders(w.nd, reader, local(0, 0) + m * 60_000);
     const day = await db.query('select kind from public.notifications order by created_at');
-    expect(day.rows.map((r) => (r as { kind: string }).kind).sort()).toEqual(['later_nudge', 'morning_reminder']);
+    expect(day.rows.map((r) => (r as { kind: string }).kind).sort()).toEqual([
+      'later_nudge',
+      'morning_reminder',
+    ]);
     // The player misses three days: nothing is sent for them, and the next morning one reminder only.
     await db.exec('truncate public.notifications cascade');
-    expect(await runReminders(w.nd, reader, local(7, 0) + 3 * 24 * HOUR)).toMatchObject({ morning: 1 });
+    expect(await runReminders(w.nd, reader, local(7, 0) + 3 * 24 * HOUR)).toMatchObject({
+      morning: 1,
+    });
     expect((await db.query('select 1 from public.notifications')).rows).toHaveLength(1);
   });
 
@@ -626,7 +711,9 @@ describe('the morning reminder and the one later reminder', () => {
     await setSettings(w, p.id, { quietStart: '06:00', quietEnd: '08:00' });
     await runReminders(w.nd, reader, local(7, 0));
     expect((await sends(w, p.id))[0]).toMatchObject({ state: 'dropped', reason: 'quiet_hours' });
-    expect((await db.query('select 1 from public.notifications where show_in_inbox')).rows).toHaveLength(0);
+    expect(
+      (await db.query('select 1 from public.notifications where show_in_inbox')).rows,
+    ).toHaveLength(0);
     // Not tried again within the same day.
     await runReminders(w.nd, reader, local(7, 30));
     expect((await db.query('select 1 from public.notifications')).rows).toHaveLength(1);
@@ -641,7 +728,9 @@ describe('the morning reminder and the one later reminder', () => {
     expect(found[0]!.userId).toBe(p.id);
     expect(found[0]!.toCheck).toBeNull();
     // With no count the line is still a fact.
-    expect(await runReminders(w.nd, sqlDailyFarmReader(w.deps.sql), local(7, 0))).toMatchObject({ morning: 1 });
+    expect(await runReminders(w.nd, sqlDailyFarmReader(w.deps.sql), local(7, 0))).toMatchObject({
+      morning: 1,
+    });
     const t = await db.query<{ title: string }>('select title from public.notifications');
     expect(t.rows[0]!.title).toBe('First light at Kooringa.');
   });
@@ -650,7 +739,11 @@ describe('the morning reminder and the one later reminder', () => {
 describe('a device', () => {
   it('is checked: keys must be the right size, and the host must be on the database list', async () => {
     const p = await addPerson(w, 'ann');
-    const ok = parseDevice({ endpoint: 'https://web.push.apple.com/x', keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH }, device: 'iPhone Safari' });
+    const ok = parseDevice({
+      endpoint: 'https://web.push.apple.com/x',
+      keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH },
+      device: 'iPhone Safari',
+    });
     expect((await addDevice(w.deps.sql, p.id, ok)).ref).toMatch(/^[0-9a-f]{12}$/);
     for (const bad of [
       { endpoint: 'http://web.push.apple.com/x', keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH } },
@@ -660,7 +753,10 @@ describe('a device', () => {
     ]) {
       expect(() => parseDevice(bad as Record<string, unknown>)).toThrow();
     }
-    const refused = parseDevice({ endpoint: 'https://push.example.org/x', keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH } });
+    const refused = parseDevice({
+      endpoint: 'https://push.example.org/x',
+      keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH },
+    });
     await expect(addDevice(w.deps.sql, p.id, refused)).rejects.toMatchObject({
       message: "Notifications aren't available in this browser yet.",
       code: 'push_host_not_allowed',
@@ -670,16 +766,33 @@ describe('a device', () => {
   it('takes the Chrome and Edge hosts, and a device moves to the account that signs in on it', async () => {
     const a = await addPerson(w, 'ann');
     const b = await addPerson(w, 'bob');
-    for (const host of ['fcm.googleapis.com', 'wns2-par02p.notify.windows.com', 'updates.push.services.mozilla.com']) {
+    for (const host of [
+      'fcm.googleapis.com',
+      'wns2-par02p.notify.windows.com',
+      'updates.push.services.mozilla.com',
+    ]) {
       await addDeviceFor(w, a.id, host);
     }
-    const shared = parseDevice({ endpoint: 'https://web.push.apple.com/shared', keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH } });
+    const shared = parseDevice({
+      endpoint: 'https://web.push.apple.com/shared',
+      keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH },
+    });
     await addDevice(w.deps.sql, a.id, shared);
     await addDevice(w.deps.sql, b.id, shared);
-    const owner = await db.query<{ user_id: string }>("select user_id from public.push_subscriptions where endpoint = 'https://web.push.apple.com/shared'");
+    const owner = await db.query<{ user_id: string }>(
+      "select user_id from public.push_subscriptions where endpoint = 'https://web.push.apple.com/shared'",
+    );
     expect(owner.rows).toEqual([{ user_id: b.id }]);
-    for (const evil of ['https://notify.windows.com.evil.org/x', 'https://evilnotify.windows.com.org/x', 'https://fcm.googleapis.com.evil.org/x', 'https://android.googleapis.com/x']) {
-      await expect(addDevice(w.deps.sql, a.id, { ...shared, endpoint: evil }), evil).rejects.toBeTruthy();
+    for (const evil of [
+      'https://notify.windows.com.evil.org/x',
+      'https://evilnotify.windows.com.org/x',
+      'https://fcm.googleapis.com.evil.org/x',
+      'https://android.googleapis.com/x',
+    ]) {
+      await expect(
+        addDevice(w.deps.sql, a.id, { ...shared, endpoint: evil }),
+        evil,
+      ).rejects.toBeTruthy();
     }
   });
 

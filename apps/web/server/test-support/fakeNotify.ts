@@ -42,5 +42,7 @@ export class FakeMail implements MailSender {
 }
 
 /** A valid-looking browser key pair for a saved device. */
-export const FAKE_P256DH = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString('base64url');
+export const FAKE_P256DH = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString(
+  'base64url',
+);
 export const FAKE_AUTH = Buffer.alloc(16, 9).toString('base64url');

@@ -1,7 +1,22 @@
-import { createPublicKey, generateKeyPairSync, verify, createDecipheriv, hkdfSync, diffieHellman, createPrivateKey } from 'node:crypto';
+import {
+  createPublicKey,
+  generateKeyPairSync,
+  verify,
+  createDecipheriv,
+  hkdfSync,
+  diffieHellman,
+  createPrivateKey,
+} from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { classify, encryptPayload, vapidAuthorization, vapidPushSender, vapidUsable, payloadText } from './webpush';
+import {
+  classify,
+  encryptPayload,
+  vapidAuthorization,
+  vapidPushSender,
+  vapidUsable,
+  payloadText,
+} from './webpush';
 import { integrationsFromEnv } from './deps';
 
 const b = (s: string): Buffer => Buffer.from(s, 'base64url');
@@ -12,12 +27,16 @@ describe('web push encryption (RFC 8291)', () => {
     const body = encryptPayload(
       b('V2hlbiBJIGdyb3cgdXAsIEkgd2FudCB0byBiZSBhIHdhdGVybWVsb24'),
       {
-        p256dh: b('BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4'),
+        p256dh: b(
+          'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
+        ),
         authSecret: b('BTBZMqHH6r4Tts7J_aSIgg'),
       },
       {
         privateKey: b('yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw'),
-        publicKey: b('BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8'),
+        publicKey: b(
+          'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8',
+        ),
         salt: b('DGv6ra1nlYgDCS1FRnbzlw'),
       },
     );
@@ -39,11 +58,31 @@ describe('web push encryption (RFC 8291)', () => {
     const idlen = body[20]!;
     const asPublic = body.subarray(21, 21 + idlen);
     const cipher = body.subarray(21 + idlen);
-    const asJwk = { kty: 'EC', crv: 'P-256', x: asPublic.subarray(1, 33).toString('base64url'), y: asPublic.subarray(33).toString('base64url') };
-    const secret = diffieHellman({ privateKey: ua.privateKey, publicKey: createPublicKey({ key: asJwk, format: 'jwk' }) });
-    const ikm = Buffer.from(hkdfSync('sha256', secret, authSecret, Buffer.concat([Buffer.from('WebPush: info\0'), uaPublic, asPublic]), 32));
-    const cek = Buffer.from(hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16));
-    const nonce = Buffer.from(hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+    const asJwk = {
+      kty: 'EC',
+      crv: 'P-256',
+      x: asPublic.subarray(1, 33).toString('base64url'),
+      y: asPublic.subarray(33).toString('base64url'),
+    };
+    const secret = diffieHellman({
+      privateKey: ua.privateKey,
+      publicKey: createPublicKey({ key: asJwk, format: 'jwk' }),
+    });
+    const ikm = Buffer.from(
+      hkdfSync(
+        'sha256',
+        secret,
+        authSecret,
+        Buffer.concat([Buffer.from('WebPush: info\0'), uaPublic, asPublic]),
+        32,
+      ),
+    );
+    const cek = Buffer.from(
+      hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16),
+    );
+    const nonce = Buffer.from(
+      hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12),
+    );
     const d = createDecipheriv('aes-128-gcm', cek, nonce);
     d.setAuthTag(cipher.subarray(cipher.length - 16));
     const plain = Buffer.concat([d.update(cipher.subarray(0, cipher.length - 16)), d.final()]);
@@ -84,7 +123,12 @@ describe('VAPID (RFC 8292)', () => {
     expect(claims.exp - Date.UTC(2026, 10, 17) / 1000).toBeLessThanOrEqual(24 * 3600);
     expect(JSON.parse(b(m[1]!).toString())).toEqual({ typ: 'JWT', alg: 'ES256' });
     expect(
-      verify('sha256', Buffer.from(`${m[1]}.${m[2]}`), { key: k.pair.publicKey, dsaEncoding: 'ieee-p1363' }, b(m[3]!)),
+      verify(
+        'sha256',
+        Buffer.from(`${m[1]}.${m[2]}`),
+        { key: k.pair.publicKey, dsaEncoding: 'ieee-p1363' },
+        b(m[3]!),
+      ),
     ).toBe(true);
     expect(vapidUsable(k)).toBe(true);
     expect(vapidUsable({ publicKey: 'x', privateKey: 'y' })).toBe(false);
@@ -110,7 +154,13 @@ describe('VAPID (RFC 8292)', () => {
     expect(i.push).not.toBeNull();
     expect(i.vapidPublicKey).toBe(pub);
     expect(integrationsFromEnv({}).push).toBeNull();
-    expect(integrationsFromEnv({ VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: 'bad', GG_SITE_URL: 'https://x.test' }).push).toBeNull();
+    expect(
+      integrationsFromEnv({
+        VAPID_PUBLIC_KEY: pub,
+        VAPID_PRIVATE_KEY: 'bad',
+        GG_SITE_URL: 'https://x.test',
+      }).push,
+    ).toBeNull();
   });
 });
 
@@ -123,7 +173,12 @@ describe('the real sender', () => {
     p256dh: Buffer.concat([Buffer.from([4]), b(j.x!), b(j.y!)]).toString('base64url'),
     authSecret: Buffer.alloc(16, 5).toString('base64url'),
   };
-  const message = { id: 'a1b2c3d4-0000-4000-8000-000000000001', title: 'Hello', body: null, link: '/play' };
+  const message = {
+    id: 'a1b2c3d4-0000-4000-8000-000000000001',
+    title: 'Hello',
+    body: null,
+    link: '/play',
+  };
 
   it('posts an encrypted body with the headers a push service expects, and follows no redirect', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
@@ -132,7 +187,9 @@ describe('the real sender', () => {
       return new Response(null, { status: 201 });
     }) as unknown as typeof fetch;
     const sender = vapidPushSender({ ...k, subject: 'https://game.example.test' }, fake);
-    expect(await sender.send(target, message, { ttlSec: 3600, topic: 'abc' })).toEqual({ ok: true });
+    expect(await sender.send(target, message, { ttlSec: 3600, topic: 'abc' })).toEqual({
+      ok: true,
+    });
     const h = calls[0]!.init.headers as Record<string, string>;
     expect(calls[0]!.url).toBe(target.endpoint);
     expect(h['Content-Encoding']).toBe('aes128gcm');
@@ -141,7 +198,12 @@ describe('the real sender', () => {
     expect(h.Authorization).toMatch(/^vapid t=.+, k=/);
     expect(calls[0]!.init.redirect).toBe('error');
     // The message carries the fact line, a same-site link and an id, and nothing else.
-    expect(JSON.parse(payloadText(message))).toEqual({ id: message.id, title: 'Hello', body: null, link: '/play' });
+    expect(JSON.parse(payloadText(message))).toEqual({
+      id: message.id,
+      title: 'Hello',
+      body: null,
+      link: '/play',
+    });
   });
 
   it('reads the push service answers', async () => {
@@ -150,14 +212,27 @@ describe('the real sender', () => {
     expect(classify(404, null)).toMatchObject({ gone: true });
     expect(classify(429, '30')).toMatchObject({ retry: true, retryAfterSec: 30 });
     expect(classify(503, null)).toMatchObject({ retry: true });
-    expect(classify(401, null)).toMatchObject({ retry: false, gone: false, reason: 'push_auth_rejected' });
+    expect(classify(401, null)).toMatchObject({
+      retry: false,
+      gone: false,
+      reason: 'push_auth_rejected',
+    });
     expect(classify(413, null)).toMatchObject({ reason: 'push_too_large' });
     const down = (async () => {
       throw new Error('network');
     }) as unknown as typeof fetch;
-    expect(await vapidPushSender({ ...k, subject: 'https://x.test' }, down).send(target, message, { ttlSec: 1, topic: 't' })).toMatchObject({ retry: true });
+    expect(
+      await vapidPushSender({ ...k, subject: 'https://x.test' }, down).send(target, message, {
+        ttlSec: 1,
+        topic: 't',
+      }),
+    ).toMatchObject({ retry: true });
     // Keys that do not decode mean this device can never be reached.
-    const bad = await vapidPushSender({ ...k, subject: 'https://x.test' }, down).send({ ...target, p256dh: 'AAAA' }, message, { ttlSec: 1, topic: 't' });
+    const bad = await vapidPushSender({ ...k, subject: 'https://x.test' }, down).send(
+      { ...target, p256dh: 'AAAA' },
+      message,
+      { ttlSec: 1, topic: 't' },
+    );
     expect(bad).toMatchObject({ gone: true });
     void createPrivateKey;
   });

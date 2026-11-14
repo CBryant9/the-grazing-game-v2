@@ -20,17 +20,13 @@ export interface MailMessage {
 }
 
 export type MailResult =
-  | { ok: true }
-  | { ok: false; retry: boolean; retryAfterSec?: number; reason: string };
+  { ok: true } | { ok: false; retry: boolean; retryAfterSec?: number; reason: string };
 
 export interface MailSender {
   send(message: MailMessage): Promise<MailResult>;
 }
 
-export function resendMail(
-  apiKey: string,
-  fetchFn: typeof fetch = fetch,
-): MailSender {
+export function resendMail(apiKey: string, fetchFn: typeof fetch = fetch): MailSender {
   return {
     async send(m) {
       const abort = new AbortController();

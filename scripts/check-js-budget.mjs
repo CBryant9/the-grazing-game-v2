@@ -63,6 +63,8 @@ const PAGES = [
     ['/sign-in/check-email', 'sign-in/check-email.html'],
     ['/sign-up/finish', 'sign-up/finish.html'],
     ['/account', 'account.html'],
+    // Notifications (milestone 3.4): its own line, so a page that grows is seen on its own.
+    ['/account/notifications', 'account/notifications.html'],
   ].map(([path, file]) => ({
     path,
     dir: APP,
@@ -132,6 +134,7 @@ for (const page of PAGES) {
 // components it uses). The heaviest admin page is the line. The limit is the measured size with
 // room to spare, never raised to make a change pass.
 const ADMIN_PAGES = [
+  'admin/notifications',
   'admin/switches',
   'admin/settings',
   'admin/users/[id]',

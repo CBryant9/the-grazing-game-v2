@@ -15,7 +15,10 @@ describe('the unsubscribe token', () => {
   });
 
   it('expires', () => {
-    expect(readUnsubToken(SECRET, token, NOW + TOKEN_TTL_MS)).toEqual({ ok: false, reason: 'expired' });
+    expect(readUnsubToken(SECRET, token, NOW + TOKEN_TTL_MS)).toEqual({
+      ok: false,
+      reason: 'expired',
+    });
   });
 
   it('reveals nothing: the account and the type are not in it, even when decoded', () => {
@@ -25,7 +28,9 @@ describe('the unsubscribe token', () => {
     expect(raw).not.toContain(USER);
     expect(raw).not.toContain('farm_alert');
     // And two tokens for the same thing differ.
-    expect(makeUnsubToken(SECRET, { userId: USER, kind: 'farm_alert', issuedAt: NOW })).not.toBe(token);
+    expect(makeUnsubToken(SECRET, { userId: USER, kind: 'farm_alert', issuedAt: NOW })).not.toBe(
+      token,
+    );
   });
 
   it('fails when changed anywhere, cut short, from another secret, or not a token at all', () => {

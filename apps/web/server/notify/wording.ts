@@ -45,8 +45,10 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 
 /** Text that came from a player (a farm name, a username): one line, no control characters, cut to length. */
 export function plain(text: string, max = 60): string {
-  // eslint-disable-next-line no-control-regex
-  const t = text.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const t = text
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}.` : t;
 }
 
@@ -144,7 +146,12 @@ export function describeEvent(e: NotifyEvent): Described {
   }
 }
 
-const alert = (title: string): Described => ({ kind: 'farm_alert', title, body: null, link: '/play' });
+const alert = (title: string): Described => ({
+  kind: 'farm_alert',
+  title,
+  body: null,
+  link: '/play',
+});
 const social = (title: string): Described => ({ kind: 'social', title, body: null, link: '/play' });
 const challenge = (title: string): Described => ({
   kind: 'challenge',

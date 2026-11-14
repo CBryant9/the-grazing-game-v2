@@ -40,7 +40,12 @@ export function notifyRoute(
   handler: (c: NotifyContext) => Promise<unknown>,
 ): (req: Request) => Promise<Response> {
   return authRoute(
-    { name: `notify-${options.name}`, max: options.max, write: options.write ?? false, by: 'session' },
+    {
+      name: `notify-${options.name}`,
+      max: options.max,
+      write: options.write ?? false,
+      by: 'session',
+    },
     async (ctx) => {
       const { deps, user } = await requireUser(ctx);
       let body: Record<string, unknown> = {};

@@ -49,7 +49,9 @@ export function setNotifyIntegrations(i: Integrations | undefined): void {
 
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
 
-export function integrationsFromEnv(env: Record<string, string | undefined> = process.env): Integrations {
+export function integrationsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): Integrations {
   const vapidPublic = env.VAPID_PUBLIC_KEY?.trim();
   const vapidPrivate = env.VAPID_PRIVATE_KEY?.trim();
   const site = env.GG_SITE_URL?.trim().replace(/\/+$/, '');

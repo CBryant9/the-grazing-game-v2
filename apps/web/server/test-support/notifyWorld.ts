@@ -191,7 +191,13 @@ export async function setPrefs(
 export async function setSettings(
   w: World,
   userId: string,
-  s: { quietStart?: string | null; quietEnd?: string | null; reminder?: string; later?: boolean; tz?: string },
+  s: {
+    quietStart?: string | null;
+    quietEnd?: string | null;
+    reminder?: string;
+    later?: boolean;
+    tz?: string;
+  },
 ): Promise<void> {
   await w.db.query(
     `insert into public.notification_settings (user_id, reminder_time, later_nudge, quiet_start, quiet_end, timezone)
@@ -213,7 +219,15 @@ export async function sends(
   w: World,
   userId?: string,
 ): Promise<
-  { kind: string; channel: string; state: string; reason: string | null; attempts: number; not_before: number | null; title: string }[]
+  {
+    kind: string;
+    channel: string;
+    state: string;
+    reason: string | null;
+    attempts: number;
+    not_before: number | null;
+    title: string;
+  }[]
 > {
   const r = await w.db.query<{
     kind: string;

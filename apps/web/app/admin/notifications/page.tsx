@@ -26,13 +26,15 @@ export default async function Page() {
         </h2>
         <p className={styles.muted}>
           Web push is {caps.push ? 'set up' : 'not set up (needs the VAPID keys)'}. Email is{' '}
-          {caps.email ? 'set up' : 'not set up (needs the Resend key, the sender address and the token secret)'}
+          {caps.email
+            ? 'set up'
+            : 'not set up (needs the Resend key, the sender address and the token secret)'}
           . The Push notifications feature switch is {caps.switchOn ? 'on' : 'off'}.
         </p>
         <p className={styles.muted}>
           Pausing stops everything that goes to a phone or by email, and stops the reminders being
-          made. Players still see their inbox. What is waiting stays waiting, and anything older than
-          12 hours is dropped when sending starts again.
+          made. Players still see their inbox. What is waiting stays waiting, and anything older
+          than 12 hours is dropped when sending starts again.
         </p>
         <ConfirmAction
           label={o.paused ? 'Resume sending' : 'Pause all sending'}

@@ -41,17 +41,20 @@ function pretend(homeKb: number, playKb: number, missing = false, accountKb = 20
   writeFileSync(join(chunks, 'account.js'), randomBytes(accountKb * 1024));
   mkdirSync(join(app, 'sign-in'), { recursive: true });
   mkdirSync(join(app, 'sign-up'), { recursive: true });
+  mkdirSync(join(app, 'account'), { recursive: true });
   for (const file of [
     'sign-in.html',
     'sign-in/check-email.html',
     'sign-up/finish.html',
     'account.html',
+    'account/notifications.html',
   ]) {
     writeFileSync(join(app, file), page('account'));
   }
   // The admin pages are rendered on demand: their scripts are named in two manifests, not in HTML.
   writeFileSync(join(chunks, 'admin.js'), randomBytes(adminKb * 1024));
   for (const rel of [
+    'admin/notifications',
     'admin/switches',
     'admin/settings',
     'admin/users/[id]',

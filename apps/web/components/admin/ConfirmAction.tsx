@@ -10,10 +10,7 @@ export interface ConfirmActionProps {
   /** What will happen, in plain words, shown before the admin confirms. */
   explain: string;
   endpoint:
-    | '/api/admin/switches'
-    | '/api/admin/settings'
-    | '/api/admin/users'
-    | '/api/admin/notifications';
+    '/api/admin/switches' | '/api/admin/settings' | '/api/admin/users' | '/api/admin/notifications';
   body: Record<string, unknown>;
   danger?: boolean;
   disabled?: boolean;

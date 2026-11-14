@@ -830,3 +830,16 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 ### The farm's standing with workers
 
 All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.
+
+## Web push service hosts (milestone 3.4, read 15 Nov 2026)
+
+A push subscription may only point at a host in `push_service_hosts`. Each row keeps the page it was read from.
+
+| Host | Subdomains | Used by | Source and what it says |
+|---|---|---|---|
+| `push.apple.com` | yes | Safari (Apple) | https://developer.apple.com/documentation/usernotifications/sending-web-push-notifications-in-web-apps-and-browsers (milestone 3.1) |
+| `updates.push.services.mozilla.com` | no | Firefox | https://mozilla-services.github.io/autopush-rs/ (milestone 3.1) |
+| `fcm.googleapis.com` | no | Chrome and Chromium browsers | https://developer.chrome.com/blog/web-push-interop-wins says a successful VAPID subscription in Chrome has an endpoint on this origin. The page also shows an older `android.googleapis.com` example, which is **not** listed |
+| `notify.windows.com` | yes | Edge (Windows Push Notification Services) | https://learn.microsoft.com/en-us/windows/apps/develop/notifications/push-notifications/wns-overview says a service must check that a channel address uses the domain `notify.windows.com`, and that the subdomain is subject to change. Edge's use of the Windows Push Notification Service is from https://learn.microsoft.com/en-us/deployedge/microsoft-edge-browser-policies/forcebuiltinpushmessagingclient . No vendor page read names the exact `wns2-*` addresses Edge gives a website, so the whole domain is allowed. **Confirm with a real Edge subscription before launch** |
+
+Other facts used. The message encryption is RFC 8291 (checked byte for byte against the RFC's own example in the tests). The sender's proof is VAPID, RFC 8292. The one-click unsubscribe mail headers are RFC 8058: `List-Unsubscribe` with one https address and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, on a message signed by DKIM, with a POST that needs no cookie or sign-in. Google's sender rules (https://support.google.com/a/answer/81126) require one-click unsubscribe for marketing and subscribed mail from senders of 5,000 or more messages a day. We send it on every notification email anyway. Resend's send call is https://resend.com/docs/api-reference/emails/send-email (endpoint, bearer key, custom `headers`, and an `Idempotency-Key` kept for 24 hours).

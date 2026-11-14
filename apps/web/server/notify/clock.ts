@@ -118,7 +118,9 @@ export function quietFrom(
 /** Is this minute of the day inside quiet hours? Handles hours that run across midnight. */
 export function inQuiet(minute: number, q: Quiet | null): boolean {
   if (!q) return false;
-  return q.start < q.end ? minute >= q.start && minute < q.end : minute >= q.start || minute < q.end;
+  return q.start < q.end
+    ? minute >= q.start && minute < q.end
+    : minute >= q.start || minute < q.end;
 }
 
 /** The instant quiet hours end, when `at` is inside them. Null when it is not. */

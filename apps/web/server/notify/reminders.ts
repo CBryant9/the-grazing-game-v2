@@ -1,12 +1,6 @@
 import 'server-only';
 import type { SqlRunner } from '../db/sql';
-import {
-  DEFAULT_ZONE,
-  localDate,
-  minutesOfDay,
-  parseClock,
-  safeZone,
-} from './clock';
+import { DEFAULT_ZONE, localDate, minutesOfDay, parseClock, safeZone } from './clock';
 import type { NotifyDeps } from './deps';
 import { queueEvent } from './queue';
 

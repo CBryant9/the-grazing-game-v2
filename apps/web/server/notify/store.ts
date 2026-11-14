@@ -179,7 +179,10 @@ export async function setSettings(
     if (m === null) throw new GameError(400, `${what} must be a time such as 07:00.`);
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   };
-  const reminder = body.reminderTime === undefined ? (c?.reminder_time ?? '07:00') : time(body.reminderTime, 'The reminder time');
+  const reminder =
+    body.reminderTime === undefined
+      ? (c?.reminder_time ?? '07:00')
+      : time(body.reminderTime, 'The reminder time');
   let qs = c?.quiet_start ?? null;
   let qe = c?.quiet_end ?? null;
   if (body.quietStart !== undefined || body.quietEnd !== undefined) {
@@ -249,12 +252,21 @@ export function parseDevice(body: Record<string, unknown>): DeviceInput {
   }
   const p = Buffer.from(p256dh, 'base64url');
   const a = Buffer.from(auth, 'base64url');
-  if (!B64URL.test(p256dh) || !B64URL.test(auth) || p.length !== 65 || p[0] !== 4 || a.length < 16) {
+  if (
+    !B64URL.test(p256dh) ||
+    !B64URL.test(auth) ||
+    p.length !== 65 ||
+    p[0] !== 4 ||
+    a.length < 16
+  ) {
     throw new GameError(400, 'This browser did not send what a device needs.');
   }
   const raw = typeof body.device === 'string' ? body.device : '';
-  // eslint-disable-next-line no-control-regex
-  const label = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 60) || 'A device';
+  const label =
+    raw
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+      .trim()
+      .slice(0, 60) || 'A device';
   return { endpoint, p256dh, auth, label };
 }
 
@@ -288,7 +300,10 @@ export async function addDevice(
   } catch (e) {
     const hint = (e as { hint?: unknown }).hint;
     const message = (e as { message?: unknown }).message;
-    if (hint === 'push_host_not_allowed' || (typeof message === 'string' && message.startsWith('push_host_not_allowed'))) {
+    if (
+      hint === 'push_host_not_allowed' ||
+      (typeof message === 'string' && message.startsWith('push_host_not_allowed'))
+    ) {
       throw new GameError(400, HOST_REFUSED, 'push_host_not_allowed');
     }
     throw e;
@@ -409,7 +424,12 @@ export async function markRead(
     return r.rowCount;
   }
   const ids = body.ids;
-  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 50 || !ids.every((i) => typeof i === 'string' && UUID.test(i))) {
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > 50 ||
+    !ids.every((i) => typeof i === 'string' && UUID.test(i))
+  ) {
     throw new GameError(400, 'Say which messages.');
   }
   const r = await sql.query(
@@ -436,13 +456,18 @@ export async function applyUnsubscribe(
   issuedAt: number,
 ): Promise<UnsubOutcome> {
   const info = KIND_INFO[kind];
-  const r = await sql.query(
-    `insert into public.notification_prefs (user_id, kind, push, email)
-     select $1, $2, $3, false
-      where exists (select 1 from auth.users where id = $1)
-     on conflict (user_id, kind) do update set email = false
-      where notification_prefs.updated_at <= $4::timestamptz and notification_prefs.email`,
-    [userId, kind, info.push, new Date(issuedAt).toISOString()],
-  );
-  return r.rowCount > 0 ? 'done' : 'already';
+  try {
+    const r = await sql.query(
+      `insert into public.notification_prefs (user_id, kind, push, email)
+       values ($1, $2, $3, false)
+       on conflict (user_id, kind) do update set email = false
+        where notification_prefs.updated_at <= $4::timestamptz and notification_prefs.email`,
+      [userId, kind, info.push, new Date(issuedAt).toISOString()],
+    );
+    return r.rowCount > 0 ? 'done' : 'already';
+  } catch (e) {
+    // The account is gone (the foreign key says so): nothing to change.
+    if ((e as { code?: unknown }).code === '23503') return 'already';
+    throw e;
+  }
 }

@@ -34,14 +34,18 @@ export interface UnsubClaims {
 export function makeUnsubToken(secret: string, claims: UnsubClaims, ttlMs = TOKEN_TTL_MS): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key(secret), iv);
-  const plain = JSON.stringify({ u: claims.userId, k: claims.kind, i: claims.issuedAt, e: claims.issuedAt + ttlMs });
+  const plain = JSON.stringify({
+    u: claims.userId,
+    k: claims.kind,
+    i: claims.issuedAt,
+    e: claims.issuedAt + ttlMs,
+  });
   const body = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), body]).toString('base64url');
 }
 
 export type TokenRead =
-  | { ok: true; claims: UnsubClaims }
-  | { ok: false; reason: 'invalid' | 'expired' };
+  { ok: true; claims: UnsubClaims } | { ok: false; reason: 'invalid' | 'expired' };
 
 export function readUnsubToken(secret: string, token: unknown, now: number): TokenRead {
   if (typeof token !== 'string' || token.length < 40 || token.length > 400) {
@@ -52,7 +56,9 @@ export function readUnsubToken(secret: string, token: unknown, now: number): Tok
     if (raw.length < 12 + 16 + 2) return { ok: false, reason: 'invalid' };
     const decipher = createDecipheriv('aes-256-gcm', key(secret), raw.subarray(0, 12));
     decipher.setAuthTag(raw.subarray(12, 28));
-    const plain = Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString('utf8');
+    const plain = Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString(
+      'utf8',
+    );
     const c = JSON.parse(plain) as { u?: unknown; k?: unknown; i?: unknown; e?: unknown };
     if (
       typeof c.u !== 'string' ||

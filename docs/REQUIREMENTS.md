@@ -241,7 +241,7 @@ Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or 
 - [ ] When they come in, a grazing plan card says: "Your grazing plan said today you would move from X to Y. Would you like to do that now?" Yes moves them. Not yet leaves a plan strip along the bottom with a quick Move button, "because they might want to have a look at the pastures first and then decide".
 - [ ] If they move stock and break the plan, they reset it themselves, or pick a template and resume from a step ("this is paddock 3 of the template", then on to 4, 5 and 6).
 - [ ] Several moves a day without staff are played in one sitting, not with several reminders: "less pressure". The card says "this was your plan, do it", and the player watches the day pass from sunrise to sunset, with the cows moving, stopping, then going again. A short run of moves leaves daylight over.
-- [ ] Reminders: one reminder at a time the player picks, then one more later if they haven't played, "so they don't miss a day". Notification settings let them change this.
+- [x] Reminders (built in m3.4, `server/notify/reminders.ts`: one at the chosen time in the farm's zone and one 6 hours later, never after the farm was opened that day): one reminder at a time the player picks, then one more later if they haven't played, "so they don't miss a day". Notification settings let them change this.
 - [ ] Show time changing across the day on the map. "It would be cool to see how we could simulate that change of time across the day."
 
 ### Answers given on the question list (13 Nov 2026)

@@ -124,7 +124,6 @@ export function isSafeLink(v: unknown): v is string {
     typeof v === 'string' &&
     v.length <= 300 &&
     SAFE_LINK.test(v) &&
-    // eslint-disable-next-line no-control-regex
     !/[\u0000-\u001f\u007f\s]/.test(v)
   );
 }

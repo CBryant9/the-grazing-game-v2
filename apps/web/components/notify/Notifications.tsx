@@ -1,23 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import accountStyles from '@/components/account/account.module.css';
 import { useMe } from '@/lib/auth/store';
-import { notifyApi, NotifyApiError, type InboxPage, type NotifyState } from '@/lib/notify/api';
-import {
-  deviceSupport,
-  forgetThisDevice,
-  needsHomeScreenGuide,
-  permission,
-  thisDeviceRef,
-  turnOnThisDevice,
-} from '@/lib/notify/device';
+import { notifyApi, NotifyApiError } from '@/lib/notify/api';
+import { deviceSupport, forgetThisDevice, permission, turnOnThisDevice } from '@/lib/notify/device';
 import { KIND_INFO, NOTIFY_KINDS, isSafeLink, type NotifyKind } from '@/lib/notify/kinds';
+import { useNotify } from '@/lib/notify/store';
 import styles from './notify.module.css';
 
 const when = (iso: string): string =>
-  new Date(iso).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  new Date(iso).toLocaleString('en-AU', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
 /**
  * Your notifications: the inbox, then the settings. Nothing here asks the browser for permission
@@ -28,32 +27,22 @@ export function Notifications() {
   const me = useMe((s) => s.me);
   const settled = useMe((s) => s.settled);
   const loadMe = useMe((s) => s.load);
-  const [state, setState] = useState<NotifyState | null>(null);
-  const [inbox, setInbox] = useState<InboxPage | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const state = useNotify((n) => n.state);
+  const inbox = useNotify((n) => n.inbox);
+  const error = useNotify((n) => n.error);
+  const here = useNotify((n) => n.here);
+  const guide = useNotify((n) => n.guide);
+  const refresh = useNotify((n) => n.load);
+  const setInbox = useNotify((n) => n.setInbox);
+  const fail = useNotify((n) => n.fail);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [here, setHere] = useState<string | null>(null);
-  const [guide, setGuide] = useState(false);
 
   useEffect(() => {
     void loadMe();
   }, [loadMe]);
 
   const signedIn = Boolean(me?.accounts && me.signedIn && !me.needsSignUp);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [s, i] = await Promise.all([notifyApi.state(), notifyApi.inbox(null)]);
-      setState(s);
-      setInbox(i);
-      setError(null);
-      setHere(await thisDeviceRef());
-      setGuide(needsHomeScreenGuide());
-    } catch (e) {
-      setError(e instanceof NotifyApiError ? e.message : 'Something went wrong. Try again in a moment.');
-    }
-  }, []);
 
   useEffect(() => {
     if (signedIn) void refresh();
@@ -67,7 +56,9 @@ export function Notifications() {
       if (done) setNote(done);
       await refresh();
     } catch (e) {
-      setError(e instanceof NotifyApiError ? e.message : 'Something went wrong. Try again in a moment.');
+      fail(
+        e instanceof NotifyApiError ? e.message : 'Something went wrong. Try again in a moment.',
+      );
     }
     setBusy(false);
   }
@@ -82,7 +73,10 @@ export function Notifications() {
   if (!me || !me.accounts) {
     return (
       <div className={accountStyles.card}>
-        <p>Sign-in is not set up on this copy of the game yet, so there are no accounts and no notifications.</p>
+        <p>
+          Sign-in is not set up on this copy of the game yet, so there are no accounts and no
+          notifications.
+        </p>
         <Link href="/play" className={`btn coral ${accountStyles.linkbtn}`}>
           Play as a guest
         </Link>
@@ -141,7 +135,9 @@ export function Notifications() {
           Your inbox{inbox.unread > 0 ? ` (${inbox.unread} unread)` : ''}
         </h2>
         {inbox.items.length === 0 ? (
-          <p className={accountStyles.small}>Nothing here yet. Notices about your account and farms appear here.</p>
+          <p className={accountStyles.small}>
+            Nothing here yet. Notices about your account and farms appear here.
+          </p>
         ) : (
           <ul className={styles.list}>
             {inbox.items.map((m) => (
@@ -154,7 +150,11 @@ export function Notifications() {
                 {m.body && <p className={accountStyles.small}>{m.body}</p>}
                 <div className={accountStyles.actions}>
                   {m.link && isSafeLink(m.link) && (
-                    <Link href={m.link} className="btn ghost" onClick={() => void openItem(m.id, m.read)}>
+                    <Link
+                      href={m.link}
+                      className="btn ghost"
+                      onClick={() => void openItem(m.id, m.read)}
+                    >
                       Open
                     </Link>
                   )}
@@ -220,9 +220,15 @@ export function Notifications() {
             inbox above still works.
           </p>
         ) : hereDevice ? (
-          <p>This device is on. {perm === 'granted' ? '' : 'Your browser has notifications turned off for this site.'}</p>
+          <p>
+            This device is on.{' '}
+            {perm === 'granted' ? '' : 'Your browser has notifications turned off for this site.'}
+          </p>
         ) : support === 'needs_install' ? (
-          <p>To get notifications on an iPhone or iPad, add the game to your Home Screen first (steps below).</p>
+          <p>
+            To get notifications on an iPhone or iPad, add the game to your Home Screen first (steps
+            below).
+          </p>
         ) : support === 'no' ? (
           <p>Notifications are not available in this browser yet.</p>
         ) : perm === 'denied' ? (
@@ -257,7 +263,10 @@ export function Notifications() {
             <ol className={styles.steps}>
               <li>Open this page in Safari and tap the Share button.</li>
               <li>Choose Add to Home Screen, then Add.</li>
-              <li>Open The Grazing Game from your Home Screen, then come back to this page and tap the button above.</li>
+              <li>
+                Open The Grazing Game from your Home Screen, then come back to this page and tap the
+                button above.
+              </li>
             </ol>
           </div>
         )}
@@ -293,7 +302,9 @@ export function Notifications() {
                       type="checkbox"
                       checked={p.email}
                       disabled={busy}
-                      onChange={(e) => void act(() => notifyApi.pref(k, { email: e.target.checked }))}
+                      onChange={(e) =>
+                        void act(() => notifyApi.pref(k, { email: e.target.checked }))
+                      }
                     />
                     <span>By email when push is not available or fails</span>
                   </label>
@@ -328,7 +339,9 @@ export function Notifications() {
             className={accountStyles.input}
             value={state.settings.reminderTime}
             disabled={busy}
-            onChange={(e) => e.target.value && void act(() => notifyApi.settings({ reminderTime: e.target.value }))}
+            onChange={(e) =>
+              e.target.value && void act(() => notifyApi.settings({ reminderTime: e.target.value }))
+            }
           />
           <p className={accountStyles.hint}>In your farm&apos;s own time zone.</p>
         </div>
@@ -364,7 +377,10 @@ export function Notifications() {
                 onChange={(e) =>
                   e.target.value &&
                   void act(() =>
-                    notifyApi.settings({ quietStart: e.target.value, quietEnd: state.settings.quietEnd }),
+                    notifyApi.settings({
+                      quietStart: e.target.value,
+                      quietEnd: state.settings.quietEnd,
+                    }),
                   )
                 }
               />
@@ -382,7 +398,10 @@ export function Notifications() {
                 onChange={(e) =>
                   e.target.value &&
                   void act(() =>
-                    notifyApi.settings({ quietStart: state.settings.quietStart, quietEnd: e.target.value }),
+                    notifyApi.settings({
+                      quietStart: state.settings.quietStart,
+                      quietEnd: e.target.value,
+                    }),
                   )
                 }
               />

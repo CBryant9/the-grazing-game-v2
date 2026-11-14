@@ -124,7 +124,6 @@ export async function queueNotification(nd: NotifyDeps, input: QueueInput): Prom
   const info = KIND_INFO[input.kind];
   const title = typeof input.title === 'string' ? input.title.trim() : '';
   const body = typeof input.body === 'string' && input.body.trim() ? input.body.trim() : null;
-  // eslint-disable-next-line no-control-regex
   const bad = /[\u0000-\u001f\u007f]/;
   if (!title || title.length > TITLE_MAX || bad.test(title)) return skip('invalid_text');
   if (body && (body.length > BODY_MAX || bad.test(body))) return skip('invalid_text');
@@ -191,7 +190,17 @@ export async function queueNotification(nd: NotifyDeps, input: QueueInput): Prom
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz)
        on conflict (user_id, dedupe_key) where dedupe_key is not null do nothing
        returning id`,
-      [userId, input.kind, title, body, link, input.farmId ?? null, dedupeKey, !hidden, new Date(now).toISOString()],
+      [
+        userId,
+        input.kind,
+        title,
+        body,
+        link,
+        input.farmId ?? null,
+        dedupeKey,
+        !hidden,
+        new Date(now).toISOString(),
+      ],
     );
     const id = made.rows[0]?.id;
     if (!id) return { status: 'duplicate' } satisfies QueueResult;
