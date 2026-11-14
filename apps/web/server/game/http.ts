@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { jarFor, type CookieJar, type CookieToSet } from '../auth/provider';
 import { identify, type Player } from '../player';
 import { clearCookieText, cookieText, csrfRefusal } from '../security';
-import { GameError, isSessionId } from './game';
+import { GameError, gameServer, isSessionId } from './game';
 import { gameStoreKind } from './kind';
 
 export const SESSION_COOKIE = 'gg_session';
@@ -218,7 +218,9 @@ export function route(
       // One CSRF rule for every state-changing route, game and account (server/security.ts).
       const refusal = options.write ? csrfRefusal(req) : null;
       if (refusal) return fail(403, refusal);
-      const existing = sessionFrom(req);
+      const sent = sessionFrom(req);
+      // A guest session whose farm moved into an account is finished: it is treated as no session.
+      const existing = sent && (await gameServer().sessionUsable(sent)) ? sent : null;
       // The limit's key is worked out before any session is made, and never
       // from a session the caller could have made up to get a fresh count.
       const who = existing ?? clientAddress(req) ?? 'guest';
@@ -232,18 +234,20 @@ export function route(
       }
       const jar = jarFor(req);
       const player = await identify(req, jar, existing);
-      // A signed-in player's farm is named by their account, so no guest session is made for them.
-      const minted =
-        !existing && options.mint && !player.user ? randomBytes(16).toString('hex') : null;
+      // A signed-in player with a finished account has farms named by the account, so no guest
+      // session is made for them. Anyone else (a visitor, a sign-in not finished, a sign-in
+      // refused as under 14) plays as a guest, with a session made and renewed as for anyone.
+      const account = player.user !== null && player.signedUp;
+      const minted = !existing && options.mint && !account ? randomBytes(16).toString('hex') : null;
       const setCookies: string[] = [];
       const out = await handler({
         req,
-        sessionId: player.user && player.key ? player.key : (existing ?? minted),
+        sessionId: account && player.key ? player.key : (existing ?? minted),
         player: { ...player, guestSession: existing ?? minted },
         jar,
         setCookies,
       });
-      const fresh = minted ?? (options.renew && !player.user ? existing : null);
+      const fresh = minted ?? (options.renew && !account ? existing : null);
       if (fresh) setCookies.push(setCookie(req, fresh));
       for (const c of jar.out) {
         setCookies.push(
@@ -259,7 +263,7 @@ export function route(
     } catch (e) {
       if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
       // The detail stays in the server log. The player gets a plain line.
-      console.error('Game route failed:', e instanceof Error ? e.message : e);
+      console.error('game_route_failed');
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
     }
   };

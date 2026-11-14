@@ -158,7 +158,7 @@ export async function finishSignUp(
     if (err.code === '23505') return { result: 'username_taken' };
     if (err.code === '23514') return { result: 'bad_username' };
     if (err.code === '22023') return { result: 'bad_date_of_birth' };
-    console.error('Sign-up failed:', e instanceof Error ? e.message : e);
+    console.error('sign_up_failed', err.code ?? '');
     return { result: 'unavailable' };
   }
 }

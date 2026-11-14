@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import type { FarmListItem, PastDayWire } from '../../lib/game/types';
 import { DIARY_DAYS, type StoredDiaryDay } from '../game/diary';
 import {
@@ -137,6 +138,20 @@ export class DbFarmStore implements FarmStore {
     });
   }
 
+  async guestAccess(farmId: string, session: string): Promise<'ok' | 'free' | 'denied'> {
+    return this.guard(async () => {
+      const r = await this.sql.query<{ guest: string | null; hash: string | null; done: boolean }>(
+        `select f.guest_session_id as guest, g.token_hash as hash, (g.converted_at is not null) as done
+           from public.farms f left join public.guest_sessions g on g.id = f.guest_session_id
+          where f.id = $1`,
+        [toUuid(farmId)],
+      );
+      const row = r.rows[0];
+      if (!row) return 'free';
+      return row.guest !== null && row.hash === sessionHash(session) && !row.done ? 'ok' : 'denied';
+    });
+  }
+
   async version(farmId: string): Promise<string | null> {
     return this.guard(async () => {
       const r = await this.sql.query<{ v: string }>(
@@ -151,14 +166,14 @@ export class DbFarmStore implements FarmStore {
     tx: SqlRunner,
     id: string,
     farm: StoredFarm,
-    expect: string | undefined,
+    expect: string,
   ): Promise<number> {
     const r = await tx.query(
       `update public.farm_saves
           set stored_format = $2, save_format = $3, engine_version = $4, save = $5::jsonb,
               setup = $6::jsonb, farm_version = $7, done = $8::jsonb, inbox_read = $9,
               missed_wages = array(select jsonb_array_elements_text($10::jsonb)::int)
-        where farm_id = $1 and ($11::text is null or farm_version = $11)`,
+        where farm_id = $1 and farm_version = $11`,
       [
         id,
         farm.format,
@@ -170,7 +185,7 @@ export class DbFarmStore implements FarmStore {
         json(farm.done),
         farm.inboxRead ?? null,
         json(farm.missedWages ?? []),
-        expect ?? null,
+        expect,
       ],
     );
     return r.rowCount;
@@ -204,19 +219,21 @@ export class DbFarmStore implements FarmStore {
 
   private async writePast(tx: SqlRunner, id: string, past: PastDayWire): Promise<void> {
     const text = json(past);
+    // Kept gzipped: 45 KB of JSON is about 4 KB.
+    const packed = gzipSync(text, { level: 9 });
     await tx.query(
       `insert into public.farm_snapshots (farm_id, day, game_date, storage_path, bytes)
        values ($1, $2, $3::date, $4, $5)
        on conflict (farm_id, day) do update
          set game_date = excluded.game_date, bytes = excluded.bytes`,
-      [id, past.day, dateText(past.date), `db:${past.day}`, text.length],
+      [id, past.day, dateText(past.date), `db:${past.day}`, packed.length],
     );
     await tx.query(
-      `insert into public.farm_snapshot_views (farm_id, day, view) values ($1, $2, $3::jsonb)
-       on conflict (farm_id, day) do update set view = excluded.view`,
-      [id, past.day, text],
+      `insert into public.farm_snapshot_views (farm_id, day, view_gz) values ($1, $2, $3)
+       on conflict (farm_id, day) do update set view_gz = excluded.view_gz`,
+      [id, past.day, packed],
     );
-    // Every day for 90 days, then one a week, nothing past 400 days. The views go with them.
+    // Every day for 14 days, then one a week, nothing past 182 days. The views go with them.
     await tx.query(
       `delete from public.farm_snapshots
         where farm_id = $1
@@ -298,7 +315,11 @@ export class DbFarmStore implements FarmStore {
     );
   }
 
-  async put(farmId: string, farm: StoredFarm, options: PutOptions = {}): Promise<void> {
+  async put(farmId: string, farm: StoredFarm, options: PutOptions): Promise<void> {
+    // The interface requires the version; this keeps a caller that gets round the types honest.
+    if (typeof options?.expect !== 'string' || options.expect === '') {
+      throw new Error('A save must name the version it expects.');
+    }
     const id = toUuid(farmId);
     await this.guard(() =>
       this.sql.transaction(async (tx) => {
@@ -441,11 +462,12 @@ export class DbFarmStore implements FarmStore {
   async past(farmId: string, day: number): Promise<PastDayWire | null> {
     if (!Number.isInteger(day) || day < 0) return null;
     return this.guard(async () => {
-      const r = await this.sql.query<{ view: PastDayWire }>(
-        'select view from public.farm_snapshot_views where farm_id = $1 and day = $2',
+      const r = await this.sql.query<{ view_gz: Uint8Array }>(
+        'select view_gz from public.farm_snapshot_views where farm_id = $1 and day = $2',
         [toUuid(farmId), day],
       );
-      return r.rows[0]?.view ?? null;
+      const row = r.rows[0];
+      return row ? (JSON.parse(gunzipSync(row.view_gz).toString('utf8')) as PastDayWire) : null;
     });
   }
 

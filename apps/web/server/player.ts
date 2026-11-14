@@ -18,6 +18,8 @@ export interface Player {
   farmId: string | null;
   /** More than one farm and none chosen: the picker comes first. */
   mustPick: boolean;
+  /** Signed in and sign-up finished (a profile exists): the account plays account farms. Anyone else plays as a guest. */
+  signedUp: boolean;
   /** How many farms the account has (0 for a guest). */
   farmCount: number;
   /** The guest session cookie value, if any. */
@@ -41,6 +43,7 @@ export async function identify(
     key: guestSession,
     farmId: null,
     mustPick: false,
+    signedUp: false,
     farmCount: 0,
     guestSession,
   };
@@ -58,6 +61,7 @@ export async function identify(
       key: farmKey(mine.id),
       farmId: mine.id,
       mustPick: false,
+      signedUp: true,
       farmCount: farms.length,
       guestSession,
     };
@@ -69,14 +73,28 @@ export async function identify(
       key: farmKey(only.id),
       farmId: only.id,
       mustPick: false,
+      signedUp: true,
       farmCount: 1,
       guestSession,
     };
   }
   if (farms.length > 1) {
-    return { user, key: null, farmId: null, mustPick: true, farmCount: farms.length, guestSession };
+    return {
+      user,
+      key: null,
+      farmId: null,
+      mustPick: true,
+      signedUp: true,
+      farmCount: farms.length,
+      guestSession,
+    };
   }
-  return { ...guest, user };
+  // No farms yet: a finished account starts one of its own; one that never finished (abandoned, or
+  // refused as under 14) is a guest until it does.
+  const profile = await deps.sql
+    .query('select 1 from public.profiles where user_id = $1', [user.id])
+    .catch(() => null);
+  return { ...guest, user, signedUp: (profile?.rowCount ?? 0) > 0 };
 }
 
 /** A new farm id for an account's farm, and its key. */

@@ -1,4 +1,4 @@
-import { proxyWarning } from './server/startup';
+import { accountsWarning, proxyWarning } from './server/startup';
 
 /**
  * Runs once when the server starts. In production with no trusted proxy
@@ -8,4 +8,6 @@ import { proxyWarning } from './server/startup';
 export function register(): void {
   const warning = proxyWarning(process.env);
   if (warning) console.warn(warning);
+  const accounts = accountsWarning(process.env);
+  if (accounts) console.warn(accounts);
 }

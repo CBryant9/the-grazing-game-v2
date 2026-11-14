@@ -1,4 +1,3 @@
-import { accountOf } from '@/server/auth/accounts';
 import { authDeps } from '@/server/auth/deps';
 import { BROKEN_MESSAGE, GameError, gameServer } from '@/server/game/game';
 import { readJson, route } from '@/server/game/http';
@@ -38,11 +37,9 @@ export const POST = route(
     const parsed = parseSetup(await readJson(req));
     if (!parsed.ok) throw new GameError(400, parsed.message);
     const deps = authDeps();
-    if (player.user && deps) {
-      const account = await accountOf(deps, player.user);
-      if (!account.profile) {
-        throw new GameError(403, 'Finish setting up your account first, then start a farm.');
-      }
+    // A finished account starts an account farm. Anyone else (a visitor, a sign-in not finished,
+    // one refused as under 14) starts the guest's one farm.
+    if (player.user && player.signedUp && deps) {
       const farm = newFarm();
       const snapshot = await gameServer().create(farm.key, parsed.value, {
         kind: 'user',

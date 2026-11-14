@@ -26,39 +26,42 @@ const WORDS: Record<string, string> = {
  * the same sign-in gets the same answer however many times it asks, with no form shown.
  * After a successful sign-up the guest's farm moves into the account (`convert_guest`).
  */
-export const POST = authRoute({ name: 'finish', max: 10, write: true }, async (ctx) => {
-  const { deps, user } = await requireUser(ctx);
-  const body = (await readJson(ctx.req, 2048)) as {
-    username?: unknown;
-    displayName?: unknown;
-    dob?: unknown;
-  } | null;
-  const username = typeof body?.username === 'string' ? body.username.trim() : '';
-  const dob = parseDob(body?.dob);
-  if (!USERNAME.test(username)) return refuse('bad_username');
-  if (!dob) return refuse('bad_date_of_birth');
-  const displayName =
-    typeof body?.displayName === 'string' && body.displayName.trim()
-      ? body.displayName.trim().slice(0, 40)
-      : undefined;
-  const out = await finishSignUp(deps, user, { username, displayName, dob });
-  if (out.result !== 'signed_up') return refuse(out.result);
+export const POST = authRoute(
+  { name: 'finish', max: 10, write: true, by: 'session' },
+  async (ctx) => {
+    const { deps, user } = await requireUser(ctx);
+    const body = (await readJson(ctx.req, 2048)) as {
+      username?: unknown;
+      displayName?: unknown;
+      dob?: unknown;
+    } | null;
+    const username = typeof body?.username === 'string' ? body.username.trim() : '';
+    const dob = parseDob(body?.dob);
+    if (!USERNAME.test(username)) return refuse('bad_username');
+    if (!dob) return refuse('bad_date_of_birth');
+    const displayName =
+      typeof body?.displayName === 'string' && body.displayName.trim()
+        ? body.displayName.trim().slice(0, 40)
+        : undefined;
+    const out = await finishSignUp(deps, user, { username, displayName, dob });
+    if (out.result !== 'signed_up') return refuse(out.result);
 
-  // The guest's farm moves in. If the account has no room, nothing moves and the player is told.
-  const guest = sessionFrom(ctx.req);
-  let moved = 0;
-  let noRoom = false;
-  if (guest) {
-    try {
-      ({ moved, noRoom } = await convertGuest(deps, guest, user.id));
-    } catch (e) {
-      console.error('Moving the guest farm failed:', e instanceof Error ? e.message : e);
+    // The guest's farm moves in. If the account has no room, nothing moves and the player is told.
+    const guest = sessionFrom(ctx.req);
+    let moved = 0;
+    let noRoom = false;
+    if (guest) {
+      try {
+        ({ moved, noRoom } = await convertGuest(deps, guest, user.id));
+      } catch {
+        console.error('guest_move_failed');
+      }
+      if (moved > 0) ctx.setCookies.push(clearCookieText(ctx.req, SESSION_COOKIE));
     }
-    if (moved > 0) ctx.setCookies.push(clearCookieText(ctx.req, SESSION_COOKIE));
-  }
-  const ok: FinishResult = { ok: true, moved, noRoom };
-  return ok;
-});
+    const ok: FinishResult = { ok: true, moved, noRoom };
+    return ok;
+  },
+);
 
 function refuse(reason: string): Response {
   const final = reason === 'too_young';

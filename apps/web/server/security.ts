@@ -67,17 +67,19 @@ export function safeNext(value: unknown): string {
 }
 
 /**
- * The site's own address, for the redirect a sign-in link comes back to. It is
- * worked out from the request's own host, never from a header the caller
- * could set to send the link somewhere else: the Host header must match the
- * origin the request names, or the public URL set in the environment.
+ * The site's own address, which every sign-in link and redirect is built from. It is
+ * `GG_SITE_URL`, a plain origin the owner sets. In production accounts are off without it
+ * (`accountsBlockers` in startup.ts), so a forged Host header can never aim a link elsewhere;
+ * reaching this in production without it is a fault and throws. Only outside production (a
+ * developer's machine, the tests) is the request's own Host used, and then it is only what
+ * that machine was reached by.
  */
 export function siteOrigin(req: Request): string {
   const fixed = process.env.GG_SITE_URL?.trim().replace(/\/+$/, '');
   if (fixed && /^https?:\/\/[^/\s]+$/.test(fixed)) return fixed;
+  if (isProduction()) throw new Error('GG_SITE_URL is not set.');
   const url = new URL(req.url);
-  const proto = req.headers.get('x-forwarded-proto') === 'https' ? 'https:' : url.protocol;
-  return `${proto}//${req.headers.get('host') ?? url.host}`;
+  return `${url.protocol}//${req.headers.get('host') ?? url.host}`;
 }
 
 /** True in a production build running on https. */

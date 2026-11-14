@@ -55,17 +55,29 @@ export function Account() {
       </div>
     );
   }
-  if (!me.signedIn || me.needsSignUp) {
+  if (!me.signedIn) {
     return (
       <div className={styles.card}>
-        <p>{me.signedIn ? 'Finish setting up your account first.' : 'You are not signed in.'}</p>
-        <Link
-          href={me.signedIn ? '/sign-up/finish' : '/sign-in?next=%2Faccount'}
-          className={`btn coral ${styles.linkbtn}`}
-        >
-          {me.signedIn ? 'Finish setting up' : 'Sign in'}
+        <p>You are not signed in.</p>
+        <Link href="/sign-in?next=%2Faccount" className={`btn coral ${styles.linkbtn}`}>
+          Sign in
         </Link>
       </div>
+    );
+  }
+  if (me.needsSignUp) {
+    return (
+      <>
+        {!me.refused && (
+          <div className={styles.card}>
+            <p>Finish setting up your account first.</p>
+            <Link href="/sign-up/finish" className={`btn coral ${styles.linkbtn}`}>
+              Finish setting up
+            </Link>
+          </div>
+        )}
+        <DeleteSignIn />
+      </>
     );
   }
 
@@ -212,5 +224,62 @@ export function Account() {
         Back to your farm
       </Link>
     </>
+  );
+}
+
+/**
+ * A sign-in with no account behind it (sign-up never finished, or refused as under 14) has no
+ * username. It can still be removed: type the word delete.
+ */
+function DeleteSignIn() {
+  const [typed, setTyped] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+  const remove = async (): Promise<void> => {
+    setWorking(true);
+    setError(null);
+    try {
+      await authApi.deleteAccount(typed);
+      clearAllLastFarms();
+      goTo('/');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Try again in a moment.');
+      setWorking(false);
+    }
+  };
+  return (
+    <div className={`${styles.card} ${styles.danger}`}>
+      <h2 className={`px ${styles.label}`}>Delete this sign-in</h2>
+      <p className={styles.small}>
+        This removes your sign-in and anything kept with it. It can not be undone.
+      </p>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="confirm-delete">
+          Type the word delete to confirm
+        </label>
+        <input
+          id="confirm-delete"
+          className={styles.input}
+          autoCapitalize="none"
+          autoComplete="off"
+          spellCheck={false}
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+        />
+      </div>
+      {error && (
+        <p className={styles.bad} role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        className="btn coral"
+        disabled={working || typed.trim().toLowerCase() !== 'delete'}
+        onClick={() => void remove()}
+      >
+        {working ? 'Deleting' : 'Delete this sign-in'}
+      </button>
+    </div>
   );
 }

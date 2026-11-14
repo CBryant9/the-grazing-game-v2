@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDb } from '../../../../packages/db/src/harness';
 import { GameServer, setGameServer } from '../game/game';
 import { TRUSTED_IP_HEADER_ENV, resetRateLimits } from '../game/http';
@@ -997,5 +997,380 @@ describe('what the new replies send the browser', () => {
     expect([...keyPaths(good.out)].sort()).toEqual(['moved', 'noRoom', 'ok']);
     const young = await signUp('fin2@example.com', 'fin_kid', dobYearsAgo(10));
     expect([...keyPaths(young.out)].sort()).toEqual(['final', 'message', 'ok', 'reason']);
+  });
+});
+
+// ======================================================================
+// Second pass (the Opus security review). Each test was written before its fix and seen to fail.
+// ======================================================================
+
+describe('1. an old guest cookie can not reach a farm that moved into an account', () => {
+  async function movedFarm() {
+    const guest = new Browser();
+    const made = await guest.json<{ snapshot: { farmVersion: string } }>(
+      await guest.call('farm', 'POST', '/api/game/farm', choices),
+    );
+    const oldSession = guest.cookies.get('gg_session')!;
+    const { out } = await signUp('mover@example.com', 'mover_user', adultDob, guest);
+    expect(out).toMatchObject({ ok: true, moved: 1 });
+    await guest.call('signout', 'POST', '/api/auth/signout', {});
+    // Someone with a copy of the old cookie.
+    const thief = new Browser();
+    thief.cookies.set('gg_session', oldSession);
+    return { guest, thief, oldSession, version: made.snapshot.farmVersion };
+  }
+
+  it('GET, act, day, skip, record, the past-day view and DELETE all fail to reach the account farm', async () => {
+    const { thief, version } = await movedFarm();
+    routes.act = await import('@/app/api/game/act/route');
+    routes.skip = await import('@/app/api/game/skip/route');
+    routes.record = await import('@/app/api/game/record/route');
+    const got = await thief.json<{ snapshot: unknown }>(
+      await thief.call('farm', 'GET', '/api/game/farm'),
+    );
+    expect(got.snapshot).toBeNull();
+    const act = await thief.call('act', 'POST', '/api/game/act', {
+      action: { type: 'markCalves', mob: 9999 },
+      version,
+      requestId: 'req-thief-0001',
+    });
+    expect(act.status).toBe(404);
+    expect((await thief.call('day', 'POST', '/api/game/day', { version })).status).toBe(404);
+    expect(
+      (await thief.call('skip', 'POST', '/api/game/skip', { length: 'week', version })).status,
+    ).toBe(404);
+    expect((await thief.call('record', 'GET', '/api/game/record')).status).toBe(404);
+    expect((await thief.call('past', 'GET', '/api/game/past')).status).toBe(404);
+    expect((await thief.call('past', 'GET', '/api/game/past?day=1')).status).toBe(404);
+    await thief.call('farm', 'DELETE', '/api/game/farm');
+    expect(await db.query('select 1 from public.farms')).toMatchObject({ rowCount: 1 });
+    const f = await db.query<{ current_day: number }>('select current_day from public.farms');
+    expect(f.rows[0]!.current_day).toBe(0);
+  });
+
+  it('the store refuses it too, whatever the route does, and a converted session is refused outright', async () => {
+    const { oldSession } = await movedFarm();
+    await expect(game.snapshot(oldSession)).rejects.toMatchObject({ status: 404 });
+    await expect(game.endDay(oldSession)).rejects.toMatchObject({ status: 404 });
+    await expect(game.remove(oldSession)).rejects.toMatchObject({ status: 404 });
+    expect(await db.query('select 1 from public.farms')).toMatchObject({ rowCount: 1 });
+  });
+
+  it("the old cookie then starts a fresh guest farm with a new session, never the account's", async () => {
+    const { thief, oldSession } = await movedFarm();
+    const res = await thief.call('farm', 'POST', '/api/game/farm', { ...choices, name: 'Fresh' });
+    expect(res.status).toBe(200);
+    expect(thief.cookies.get('gg_session')).not.toBe(oldSession);
+    expect(
+      await db.query(`select 1 from public.farms where name = 'Fresh' and owner_id is null`),
+    ).toMatchObject({ rowCount: 1 });
+    expect(
+      await db.query(
+        `select 1 from public.farms where name = 'Flow Farm' and owner_id is not null`,
+      ),
+    ).toMatchObject({ rowCount: 1 });
+  });
+});
+
+describe('2. rate limits never share one bucket, and accounts need the trusted address header in production', () => {
+  const keys = {
+    NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pk',
+    SUPABASE_SECRET_KEY: 'sk',
+    SUPABASE_DB_POOLER_URL: 'postgres://u:p@localhost:6543/postgres',
+    BAN_HASH_PEPPER: 'p'.repeat(40),
+  };
+  const set = (env: Record<string, string>) => {
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
+  };
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    process.env[TRUSTED_IP_HEADER_ENV] = 'x-real-ip';
+    setAuthDeps(deps);
+  });
+
+  it('with the header unset in production, accounts are off; with it (and the site address) set they are on', async () => {
+    const { authDeps } = await import('./deps');
+    setAuthDeps(undefined);
+    set({ ...keys, NODE_ENV: 'production', GG_SITE_URL: 'https://game.example' });
+    delete process.env[TRUSTED_IP_HEADER_ENV];
+    expect(authDeps()).toBeNull();
+    setAuthDeps(undefined);
+    set({ GG_TRUSTED_IP_HEADER: 'x-real-ip' });
+    expect(authDeps()).not.toBeNull();
+    // Outside production the header is not needed (a developer's machine).
+    setAuthDeps(undefined);
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('GG_TRUSTED_IP_HEADER', '');
+    vi.stubEnv('GG_SITE_URL', '');
+    expect(authDeps()).not.toBeNull();
+  });
+
+  it("one caller flooding /api/auth/email does not block another caller's sign-in or /me", async () => {
+    const a = new Browser('10.50.0.1');
+    let last = 200;
+    for (let i = 0; i < 25; i++) {
+      last = (await a.call('email', 'POST', '/api/auth/email', { email: `flood${i}@example.com` }))
+        .status;
+    }
+    expect(last).toBe(429);
+    const b = new Browser('10.50.0.2');
+    expect(
+      (await b.call('email', 'POST', '/api/auth/email', { email: 'fine@example.com' })).status,
+    ).toBe(200);
+    expect((await b.call('me', 'GET', '/api/auth/me')).status).toBe(200);
+  });
+
+  it('/me is keyed on the session, so one signed-in player flooding it does not cap another on the same address', async () => {
+    const one = (await signUp('m1@example.com', 'me_one', adultDob, new Browser('10.60.0.1'))).b;
+    const two = (await signUp('m2@example.com', 'me_two', adultDob, new Browser('10.60.0.1'))).b;
+    let last = 200;
+    for (let i = 0; i < 130; i++) last = (await one.call('me', 'GET', '/api/auth/me')).status;
+    expect(last).toBe(429);
+    expect((await two.call('me', 'GET', '/api/auth/me')).status).toBe(200);
+  });
+
+  it('with no trusted address a request still gets its own bucket, never a shared one', async () => {
+    delete process.env[TRUSTED_IP_HEADER_ENV];
+    const mk = (agent: string) =>
+      new Request(`${HOST}/api/auth/email`, {
+        method: 'POST',
+        headers: {
+          host: 'localhost:3000',
+          'content-type': 'application/json',
+          'user-agent': agent,
+        },
+        body: JSON.stringify({ email: 'x@example.com' }),
+      });
+    for (let i = 0; i < 12; i++) await routes.email!.POST!(mk('agent-a'));
+    expect((await routes.email!.POST!(mk('agent-b'))).status).toBe(200);
+  });
+});
+
+describe('3. every auth link is built from the site address, never from the Host header', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('uses GG_SITE_URL even when the request names another host', async () => {
+    vi.stubEnv('GG_SITE_URL', 'https://game.example');
+    const req = new Request('http://evil.example/api/auth/email', {
+      method: 'POST',
+      headers: {
+        host: 'evil.example',
+        'content-type': 'application/json',
+        'x-real-ip': '10.70.0.1',
+      },
+      body: JSON.stringify({ email: 'link@example.com', next: '/play' }),
+    });
+    expect((await routes.email!.POST!(req)).status).toBe(200);
+    expect(auth.sent[0]!.redirectTo.startsWith('https://game.example/auth/callback')).toBe(true);
+    const cb = await routes.callback!.GET!(
+      new Request('http://evil.example/auth/callback?code=nope', {
+        headers: { host: 'evil.example', 'x-real-ip': '10.70.0.1' },
+      }),
+    );
+    expect(cb.headers.get('location')).toBe('https://game.example/sign-in?problem=link');
+  });
+
+  it('in production, accounts are off without a site address', async () => {
+    const { accountsBlockers } = await import('../startup');
+    expect(accountsBlockers({ NODE_ENV: 'production', GG_TRUSTED_IP_HEADER: 'x-real-ip' })).toEqual(
+      ['GG_SITE_URL'],
+    );
+    expect(
+      accountsBlockers({
+        NODE_ENV: 'production',
+        GG_SITE_URL: 'https://a.example/path',
+        GG_TRUSTED_IP_HEADER: 'x',
+      }),
+    ).toEqual(['GG_SITE_URL']);
+    expect(accountsBlockers({ NODE_ENV: 'production', GG_SITE_URL: 'https://a.example' })).toEqual([
+      'GG_TRUSTED_IP_HEADER',
+    ]);
+    expect(
+      accountsBlockers({
+        NODE_ENV: 'production',
+        GG_SITE_URL: 'https://a.example',
+        GG_TRUSTED_IP_HEADER: 'x-real-ip',
+      }),
+    ).toEqual([]);
+    expect(accountsBlockers({ NODE_ENV: 'development' })).toEqual([]);
+  });
+});
+
+describe('4. an account with no finished profile can play as a guest', () => {
+  it('a refused under-14 can start a guest farm, with a guest session made and renewed', async () => {
+    const { b } = await signUp('kid2@example.com', 'kid_two', dobYearsAgo(11));
+    expect(b.cookies.has('gg_session')).toBe(false);
+    const made = await b.call('farm', 'POST', '/api/game/farm', choices);
+    expect(made.status).toBe(200);
+    expect(b.cookies.get('gg_session')).toMatch(/^[0-9a-f]{32}$/);
+    expect(
+      await db.query('select 1 from public.farms where guest_session_id is not null'),
+    ).toMatchObject({ rowCount: 1 });
+    const again = await b.call('farm', 'GET', '/api/game/farm');
+    expect((await again.json()).snapshot.farm.name).toBe('Flow Farm');
+    expect(again.headers.getSetCookie().some((c) => c.startsWith('gg_session='))).toBe(true);
+  });
+
+  it('an abandoned sign-up (signed in, no username yet) can too', async () => {
+    const { b } = await signIn('abandon@example.com');
+    const made = await b.call('farm', 'POST', '/api/game/farm', choices);
+    expect(made.status).toBe(200);
+    expect(b.cookies.get('gg_session')).toMatch(/^[0-9a-f]{32}$/);
+    expect(await db.query('select 1 from public.farms where owner_id is not null')).toMatchObject({
+      rowCount: 0,
+    });
+  });
+});
+
+describe('5. the store runs as service_role', () => {
+  it('a query through the store client runs as service_role and can not do what only the owner can', async () => {
+    const who = await deps.sql.query<{ u: string }>('select current_user as u');
+    expect(who.rows[0]!.u).toBe('service_role');
+    await expect(deps.sql.query('create table public.nope (a int)')).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(
+      deps.sql.transaction((tx) => tx.query('select current_user as u')),
+    ).resolves.toMatchObject({ rows: [{ u: 'service_role' }] });
+  });
+
+  it('the production client wraps every statement in a transaction that sets the role first', async () => {
+    const { clientOnPool } = await import('../db/sql');
+    const log: string[] = [];
+    const conn = {
+      query: async (t: string) => (log.push(t), { rows: [], rowCount: 0 }),
+      release: () => undefined,
+    };
+    const client = clientOnPool({ query: conn.query, connect: async () => conn });
+    await client.query('select 1');
+    expect(log).toEqual(['begin', 'set local role service_role', 'select 1', 'commit']);
+    log.length = 0;
+    await client.transaction(async (tx) => {
+      await tx.query('select 2');
+    });
+    expect(log).toEqual(['begin', 'set local role service_role', 'select 2', 'commit']);
+  });
+});
+
+describe('6. sign out and delete clear the guest session cookie too', () => {
+  const clearsGuest = (res: Response): boolean =>
+    res.headers.getSetCookie().some((c) => c.startsWith('gg_session=') && /Max-Age=0/.test(c));
+
+  it('sign out, sign out everywhere and delete', async () => {
+    const a = await signUp('c1@example.com', 'clear_one');
+    a.b.cookies.set('gg_session', 'a'.repeat(32));
+    expect(clearsGuest(await a.b.call('signout', 'POST', '/api/auth/signout', {}))).toBe(true);
+    const b = await signUp('c2@example.com', 'clear_two');
+    expect(
+      clearsGuest(await b.b.call('signout', 'POST', '/api/auth/signout', { everywhere: true })),
+    ).toBe(true);
+    const c = await signUp('c3@example.com', 'clear_three');
+    expect(
+      clearsGuest(
+        await c.b.call('delete', 'POST', '/api/account/delete', { confirm: 'clear_three' }),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('7. the token check lets a signed-out-everywhere token pass; account routes check with the server', () => {
+  it('a token still passes the claims check after a global sign out (the gap), but no account change goes through', async () => {
+    const { b, out } = await signUp('gap@example.com', 'gap_user');
+    expect(out.ok).toBe(true);
+    const other = new Browser();
+    other.cookies.set('fake_session', b.cookies.get('fake_session')!);
+    await b.call('signout', 'POST', '/api/auth/signout', { everywhere: true });
+    // The old token on another device: game identity (claims) still accepts it for its lifetime...
+    expect((await other.me()).signedIn).toBe(true);
+    // ...but anything that changes or exports the account asks the server, and is refused.
+    expect((await other.call('data', 'GET', '/api/account/data')).status).toBe(401);
+    expect(
+      (await other.call('delete', 'POST', '/api/account/delete', { confirm: 'gap_user' })).status,
+    ).toBe(401);
+    expect(
+      (
+        await other.call('finish', 'POST', '/api/auth/finish', {
+          username: 'gap2_user',
+          dob: adultDob,
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      await db.query(`select 1 from auth.users where email = 'gap@example.com'`),
+    ).toMatchObject({ rowCount: 1 });
+  });
+});
+
+describe('8. an account with no profile can delete its sign-in', () => {
+  it('a refused under-14 deletes the sign-in with a plain confirm, and the refusal goes with it', async () => {
+    const { b } = await signUp('kid3@example.com', 'kid_three', dobYearsAgo(10));
+    expect(await db.query('select 1 from public.signup_refusals')).toMatchObject({ rowCount: 1 });
+    expect((await b.call('delete', 'POST', '/api/account/delete', {})).status).toBe(400);
+    expect(
+      (await b.call('delete', 'POST', '/api/account/delete', { confirm: 'delete' })).status,
+    ).toBe(200);
+    expect(
+      await db.query(`select 1 from auth.users where email = 'kid3@example.com'`),
+    ).toMatchObject({ rowCount: 0 });
+    // The refusal belonged to the sign-in (DATABASE.md): it goes with it, and nothing else of them is kept.
+    expect(await db.query('select 1 from public.signup_refusals')).toMatchObject({ rowCount: 0 });
+    expect(await db.query('select 1 from public.ban_records')).toMatchObject({ rowCount: 0 });
+  });
+
+  it('an abandoned sign-up can too', async () => {
+    const { b } = await signIn('half@example.com');
+    expect(
+      (await b.call('delete', 'POST', '/api/account/delete', { confirm: 'delete' })).status,
+    ).toBe(200);
+    expect(
+      await db.query(`select 1 from auth.users where email = 'half@example.com'`),
+    ).toMatchObject({ rowCount: 0 });
+  });
+});
+
+describe('9. no email address, token or link is ever logged', () => {
+  it('a provider error that carries the address is logged as a fixed reason only', async () => {
+    const lines: string[] = [];
+    const spies = (['error', 'warn', 'log', 'info'] as const).map((m) =>
+      vi
+        .spyOn(console, m)
+        .mockImplementation((...a: unknown[]) => void lines.push(a.map(String).join(' '))),
+    );
+    try {
+      auth.errorText =
+        'Email address "secret.person@example.com" is invalid https://x.supabase.co/auth?token=abc123';
+      auth.fail.sendLink = true;
+      await new Browser().call('email', 'POST', '/api/auth/email', {
+        email: 'secret.person@example.com',
+      });
+      auth.fail.sendLink = false;
+      auth.fail.googleUrl = true;
+      await new Browser().call('google', 'POST', '/api/auth/google', {});
+      auth.fail.googleUrl = false;
+      const b = new Browser();
+      await b.call('email', 'POST', '/api/auth/email', { email: 'secret.person@example.com' });
+      auth.fail.exchange = true;
+      await b.call(
+        'callback',
+        'GET',
+        `/auth/callback?code=${auth.sent[auth.sent.length - 1]!.code}`,
+      );
+      auth.fail.exchange = false;
+      const acct = await signUp('secret.two@example.com', 'secret_two');
+      auth.fail.deleteUser = true;
+      await acct.b.call('delete', 'POST', '/api/account/delete', { confirm: 'secret_two' });
+      auth.fail.deleteUser = false;
+      auth.fail.signOut = true;
+      await acct.b.call('signout', 'POST', '/api/auth/signout', { everywhere: true });
+    } finally {
+      auth.errorText = null;
+      spies.forEach((s) => s.mockRestore());
+    }
+    expect(lines.length).toBeGreaterThan(0);
+    const all = lines.join('\n');
+    expect(all).not.toMatch(
+      /secret\.person|secret\.two|example\.com|token=|abc123|supabase\.co|link-\d/,
+    );
   });
 });

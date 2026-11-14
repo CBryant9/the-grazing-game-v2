@@ -16,8 +16,8 @@ export const POST = authRoute({ name: 'google', max: 10, write: true }, async (c
   const redirectTo = `${ctx.origin}/auth/callback?next=${encodeURIComponent(safeNext(body?.next))}`;
   try {
     return { url: await ctx.deps.provider.googleUrl(ctx.jar, redirectTo) };
-  } catch (e) {
-    console.error('Starting Google sign-in failed:', e instanceof Error ? e.message : e);
+  } catch {
+    console.error('google_start_failed');
     throw new GameError(
       503,
       'Google sign-in is not working right now. Try the emailed link instead.',

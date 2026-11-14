@@ -133,11 +133,12 @@ export interface ActionLogEntry {
 
 export interface PutOptions {
   /**
-   * The version the farm had when it was loaded. The write only goes ahead
-   * if that is still the farm's version, so two tabs can not both win.
-   * Left out, the write is not checked (a test, or the file store).
+   * The version the farm had when it was loaded. Required: the write only goes ahead if that
+   * is still the farm's version, so two tabs can not both win, and a caller can not forget
+   * to ask. Making a farm is its own call (`create`). The file store, which has one process,
+   * does not check it.
    */
-  expect?: string;
+  expect: string;
   facts?: FarmFacts;
   /** The days whose diary lines changed, so a database writes only those. */
   diaryDays?: number[];
@@ -147,15 +148,17 @@ export interface PutOptions {
 }
 
 /**
- * Past days kept for each farm. The database keeps every day for the last
- * 90, then one a week back to 400 days (BUILD_PLAN 5.2). The file store
- * keeps the last 14 days only: it is for one machine. The cap is there
- * because each picture is the whole map (tens of KB), so a farm kept for
- * years would otherwise grow without end.
+ * Past days kept for each farm. The database keeps every day for the last 14, then one a week
+ * back to 182 days (26 weeks): at most 14 + 24 = 38 pictures. The file store keeps the last 14
+ * days only: it is for one machine. The cap is there because each picture is the whole map. It
+ * is 45 to 48 KB as JSON and 3.5 to 4.7 KB gzipped (measured on every district, size and
+ * enterprise, 15 Nov 2026), so a full farm holds at most about 180 KB, and 1,000 farms at most
+ * about 180 MB. (The first design, 90 days then weekly to 400, was 134 pictures: 630 MB for
+ * 1,000 farms gzipped, 6 GB raw, too much for a small database.)
  */
 export const PAST_FILE_DAYS = 14;
-export const PAST_DAILY_DAYS = 90;
-export const PAST_MAX_DAYS = 400;
+export const PAST_DAILY_DAYS = 14;
+export const PAST_MAX_DAYS = 182;
 
 /** Is the picture of `day` kept, when `newest` is the farm's latest day? */
 export function pastKept(day: number, newest: number, mode: 'file' | 'db' = 'db'): boolean {
@@ -178,7 +181,7 @@ export interface FarmStore {
   /** Make a farm for an owner. Throws `FarmLimitError` when the account has no room. */
   create(farmId: string, owner: Owner, farm: StoredFarm, facts: FarmFacts): Promise<void>;
   /** Keep a changed farm. Throws `SaveConflictError` when `options.expect` is not its version now. */
-  put(farmId: string, farm: StoredFarm, options?: PutOptions): Promise<void>;
+  put(farmId: string, farm: StoredFarm, options: PutOptions): Promise<void>;
   delete(farmId: string): Promise<void>;
   /** Move a farm that can't be read out of the way, kept under another name. */
   setAside(farmId: string): Promise<void>;
@@ -188,6 +191,14 @@ export interface FarmStore {
   count(): Promise<number>;
   /** Remove stale farms. The file store removes those last used before `before` (ms); the database applies its own 30 days for guests. Returns how many went. */
   prune(before: number): Promise<number>;
+  /**
+   * May this guest session reach this farm? `free`: there is no such farm. `ok`: the farm is
+   * still owned by this guest session, which has not been moved into an account. `denied`:
+   * the farm exists and is not this session's (an account's now, or another guest's), or the
+   * session was converted. A guest key reads, writes and deletes only on `ok` or `free`. Only a
+   * store that records owners has it (the file store has none to keep apart).
+   */
+  guestAccess?(farmId: string, session: string): Promise<'ok' | 'free' | 'denied'>;
   /** The farm's version now, cheaply. A store shared between servers has it, so a cached copy can be checked. */
   version?(farmId: string): Promise<string | null>;
   /** An owner's farms, most recently played first. */
@@ -252,7 +263,7 @@ export class FileFarmStore implements FarmStore {
     await this.write(farmId, farm);
   }
 
-  async put(farmId: string, farm: StoredFarm, options: PutOptions = {}): Promise<void> {
+  async put(farmId: string, farm: StoredFarm, options: PutOptions): Promise<void> {
     await this.write(farmId, farm);
     if (options.past) await this.keepPast(farmId, options.past);
   }
@@ -419,14 +430,14 @@ export class MemoryFarmStore implements FarmStore {
     this.keep(farmId, farm, owner, facts);
   }
 
-  async put(farmId: string, farm: StoredFarm, options: PutOptions = {}): Promise<void> {
+  async put(farmId: string, farm: StoredFarm, options: PutOptions): Promise<void> {
     checkId(farmId);
     if (this.failPuts && this.failPuts.times > 0) {
       this.failPuts.times--;
       throw this.failPuts.error;
     }
     const there = this.farms.get(farmId);
-    if (this.enforceVersions && options.expect !== undefined && there?.version !== options.expect) {
+    if (this.enforceVersions && there?.version !== options.expect) {
       throw new SaveConflictError('The farm changed.');
     }
     this.writes++;

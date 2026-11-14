@@ -50,7 +50,7 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `farm_saves` | The engine's save, the setup, the stored format, save format, engine and data versions, the farm version, recent act requests, inbox read mark, the pay days missed (`missed_wages`, m3.2) | **Server only** | Server only |
 | `farm_days` | One row per day: the diary lines, daylight, time used, rain, a summary | S own | |
 | `farm_snapshots` | The index of the days that have a picture kept (day, date). The picture is in `farm_snapshot_views` | S own |
-| `farm_snapshot_views` (m3.2) | The map and paddock figures of each past day, as the server built them. **Server only**, because it is game data the browser must only get through the server | Server only |
+| `farm_snapshot_views` (m3.2) | The map and paddock figures of each past day, as the server built them, gzipped (`view_gz`). **Server only**, because it is game data the browser must only get through the server | Server only |
 | `farm_saves_aside` (m3.2) | A save that could not be opened, kept when "Start a new farm" removes the farm. Goes with its owner, and after 30 days. **Server only** | Server only | |
 | `farm_actions` | Every job and skip, in order (PRD 14.5) | **Server only** | Server only |
 | `farm_scores` | A farm's scores | S own | S |
@@ -222,7 +222,13 @@ Everything above that said "the server" is built in `apps/web/server`. The datab
 | Feature switches | `featureSwitches` reads `feature_switches` (cached 30 seconds) and falls back to the shared defaults if the database can not be read |
 | Farm saves | `DbFarmStore`: a save is written in one transaction with the diary days it changed, the action log row and the picture of the new day. The write names the version it expects (`where farm_version = $expected`), so a second tab or server that loaded the same version changes nothing and is told the farm changed |
 | Guests | A guest cookie lasts 30 days with the database (90 with files), renewed each time the farm is played, because `prune_housekeeping` removes a guest not seen for 30 days. Playing marks the session seen |
-| Daily history | Every day for the last 90 days, then one a week back to 400 days (`pastKept`), written with the save. The file store keeps the last 14 days |
+| Daily history | Every day for the last 14 days, then one a week back to 182 days (`pastKept`), written with the save, each picture gzipped (3.5 to 4.7 KB; 45 to 48 KB as JSON, measured on every district, size and enterprise). At most 38 pictures a farm: about 180 KB a farm, about 180 MB for 1,000 farms. The first design (90 days daily, weekly to 400) was 134 pictures, 630 MB gzipped for 1,000 farms, 6 GB raw. The file store keeps the last 14 days |
+| Which guest reaches which farm | `guestAccess`: a guest key reads, writes and deletes only a farm whose `guest_session_id` is that session, which has not been converted. Once the farm moves into an account (or the session is converted) the old cookie gets "no farm" for everything. This is the store's own owner check; clearing the cookie is only tidiness. A guest session that moved is removed 30 days later by `prune_housekeeping` (migration `20261115000200`) |
+| Role | Every statement runs inside a transaction that begins `set local role service_role` (`clientOnPool`), so the server has the service role's rights and not the pooler owner's. The tests run the same way |
+| Saves name their version | `put` requires the version it expects (the interface and a runtime check). Making a farm is `create` |
+| Token lifetime | Game routes identify a player with `getClaims()` (the token's signature, no round trip), so after "sign out everywhere" an access token still works on the game routes until it expires. Account routes (download, delete, finish sign-up) ask the auth server (`getUser()`) and refuse it at once. Keep the access token lifetime short: see the hand-set settings in the log |
+| What is logged | Never an email address, token or link. A failure logs a fixed reason code (`send_link_failed`, `code_exchange_failed`, `sign_up_failed` with the SQLSTATE and so on) |
+| Deleting a sign-in with no account | A sign-in that never finished sign-up (abandoned, or refused as under 14) deletes with the word `delete`. The under-14 refusal belongs to the sign-in and goes with it (cascade), as above. Signing up again with the same address is a fresh sign-in with a fresh try, which is what this document says the database can not tell apart
 
 Daily Farm slots exist in the tables and the limits. No Daily Farm can be started from the game in this milestone: the setup flow makes Fast Farms only, whatever the switch says. It comes with the rollover (3.3).
 

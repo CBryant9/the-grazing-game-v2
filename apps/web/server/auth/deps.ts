@@ -1,5 +1,6 @@
 import 'server-only';
 import { sqlFromEnv } from '../db/sql';
+import { accountsBlockers } from '../startup';
 import type { AuthDeps } from './accounts';
 import { PEPPER_MIN } from './email';
 import { supabaseProvider } from './supabase';
@@ -19,7 +20,8 @@ declare global {
 /**
  * Accounts are on only when every key they need is set: the project address,
  * the publishable key, the secret key, the database connection and the ban
- * pepper. Missing any one, `null`: the game runs as guest play with files, and
+ * pepper, and in production the trusted address header and the site address (startup.ts).
+ * Missing any one, `null`: the game runs as guest play with files, and
  * sign-in is simply not offered. Nothing complains about it.
  */
 export function authDeps(): AuthDeps | null {
@@ -30,7 +32,15 @@ export function authDeps(): AuthDeps | null {
   const secret = process.env.SUPABASE_SECRET_KEY?.trim();
   const pepper = process.env.BAN_HASH_PEPPER?.trim();
   const sql = sqlFromEnv();
-  const on = Boolean(url && publishable && secret && sql && pepper && pepper.length >= PEPPER_MIN);
+  const on = Boolean(
+    url &&
+    publishable &&
+    secret &&
+    sql &&
+    pepper &&
+    pepper.length >= PEPPER_MIN &&
+    accountsBlockers(process.env).length === 0,
+  );
   globalThis.__ggAuth = on
     ? { provider: supabaseProvider(url!, publishable!, secret!), sql: sql!, pepper: pepper! }
     : null;

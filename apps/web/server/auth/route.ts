@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { GameError } from '../game/game';
 import { allow, clientAddress, fail, json } from '../game/http';
 import { clearCookieText, cookieText, csrfRefusal, siteOrigin } from '../security';
@@ -29,6 +30,35 @@ export interface AuthRouteOptions {
   windowMs?: number;
   /** True for anything that changes something: the shared CSRF rule applies. */
   write?: boolean;
+  /**
+   * What the limit counts. `address` (the default) is for the routes a visitor with no session
+   * uses (sign-in). `session` counts each signed-in player on their own, so players behind one
+   * address (a farm's wifi, a phone network) do not use each other's allowance; with no sign-in
+   * cookie it falls back to the address.
+   */
+  by?: 'address' | 'session';
+}
+
+const sha = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 24);
+
+/**
+ * The caller for a limit. Never one bucket for everybody: with no trusted address (a developer's
+ * machine; production does not turn accounts on without one) callers are told apart by their
+ * browser's own headers, which is weak, but only ever limits a caller more narrowly.
+ */
+export function callerKey(req: Request, by: 'address' | 'session' = 'address'): string {
+  if (by === 'session') {
+    const cookies = (req.headers.get('cookie') ?? '')
+      .split(';')
+      .map((c) => c.trim())
+      .filter((c) => /^(sb-[^=]*|fake_session)=/.test(c))
+      .sort()
+      .join(';');
+    if (cookies) return `s:${sha(cookies)}`;
+  }
+  const address = clientAddress(req);
+  if (address) return `a:${address}`;
+  return `u:${sha(`${req.headers.get('user-agent') ?? ''}|${req.headers.get('accept-language') ?? ''}`)}`;
 }
 
 /**
@@ -45,7 +75,7 @@ export function authRoute(
     try {
       const refusal = options.write ? csrfRefusal(req) : null;
       if (refusal) return fail(403, refusal);
-      const who = clientAddress(req) ?? 'shared';
+      const who = callerKey(req, options.by);
       if (!allow(`auth-${options.name}:${who}`, options.max, options.windowMs ?? 60_000)) {
         return fail(429, 'That was a lot of tries. Wait a minute and try again.', {
           'Retry-After': '60',
@@ -74,7 +104,7 @@ export function authRoute(
       return res;
     } catch (e) {
       if (e instanceof GameError) return fail(e.status, e.message, {}, e.code);
-      console.error('Account route failed:', e instanceof Error ? e.message : e);
+      console.error('account_route_failed');
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
     }
   };

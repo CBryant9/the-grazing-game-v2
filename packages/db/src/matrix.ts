@@ -305,9 +305,9 @@ export const MATRIX: Record<string, TableSpec> = {
   farm_snapshot_views: serverOnly(
     'farm_snapshot_views',
     `farm_id = '${ID.farmA}'`,
-    `with s as (insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 7, '2026-11-07', 'db:7') returning 1) insert into public.farm_snapshot_views (farm_id, day, view) values ('${ID.farmA}', 7, '{}')`,
-    `view = '{"a":1}'`,
-    `insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 8, '2026-11-08', 'db:8') on conflict do nothing; insert into public.farm_snapshot_views (farm_id, day, view) values ('${ID.farmA}', 8, '{}');`,
+    `with s as (insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 7, '2026-11-07', 'db:7') returning 1) insert into public.farm_snapshot_views (farm_id, day, view_gz) values ('${ID.farmA}', 7, '\x1f')`,
+    `view_gz = decode('2f', 'hex')`,
+    `insert into public.farm_snapshots (farm_id, day, game_date, storage_path) values ('${ID.farmA}', 8, '2026-11-08', 'db:8') on conflict do nothing; insert into public.farm_snapshot_views (farm_id, day, view_gz) values ('${ID.farmA}', 8, decode('1f', 'hex'));`,
   ),
   farm_saves_aside: serverOnly(
     'farm_saves_aside',

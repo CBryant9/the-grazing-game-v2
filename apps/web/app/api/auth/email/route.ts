@@ -34,8 +34,9 @@ export const POST = authRoute({ name: 'email', max: 10, write: true }, async (ct
   try {
     // Send to the address as typed, not the normalised one: the player's own spelling gets the mail.
     await ctx.deps.provider.sendLink(ctx.jar, (body!.email as string).trim(), redirectTo);
-  } catch (e) {
-    console.error('Sending a sign-in link failed:', e instanceof Error ? e.message : e);
+  } catch {
+    // Never the provider's message: it can carry the address.
+    console.error('send_link_failed');
   }
   return { ok: true, message: SENT };
 });

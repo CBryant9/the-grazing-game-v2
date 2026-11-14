@@ -33,6 +33,13 @@ export class FakeAuth implements AuthProvider {
     { email: string; verifier: string; used: boolean; expired: boolean; method: string }
   >();
   private readonly sessions = new Map<string, string>();
+  /**
+   * Tokens signed out everywhere. Like a real access token, one keeps passing the token check
+   * (`session`) until it runs out, while the server-side check (`user`) refuses it at once.
+   */
+  private readonly revoked = new Set<string>();
+  /** For tests: the text of the error a failing call throws (a real one may carry an address). */
+  errorText: string | null = null;
   private n = 0;
 
   constructor(private readonly db: PGlite) {}
@@ -46,12 +53,17 @@ export class FakeAuth implements AuthProvider {
     return id ? (this.users.get(id) ?? null) : null;
   }
 
-  user(jar: CookieJar): Promise<AuthUser | null> {
+  async user(jar: CookieJar): Promise<AuthUser | null> {
+    if (this.revoked.has(this.cookie(jar, 'fake_session') ?? '')) return null;
     return this.session(jar);
   }
 
+  private boom(what: string): Error {
+    return new Error(this.errorText ?? `${what} is down`);
+  }
+
   async sendLink(jar: CookieJar, email: string, redirectTo: string): Promise<void> {
-    if (this.fail.sendLink) throw new Error('mail is down');
+    if (this.fail.sendLink) throw this.boom('mail');
     const code = `link-${++this.n}`;
     const verifier = randomBytes(8).toString('hex');
     this.links.set(code, {
@@ -66,7 +78,7 @@ export class FakeAuth implements AuthProvider {
   }
 
   async googleUrl(jar: CookieJar, redirectTo: string): Promise<string> {
-    if (this.fail.googleUrl) throw new Error('google is down');
+    if (this.fail.googleUrl) throw this.boom('google');
     const verifier = randomBytes(8).toString('hex');
     jar.setAll([{ name: 'fake_verifier', value: `google:${verifier}` }]);
     return `https://accounts.example/google?to=${encodeURIComponent(redirectTo)}`;
@@ -92,7 +104,7 @@ export class FakeAuth implements AuthProvider {
   }
 
   async exchange(jar: CookieJar, code: string): Promise<AuthUser | null> {
-    if (this.fail.exchange) throw new Error('auth is down');
+    if (this.fail.exchange) throw this.boom('auth');
     const l = this.links.get(code);
     if (!l || l.used || l.expired) return null;
     const mine = (this.cookie(jar, 'fake_verifier') ?? '').split(':')[1];
@@ -134,7 +146,7 @@ export class FakeAuth implements AuthProvider {
     const token = this.cookie(jar, 'fake_session') ?? '';
     const id = this.sessions.get(token);
     if (scope === 'global' && id) {
-      for (const [t, u] of this.sessions) if (u === id) this.sessions.delete(t);
+      for (const [t, u] of this.sessions) if (u === id) this.revoked.add(t);
     } else this.sessions.delete(token);
     jar.setAll([{ name: 'fake_session', value: '', maxAge: 0 }]);
   }

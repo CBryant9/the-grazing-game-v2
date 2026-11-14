@@ -442,7 +442,7 @@ describe('the snapshot keeps the rules hidden', () => {
       saved: saveFarm(farm),
     } as unknown as StoredFarm;
     const store = new MemoryFarmStore();
-    await store.put(farmIdFor(A), stored);
+    await store.put(farmIdFor(A), stored, { expect: 'abc123' });
     const game = new GameServer({ store });
     const snap = (await game.snapshot(A))!;
     const bytes = Buffer.byteLength(JSON.stringify(snap));

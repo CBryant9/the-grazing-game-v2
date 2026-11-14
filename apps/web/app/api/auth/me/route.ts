@@ -25,35 +25,38 @@ const NONE: MeResponse = {
   scope: null,
 };
 
-export const GET = authRoute({ name: 'me', max: 120 }, async (ctx): Promise<MeResponse> => {
-  if (!ctx.deps) return NONE;
-  const switches = await featureSwitches(ctx.deps.sql);
-  const base: MeResponse = { ...NONE, accounts: true, signupsOpen: switches.signups_open };
-  const user = await ctx.deps.provider.session(ctx.jar).catch(() => null);
-  if (!user || user.anonymous) return base;
-  const account = await accountOf(ctx.deps, user);
-  if (!account.profile) {
-    const refused = await ctx.deps.sql.query(
-      'select 1 from public.signup_refusals where user_id = $1',
-      [user.id],
-    );
+export const GET = authRoute(
+  { name: 'me', max: 120, by: 'session' },
+  async (ctx): Promise<MeResponse> => {
+    if (!ctx.deps) return NONE;
+    const switches = await featureSwitches(ctx.deps.sql);
+    const base: MeResponse = { ...NONE, accounts: true, signupsOpen: switches.signups_open };
+    const user = await ctx.deps.provider.session(ctx.jar).catch(() => null);
+    if (!user || user.anonymous) return base;
+    const account = await accountOf(ctx.deps, user);
+    if (!account.profile) {
+      const refused = await ctx.deps.sql.query(
+        'select 1 from public.signup_refusals where user_id = $1',
+        [user.id],
+      );
+      return {
+        ...base,
+        signedIn: true,
+        needsSignUp: true,
+        refused: refused.rowCount > 0,
+        method: user.method,
+        scope: user.id,
+      };
+    }
+    const under = account.profile.underSixteen;
     return {
       ...base,
       signedIn: true,
-      needsSignUp: true,
-      refused: refused.rowCount > 0,
+      username: account.profile.username,
       method: user.method,
+      community: !under && switches.community,
+      interestAds: !under,
       scope: user.id,
     };
-  }
-  const under = account.profile.underSixteen;
-  return {
-    ...base,
-    signedIn: true,
-    username: account.profile.username,
-    method: user.method,
-    community: !under && switches.community,
-    interestAds: !under,
-    scope: user.id,
-  };
-});
+  },
+);

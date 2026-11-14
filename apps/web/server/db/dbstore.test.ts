@@ -124,14 +124,16 @@ describe('the database store: a guest farm', () => {
     expect(Array.isArray(rec.diary)).toBe(true);
   });
 
-  it('keeps every day for 90 days, then one a week, and nothing past 400', () => {
+  it('keeps every day for 14 days, then one a week, and nothing past 182', () => {
     expect(pastKept(10, 10)).toBe(true);
     expect(pastKept(11, 10)).toBe(false);
-    expect(pastKept(100, 150)).toBe(true);
-    expect(pastKept(55, 150)).toBe(false); // 95 days old, not a week day
-    expect(pastKept(56, 150)).toBe(true); // 94 days old, day 56 is a multiple of 7
-    expect(pastKept(7, 500)).toBe(false); // past 400 days
-    expect(pastKept(7, 350, 'db')).toBe(true);
+    expect(pastKept(140, 150)).toBe(true); // 10 days old
+    expect(pastKept(130, 150)).toBe(false); // 20 days old, day 130 is not a multiple of 7
+    expect(pastKept(126, 150)).toBe(true); // 24 days old, day 126 is a multiple of 7
+    expect(pastKept(7, 300)).toBe(false); // past 182 days
+    expect(pastKept(126, 300)).toBe(true); // 174 days old, a week day
+    expect(pastKept(7, 189, 'db')).toBe(false); // 182 days old: out
+    expect(pastKept(7, 188, 'db')).toBe(true); // 181 days old: in
     expect(pastKept(8, 14, 'file')).toBe(true);
     expect(pastKept(0, 14, 'file')).toBe(false);
   });
@@ -142,6 +144,7 @@ describe('the database store: a guest farm', () => {
     const put = async (day: number): Promise<void> => {
       const raw = (await store.get(fromUuid(id))) as StoredFarm;
       await store.put(fromUuid(id), raw, {
+        expect: raw.version,
         past: {
           version: 1,
           day,
@@ -159,6 +162,66 @@ describe('the database store: a guest farm', () => {
     expect(days).toEqual([120, 7, 0]);
     // The view rows went with the pictures.
     expect(await count('farm_snapshot_views')).toBe(3);
+  });
+});
+
+describe('the database store: second pass', () => {
+  it('10. a write must name the version it expects: leaving it out is refused', async () => {
+    await game.create(session(50), choices);
+    const id = fromUuid(
+      (await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id,
+    );
+    const farm = (await store.get(id)) as StoredFarm;
+    // @ts-expect-error `expect` is required in the interface
+    await expect(store.put(id, { ...farm, version: 'zz' }, {})).rejects.toThrow(/version/);
+    // @ts-expect-error and so is the options object
+    await expect(store.put(id, { ...farm, version: 'zz' })).rejects.toThrow(/version/);
+  });
+
+  it('11. a converted guest session is removed with the housekeeping, after 30 days', async () => {
+    await game.create(session(51), choices);
+    await game.create(session(52), choices);
+    await db.query(
+      `update public.guest_sessions set converted_at = now() - interval '31 days', converted_to = $1 where token_hash = $2`,
+      [USER, sessionHash(session(51))],
+    );
+    await db.query(
+      `update public.guest_sessions set converted_at = now() - interval '5 days', converted_to = $1 where token_hash = $2`,
+      [USER, sessionHash(session(52))],
+    );
+    await store.prune();
+    const left = await db.query<{ token_hash: string }>(
+      'select token_hash from public.guest_sessions',
+    );
+    expect(left.rows.map((r) => r.token_hash)).toEqual([sessionHash(session(52))]);
+  });
+
+  it('12. a past day is kept gzipped: a few KB, not the 45 KB of the view, and it reads back whole', async () => {
+    await game.create(session(53), choices);
+    await game.endDay(session(53));
+    const row = await db.query<{ n: number; b: number }>(
+      `select length(view_gz) as n, (select bytes from public.farm_snapshots limit 1) as b from public.farm_snapshot_views`,
+    );
+    expect(row.rows[0]!.n).toBeLessThan(8_000);
+    expect(row.rows[0]!.n).toBeGreaterThan(500);
+    expect(row.rows[0]!.b).toBe(row.rows[0]!.n);
+    const past = await game.pastDay(session(53), 1);
+    expect(past.view.paddocks.length).toBeGreaterThan(0);
+    expect(JSON.stringify(past).length).toBeGreaterThan(30_000);
+  });
+
+  it('1. a guest cookie only reaches a farm still owned by that guest session', async () => {
+    await game.create(session(54), choices);
+    // Another cookie, even one that hashes to a real farm id, owns nothing.
+    await expect(game.snapshot(session(55))).resolves.toBeNull();
+    await db.query(`update public.farms set owner_id = $1, guest_session_id = null`, [USER]);
+    await expect(game.snapshot(session(54))).rejects.toMatchObject({ status: 404 });
+    await expect(
+      store.guestAccess(
+        fromUuid((await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id),
+        session(54),
+      ),
+    ).resolves.toBe('denied');
   });
 });
 

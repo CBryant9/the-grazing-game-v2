@@ -534,6 +534,28 @@ export class GameServer {
     this.now = options.now ?? Date.now;
   }
 
+  /**
+   * The farm id for a key, after the store has agreed the key may reach it. A guest key (a
+   * session) reaches only a farm still owned by that guest session: once the farm moves into an
+   * account, or the session is converted, the old cookie gets "no farm" for every read, write and
+   * delete. This is the store's own owner check, not the cookie being cleared.
+   */
+  private async idFor(sessionId: string): Promise<string> {
+    const id = farmIdFor(sessionId);
+    if (isSessionId(sessionId) && this.store.guestAccess) {
+      if ((await this.store.guestAccess(id, sessionId)) === 'denied') {
+        throw new GameError(404, 'There is no farm yet. Set one up first.');
+      }
+    }
+    return id;
+  }
+
+  /** False for a guest session whose farm moved into an account (or that was converted): it is finished. */
+  async sessionUsable(sessionId: string): Promise<boolean> {
+    if (!isSessionId(sessionId) || !this.store.guestAccess) return true;
+    return (await this.store.guestAccess(farmIdFor(sessionId), sessionId)) !== 'denied';
+  }
+
   /** Run one thing at a time for a farm, so two quick taps never save over each other. */
   private async locked<T>(
     farmId: string,
@@ -627,7 +649,7 @@ export class GameServer {
         const wait = this.retryMs[attempt];
         if (wait === undefined) {
           this.cache.delete(farmId);
-          console.error('Saving a farm failed:', e instanceof Error ? e.message : e);
+          console.error('save_failed');
           throw new GameError(503, SAVE_FAILED_MESSAGE, 'save_failed');
         }
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -749,7 +771,7 @@ export class GameServer {
   async snapshot(sessionId: string): Promise<Snapshot | null>;
   async snapshot(sessionId: string, report: true): Promise<Snapshot | null | 'broken'>;
   async snapshot(sessionId: string, report = false): Promise<Snapshot | null | 'broken'> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(id, async () => {
       try {
         const held = await this.load(id);
@@ -784,7 +806,7 @@ export class GameServer {
 
   /** Start the session's farm from the setup choices. A session has one farm. */
   async create(sessionId: string, choices: SetupChoices, owner?: Owner): Promise<Snapshot> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     const who: Owner | null =
       owner ?? (isSessionId(sessionId) ? { kind: 'guest', session: sessionId } : null);
     if (!who) throw new GameError(400, 'That session is not valid.');
@@ -829,7 +851,7 @@ export class GameServer {
    * can't be opened is kept aside under another name, not deleted.
    */
   async remove(sessionId: string): Promise<void> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     await this.locked(id, async () => {
       this.cache.delete(id);
       try {
@@ -995,7 +1017,7 @@ export class GameServer {
 
   /** The job card for an action: time, cost and light left. Nothing changes. */
   async preview(sessionId: string, req: ActionRequest): Promise<PreviewResponse> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(id, async () => {
       const { farm, stored } = await this.need(id);
       const action = this.resolve(farm, req);
@@ -1044,7 +1066,7 @@ export class GameServer {
    * with the latest snapshot.
    */
   async act(sessionId: string, req: ActionRequest, meta: ActMeta = {}): Promise<ActResponse> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(
       id,
       async () => {
@@ -1151,7 +1173,7 @@ export class GameServer {
 
   /** The player has opened the inbox: every message up to this number is read. */
   async markRead(sessionId: string, upTo: number): Promise<Snapshot> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(
       id,
       async () => {
@@ -1190,7 +1212,7 @@ export class GameServer {
    * page of the diary. `before` asks for diary days older than that day.
    */
   async record(sessionId: string, before?: number): Promise<RecordResponse> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(id, async () => {
       const held = await this.need(id);
       const { stored, farm } = held;
@@ -1204,7 +1226,7 @@ export class GameServer {
 
   /** The picture of the farm on a past day, read only (milestone 3.2, PRD 5.2). */
   async pastDay(sessionId: string, day: number): Promise<PastDayWire> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     const found = await this.store.past(id, day);
     if (!found) throw new GameError(404, 'There is no picture of the farm kept for that day.');
     return found;
@@ -1212,7 +1234,7 @@ export class GameServer {
 
   /** The farm days that have a picture kept, newest first. */
   async pastDays(sessionId: string): Promise<number[]> {
-    return this.store.pastDays(farmIdFor(sessionId));
+    return this.store.pastDays(await this.idFor(sessionId));
   }
 
   /** The farms an owner has, most recently played first, with `currentId` marked. */
@@ -1239,7 +1261,7 @@ export class GameServer {
   async endDay(sessionId: string): Promise<DayResponse>;
   async endDay(sessionId: string, version: string): Promise<DayResponse | StaleResponse>;
   async endDay(sessionId: string, version?: string): Promise<DayResponse | StaleResponse> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(
       id,
       async () => {
@@ -1289,7 +1311,7 @@ export class GameServer {
     anyway = false,
     version?: string,
   ): Promise<DayResponse | StaleResponse> {
-    const id = farmIdFor(sessionId);
+    const id = await this.idFor(sessionId);
     return this.locked(
       id,
       async () => {

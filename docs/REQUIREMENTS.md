@@ -332,6 +332,6 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 
 - [x] A failed save retries, the player sees "Saving again", a job is never shown as done before it is stored, and if saving finally fails the player is told what was not saved. *(BUILD_PLAN 3.2, built and tested with injected failures and races.)*
 - [x] A guest plays one farm kept on this device; making an account moves the farm in, or says plainly there is no room. *(PRD 8.1.)*
-- [x] See the farm on a past day, read only, from the Diary, with "You are looking at Day N" and a way back. *(Closes the call deferred in 1.7g. The picture is kept for every day for 90 days, then weekly to 400 days; the file store keeps the last 14.)*
+- [x] See the farm on a past day, read only, from the Diary, with "You are looking at Day N" and a way back. *(Closes the call deferred in 1.7g. The picture is kept for every day for 14 days, then weekly to 182 days (gzipped, about 180 KB a farm at most); the file store keeps the last 14.)*
 - [x] Download my data and delete my account, with a typed confirm that says what goes and what stays. *(PRD 21a "Your data".)*
 - [x] One player never sees another's farm on a shared device: the offline copy is kept per player and cleared on sign out. *(PRD 21a.)*

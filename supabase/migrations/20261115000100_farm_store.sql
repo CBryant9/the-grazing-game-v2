@@ -4,7 +4,8 @@
 -- 1. farm_saves.missed_wages: StoredFarm.missedWages, the farm days a pay day was missed.
 -- 2. farm_snapshot_views: the view of a past day for "see the farm on a past day" (PRD 5.2).
 --    farm_snapshots stays the index (day, date); the numbers live here, server only,
---    because they are game data the browser must only get through the server.
+--    because they are game data the browser must only get through the server. Kept gzipped
+--    (`view_gz`): a day's picture is 45 to 48 KB as JSON and 3.5 to 4.7 KB gzipped.
 -- 3. farm_saves_aside: a save that could not be opened, kept aside ("Start a new farm"
 --    never deletes it). Server only. It goes with its owner when an account or
 --    guest goes, and is cleared by prune_housekeeping after 30 days.
@@ -15,7 +16,7 @@ alter table public.farm_saves
 create table public.farm_snapshot_views (
   farm_id uuid not null,
   day integer not null check (day >= 0),
-  view jsonb not null,
+  view_gz bytea not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (farm_id, day),

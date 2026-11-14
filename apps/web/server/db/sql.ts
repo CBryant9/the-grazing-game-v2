@@ -43,18 +43,70 @@ export function sqlFromEnv(): SqlClient | null {
 /** True when the database is configured. Everything database-shaped asks this first. */
 export const databaseOn = (): boolean => Boolean(process.env[DB_URL_ENV]?.trim());
 
-interface PgLike {
+interface Conn {
   query(text: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
-  connect(): Promise<{
-    query(text: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
-    release(error?: boolean): void;
-  }>;
+  release(error?: boolean): void;
+}
+export interface PgLike {
+  query(text: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
+  connect(): Promise<Conn>;
+}
+
+/** The role every statement runs as. The pooler connects as an owner; the server drops to this. */
+export const SERVER_ROLE = 'service_role';
+
+/**
+ * A client on a pool. Every statement, even a single one, runs inside a transaction that begins
+ * with `set local role service_role`, so the server has the rights of Supabase's service role
+ * and no more (it is not the database owner), and the tests, which also run as `service_role`,
+ * match it. `set local` lasts to the end of the transaction, so a pooled connection is never
+ * left in another role for the next caller.
+ */
+export function clientOnPool(pool: PgLike): SqlClient {
+  const run = (c: Conn): SqlRunner => ({
+    async query<T>(text: string, params?: unknown[]) {
+      const r = await c.query(text, params);
+      return { rows: r.rows as T[], rowCount: r.rowCount ?? r.rows.length };
+    },
+  });
+  const client: SqlClient = {
+    query: (text, params) => client.transaction((tx) => tx.query(text, params)),
+    async transaction<T>(fn: (tx: SqlRunner) => Promise<T>) {
+      const conn = await pool.connect();
+      let broken = false;
+      try {
+        await conn.query('begin');
+        await conn.query(`set local role ${SERVER_ROLE}`);
+        const out = await fn(run(conn));
+        await conn.query('commit');
+        return out;
+      } catch (e) {
+        try {
+          await conn.query('rollback');
+        } catch {
+          broken = true;
+        }
+        throw e;
+      } finally {
+        conn.release(broken);
+      }
+    },
+  };
+  return client;
 }
 
 /** A pool of a few connections (a serverless function needs very few). Opened on first use. */
 function pgClient(url: string): SqlClient {
   let pool: PgLike | null = null;
-  const get = async (): Promise<PgLike> => {
+  const lazy: PgLike = {
+    async query(text, params) {
+      return (await open()).query(text, params);
+    },
+    async connect() {
+      return (await open()).connect();
+    },
+  };
+  async function open(): Promise<PgLike> {
     if (!pool) {
       const { Pool } = await import('pg');
       pool = new Pool({
@@ -66,35 +118,6 @@ function pgClient(url: string): SqlClient {
       }) as unknown as PgLike;
     }
     return pool;
-  };
-  const run = (c: PgLike | Awaited<ReturnType<PgLike['connect']>>): SqlRunner => ({
-    async query<T>(text: string, params?: unknown[]) {
-      const r = await c.query(text, params);
-      return { rows: r.rows as T[], rowCount: r.rowCount ?? r.rows.length };
-    },
-  });
-  return {
-    async query<T>(text: string, params?: unknown[]) {
-      return run(await get()).query<T>(text, params);
-    },
-    async transaction<T>(fn: (tx: SqlRunner) => Promise<T>) {
-      const client = await (await get()).connect();
-      let broken = false;
-      try {
-        await client.query('begin');
-        const out = await fn(run(client));
-        await client.query('commit');
-        return out;
-      } catch (e) {
-        try {
-          await client.query('rollback');
-        } catch {
-          broken = true;
-        }
-        throw e;
-      } finally {
-        client.release(broken);
-      }
-    },
-  };
+  }
+  return clientOnPool(lazy);
 }

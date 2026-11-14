@@ -23,8 +23,8 @@ export const GET = authRoute({ name: 'callback', max: 30 }, async (ctx) => {
   let user = null;
   try {
     user = await ctx.deps.provider.exchange(ctx.jar, code);
-  } catch (e) {
-    console.error('Sign-in code exchange failed:', e instanceof Error ? e.message : e);
+  } catch {
+    console.error('code_exchange_failed');
   }
   if (!user || user.anonymous) return redirect(ctx, '/sign-in?problem=link');
   const account = await accountOf(ctx.deps, user);
