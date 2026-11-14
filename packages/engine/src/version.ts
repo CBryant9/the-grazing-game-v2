@@ -58,8 +58,59 @@
  * cattle, crop, season or price formula changed. A farm with no hands and
  * no contract fencing plays exactly as it did on 0.12.1 (a test holds its
  * digest).
+ *
+ * 0.14.0 (milestone 2.3): the sheep model. Sheep mobs beside the cattle
+ * mobs, on the same grass model: energy and intake by class, growth,
+ * condition, joining on a 17-day cycle, lambing, lamb survival, marking and
+ * weaning counts, wool and micron, deaths (lambing, weaners, thin sheep, no
+ * water, flystrike) and water by class (docs/MODEL.md, the sheep section).
+ * No grass, cattle, crop, season or price formula changed. A farm with no
+ * sheep plays exactly as it did on 0.13.0 (a test holds its digest).
+ *
+ * 0.15.0 (milestone 2.3 second pass and the engine half of 2.4): sheep run
+ * as records of like animals with head counts (drawn from the seeded
+ * streams); sheep feeding (lick, grain, hay); contractor shearing and
+ * crutching on dates, with wool sold at shearing; sheep health costs; sheep
+ * deaths in the year score; the sheep market (buying and selling at the
+ * MLA indicators); netting fence; sheep that get through cattle fences;
+ * the cattle, sheep or mix choice at setup; one DSE figure (8.4) for every
+ * display. No grass, cattle, crop, season or price formula changed. A farm
+ * with no sheep plays exactly as it did on 0.13.0 (a test holds its digest).
+ *
+ * m2.5, calf growth (numbered 0.14.0 on its own branch, cut from 0.13.0;
+ * shipped in 0.16.0 below): stock under 200 kg pay the measured energy
+ * cost for a kg of gain (Sekine and Asahida 1990), moving to the grown
+ * animal's cost in a straight line from 100 to 200 kg (`mjPerKgGain`); and
+ * a cow's milk falls with her condition (to none at CS 1.5), not with the
+ * feed's ME (`milkMJ`, `MILK`); and no milk is made past what her loss
+ * for the day can pay for (`unpaidMilk`). Deliberate cattle model changes:
+ * calves grow faster. Logged in
+ * docs/CALIBRATION.md (the m2.5 entry); the no-hands digests were taken
+ * again. No stored field changed, so the save format stays 9.
+ *
+ * 0.16.0 (m2.7, the engine join): the sheep line (0.15.0) and the calf
+ * growth change joined. Both sets of rules are in; nothing else changed.
+ * The calf rules move cattle only: every cattle figure equals the calf
+ * branch's and every sheep figure the sheep branch's (docs/CALIBRATION.md,
+ * the m2.7 entry). A farm with no sheep plays as the calf branch did (the
+ * no-hands digests hold). No stored field changed, so the save format
+ * stays 11.
+ *
+ * 0.17.0 (m2.7, review of the sheep third pass): sheep only. A lambing that
+ * began before the farm's first day is a negative day, so start lambs are
+ * marked and weaned (and no lamb stays at foot past 150 days); a sheep
+ * under half its normal weight for its age dies, starved; the start flock
+ * keeps only the replacements it needs, casts the oldest ewes at weaning,
+ * has the lambs and the ewes in lamb the model itself would; adult and
+ * wether deaths 0.91% a year (the document's arithmetic); lambs count in
+ * the year's births; sheep plans take a move's daylight, warn of dry stops
+ * and pause and resume; sheep on their way count in net worth; the sheep
+ * breakout stream carries on from day to day; real-year sheep prices; the
+ * budget's shearing, crutching and ram replacement costs; the weekly
+ * losing-weight and low-condition notes. No cattle, grass or crop rule
+ * changed. Logged in docs/CALIBRATION.md (the m2.7 review entry).
  */
-export const ENGINE_VERSION = '0.13.0';
+export const ENGINE_VERSION = '0.17.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -104,5 +155,23 @@ export const ENGINE_VERSION = '0.13.0';
  * day, contract fencing under way and the injury stream). It is left out on
  * a farm that has never hired or ordered contract fencing, so an older save
  * loads with no hands and no contract fencing, and is otherwise unchanged.
+ *
+ * 10: sheep (milestone 2.3). A farm may have `sheep` (its sheep mobs and
+ * their random streams); a mob's sheep are saved in columns. It is left out
+ * on a farm that has never had sheep, so an older save loads with no sheep
+ * and is otherwise unchanged.
+ *
+ * 11: sheep as records (milestone 2.3 second pass and 2.4, engine half). A
+ * sheep record has `n` (head) and `doomed2`; a sheep mob has `feed`,
+ * `shearOn`, `crutchOn` and `lastBreak`; a year may have `wool` and
+ * `sheepDeaths`. A format 10 save loads each sheep as a record of one, with
+ * the district's shearing days and no feed. Older saves load with no sheep.
+ *
+ * 12: the sheep review (m2.7). A joining's `lambingStart` is null before
+ * lambing, not -1, so a lambing that began before the farm's first day can
+ * be a negative day; a format 11 or older save's -1 loads as null. On a
+ * real-year farm, `sheep.prices` keeps today's sheep indicators and their
+ * data version (left out with random seasons). A format 10 lamb doomed to
+ * die after day 2 now dies on its next day.
  */
-export const SAVE_FORMAT_VERSION = 9;
+export const SAVE_FORMAT_VERSION = 12;

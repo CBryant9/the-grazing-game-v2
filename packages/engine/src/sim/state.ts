@@ -24,6 +24,7 @@ import type { YearOrder } from '../season/realYears';
 import type { Action } from '../actions/types';
 import type { FarmEvent } from './events';
 import type { LabourState } from '../labour/types';
+import type { SheepState } from '../sheep/types';
 
 /** Where a mob is. */
 export type MobWhere =
@@ -75,7 +76,12 @@ export interface PlanTemplate {
 }
 
 /** Why a plan can not move a mob today. */
-export type PlanWaitReason = 'no-water';
+export type PlanWaitReason =
+  | 'no-water'
+  /** Sheep graze the next stop: cattle never go in with sheep. */
+  | 'sheep-there'
+  /** Cattle graze the next stop of a sheep plan: sheep never go in with cattle. */
+  | 'cattle-there';
 
 /** A mob running a template: where it is on it, and the counts so far. */
 export interface PlanRun {
@@ -158,8 +164,20 @@ export interface YearTotals {
   sales: number;
   /** Dollars spent buying cattle, freight included. */
   buys: number;
-  /** Dollars spent on supplements and the feedlot. */
+  /** Dollars spent on supplements and the feedlot (and on feeding sheep). */
   feed: number;
+  /** Dollars from wool sold at shearing, after selling costs. Left out until a farm first sells wool. */
+  wool?: number;
+  /** Dollars from sheep sold, after selling costs, and spent buying sheep. Left out until the first. */
+  sheepSales?: number;
+  sheepBuys?: number;
+  /** Sheep that died (lambs included). Left out until a farm first has sheep die. */
+  sheepDeaths?: number;
+  /**
+   * The same deaths weighed by each animal's size, in AE ((kg ÷ 450)^0.75, the
+   * cattle AE rule): what the year score counts. Left out with `sheepDeaths`.
+   */
+  sheepDeathAe?: number;
   /** Dollars from grain. */
   grain: number;
   /** Dollars spent on sowing forages and crops, and on harvesting. */
@@ -436,6 +454,13 @@ export interface FarmState {
    * then saves and plays exactly as it did before hands existed.
    */
   labour?: LabourState;
+
+  /**
+   * Sheep (milestone 2.3): the farm's sheep mobs and their random streams.
+   * Left out on a farm that has never had sheep, which then saves and plays
+   * exactly as it did before sheep existed.
+   */
+  sheep?: SheepState;
 }
 
 /** The MVP's price chart kept 31 days. */

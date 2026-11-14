@@ -24,6 +24,7 @@ import { labourDawn } from '../labour/day';
 import { animalLookup, type Animal } from '../cattle/types';
 import type { FarmEvent } from '../sim/events';
 import { newMob } from '../sim/mobs';
+import { createSheepMob } from '../sheep/farm';
 import { toInbox, type FarmMob, type FarmState } from '../sim/state';
 
 /**
@@ -56,6 +57,37 @@ export function dawn(farm: FarmState, env: ActionEnv = {}): FarmEvent[] {
         mob: mob.id,
         mobName: mob.name,
         joined,
+      });
+    }
+  }
+
+  // 1b. Sheep bought land in the stock yards (a sheep yards mob of their own).
+  const sheepDue = farm.sheep?.arrivals?.filter((a) => a.arriveDay <= farm.day) ?? [];
+  if (sheepDue.length) {
+    const state = farm.sheep!;
+    state.arrivals = state.arrivals!.filter((a) => a.arriveDay > farm.day);
+    if (!state.arrivals.length) delete state.arrivals;
+    for (const a of sheepDue) {
+      let mob = state.mobs.find((m) => m.where.kind === 'yards' && m.sheep.length > 0);
+      if (!mob) {
+        mob = createSheepMob(
+          farm.nextMobId++,
+          '',
+          { kind: 'yards', since: farm.day },
+          farm.district,
+        );
+        mob.name = 'Sheep ' + mob.id;
+        state.mobs.push(mob);
+      }
+      for (const s of a.sheep) mob.sheep.push(s);
+      const head = a.sheep.reduce((t, s) => t + s.n, 0);
+      events.push({
+        type: 'sheep-arrived',
+        cls: a.cls,
+        head,
+        cost: a.total,
+        mob: mob.id,
+        mobName: mob.name,
       });
     }
   }

@@ -4,27 +4,37 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 
 ## Benchmarks
 
-| What | Target | Why this figure |
-|---|---|---|
-| Steer gain, Central Qld, set-stocked, no lick | 20–60 kg/head/yr | Spear grass country without supplement: weight lost through the dry wipes out most of the wet-season gain |
-| Steer gain, Central Qld, with lick | 75–130 kg/head/yr | Urea/protein lick lifts dry-season intake (CP < 7%) |
-| Steer gain, Northern Tablelands | 90–105 kg/head/yr | Frosty winters, a good summer |
-| Steer gain, Central West NSW | 115–130 kg/head/yr | Spring flush, rain through the year |
-| Steer gain, Western Victoria | 155–185 kg/head/yr | Higher-quality temperate native pasture |
-| Steer gain, Top End | 30–55 kg/head/yr | Long dry, low CP, big paddocks |
-| Annual deaths, lick and normal stocking | 1.5–3.6% (Top End 2–5%) | Industry ranges. Droughts with no destocking can be far worse, and that is intended |
-| Intake on green leafy feed | 2.5–3% of live weight | |
-| Intake on dry stemmy feed | 1.5–2% of live weight | Lactating cows eat more |
-| Conception per 3-week cycle | ~50–65% in good condition, ~25% at CS 2 | |
-| 9-week joining at CS 3–4 | 85–95% in calf | About 4% of cows never get in calf |
-| Post-calving anoestrus | 45 days (good condition) to 85+ (CS 2) | |
-| Carrying capacity | annual growth × 0.65 × district safe utilisation ÷ 3,285 kg | About 0.3 AE/ha in Central Qld, much lower in the Top End |
-| Barley yield, Central West | ~2.5 t/ha | |
-| Wheat yield, Central West | ~2.4–3 t/ha | |
-| Steers on oats | ME ~10.7, CP ~18%, ~1.4 kg/day | |
-| Speed | under ~5 ms per simulated day with 4,000+ head | Fast-forward must stay smooth |
+| What | Target | Why this figure | State (engine 0.17.0) |
+|---|---|---|---|
+| Steer gain, Central Qld, set-stocked, no lick | 20–60 kg/head/yr | Spear grass country without supplement: weight lost through the dry wipes out most of the wet-season gain | Pass |
+| Steer gain, Central Qld, with lick | 75–130 kg/head/yr | Urea/protein lick lifts dry-season intake (CP < 7%) | Pass, with a known gap held: the average year may run up to 2 kg over the top (`averageYearOver`) |
+| Steer gain, Northern Tablelands | 90–105 kg/head/yr | Frosty winters, a good summer | Pass |
+| Steer gain, Central West NSW | 115–130 kg/head/yr | Spring flush, rain through the year | Pass |
+| Steer gain, Western Victoria | 155–185 kg/head/yr | Higher-quality temperate native pasture | Pass |
+| Steer gain, Top End | 30–55 kg/head/yr | Long dry, low CP, big paddocks | Not tested: not a launch district |
+| Annual deaths, lick and normal stocking | 1.5–3.6% (Top End 2–5%) | Industry ranges. Droughts with no destocking can be far worse, and that is intended | Pass (steers and herds, four districts) |
+| Intake on green leafy feed | 2.5–3% of live weight |  | Pass |
+| Intake on dry stemmy feed | 1.5–2% of live weight | Lactating cows eat more | Pass |
+| Conception per 3-week cycle | ~50–65% in good condition, ~25% at CS 2 |  | Pass |
+| 9-week joining at CS 3–4 | 85–95% in calf | About 4% of cows never get in calf | Pass |
+| Post-calving anoestrus | 45 days (good condition) to 85+ (CS 2) |  | Pass |
+| Carrying capacity | annual growth × 0.65 × district safe utilisation ÷ 3,285 kg | About 0.3 AE/ha in Central Qld, much lower in the Top End | Pass |
+| Barley yield, Central West | ~2.5 t/ha |  | Pass |
+| Wheat yield, Central West | ~2.4–3 t/ha |  | Pass |
+| Steers on oats | ME ~10.7, CP ~18%, ~1.4 kg/day |  | Pass |
+| Home-bred calves, Central Qld (m2.5) | 0.6–0.95 kg/day birth to 200 days and from 100 to 200 days; 100–146 kg at 100 days; 140–225 kg at 200 days | Nearest source, not the district's own: Brahman-Shorthorn calves in north Queensland (Fordyce et al. 1993), about 0.77 kg/day; the floors are a quarter under it (stand-in, years 25% apart); 100 kg at 100 days is FutureBeef's usual lowest weaning weight | Weight at 100 and 200 days pass. Known open gaps (expected failures): 0.53 kg/day birth to 200 days, 0.33 from 100 to 200. Regression floors held |
+| Home-bred calves, Northern Tablelands, Central West, Western Victoria (m2.5) | 0.7–1.1 kg/day birth to 200 days and from 100 to 200 days; 101–146 kg at 100 days; 171–256 kg at 200 days | Nearest source, not the districts' own: MLA More Beef from Pastures tool 5.05 (British calves, Grafton) | Weight at 100 days passes. Known open gaps (expected failures): birth to 200 days 0.54 / 0.57 / 0.63 kg/day, 200 days 143 / 149 / 163 kg, 100 to 200 days 0.39 / 0.29 / 0.36 kg/day. Regression floors held |
+| Herd years 1 to 3, no player action (m2.5, `herdYears.test.ts`) | pinned to the m2.5 figures (5 calves per 100 females, 8 points of cows under CS 2.25) | A pin, not a benchmark: holds calving and cow condition in later years | Pass |
+| Sheep, SHEEP_BENCHMARKS.md rows (SB-01 to SB-65) | each row's band (see Sheep benchmarks below) | Sources S1 to S74 | Engine 0.17.0: 82 tests named by SB row: 71 pass; 7 known open gaps (expected failures, figures in their names), each with a regression limit beside it: SB-43 Merino ewe deaths 3.33 (blocks 4.67, 5.08) / 3.98 (blocks 5.26, 5.53) / 4.70%, SB-43 first-cross 4.95 / 5.36 / 5.35% (Tablelands / Central West / Western Victoria), SB-47 Western Victoria weaners 1.66%; 4 skipped: SB-59 to SB-62 (C18, carrying capacity). SB-65 is now tested (netting $10 a metre against permanent $7) |
+| Start flock, first year with no hands (m2.3) | within half to twice the DPIRD $50.46/DSE gross margin (unmanaged: no sales, no feeding) | DPIRD 2025 self-replacing 20-micron Merino gross margin | Central West passes ($44.28). Known open gaps (expected failures) with regression limits: Tablelands $5.37, Western Victoria $135.74 a DSE |
+| SB-GM: a managed self-replacing Merino flock, gross margin (m2.7 review) | $37.85 to $63.08 a budget DSE (±25% of DPIRD's $50.46; the budget rates 2.32 DSE a ewe joined) | NSW DPIRD 2025 self-replacing 20-micron Merino (Sheep Central, 5 Aug 2026) | Central West passes ($38.69). Known open gaps with regression limits: Tablelands $71.88, Western Victoria $90.33 (wool at 2026 prices) |
+| Speed | under ~5 ms per simulated day with 4,000+ head (cattle); the largest flock (sheep) | Fast-forward must stay smooth | Pass (`pnpm test:speed`) |
 
 Seasons are random. Judge a run against its season: a drought year below target is expected, but an average year outside target is a bug.
+
+## Sheep benchmarks
+
+The sheep benchmarks are the table at the end of [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md) (SB-01 to SB-65, with SB-43a, SB-48a and SB-52a to SB-52c), with their sources and the calls behind each band (C1 to C32). Each row is an automated test named by its SB number in `packages/engine/src/calibration/sheep.units.test.ts`, `sheep.paddock.test.ts`, `sheep.mob.test.ts` and `sheep.year.test.ts`, run with the rest by `pnpm test`. A row that cannot be tested yet is a skipped test with its reason in its name. The model's figure for every row is in the results log (15 Nov 2026, milestone 2.3).
 
 ## How to run the checks (the rebuild)
 
@@ -1128,6 +1138,372 @@ No grass, cattle, crop, season or price formula changed, and the daily tick (`st
 - **Evidence that cattle and grass did not move:** `packages/engine/src/labour/noHands.test.ts` runs a running farm for a year on random seasons (seed 11, NSW, with a fence job) and for half a year on real years (seed 5, Central West from 2006, with a tape job), and hashes the whole farm (engine version, save format and labour state left out). Both digests were taken on engine 0.12.1 (commit cb9cba4, before any labour code) and both still match: `119de6c1e6862bb2` and `a52568e82c5f4cdf`.
 - **Real-year calibration:** the herd and steer files (`calibration/realYearHerds.{cq,nsw,cw,wv}.test.ts`, `calibration/realYearSteers.{cqLick,cqNoLick,nsw,cw,wv}.test.ts`) were run on this branch: 9 files, 55 tests, all pass, with no band changed.
 - The whole suite (`pnpm test`) passes, with no `*.mvp.test.ts` file or calibration band changed.
+
+### 15 Nov 2026, milestone 2.3 third pass: engine 0.15.0, save format 11
+
+What changed in the model: adult deaths outside lambing put back to 0.8% a year, now derived from the document (`ADULT_DAILY`: Lifetime Wool's 3.2% a year at CS 3, S19, less 1.95% at lambing, S67, leaves 1.25%; less flystrike, 17% struck × 2% dying = 0.34%, S37, leaves about 0.8%); wethers get their own rate by the same working (`WETHER_DAILY`, 0.8%); Merino ewe micron 17.8 (was 17.0); grain charged at feed barley's $330 a tonne (was the pellet price); the year harness feeds through the player's action (`setSheepFeed`), not by setting the mob's feed. No cattle or grass figure moved, and no band was changed.
+
+**The year rows, before (second pass) and after** (mean of eight seeds, with winter feeding; Tablelands / Central West / Western Victoria):
+
+| Row | Band | Before | After |
+|---|---|---|---|
+| SB-40 Merino marking | 75–90% | 89.9 / 88.6 / 85.8 | 89.5 / 87.1 / 85.2 |
+| SB-41 first-cross marking | 100–120% | 114.9 / 111.7 / 116.9 | 115.2 / 111.1 / 115.9 |
+| SB-43 Merino ewe deaths | 2–4%, no block over 4.5% | 2.21 / 3.29 / 3.82 | 3.10 / 3.98 / **4.63** |
+| SB-43 first-cross ewe deaths | 2–4% | 4.22 / 4.74 / 4.57 (gaps) | 4.50 / 5.76 / 5.13 (gaps) |
+| SB-47 weaner deaths | 2–6% | 5.41 / 2.19 / 1.65 (gap) | 5.41 / 2.21 / 1.66 (gap) |
+| SB-52 wether fleece, micron | 3.8–4.6 kg; 18–20 | 4.36, 19.3 / 4.20, 19.1 | unchanged |
+| SB-52a ewe fleece | 3.3–4.7 kg | 4.43 / 4.13 / 4.27 | 4.42 / 4.13 / 4.27 |
+| SB-52b first fleece | 1.0–1.5 kg | 1.25 | 1.25 |
+| SB-52c first-cross share | 65–85% | 75.5% | 75.6% |
+| SB-53 struck that die | 1.8–2.2% | 2.14% | 2.09% (18.35% struck) |
+| SB-54 | as before | — | 5.10% |
+
+**SB-43 is now tested per block** ("never over 4.5%" on every 675-ewe block, not the mean). Known open gaps, expected failures with the figures in their names: Merino, Tablelands, one block of eight at 4.67% (mean 3.10, passes); Central West, blocks at 5.26, 5.00 and 5.53% (mean 3.98, passes); Western Victoria, mean 4.63%. First-cross as before. With the derived 0.8% put back, the Merino rows sit at the top of the band or over it. The second pass's 0.4% passed them only because it was fitted to them.
+
+**Western Victoria's movement, explained.** Three seeds against eight on the same code: in lamb 90.9 against 90.3%, scanning 124.3 against 123.2%, marked 86.3 against 85.2%, ewe deaths 4.25 against 4.63%. So about a point of marking is sampling (three seeds to eight). The deaths rise is mostly the adult rate going from 0.4% back to 0.8% (0.4 of a point), and the rest is sampling. Weaning: **21.9 kg on day 245 from 1 April, 2 December** (22.3 kg on three seeds).
+
+**Unfed winter, re-measured (eight seeds, average year).** Tablelands: ewe deaths **31.7%**, marking 48.8%, CS at lambing 1.41. Central West: deaths 6.41%, marking 71.1%, CS 2.42. (The second pass's "19%" was three seeds on the 0.4% adult rate.) With winter feeding: Tablelands deaths 3.10% and **$19.76 a ewe** of grain a year; Central West 3.98% and $9.26 a ewe. The Tablelands figure rides on the grass question (C18, below): it is the cost of the grass model's native winter.
+
+**Start flocks, the first year with no hands** (`sheep/start.test.ts`; seed 7, medium farm, from 1 September, average year). Profit is the change in net worth, wool on the sheep's backs counted (net of the levy and the cost to shear it) so that wool grown before the start is not counted as the year's:
+
+| District | Head at start (at foot) | DSE | Lambs born | First shearing | Profit |
+|---|---|---|---|---|---|
+| Tablelands | 1,150 (0) | 1,712 | 1,217 | day 80: 3.69 kg clean, 17.7 µm | $19,925, $11.6/DSE (897 deaths, nobody fed) |
+| Central West | 3,256 (1,481) | 3,127 | 628 | day 353: 3.86 kg, 17.9 µm | $389,837, $124.7/DSE |
+| Western Victoria | 947 (0) | 1,439 | 1,280 | day 74: 4.07 kg, 17.9 µm | $215,731, $149.9/DSE |
+
+Compared with NSW DPIRD's 2025 self-replacing 20-micron Merino gross margin of **$50.46/DSE** (DPIRD release, 6 Aug 2026). Tested: lambs, a clip of 3 to 5 kg clean at 16.5 to 19.5 µm, and a profit between −$50 and $200 a DSE. Known gap (expected failure): none of the three is within half to twice the gross margin. The Tablelands loses its unfed winter; Central West and Western Victoria keep every lamb (nothing is sold, so the whole crop is valued at 2026 market prices, which are high) and carry only shearing, feed and health as running costs.
+
+**Construction notes.** The start flock is built with the model's own figures (conception at CS 3, litters, lamb survival, birth weight, 0.198 kg a day lamb growth, S68; 50 g a day after weaning, S17), so the first year plays on from where it stands; it is not fitted to anything. Cast for age at 6 years is a stand-in.
+
+### 15 Nov 2026, milestone 2.3 second pass and the engine half of 2.4: engine 0.15.0
+
+After a review (an Opus run of its own flocks). What changed in the model: sheep run as records of like animals with head counts, drawn from the seeded streams (the year tests then went from 35 s to 8 s); adult deaths outside lambing refitted from 0.8% to 0.4% a year (`ADULT_DAILY`, fitted to SB-43, which it was fitted to before: as records the year runs gave Merino ewes 4.2%); the Central West and Tablelands joining dates sourced (Central West 5 January for June lambing, Tablelands 7 April for September lambing: NSW DPIRD); sheep feeding added, and every year row now runs with the district's winter feeding (grain to fill the energy gap whenever a mob's CS falls under 2.7, Lifetime Wool's target, S18; weaners while they grow under 50 g a day, MMFS S17). Year rows are the mean over eight seeds (three before). No cattle or grass figure moved; the one DSE display figure (8.4, call C3) is read by no cattle formula, and every cattle band and `*.mvp.test.ts` passes as before.
+
+**Bands put back.** SB-53's "about 2% of the struck die" is held at 1.8 to 2.2% (call C6), not the 0.5 to 5% the first pass allowed; it is measured on 100,000 ewes so the figure is good to a tenth of a point (2.14%). Every other row's band was checked against SHEEP_BENCHMARKS.md and is as the document gives it. SB-43 is now tested on both breeds.
+
+**The year rows, all three districts** (mean of eight seeds, with winter feeding):
+
+| Row | Band | Tablelands | Central West | Western Victoria |
+|---|---|---|---|---|
+| SB-40 Merino marking | 75–90% | 89.9 | 88.6 | 85.8 |
+| SB-41 first-cross marking | 100–120% | 114.9 | 111.7 | 116.9 |
+| SB-43 Merino ewe deaths (CS at lambing) | 2–4% | 2.21 (2.66) | 3.29 (2.69) | 3.82 (2.92) |
+| SB-43 first-cross ewe deaths | 2–4% | **4.22, known open gap** | **4.74, known open gap** | **4.57, known open gap** |
+| SB-47 weaner deaths | 2–6% | 5.41 | 2.19 | **1.65, known open gap** |
+| SB-52 wether fleece, micron | 3.8–4.6 kg; 18–20 | 4.36, 19.3 | 4.20, 19.1 | — |
+| SB-52a ewe fleece | 3.3–4.7 kg | 4.43 | 4.13 | 4.27 |
+| SB-52b first fleece (8 months) | 1.0–1.5 kg | — | — | 1.25 |
+| SB-52c first-cross share | 65–85% | — | — | 75.5% |
+
+The known open gaps are vitest expected failures (`it.fails`), with the reason and the figure in the test's name; each fails the run if it starts to pass. First-cross ewes: S67 puts their lambing deaths alone at 3.25%, so with the adult rate and flystrike they sit over SB-43's 4%. Western Victoria's weaners: the band is the national survey average, which takes in worm deaths, and worms are left out (C22). Held on the mean over the blocks (as every year band is): the highest single 675-ewe block in Western Victoria went over 4.5%, which is one block's noise (about 0.7 points from block to block).
+
+**What a pass means, row by row.** Some rows are checked by construction: the constant is the band, or a rule is tested on its own input, so the pass shows the constant is in the right place, not that the model produced it. The rest go through the daily sheep step on a held paddock (Mob) or the daily tick on real pasture (Year).
+
+- **By construction** (a figure or rule read directly): SB-01, SB-02, SB-03, SB-04 to SB-13 (the energy formulas at set inputs), SB-14 to SB-16 (appetite at set inputs), SB-27, SB-28, SB-29 (gestation), SB-49, SB-51, SB-56 to SB-58 (water table), SB-63, SB-64, and the rule parts of SB-32, SB-44 and SB-53.
+- **Through the sheep step on a held paddock**: SB-17 to SB-26, SB-29 (first lambs), SB-30 to SB-39, SB-42, SB-43a, SB-44, SB-45, SB-46, SB-48, SB-48a, SB-50, SB-53 to SB-55.
+- **Through the daily tick on real pasture, average year**: SB-40, SB-41, SB-43, SB-47, SB-52, SB-52a, SB-52b, SB-52c.
+
+**Read with care.**
+
+- `WEANER_DEATHS` is three parameters (base, growth and weight) fitted to three points (MMFS table 10.1's groups 1, 3 and 4), so SB-45 and SB-46 passing is close to a pass by construction; the fourth group (18.1 kg growing 136 g a day, 0.0%) comes out at about 0.8%.
+- `SURVIVAL_PER_CS` passes SB-37 at 11.3 more lambs per 100 against a floor of 10: near the edge, because the slopes sit between S19's table and its text, which disagree (C32).
+- `DEAD_IN_REACH` was moved from 0.25 to 1 in the first pass (LESSONS SH1): at 0.25 sheep on dry winter feed starved whatever the stocking.
+
+**Speed.** The largest flock the game holds (Western Victoria, 1,500 ha, stocked as the year benchmarks: 3,897 ewes and their lambs, 7,012 head after lambing) now runs at **2.65 ms a day** (`calibration/sheepSpeed.timed.ts`, `pnpm test:speed`, the cattle limit of 5 ms). Before, with every sheep on its own, the same flock did not get through its 170 warm-up days in three minutes: about a second a day or more. The machine was busy with another session's work for every timing that night (the cattle test read 5.6 to 8.8 ms on both this branch and the base commit), so these are upper figures.
+
+**The grass question for Claudia (the top one).** Without feed, the Tablelands winter on native pasture takes ewes from CS 3 to 1.4 at lambing and kills 19% of them in a year (three seeds; re-measured in the third pass on eight seeds and the 0.8% adult rate: 31.7%), and it does not move with stocking rate (60% and 100% of carrying capacity give the same). The cause is the grass model's native winter, not the sheep rules. In July and August on the Tablelands block the sheep's diet is 24 to 44 kg/ha green and about 1,000 to 1,300 kg/ha dead at 50% digestibility: ME about 7.0 MJ/kg, CP 5.3 to 5.8%, intake about 1.3% of live weight. Dry cows on the same block also fall, from CS 2.8 to 2.1 (the review's run, not repeated here). Against it, S57 (MLA L.PDS.2003) has unimproved native pasture on the Northern Tablelands carrying 5 DSE/ha year round; the game's carrying capacity rule gives 3.55 DSE/ha there and its winter will not hold a dry sheep without feed. Nothing in the grass model was changed (C18). The year rows pass only with winter feeding.
+
+### 15 Nov 2026, milestone 2.3 (the sheep model): engine 0.14.0
+
+_Superseded by the entry above (engine 0.15.0) where they differ._
+
+The first run of the sheep benchmarks (the table in [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md), section "Sheep benchmarks" above). No cattle or grass figure changed: every cattle band, every `*.mvp.test.ts` and the no-hands digest (engine 0.12.1) pass as they did. 70 rows: **61 pass in full; 4 pass in Western Victoria (or the Central West) with their Tablelands and Central West parts skipped** (SB-40, SB-41, SB-43, SB-47); **5 are skipped** (SB-59 to SB-62 for C18, SB-65 for C26). The reasons follow the table. Each figure is the model's on the run in the test.
+
+| ID | Measure | Band | Model | |
+|---|---|---|---|---|
+| SB-01 | ME, dry 50 kg wether | 7.6–9.7 MJ | 8.30 | pass |
+| SB-02 | DSE, dry 50 kg wether | 0.9–1.1 | 1.00 | pass |
+| SB-03 | DSE, dry ewe 40 and 60 kg | 0.8–1.0; 1.1–1.3 | 0.85; 1.15 | pass (C32: table still to be checked) |
+| SB-04 | ME, single, day 130 | 12–14 MJ | 12.25 | pass |
+| SB-05 | ME, twins, day 130 | 14.5–17.5 MJ | 15.61 | pass |
+| SB-06 | ME, single, mid-lactation | 18.5–23 MJ | 20.40 | pass |
+| SB-07 | ME, twins, mid-lactation | 23.5–28.5 MJ | 27.40 | pass |
+| SB-08 | Large Merino above medium | +1.5–2.5; twins lactating +3–5 | +1.80 at every stage; +3.90 | pass |
+| SB-09 | DSE, last month, single | 1.3–1.5 | 1.47 | pass |
+| SB-10 | DSE, lactating single | 2.2–2.5 | 2.46 | pass |
+| SB-11 | DSE, lactating twins | 3.1–3.4 | 3.30 | pass |
+| SB-12 | DSE, ram | 1.8–2.2 | 1.94 | pass |
+| SB-13 | DSE, 25 kg weaner, 0 and 100 g/day | 0.6–0.7; 0.9–1.0 | 0.65; 0.98 | pass |
+| SB-14 | Intake, dry adult, green leafy | 2–3% LW | 2.7% | pass |
+| SB-15 | Intake, weaner | 3.5–4.5% | 4.2% | pass |
+| SB-16 | Intake, lactating ewe | 4–5.5% | 4.4% single; 4.8% twins | pass |
+| SB-17 | Dry sheep at 400/75%, 600/68%, 1,200/60% green | −20 to +20 g/day; losing at 60% of each mass | +7, +15, +2; −104, −72, −53 | pass |
+| SB-18 | Needs met, last month single, 700/75%, 1,200/68% | 90–110%; under 90% at 60% | 95%, 94%; 74% | pass |
+| SB-19 | Needs met, lactating single, 1,000/75%, 1,700/68% | 90–110%; under 90% at 60% | 106%, 98%; 73% | pass |
+| SB-20 | Needs met, lactating twins, 1,500/75% | 90–110%; under 90% at 68% | 94%; 82% | pass |
+| SB-21 | Weaner growth, 600/75%, 1,000/68% | 100–150 g/day | 122, 129 | pass |
+| SB-22 | Weaner growth, 800/75%, 1,700/68% | 150–200 | 165, 164 | pass |
+| SB-23 | Weaner growth, 1,600/75% | 200–250; under 200 at 68% | 232; 174 | pass |
+| SB-24 | Large Merino and crossbred weaners, over 2,000 FOO | over 200 | 300; 279 (at 1,700 green) | pass |
+| SB-25 | Share of intake at 1,600 kg green | sheep 90%+, above cattle | 0.96 against 0.91 | pass |
+| SB-26 | Sheep at 800, cattle at 1,200 | within 10 points | 0.81 against 0.84 | pass |
+| SB-27 | kg for one CS, SRW 50 | 8.5–10.5 | 9.5 | pass |
+| SB-28 | Oestrous cycle | 17 days | 17 | pass |
+| SB-29 | Gestation; first lambs from the start of joining | 144–150; about day 150 | 147; day 147 | pass |
+| SB-30 | Merino in lamb, CS 3 | 88–95% | 90.8% | pass |
+| SB-31 | Crossbred in lamb, CS 3 | 93–98% | 94.8% | pass |
+| SB-32 | Foetuses per 100 ewes for each CS | 15–25 | +20.3 (CS 2→3), +21.0 (3→4); the rule +20.0 from 1.5 to 4.5 | pass |
+| SB-33 | Merino scanning | 115–135% | 123.6% | pass |
+| SB-34 | Non-Merino scanning | 145–165% | 154.2% | pass |
+| SB-35 | Merino lamb survival, CS 3 | singles 88–93%, twins 68–75% | 90.2%, 71.5% | pass |
+| SB-36 | Crossbred lamb survival, CS 3 | 90–97%, 80–87% | 92.9%, 83.9% | pass |
+| SB-37 | More lambs at CS 3.0–3.5 than 2.0–2.5 | 10–25 per 100, twins gain more | +11.3 per 100 lambs; twins gain more | pass (C32) |
+| SB-38 | Share of lamb deaths in the first 3 days | 70%+ | 78.7% | pass |
+| SB-39 | Lamb deaths, marking to weaning | under 1% | 0.41% | pass |
+| SB-40 | Merino marking, average year | 75–90% | Western Victoria 88.9%; Central West 67.3%, Tablelands 52.6% | pass (WV); skipped (NT, CW) |
+| SB-41 | First-cross marking, average year | 100–120% | Western Victoria 118.5%; Central West 91.5%, Tablelands 64.2% | pass (WV); skipped (NT, CW) |
+| SB-42 | Ewe deaths, scanning to marking | 0.5–3.0, 1.2–5.0, 1.8–14.5% | 1.48%, 3.70%, 7.30% | pass |
+| SB-43 | Merino ewe deaths, average year | 2–4% | Western Victoria 3.80% (CS 2.98 at lambing); Central West 5.70%, Tablelands 19.31% | pass (WV); skipped (NT, CW) |
+| SB-43a | Ewe deaths at lambing | Merino 1.5–2.5%, first-cross 2.8–3.7% | 2.06%, 3.48% | pass |
+| SB-44 | Deaths at CS 1.5 against 2.5–3 | 1.6–2.5 times | 1.73 times in the run; the rule 2.00 | pass |
+| SB-45 | Weaners 24 kg, about 60 g/day | 0–2% | 0.77% | pass |
+| SB-46 | Weaners losing about 10 g/day | 8–15% | 10.58% | pass |
+| SB-47 | Weaners grown to target, average year | 2–6% | Central West 2.07%; Western Victoria 1.63%; Tablelands 9.82% | pass (CW); WV a known gap 0.4 under, held by the test; skipped (NT) |
+| SB-48 | Weaning weight, ewes on 800 and 3,000 FOO | 11–17; 25–31 kg | 16.0; 27.4 | pass |
+| SB-48a | Growth, marking to weaning | 175–220 g/day | singles 212, twins 195 | pass |
+| SB-49 | Wool, last third of pregnancy against dry | 20–40% lower | 30% | pass |
+| SB-50 | Losing 1 CS over pregnancy | 0.5–0.9 kg less; 0.6–1.2 micron finer | 0.58 kg; 0.73 micron | pass |
+| SB-51 | Wethers and rams against ewes | 1–3 micron coarser | 1.9 | pass |
+| SB-52 | Merino wethers, Tablelands and Central West | 3.8–4.6 kg clean; 18–20 micron | 4.01 kg, 19.5; 4.18 kg, 19.0 | pass |
+| SB-52a | Merino breeding ewes, three districts | 3.3–4.7 kg | Tablelands 3.41, Central West 3.64, Western Victoria 4.37 | pass |
+| SB-52b | Weaners, about 8 months of wool | 1.0–1.5 kg | 1.20 (Western Victoria) | pass |
+| SB-52c | First-cross against Merino ewes | 65–85% | 72% (Western Victoria) | pass |
+| SB-53 | Unmulesed Merino ewes struck in a year | 10–25%; about 2% of struck die | 16.6%; 2.7% | pass |
+| SB-54 | Unmulesed crossbred ewes struck | 2–8% | 5.5% | pass |
+| SB-55 | Six weeks after shearing or crutching | fewer strikes | none, against some | pass |
+| SB-56 | Weaner water | 3–5; 5–7 L | 4; 6 | pass |
+| SB-57 | Dry adult water | 4–7; 8–12 L | 6; 10 | pass |
+| SB-58 | Ewes with lambs water | 8–11; 12–15 L | 10; 14 | pass |
+| SB-59 | Tablelands native carrying capacity | 4–6 DSE/ha | 3.55 | skipped (C18) |
+| SB-60 | Tablelands sown pasture | 12–17.5 DSE/ha | 5.5 (phalaris), 5.8 (ryegrass) by the carrying capacity rule | skipped (C18) |
+| SB-61 | Western Victoria improved perennial pasture | 13–23 DSE/ha | 7.1 (phalaris), 7.7 (ryegrass) | skipped (C18) |
+| SB-62 | Central West, a whole farm per 100 mm | 1.0–1.5 DSE/ha | about 0.45 on native pasture (2.7 at 594 mm) | skipped (C18) |
+| SB-63 | Cattle fence holds sheep | no | no | pass |
+| SB-64 | Netting fence holds sheep | yes | yes | pass |
+| SB-65 | Sheep-proof fence price above cattle | Claudia's call (C26) | not built | skipped |
+
+**How the rows are run.** "Unit" rows call the energy, intake, wool and water rules on one sheep. "Paddock" and "Mob" rows run the sheep step on its own on a paddock held at a set green mass and digestibility, with as much of it as the mob wants (the `held` place, tests only), and large seeded mobs (thousands of head). "Year" rows run a flock on the cattle steer block (260 ha, one water) in the district on the average year, stocked at 80% of the block's carrying capacity in DSE (1.5 DSE a ewe for the year; wethers 1 a head; weaners 0.7), rams at 1% + 1, shorn at the start and crutched six months on, averaged over three seeds. The runs are in `packages/engine/test-support/sheep.ts`; the tests in `packages/engine/src/calibration/sheep.*.test.ts`.
+
+**Why the Tablelands and Central West year rows are skipped (C18).** Their ewes are fine on paper (scanning 125% and 126%, the same as Western Victoria's 123%), but the winter on native pasture in the grass model takes them from CS 3 at joining to 1.40 on the Tablelands and 2.24 in the Central West at lambing: green feed falls under 100 kg DM/ha on the Tablelands from June to August and to 200 to 350 in the Central West, and the dead feed is 50% digestible (ME about 7.0). Sheep have no supplement in this build. Western Victoria's winter keeps more green (250 to 400 kg) and its ewes lamb at CS 3.0. Making these rows pass needs the grass model's winter (C18), a sheep supplement (milestone 2.4) or sown pasture and crops in the run (as the Central West figures assume): all for Claudia. The same runs give every Merino wether and ewe fleece in the band, and wethers lose about 1% a year in every district.
+
+**Why the carrying capacity rows are skipped (C18).** The carrying capacity rule (annual growth × 0.65 × district safe use ÷ 3,285 kg) is the grass model's, used for the cattle. With the district's native safe use it gives 3.55 DSE/ha on the Tablelands against the sourced 5, and on sown pasture 5.5 to 7.7 DSE/ha against 12 to 23, though the growth itself (9.4 to 11.5 t DM/ha a year) matches EverGraze's 8 to 12 t at Hamilton (S54). The gap is the safe use: 13 to 23 DSE/ha eats 45 to 80% of that growth, against the rule's 26%.
+
+**Fitted figures.** Each was set so a benchmark holds, and is marked FITTED in `data/sheep.ts` with the row it was fitted to: maintenance (SB-01), the young sheep's maintenance (SB-13), pregnancy (SB-04, SB-09), milk (SB-06, SB-07, SB-10, SB-11), the large Merino's SRW (SB-08), energy in a kg of gain (S6's weaner rows), appetite and short feed (SB-17 to SB-23), the lamb's share of milk and the lambs' grazing (SB-48, SB-48a), milk on short feed (SB-48), lamb survival by CS (SB-37), the crossbred lambing risk (SB-43a), adult deaths (SB-43), weaner deaths (SB-45, SB-46), wool per kg of feed (SB-52), the crossbred wool share (SB-52c), wool and gain, and micron and growth (SB-50), the lamb's wool (SB-52b). The stand-ins with no source are listed in DEVELOPMENT_LOG ("m2.3 Sheep model").
+
+**Wrong turns on the way** (LESSONS SH1 to SH4): dead feed first counted at a quarter in the sheep's reach, which starved sheep on dry winter feed (Tablelands wethers lost 40% in a year); a lamb fated to die "in its first 3 days" died on its fourth; the held mob tests had no joining record, so nothing was weaned.
+### 15 Nov 2026, m2.5 calf growth: engine 0.14.0
+
+Home-bred calves grew far too slowly before weaning. Two MVP formulas were wrong for calves and are fixed: the cost of a kg of gain for light stock (sourced) and the milk rule (milk now falls with the cow's condition, with stand-in figures). New benchmarks hold calf growth to 200 days; Western Victoria passes, three districts are open. The investigation comes first below, then what went in and every benchmark that moved. The sources are in DATA.md, "Calf growth to weaning".
+
+#### The investigation (engine 0.13.0)
+
+**What the model gave.** Home-bred calves only (bought calves at foot left out), weighed on the day they reach each age. Running farm left alone for a year from 1 September; "average year" is the medium farm on seed 1 with every day at the district curve; "found case" is a small Central Qld farm on easy, real years in order from 1997 (a below average season, 0.81), seed 1.
+
+| Run | 100 days | 150 days | 200 days | Weaned (days old) | Weaned, kg (lowest to highest) |
+|---|---|---|---|---|---|
+| Found case, Central Qld 1997 | 77 | 82 | 85 | 100 to 281 (mean 222) | 77 (51 to 86) |
+| Central Qld, average year | 82 | 88 | 90 | 125 to 281 (227) | 81 (70 to 95) |
+| Northern Tablelands, average year | 89 | 95 | 96 | 135 to 281 (225) | 83 (71 to 96) |
+| Central West NSW, average year | 76 | 86 | 90 | 173 to 281 (227) | 83 (80 to 86) |
+| Western Victoria, average year | 72 | 88 | 98 | 173 to 281 (222) | 101 (95 to 104) |
+
+Against the sources: about 0.75 to 0.79 kg a day and 161 to 173 kg at 180 days for Brahman-cross calves in the north (Fordyce et al. 1993), and 0.7 kg a day and 171 kg at 200 days for British calves on the poorest pasture in MLA's table (ME 9.0). The model's calves gain about 0.46 kg a day to 100 days and then almost nothing: 0.08 kg a day from 100 to 200 days.
+
+**Why the MVP recorded 148 to 249 kg (v11).** No script for that check survives (`reference/mvp/calibrate.js` has no weaning test). An established herd starts with cow and calf units whose calves are set at 36 kg + 0.8 kg a day of age (`BOUGHT_CALF`), so calves of 60 to 140 days start at 84 to 148 kg. Weaned at about 9 months, those give weights of that size. Most likely the v11 figure came from those bought calves, not from calves the model grew. The model has never been tested on a calf it grew itself.
+
+**The cause, from the energy each calf gets, by age (Central Qld, average year).**
+
+- **0 to 100 days:** milk 16 to 19 MJ a day, little pasture. The gain is held down by the cost of gain: the model charges 20 + 0.045 x LW MJ for each kg, the same for a calf as for a steer. For a 60 kg calf that is about twice what Sekine and Asahida (1990) measured for calves (510 to 520 kJ per kg LW^0.75 for ruminant calves under 100 kg, 413 on milk). For a 300 kg steer the two agree.
+- **100 to 200 days:** milk falls from 16 to about 6 MJ, and the calf's own pasture (1 to 2 kg DM at ME 7.1 to 7.5) does not make up the rest, so the calf sits near maintenance. Most of the fall is the milk rule's feed term, `clamp((ME - 6) / 3, 0.45, 1)`: on the herd's ME of 7.2 to 7.6 it halves the milk. Brahman cows on tropical pasture averaged 6.2 kg of milk a day over 216 days (Neidhardt et al. 1979); the model's cow gives about half that on the same kind of feed. The lactation curve (full to day 60, then a straight line to nothing at day 280) adds to it.
+- **Not the cause:** calf maintenance (the model's 0.45 x LW^0.75 x (1 + walk) is 0.47 to 0.53 MJ, against 480 to 500 kJ measured) and the calf's appetite (3% of LW, the same as a weaner, which is held by the steer benchmarks). Calving time is the start herd's (PTIC cows 100 to 210 days in calf on 1 September calve from late November to early March in every district), which is right for Central Qld and not for the southern districts.
+
+**What each change gave** (home-bred calves at 200 days, kg; then the established herd benchmarks in `calibration/herds.test.ts`, 24 tests). Each was switched on in a scratch copy only and taken out again.
+
+| Change | Found case | Central Qld | Tablelands | Central West | Western Vic | Herd benchmarks |
+|---|---|---|---|---|---|---|
+| None (as now) | 85 | 90 | 96 | 90 | 98 | all pass |
+| A. Calf cost of gain 0.52 x LW^0.75 MJ a kg, never above the steer figure (Sekine and Asahida) | 103 | 111 | 115 | 110 | 121 | not run (calves only, cows unchanged) |
+| A at 0.413 (the milk figure) | 109 | 118 | 122 | 118 | 130 | not run |
+| B. No feed term on milk (the cow pays for her milk and loses condition instead) | 132 | 130 | 127 | 126 | 134 | **Tablelands deaths 4.4% (band 1.5 to 3.6), one herd 6.6% (limit 6)** |
+| A and B | 158 | 156 | 151 | 151 | 160 | **the same two Tablelands failures** |
+| A, and the lactation line reaching nothing at day 460 not 280 (no source) | 116 | 124 | 127 | 126 | 141 | all pass |
+| Milk worth 1.6 / 2.0 times forage ME to the calf (no source) | weaned 121 / 146 | weaned 129 / 153 | | | | not run |
+
+A and B together is the only change with a source for each part, and it puts calves at about 0.6 kg a day to 200 days, the bottom of the sourced range. It breaks the Tablelands herd deaths benchmark: those herds calve in summer and milk into a frosty winter, and a cow that keeps milking loses condition. The change that keeps every benchmark passing (A with a longer lactation) has no source for its second half and still gives only 0.4 to 0.5 kg a day.
+
+The three questions this left were answered by the coordinating session for Claudia (she was away): put the calf cost of gain in on its own; make milk fall as the cow loses condition, with a floor so cows do not milk themselves to death; and do not change when the herds calve (written up for her in DEVELOPMENT_LOG, m2.5).
+
+#### What went in
+
+1. **Calf cost of gain** (commit "Charge light stock the measured energy cost of a kg of gain"). Up to 100 kg, 0.52 MJ per kg LW^0.75 for each kg; from 200 kg the MVP's 20 + 0.045 × LW; a straight line between (`YOUNG_GAIN_COST`, `mjPerKgGain`). By weight, so no step at weaning.
+2. **Milk falls with condition** (`MILK`, `milkMJ`). The feed term is gone. Milk is full at CS 2.25 and above and falls in a straight line to none at CS 1.5. Stand-ins, tried on every herd benchmark:
+
+| Full milk at CS, none at CS | Herd benchmarks (24) | Calves at 200 days, kg a day (Central Qld, Tablelands, Central West, Western Vic) |
+|---|---|---|
+| no fall at all | Tablelands deaths 4.4%, one herd 6.6% | (about 0.6 everywhere) |
+| 3.0, 1.8 | all pass | 0.50, 0.53, 0.56, 0.64 |
+| 2.5, 1.6 | all pass | 0.52, 0.53, 0.57, 0.64 |
+| **2.25, 1.5 (taken)** | all pass | 0.53, 0.54, 0.57, 0.64 |
+
+The condition figures barely move the calves: most cows stay above CS 2.25. What they decide is whether a thin cow keeps milking into her death. 1.5 is the lowest stop tried, just above the CS 1.4 where deaths start to rise.
+
+#### The calf benchmarks (new, `calibration/herds.test.ts`)
+
+Every calf born in the average-year herd runs (seeds 1 to 8, September and May starts), weighed on the day it reached 100 days and on the day it reached 200 days, weaned or not. Gain to 200 days is from its own birth weight. Each band is the nearest sourced figure, not the district's own. Figures are engine 0.13.0, then 0.14.0 (both changes and the milk payment below).
+
+| District | Birth to 200 days, kg a day | At 100 days, kg | At 200 days, kg | 100 to 200 days, kg a day |
+|---|---|---|---|---|
+| Central Qld, band (north Qld; floors stand-in) | 0.6 to 0.95 | 100 to 146 | 140 to 225 | 0.6 to 0.95 |
+| Central Qld, 0.13.0 → 0.14.0 | 0.28 → **0.53 open** | 73 → **111 passes** | 93 → **142 passes** | 0.20 → **0.33 open** |
+| Southern band (MLA tool 5.05, its own range) | 0.7 to 1.1 | 101 to 146 | 171 to 256 | 0.7 to 1.1 |
+| Northern Tablelands | 0.34 → **0.54 open** | 84 → **107 passes** | 103 → **143 open** | 0.20 → **0.39 open** |
+| Central West NSW | 0.32 → **0.57 open** | 84 → **120 passes** | 101 → **149 open** | 0.16 → **0.29 open** |
+| Western Victoria | 0.41 → **0.63 open** | 91 → **127 passes** | 117 → **163 open** | 0.26 → **0.36 open** |
+
+- **The shape.** The calves now grow well to 100 days (every district inside the 100-day band) and slowly after: 0.29 to 0.39 kg a day from 100 to 200 days against 0.6 to 1.1 in the sources. Milk tails off with the lactation line and the herd's feed runs at ME 7 to 8 with protein under 7% for months (item 8 of the third pass, below).
+- **Third pass (the review):** the southern floors are now the source's own (0.7 kg a day and 171 kg at 200 days; they were 0.6 and 150, below the source). That turned Western Victoria, which passed at 0.635 kg a day and 163 kg, into an open row. The Central Qld floors stay a quarter under the source, marked as stand-ins in the test. A 100-day row and a 100-to-200-day row were added.
+- **Open rows** are `it.fails`, named with their figure. Beside each district is a plain **regression floor** (not a benchmark): engine 0.14.0's four figures less 0.02 kg a day and 5 kg (Central Qld 0.51, 106, 137, 0.30; Tablelands 0.51, 102, 138, 0.36; Central West 0.54, 115, 144, 0.27; Western Victoria 0.61, 121, 157, 0.34), so the growth cannot slide back while the rows stay open.
+- What probably closes the gaps is on Claudia's list in DEVELOPMENT_LOG (m2.5): calving time on its own will not, on the Tablelands at least; the grass looks like the binding limit.
+
+**The found case** (`calibration/calvesFoundCase.cq.test.ts`, a plain test). Small Central Qld farm, easy, real years from 1 September 1997 (a below average season), seed 1, no player action.
+
+| | Engine 0.13.0 | Engine 0.14.0 | Band held |
+|---|---|---|---|
+| Mean at 200 days | 82 kg | 154 kg | 140 to 225 kg |
+| Weaned about 22 August, calves 150 days or older | 77 kg (51 to 86; all weaned) | 150 kg (138 to 154), 173 to 281 days | mean 130 kg or more, none under 100 kg |
+
+Why these bands: the nearest source gives 161 to 173 kg at 180 days with years up to 25% apart, so a quarter off it (140 kg) is the floor for a below average year; 100 kg is the weight FutureBeef calls a drought wean.
+
+#### Every other benchmark that moved
+
+Engine 0.13.0 against 0.14.0, the same runs and seeds as the tests (steers: seeds 1 to 12; herds: seeds 1 to 8, average year from September and May starts, random seasons from September). Every figure stays inside its band; no band changed.
+
+**Steers** (kg a head a year). Bought weaner steers are 190 to 235 kg, so only the lightest pay the lighter cost of gain, for a few days. Central Qld no lick 41.24 to 41.34 in the average year (34.79 to 34.91 random); Northern Tablelands 102.56 to 102.57; Central West 127.55 to 127.56. Central Qld with lick (131.13, 126.08), Western Victoria (181.89, 162.25) and every steer death figure did not move.
+
+**Established herds:**
+
+| District | Deaths, average year (highest herd) | Deaths, random seasons | Gain a head, September / May start, kg | Preg tests over the expected rate, points | In calf at preg tests |
+|---|---|---|---|---|---|
+| Central Qld | 2.36 to 2.40% (3.04 to 2.91) | 2.37 to 2.40% | 130.3 / 149.6 to 143.8 / 157.8 | 4.08 to 4.29 | 90.9 to 89.2% |
+| Northern Tablelands | 2.55 to 2.65% (4.06, the same) | 2.65 to 2.51% | 96.8 / 135.1 to 101.3 / 149.0 | 5.54 to 7.17 | 88.6 to 88.1% |
+| Central West NSW | 2.42 to 2.44% (3.37 to 3.85) | 2.39, the same | 123.2 / 135.5 to 132.9 / 146.8 | 3.38 to 3.57 | 91.3 to 90.9% |
+| Western Victoria | 2.65, the same (3.63, the same) | 2.65 to 2.70% | 177.3 / 170.5 to 191.0 / 180.7 | 2.73 to 2.58 | 91.7 to 91.3% |
+
+Bands: deaths 1.5 to 3.6% (any one herd under 6%), preg tests 0 to 9 points over and over 80% in calf, gain over 50 kg.
+
+**The Tablelands preg tests moved because the yardstick moved, not because more cows got in calf** (traced by the review). The test compares the share in calf with the rate expected from each cow's condition. Cows are now thinner at the test, so the expected rate fell (83.59% to 81.35% in the review's runs), while the share actually in calf fell a little too (89.13% to 88.52%; 88.6% to 88.1% in the runs above). The gap between them widened from 5.54 to 7.17 points.
+
+**The milk payment (third pass) moved almost nothing.** With no milk made past what the cow can pay for, every herd figure above is the same to the decimal shown except Tablelands gain from the September start, 101.3 to 100.9 kg; the calf figures moved by under 0.001 kg a day and the found case not at all.
+
+**Other suites.** The real-year herd and steer files (`calibration/realYear*.test.ts`), crops, density, the speed check and the whole suite pass on 0.14.0 with no band changed. Real years, before and after: the year-by-year tables were run again on engine 0.14.0 (`GG_REAL_YEARS_RUN=1`, 9 files, 55 tests pass) and compared with the 1.4 entry (no cattle formula changed between engine 0.6.0 and 0.13.0, so those tables stand for 0.13.0).
+
+- **Steers, real years:** every figure in the 1.4 summary is the same (Central Qld no lick 34 over 29 years and 44 in the average year, with lick 124 and 131, Tablelands 98 and 104, Central West 102 and 130, Western Victoria 180 and 183; deaths unchanged).
+- **Herds, real years** (seeds 1 and 2), 1.4 → 0.14.0: Central Qld deaths over 29 years 2.9% → 2.9%, average year 2.8% → 2.9%, gain 123 → 135 kg over 29 years and 129 → 143 kg in the average year. Tablelands 3.8% → 3.7%, 3.9% → 3.5%, gain 91 → 95 and 97 → 101. Central West 4.8% → 3.8%, 3.0% → 3.0%, gain 97 → 105 and 121 → 130. Western Victoria 3.6% → 3.6%, 3.6% → 3.6%, gain 174 → 187 and 175 → 189.
+- **Central West herds in the droughts, left alone,** lose fewer now that a thin cow stops milking: from September 2002 11.4% → 4.0%, 2006 32.4% → 18.5%, 2019 12.6% → 5.8%; 2017 rose, 4.6% → 6.1%.
+
+The no-hands digests (`labour/noHands.test.ts`) were taken again in each model commit; the last are in the test with a comment pointing here.
+
+#### What the change does to the herd (third pass, recorded observation)
+
+No benchmark covers how many cows calve in later years or how thin they get. Over three average years from the September start with no player action:
+
+| | Central Qld, 0.13.0 | Central Qld, 0.14.0 | Tablelands, 0.13.0 | Tablelands, 0.14.0 |
+|---|---|---|---|---|
+| Calves born per 100 females 400 days or older, years 1 / 2 / 3 (the review's runs) | 86.1 / 72.2 / 59.6 | 84.7 / 70.8 / 52.1 | 84.8 / 68.1 / 55.6 | 83.7 / 61.8 / 51.4 |
+| The same, `calibration/herdYears.test.ts` (medium farm, seeds 1 to 4) | 86.0 / 67.7 / 61.4 | 85.1 / 66.2 / 55.3 | 85.4 / 63.6 / 58.4 | 84.0 / 57.9 / 55.4 |
+| % of cows under CS 2.25, August to October, years 1 / 2 / 3 (the test) | 0 / 0 / 0 | 0.5 / 0 / 4.5 | 0.7 / 0 / 0.2 | 3.1 / 17.0 / 16.6 |
+| The same, the review (its own measure, three years) | 0 | 5 to 16 in year 3 | 0 to 1 | 21 to 27 each year |
+
+Deaths did not rise. The cows milk off their backs, get thin late in the dry or the winter, and fewer get back in calf. `calibration/herdYears.test.ts` pins the test's figures (5 calves per 100 females, 8 points of cows) so later changes show up; on engine 0.13.0 it fails, which shows it can see the change.
+
+**Against the sources** (DATA.md, "Calving and weaning rates in breeder herds"): northern breeder herds in CashCow weaned 72 to 77 calves per 100 cows on average in the Southern Forest, Central Forest and Northern Downs; the national herd weans about 53 calves per 100 females over a year old, and national branding rates run 70 to 80%. The model's year-1 calving (84 to 85 per 100) sits above those, which count calves weaned, not born. Years 2 and 3 (52 to 66 per 100 born, before calf losses) sit at or under the bottom of them, for herds with no player action at all, no lick for the Tablelands herds and no weaning by hand. Whether that is fair for a herd left alone is for Claudia. No southern district figure was found.
+
+#### Calving time alone will not close the Tablelands gap (third pass, the review)
+
+With a May start the Tablelands herds calve in spring. 79 to 82% of their cows sit under CS 2.25 in September and October, the herd averages CS 1.99 at its lowest, and those calves do worse than the September-start ones (0.51 against 0.56 kg a day). The grass looks like the binding limit: diet ME runs 6.9 to 9.5 on the Tablelands and 6.8 to 8.8 in Central Qld, with protein under 7% for 5 to 6 months, and the feed is never short in amount.
+
+### 15 Nov 2026, m2.7 engine join: engine 0.16.0, save format 11
+
+The sheep line (`m2.3-sheep-model`, eff980d, engine 0.15.0) and the calf growth change (`m2.5-calf-growth`, 2bd90de, cut from 0.13.0 and numbered 0.14.0 there) joined on `m2.7-engine-joined`. No rule or number changed in the join. The only code files both sides touched were `version.ts` and the version test; nothing in `sheep/` calls `mjPerKgGain`, `milkMJ`, `unpaidMilk`, `YOUNG_GAIN_COST` or the cattle `MILK` (the sheep have their own gain energy and their own `MILK` in `data/sheep.ts`; the one cattle function they call, `aeOf`, did not change).
+
+**How the figures were compared.** Each branch tip's engine was checked out beside the joined one and the same probe run on all three: every steer run of the steers suite (5 cases, 12 seeds, average year and random seasons) and every herd run of the herds suite (4 districts, September and May starts, 8 seeds, average year; and the random-season runs), with every field written out in full, calf weights included; and every sheep year case (Merino and first-cross ewes, weaners, wethers; 3 districts; 8 seeds) with its joining record, deaths, clip, CS at lambing and year totals. Then the calibration suites themselves were run on both sides and their output compared with the timings taken out.
+
+| What | Compared with | Result |
+|---|---|---|
+| Steers, herds and calf weights (216 runs, every field) | the calf branch | identical to the last digit (the files are the same byte for byte) |
+| Cattle suites: steers, herds (calf rows and regression floors), `herdYears`, the found case, the real-year steers and herds | the calf branch | the same tests, the same results, the same figures in every test name: 124 pass, 11 known open gaps (the calf rows, figures as in the m2.5 entry) |
+| Sheep year cases (96 runs, every field) | the sheep branch | identical to the last digit |
+| Sheep suites (`calibration/sheep.*`, `sheep/*`) | the sheep branch | the same tests, the same results, the same figures in every name: 10 known open gaps (7 year rows, 3 start-flock profits) and 5 skipped, as on the sheep branch |
+| No-hands digests (`labour/noHands.test.ts`) | the calf branch's regenerated values | pass as they stand, before anything was regenerated |
+| Map fixtures (`pnpm dev:map-fixtures`) | the calf branch's | made again; none changed (they hold cattle farms only) |
+
+So the calf change moves no sheep figure, and the sheep work moves no cattle figure. The figures in the m2.5 entry and the m2.3 third-pass entry stand for engine 0.16.0.
+
+**A mixed farm, two years with no player action** (`sim/mixedFarm.test.ts`: Western Victoria, seed 11, medium, from 1 March, easy, cattle and sheep). 86 cattle and 659 sheep at the start. Over the two years: 89 calves born and 58 weaned, 1,185 lambs born and 725 weaned, three shearings, 4 cattle and 579 sheep (mostly lambs) dead; profit $192,435 then $25,757, wool $59,231 then $70,847. Held by the test: no day has cattle and sheep in one paddock; the year lines (sales, wool, sheep sales, grain and interest, less buys, sheep buys, feed, crops, infrastructure and running costs) add up to the change in cash over the two years; the farm eats exactly what the same farm eats with only its cattle plus what it eats with only its sheep, day by day until day 276, when the first lambs are weaned to Paddock 1 because Paddock 6 holds cattle (with no cattle they go to Paddock 6); both species breed and wean; the same seed gives the same farm (by its hash). It runs in about 10 seconds.
+
+**Speed** (each run alone, after the join): cattle 4.49 ms a day with 4,890 head and 407 calves (limit 5); the largest flock 1.99 ms a day with 6,975 sheep.
+
+### 15 Nov 2026, m2.7 review of the sheep third pass: engine 0.17.0, save format 12
+
+What changed in the model (sheep only; no cattle, grass or crop rule): a lambing that began before the farm's first day is a negative day, so start lambs are marked and weaned; no lamb stays at foot past 150 days; a sheep under half the weight it is measured against dies, starved (a lamb at foot against the normal weight for its age, a weaned sheep against the normal weight at weaning); adult and wether deaths 0.91% a year (the document's own arithmetic, was written "about 0.8%"); the start flock keeps one age class of ewe weaners, casts the oldest class at weaning, has its lambs at foot at the CS the model's flocks lamb at with the ewes that died lambing taken out, and mid-joining has the ewes whose heat came before the first day in lamb; lambs count in the year's births; the sheep breakout stream carries on from day to day (it restarted from the seed every day, so most thirsty mobs never got out); shearing $9.81 a head all in, crutching $1.92, ram replacement (NSW DPIRD budget, search summaries); real-year sheep prices. No band was changed.
+
+**Cattle: unchanged.** The 216 steer and herd runs (every field, calf weights included) are byte for byte the calf branch's, and the cattle calibration suites give the same results and the same figures in every name. The no-hands digests pass untouched.
+
+**Every sheep row that moved** (mean of eight seeds, average year, winter feeding; Tablelands / Central West / Western Victoria). Every other sheep row (units, paddock, mob, SB-47, SB-52, SB-52b, SB-52c, SB-53, SB-54) is unchanged.
+
+| Row | Band | Before (0.16.0) | After (0.17.0) |
+|---|---|---|---|
+| SB-40 Merino marking | 75–90% | 89.53 / 87.07 / 85.24 | 88.82 / 87.40 / 85.09 |
+| SB-41 first-cross marking | 100–120% | 115.22 / 111.05 / 115.94 | 114.59 / 111.45 / 115.50 |
+| SB-43 Merino ewe deaths (highest block) | 2–4%, no block over 4.5% | 3.10 (4.67) / 3.98 (5.53) / 4.63 (5.33) | 3.33 (5.08) / 3.98 (5.53) / 4.70 (6.07): all three open, as before |
+| SB-43 first-cross ewe deaths | 2–4% | 4.50 / 5.76 / 5.13 | 4.95 / 5.36 / 5.35: open, as before |
+| SB-52a ewe fleece, kg clean; micron | 3.3–4.7 | 4.42 / 4.13 / 4.27; 18.30 / 18.11 / 18.17 | 4.42 / 4.12 / 4.27; 18.29 / 18.10 / 18.17 |
+| SB-65 netting against cattle fence price | higher | skipped | passes ($10 a metre against $7) |
+
+The deaths rise is the adult rate (0.8 to 0.91%). Each open row now has a regression limit beside it (today's mean plus 0.3 of a point; SB-47's weaners no less than 1.36%).
+
+**Start flocks, the first year with no hands** (seed 7, medium, from 1 September, average year):
+
+| District | Head (at foot) | DSE | Lambs born | Weaned | Deaths | First shearing | Profit |
+|---|---|---|---|---|---|---|---|
+| Tablelands | 1,150 (0) | 1,712 | 1,217 | 791 | 885 | day 80: 3.70 kg, 17.75 µm | $9,191, $5.37/DSE (was $11.6) |
+| Central West | 3,072 (1,333) | 2,981 | 2,070 (was 628) | 1,333 (was 0) | 2,233 | day 353: 3.35 kg, 17.66 µm | $131,978, $44.28/DSE (was $124.7) |
+| Western Victoria | 947 (0) | 1,439 | 1,268 | 709 | 416 | day 74: 4.08 kg, 17.92 µm | $195,357, $135.74/DSE (was $149.9) |
+
+The Central West flock now weans its lambs at foot on day 6 at about 22 kg, joins dry on 5 January and lambs 2,070 (was 628); its start lambs are shorn with the flock. The deaths are the unfed winter (no one feeds in this test; C18). Western Victoria stays high: nothing is sold, so the lamb crop counts at 2026 prices.
+
+**SB-GM, a managed self-replacing Merino flock** (`calibration/sheep.margin.test.ts`; seeds 7 and 8, second year; surplus lambs and cast-for-age ewes sold, replacements kept, winter feeding). Dollars a budget DSE (a ewe joined ÷ 2.32, the budget's own rating):
+
+| District | Gross margin | Sales | Wool | Stock change | Shearing | Crutching | Health | Rams | Feed | Model DSE a ewe | Gross margin a model DSE |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Tablelands | **71.88** (open) | 51.03 | 59.38 | −16.36 | 6.46 | 1.28 | 2.39 | 1.95 | 10.09 | 1.86 | 89.65 |
+| Central West | **38.69** (passes) | 25.01 | 51.72 | −23.31 | 5.56 | 1.11 | 2.09 | 1.83 | 4.13 | 1.60 | 56.27 |
+| Western Victoria | **90.33** (open) | 54.18 | 64.71 | −16.11 | 6.76 | 1.31 | 2.48 | 1.90 | 0.00 | 1.98 | 105.56 |
+
+Band $37.85 to $63.08 (±25% of $50.46): the same DPIRD budget moved from $27.81 on October 2024 prices to $50.46 on 2025 prices, so a tighter band would test the price date. What still differs from the budget: **wool** $52 to $65 a budget DSE against the budget's about $20 (5.64 kg greasy at $8.10, October 2024), from the game's September 2026 wool prices (about $26 a kg clean at 18 µm, $21 at 20 µm) against the budget's $13.30 a kg clean for 20 µm, a heavier cut (4.1 to 4.4 kg clean against 3.67) and finer wool (18 µm against 20); **costs** not charged because no figure was read: marking, freight beyond the $3 head fee, pasture; animal health at the $3.57 stand-in. **The DSE**: the model's DSE from energy is 1.6 to 2.0 a ewe joined, against the budget's 2.32, so a margin "per DSE" on the model's own DSE reads 20 to 45% higher than on the budget's: that, with wool, is most of the "three times the margin" the review found. The stock change is negative because the flock is drawn down a little as it settles from the start flock's shape.
+
+**Cattle against sheep on the same farm, the same average year** (seed 11, medium, from 1 March, no player action: the mixed start farm run once with its cattle only and once with its sheep only, each carrying the whole farm's overheads; profit is the change in net worth):
+
+| District | Cattle, year 1; year 2 ($/DSE) | Sheep, year 1; year 2 ($/DSE) |
+|---|---|---|
+| Western Victoria | 20.14; −95.75 (971 DSE) | −67.92; 101.16 (901 DSE) |
+| Central West | −23.83; −96.51 (1,621 DSE) | −230.98; 58.59 (867 DSE) |
+
+Unmanaged figures swing on stock values and overheads year to year and are not margins; on Claudia's list.
+
+**Speed** (each alone): see the DEVELOPMENT_LOG entry.
 
 ### Earlier checks (build sessions, older model versions)
 

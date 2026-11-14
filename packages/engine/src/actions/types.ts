@@ -10,6 +10,7 @@ import type { CalendarDate } from '../calendar';
 import type { CropRefusalReason } from '../crops/fields';
 import type { CattleClassId, GroupId, MarketClassId, SaleClassId } from '../data/cattle';
 import type { Supplement } from '../data/feed';
+import type { SheepFeed } from '../data/sheep';
 import type { SpeciesId } from '../data/species';
 import type { RefusalReason } from '../farm/layout';
 import type { EdgeRef } from '../farm/topology';
@@ -17,7 +18,7 @@ import type { FarmEvent } from '../sim/events';
 import type { FarmState, PlanRule } from '../sim/state';
 
 /** The fences a player can build. */
-export type FenceKind = 'permanent' | 'electric' | 'tape';
+export type FenceKind = 'permanent' | 'electric' | 'tape' | 'netting';
 
 /** Where cattle are sent: the grazing area that holds a square, or the feedlot. */
 export type MoveTarget = { cell: number } | 'lot';
@@ -136,7 +137,37 @@ export type Action =
    */
   | { type: 'orderContractFence'; edges: EdgeRef[]; team: 1 | 2; handsHelp?: boolean }
   /** Stop contract fencing. What is built stays and what was charged stays paid. */
-  | { type: 'cancelContractFence'; run: number };
+  | { type: 'cancelContractFence'; run: number }
+  // ---- Sheep (milestone 2.4, engine half). Decisions: they take none of the day.
+  /** What a sheep mob is fed on top of the pasture: none, lick, grain or hay (charged each day). */
+  | { type: 'setSheepFeed'; mob: number; feed: SheepFeed }
+  /**
+   * Move a sheep mob's joining day, or its shearing or crutching day (the
+   * contractors come on it each year by themselves); null cancels shearing or
+   * crutching. Left out leaves it as it is.
+   */
+  | {
+      type: 'setSheepDates';
+      mob: number;
+      join?: { month: number; date: number };
+      shear?: { month: number; date: number } | null;
+      crutch?: { month: number; date: number } | null;
+    }
+  /** Buy sheep of a class into a paddock (not where cattle graze; never in Central Queensland). */
+  | { type: 'buySheep'; cls: string; qty: number; to: { cell: number } }
+  /**
+   * Sell sheep of a class (and, if given, of one sex: 'F' ewes, 'W' wethers, 'M' rams) from a
+   * sheep mob. Ewes with lambs at foot go with their share of the lambs.
+   */
+  | { type: 'sellSheep'; mob: number; cls: string; qty: number; sex?: 'F' | 'W' | 'M' }
+  /** Move a whole sheep mob to a paddock (not where cattle graze). It pauses the mob's plan. */
+  | { type: 'moveSheep'; mob: number; to: { cell: number } }
+  /** Move part of a sheep mob, by class and head, to a paddock (ewes take their lambs at foot). */
+  | { type: 'moveSheepPart'; mob: number; cls: string; qty: number; to: { cell: number } }
+  /** Put a sheep mob on a grazing plan template, from a step. */
+  | { type: 'setSheepPlan'; mob: number; template: number; step?: number }
+  /** Take a sheep mob off its plan. */
+  | { type: 'clearSheepPlan'; mob: number };
 
 /** One leg of a plan as the player asks for it. `rounds` is 0 (keep going) if left out. */
 export interface PlanLegSpec {
@@ -192,7 +223,11 @@ export type ActionRefusalReason =
   /** There is no such hand on the farm. */
   | 'no-such-hand'
   /** There is no such contract fencing under way. */
-  | 'no-such-run';
+  | 'no-such-run'
+  /** Sheep graze the area cattle were to go to (one mob to an area, one species to a paddock). */
+  | 'sheep-there'
+  /** Cattle graze the area sheep were to go to. */
+  | 'cattle-there';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {

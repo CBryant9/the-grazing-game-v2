@@ -16,6 +16,7 @@ import type { Action, ActionType } from '../actions/types';
 import { EDGE, getEdge } from '../farm/topology';
 import { GRID_N, GRID_W } from '../grid';
 import { labourPool } from '../labour/pool';
+import { addSheepMob } from '../sheep/farm';
 import { LAND } from '../pasture/state';
 import { farmHash } from '../save/save';
 import { createFarm } from '../sim/create';
@@ -458,6 +459,23 @@ describe('the job card and the job agree, for every kind of action', () => {
     const withHand = work(b.farm, hire).farm;
     const order: Action = { type: 'orderContractFence', edges: down(34, 1, 6), team: 2 };
     const ordered = work(b.farm, order).farm;
+    // A sheep mob in the empty paddock, on the sale day, for the sheep actions.
+    const sheepy = cloneFarm(saleDay);
+    const flockAdded = addSheepMob(sheepy, surveyOf(sheepy), {
+      cell: b.emptyCell,
+      breed: 'merino',
+      groups: [{ cls: 'ewe', head: 40 }],
+    });
+    if (!flockAdded.ok) throw new Error(flockAdded.reason);
+    const flock = flockAdded.mob.id;
+    const sheepPlanned = cloneFarm(sheepy);
+    sheepPlanned.plans.push({
+      id: 99,
+      name: 'Sheep round',
+      legs: [{ stops: [b.emptyCell, b.openCell], rule: { mode: 'days', every: 3 }, rounds: 0 }],
+      after: 'repeat',
+    });
+    const sheepOnPlan = work(sheepPlanned, { type: 'setSheepPlan', mob: flock, template: 99 }).farm;
     const cases: Record<ActionType, { farm: FarmState; action: Action }[]> = {
       buyCattle: [{ farm: saleDay, action: { type: 'buyCattle', cls: 'yearSteer', qty: 5 } }],
       cancelSale: [{ farm: booked, action: { type: 'cancelSale' } }],
@@ -558,9 +576,44 @@ describe('the job card and the job agree, for every kind of action', () => {
       letHandGo: [{ farm: withHand, action: { type: 'letHandGo', hand: person } }],
       orderContractFence: [{ farm: b.farm, action: order }],
       cancelContractFence: [{ farm: ordered, action: { type: 'cancelContractFence', run: 1 } }],
+      // Sheep (milestone 2.4, engine half): decisions, none of the day.
+      setSheepFeed: [{ farm: sheepy, action: { type: 'setSheepFeed', mob: flock, feed: 'grain' } }],
+      setSheepDates: [
+        {
+          farm: sheepy,
+          action: { type: 'setSheepDates', mob: flock, shear: { month: 9, date: 1 } },
+        },
+      ],
+      buySheep: [
+        {
+          farm: saleDay,
+          action: { type: 'buySheep', cls: 'merinoEwes', qty: 20, to: { cell: b.emptyCell } },
+        },
+      ],
+      sellSheep: [{ farm: sheepy, action: { type: 'sellSheep', mob: flock, cls: 'ewe', qty: 5 } }],
+      // Moving sheep (third pass): the cattle move time; plans as for cattle.
+      moveSheep: [
+        { farm: sheepy, action: { type: 'moveSheep', mob: flock, to: { cell: b.openCell } } },
+      ],
+      moveSheepPart: [
+        {
+          farm: sheepy,
+          action: {
+            type: 'moveSheepPart',
+            mob: flock,
+            cls: 'ewe',
+            qty: 10,
+            to: { cell: b.openCell },
+          },
+        },
+      ],
+      setSheepPlan: [
+        { farm: sheepPlanned, action: { type: 'setSheepPlan', mob: flock, template: 99 } },
+      ],
+      clearSheepPlan: [{ farm: sheepOnPlan, action: { type: 'clearSheepPlan', mob: flock } }],
     };
-    // 41 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(41);
+    // 49 kinds of action: everything a player can do.
+    expect(Object.keys(cases).length).toBe(49);
 
     const outcomes = new Set<string>();
     let refusals = 0;

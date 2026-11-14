@@ -113,6 +113,16 @@ import {
 } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import { autoWeanDest, mergeShared, newMob, splitMobs } from '../sim/mobs';
+import { sheepAreas } from '../sheep/farm';
+import { buySheep, sellSheep, setSheepDates, setSheepFeed } from '../sheep/actions';
+import {
+  clearSheepPlan,
+  moveSheep,
+  moveSheepPart,
+  pauseSheepPlan,
+  resumeSheepPlan,
+  setSheepPlan,
+} from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
 import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
@@ -143,6 +153,7 @@ export const MAX_BUY = 5000;
 
 const FENCE_CODE: Record<FenceKind, FenceType> = {
   permanent: EDGE.permanent,
+  netting: EDGE.netting,
   electric: EDGE.electric,
   tape: EDGE.tape,
 };
@@ -219,7 +230,15 @@ class Job {
     if (to === 'lot') return { kind: 'lot' };
     if (!to || !isCell(to.cell)) return refuse('bad-request', 'That square is off the farm.');
     const s = this.survey;
-    return { kind: 'paddock', anchor: placeAnchor(s, s.topology.areaOf[to.cell]!) };
+    const areaId = s.topology.areaOf[to.cell]!;
+    // One mob to an area: cattle never go in with sheep.
+    if (this.farm.sheep && sheepAreas(this.farm, s).has(areaId)) {
+      return refuse(
+        'sheep-there',
+        'Sheep are grazing there. Cattle and sheep run in separate paddocks.',
+      );
+    }
+    return { kind: 'paddock', anchor: placeAnchor(s, areaId) };
   }
 
   /** Say where cattle ended up, and warn about no water and about crops there. */
@@ -943,6 +962,9 @@ function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
 
 function pausePlan(j: Job, a: Extract<Action, { type: 'pausePlan' }>): Out {
   const m = j.mob(a.mob);
+  // A sheep mob's plan pauses the same way (sheep/moves.ts).
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob))
+    return pauseSheepPlan(j.farm, j.events, a.mob);
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
@@ -962,6 +984,9 @@ function pausePlan(j: Job, a: Extract<Action, { type: 'pausePlan' }>): Out {
 
 function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
   const m = j.mob(a.mob);
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob)) {
+    return resumeSheepPlan(j.farm, j.events, a.mob, a.step);
+  }
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan to resume. Set one.`);
@@ -1123,7 +1148,8 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
   const side = farm.layout.scale.sideM;
   const each = segmentCost(a.fence, side);
   // A segment built from materials on hand (kept from fence taken down) is half price.
-  const reused = a.fence === 'tape' ? each : reusedSegmentCost(a.fence, side);
+  const reused =
+    a.fence === 'tape' || a.fence === 'netting' ? each : reusedSegmentCost(a.fence, side);
   const fromStock = new Set(out.fromStockEdges.map(edgeKey));
   const fenceCost = (out.segments - out.fromStock) * each + out.fromStock * reused;
   let cost: number;
@@ -1159,7 +1185,7 @@ function doBuildFence(j: Job, a: Extract<Action, { type: 'buildFence' }>): Out {
     farm.year.running += fee;
   } else farm.year.infra += fenceCost;
   farm.layout = out.layout;
-  const onHand = a.fence === 'tape' ? 0 : farm.layout.fenceOnHand[a.fence];
+  const onHand = a.fence === 'tape' || a.fence === 'netting' ? 0 : farm.layout.fenceOnHand[a.fence];
   j.events.push({
     type: 'layout-job',
     job: 'buildFence',
@@ -1670,6 +1696,23 @@ function run(j: Job, a: Action): Out {
       return orderContractFence(j.farm, j.events, a);
     case 'cancelContractFence':
       return cancelContractFence(j.farm, j.events, a);
+    // ---- Sheep (milestone 2.4, engine half).
+    case 'setSheepFeed':
+      return setSheepFeed(j.farm, j.events, a);
+    case 'setSheepDates':
+      return setSheepDates(j.farm, j.events, a);
+    case 'buySheep':
+      return buySheep(j.farm, j.events, a, j.env, j.part.clocked === true);
+    case 'sellSheep':
+      return sellSheep(j.farm, j.events, a, j.env, j.part.clocked === true);
+    case 'moveSheep':
+      return moveSheep(j.farm, j.events, a);
+    case 'moveSheepPart':
+      return moveSheepPart(j.farm, j.events, a);
+    case 'setSheepPlan':
+      return setSheepPlan(j.farm, j.events, a);
+    case 'clearSheepPlan':
+      return clearSheepPlan(j.farm, j.events, a);
     default:
       return refuse('bad-request', 'That is not something that can be done on a farm.');
   }

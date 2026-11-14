@@ -14,6 +14,7 @@ import { netSaleValue, type Prices } from '../market/prices';
 import { coverPct } from '../pasture/summary';
 import { pricesOf } from '../sim/derived';
 import type { FarmState, InfraLedger, YearRecord, YearScore, YearTotals } from '../sim/state';
+import { sheepIndicatorsOf, sheepWorth } from '../sheep/market';
 import { INFRA_WORTH_SHARE, segmentCost } from './costs';
 
 const sum = (r: Record<string, number>): number => {
@@ -67,9 +68,13 @@ export function stockWorth(farm: Pick<FarmState, 'mobs'>, prices: Prices): numbe
  * What was paid for cattle bought and not yet in the yards. They are
  * counted at what was paid until they land, then at net sale value.
  */
-export function arrivalsWorth(farm: Pick<FarmState, 'arrivals'>): number {
+export function arrivalsWorth(
+  farm: Pick<FarmState, 'arrivals'> & Partial<Pick<FarmState, 'sheep'>>,
+): number {
   let v = 0;
   for (const a of farm.arrivals) v += a.cost;
+  // Sheep bought on the clock, on their way to the yards, likewise at what was paid.
+  for (const a of farm.sheep?.arrivals ?? []) v += a.total;
   return v;
 }
 
@@ -98,6 +103,8 @@ export function netWorth(farm: FarmState, prices: Prices = pricesOf(farm)): numb
   let v =
     farm.cash + infraInPlace(farm) * INFRA_WORTH_SHARE + arrivalsWorth(farm) - wagesOwedOf(farm);
   for (const m of farm.mobs) for (const a of m.animals) v += Math.max(0, netSaleValue(a, prices));
+  // Sheep at what they would fetch today. A farm with no sheep adds nothing.
+  if (farm.sheep) v += sheepWorth(farm.sheep.mobs, sheepIndicatorsOf(farm));
   return v;
 }
 
@@ -114,7 +121,10 @@ export function netWorthParts(farm: FarmState): {
   const owed = wagesOwedOf(farm);
   return {
     cash: farm.cash,
-    stock: stockWorth(farm, prices) + arrivalsWorth(farm),
+    stock:
+      stockWorth(farm, prices) +
+      arrivalsWorth(farm) +
+      (farm.sheep ? sheepWorth(farm.sheep.mobs, sheepIndicatorsOf(farm)) : 0),
     infrastructure: infraInPlace(farm) * INFRA_WORTH_SHARE,
     ...(owed > 0 ? { wagesOwed: owed } : {}),
     total: netWorth(farm, prices),
@@ -171,7 +181,10 @@ export const SCORE = {
  * when the year has no monthly readings yet.
  */
 export function scoreYear(
-  y: Pick<YearTotals, 'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'covers'> & {
+  y: Pick<
+    YearTotals,
+    'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'sheepDeaths' | 'sheepDeathAe' | 'covers'
+  > & {
     worth1: number;
   },
   coverNow: number,
@@ -191,7 +204,9 @@ export function scoreYear(
     (cover < S.coverLow ? (S.coverLow - cover) * S.coverShort : 0);
   const profitPts = profit / S.dollarsPerPoint;
   const gainPts = y.gain * S.gainPts;
-  const deathPts = -y.deaths * S.death;
+  // A sheep death counts by the animal's size in AE (call, 15 Nov 2026): a newborn lamb about
+  // 0.03 of a beast, a ewe about 0.2. Cattle deaths count one each, as before. 0 with no sheep.
+  const deathPts = -(y.deaths + (y.sheepDeathAe ?? 0)) * S.death;
   return {
     profit,
     util,

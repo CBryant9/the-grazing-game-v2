@@ -18,6 +18,7 @@ import type { Plantings } from '../pasture/plantings';
 import { areaSummary } from '../pasture/summary';
 import { DISTRICTS } from '../data/districts';
 import type { Rng } from '../rng';
+import { sheepAreas } from '../sheep/farm';
 import { areaIdOf, placeAnchor } from './derived';
 import type { FarmEvent } from './events';
 import { type FarmMob, type FarmState, type MobWhere } from './state';
@@ -104,8 +105,10 @@ export function autoWeanDest(
   const here = areaIdOf(survey, m);
   const occupied = new Set<number>();
   for (const x of farm.mobs) if (x.where.kind === 'paddock') occupied.add(areaIdOf(survey, x));
+  // Weaner calves never go in with sheep (one mob to an area). No sheep: no change.
+  const sheep = farm.sheep ? sheepAreas(farm, survey) : null;
   const opts = survey.topology.areas.filter(
-    (r) => r.id !== here && survey.points.areaTroughs[r.id]!.length > 0,
+    (r) => r.id !== here && survey.points.areaTroughs[r.id]!.length > 0 && !sheep?.has(r.id),
   );
   if (!opts.length) return null;
   const me = new Map<number, number>();

@@ -19,6 +19,8 @@ import type { EdgeRef } from '../farm/topology';
 import type { WaterEvent } from '../farm/water';
 import type { ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
+import type { SheepFeed } from '../data/sheep';
+import type { SheepDeathCause, SheepNote } from '../sheep/notes';
 import type { GameOverReason, MobWhere, PlanWaitReason, YearRecord } from './state';
 
 /** Where a mob is, with the grazing area's name when it is on pasture. */
@@ -78,6 +80,113 @@ export type TickEvent =
       reason: 'hungry' | 'thirsty';
       edge: EdgeRef;
       area: string;
+    }
+  /** A note from a sheep mob's day: no water, short of feed, joining, scanning, lambing, marking, flystrike. */
+  | { type: 'sheep'; mob: number; mobName: string; area: string | null; note: SheepNote }
+  /** Lambs born today in one sheep mob. */
+  | { type: 'lambs-born'; mob: number; mobName: string; count: number }
+  /** Sheep that died today in one sheep mob of one cause. */
+  | { type: 'sheep-deaths'; mob: number; mobName: string; cause: SheepDeathCause; count: number }
+  /**
+   * A sheep mob's lambs were weaned. `into` is the new mob they went to, or
+   * null when there was no other empty area with water and they stayed.
+   */
+  | {
+      type: 'sheep-weaned';
+      mob: number;
+      mobName: string;
+      count: number;
+      avgKg: number;
+      into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
+    }
+  /**
+   * Contractors shore a sheep mob (on its shearing day, by themselves): head
+   * shorn, the wool (clean and greasy kg, micron, months of wool), what it
+   * sold for at the stand-in price and the contractors' cost, dollars.
+   */
+  | {
+      type: 'sheep-shorn';
+      mob: number;
+      mobName: string;
+      head: number;
+      cleanKg: number;
+      greasyKg: number;
+      micron: number;
+      months: number;
+      woolIncome: number;
+      cost: number;
+    }
+  /** Contractors crutched a sheep mob: head and cost, dollars. */
+  | { type: 'sheep-crutched'; mob: number; mobName: string; head: number; cost: number }
+  /** Sheep bought (`buySheep`): the class, head, dollars paid with the head fee, and the mob. */
+  | {
+      type: 'sheep-bought';
+      cls: string;
+      qty: number;
+      total: number;
+      mob: number;
+      mobName: string;
+    }
+  /** Sheep sold (`sellSheep`): head, lambs at foot that went with their ewes, average kg, dollars banked. */
+  | {
+      type: 'sheep-sold';
+      mob: number;
+      mobName: string;
+      head: number;
+      lambsAtFoot: number;
+      avgKg: number;
+      net: number;
+    }
+  /**
+   * Hungry or thirsty sheep got through a fence that does not hold sheep
+   * into the next area (`edge`), from `from` to `to` (area names).
+   */
+  | {
+      type: 'sheep-breakout';
+      mob: number;
+      mobName: string;
+      reason: 'hungry' | 'thirsty';
+      edge: EdgeRef;
+      from: string;
+      to: string;
+    }
+  /** Sheep were moved by hand to an area: the mob they are in there, and the head moved. */
+  | { type: 'sheep-moved'; mob: number; mobName: string; head: number; area: string }
+  /**
+   * A sheep mob was put on a plan (with the stops that have no water, as the
+   * cattle `plan-set` gives them), or taken off one, or finished one; or
+   * its plan was paused (by asking) or resumed at a step.
+   */
+  | { type: 'sheep-plan-set'; mob: number; mobName: string; template: number; dryAreas: string[] }
+  | { type: 'sheep-plan-paused'; mob: number; mobName: string; template: number; step: number }
+  | {
+      type: 'sheep-plan-resumed';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      area: string;
+    }
+  | { type: 'sheep-plan-cleared'; mob: number; mobName: string }
+  | { type: 'sheep-plan-finished'; mob: number; mobName: string }
+  /** A sheep plan's next stop has no water, or cattle in it: the plan waits (told once a stop). */
+  | { type: 'sheep-plan-waiting'; mob: number; mobName: string; why: PlanWaitReason; area: string }
+  /** A sheep plan moved its mob on. */
+  | { type: 'sheep-plan-moved'; mob: number; mobName: string; from: string; to: string }
+  /** Sheep bought on a sale day, on their way to the yards (they land at first light on `arriveDay`). */
+  | { type: 'sheep-on-the-way'; cls: string; qty: number; total: number; arriveDay: number }
+  /** Sheep bought landed in the stock yards. */
+  | { type: 'sheep-arrived'; cls: string; head: number; cost: number; mob: number; mobName: string }
+  /** A sheep mob's feed was set. */
+  | { type: 'sheep-feed-set'; mob: number; mobName: string; feed: SheepFeed }
+  /** A sheep mob's joining, shearing and crutching days, as they now stand (null: not booked). */
+  | {
+      type: 'sheep-dates-set';
+      mob: number;
+      mobName: string;
+      joinOn: { month: number; date: number };
+      shearOn: { month: number; date: number } | null;
+      crutchOn: { month: number; date: number } | null;
     }
   /** Two mobs that share a grazing area, the feedlot or the yards now run as one. */
   | {
@@ -388,6 +497,8 @@ export interface FarmStarted {
   /** Fence, gates, troughs and pipe that came with the farm, in segments and counts. */
   improvements: StartImprovements;
   herd: StartHerd | null;
+  /** A running sheep or mixed farm's start flock (milestone 2.4). Left out otherwise. */
+  flock?: { ewes: number; rams: number; dse: number; share: number };
   /** The season on day 0, and its growth as a multiple of a normal season. */
   season: { label: string; factor: number };
 }

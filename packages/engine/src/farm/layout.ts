@@ -117,6 +117,8 @@ export interface EdgeTally {
   gateOpen: number;
   electricDown: number;
   tapeDown: number;
+  /** Sheep-proof netting. Left out until a farm has some. */
+  netting?: number;
 }
 
 const TALLY_KEY: Record<number, keyof EdgeTally> = {
@@ -127,6 +129,7 @@ const TALLY_KEY: Record<number, keyof EdgeTally> = {
   [EDGE.gateOpen]: 'gateOpen',
   [EDGE.electricDown]: 'electricDown',
   [EDGE.tapeDown]: 'tapeDown',
+  [EDGE.netting]: 'netting',
 };
 
 const emptyTally = (): EdgeTally => ({
@@ -295,7 +298,12 @@ export function buildFence(
   edges: readonly EdgeRef[],
   type: FenceType,
 ): Outcome<FenceBuilt> {
-  if (type !== EDGE.permanent && type !== EDGE.electric && type !== EDGE.tape) {
+  if (
+    type !== EDGE.permanent &&
+    type !== EDGE.electric &&
+    type !== EDGE.tape &&
+    type !== EDGE.netting
+  ) {
     return refuse('nothing-to-build', 'That is not a kind of fence.');
   }
   if (!edges.every(edgeOnFarm)) return refuse('off-the-farm', 'That line runs off the farm.');

@@ -64,6 +64,9 @@ export const VIEW_BODY_SHAPE = { thinBelow: 2, fatFrom: 3.6 } as const;
 const EDGE_TO_VIEW: Record<number, number> = {
   [EDGE.none]: VIEW_FENCE.none,
   [EDGE.permanent]: VIEW_FENCE.permanent,
+  // Netting is drawn as permanent fence until the map has its own code
+  // (`nettingEdges` says which is which).
+  [EDGE.netting]: VIEW_FENCE.permanent,
   [EDGE.electric]: VIEW_FENCE.electric,
   [EDGE.tape]: VIEW_FENCE.tape,
   [EDGE.gateShut]: VIEW_FENCE.gate,

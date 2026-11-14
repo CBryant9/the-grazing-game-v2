@@ -200,7 +200,7 @@ export interface PaddockView extends PaddockSummary {
   water: 'own' | 'gate' | 'none';
   /** The mobs on the paddock's grazing area, by id. */
   mobs: number[];
-  /** DSE per hectare (AE x 8). */
+  /** DSE per hectare (AE × 8.4, `DSE_PER_AE`). */
   dsePerHa: number;
 }
 

@@ -1542,6 +1542,191 @@ It should say `UPDATE 1`. A test runs this exact statement. There is no public r
 **What a banned or suspended account can and can not do today (call 3, still a call for Claudia).** It can not use the community, sign up again after a ban (by hash, when the hash was written), or open admin, and its sessions end when it is banned or suspended. An access token already issued still works on the game routes until it runs out. It **can** sign in again and play its own farm, because the game routes do not check status. Enforcing it is one check in `route()`.
 
 **Not done:** the redirect route (or `proxy.ts`) that would refresh an admin's sign-in on a page load; the unknown `/api/...` path answers differently from an admin route's JSON 404 (an admin route's answer is the same for everyone who is not an admin, which is what was asked); the access matrix has no new table to add (the new test file covers the new rules); nothing was checked in a real browser or a real Supabase project.
+### 15 Nov 2026: m2.3 Sheep model
+
+Branch `m2.3-sheep-model`, from `m2.1-hands-and-contractors` (fd01165), with `docs/SHEEP_BENCHMARKS.md` brought in from the benchmark branch. Engine 0.14.0, save format 10. Engine and docs only.
+
+**Built (engine).** BUILD_PLAN 2.3, the animal model (MODEL section 12; figures in DATA, "Sheep"):
+
+- Sheep mobs beside the cattle mobs (`farm.sheep`, left off a farm with no sheep), each with `species: 'sheep'`, grazing the same pasture arrays with the cattle's rules and sheep figures: a greener pick, fuller intake from shorter feed, a lower residual.
+- Classes (lamb, weaner, hogget, ewe, wether, ram), Merino (medium and large) and crossbred, SRW, DSE worked out from energy, AE at 8.4 DSE.
+- Energy for maintenance, walking, pregnancy (singles, twins, triplets), milk and growth; appetite as a share of live weight; lamb and weaner growth; CS and weight moving together (0.19 × SRW a CS).
+- Joining on the district's date for 5 weeks on a 17-day cycle, conception and litter by CS and breed, ram cover at 1% + 1, scanning count, lambing at 147 days, birth weight, lamb survival by litter, breed and CS, marking and weaning counts, orphans.
+- Wool: clean fleece with feed and gain, slower in late pregnancy, micron with growth rate, coarser males; `shearMob` and `crutchMob` (fleece weight, micron, months of wool; 6 weeks of fly cover).
+- Deaths: adult, lambing (by litter, breed, CS, toxaemia), lambs (early and late), weaners (by growth and weaning weight), thin sheep, no water, flystrike.
+- Water by class and season. One mob to an area holds across species: cattle are refused into a sheep paddock (`sheep-there`), plans wait, weaner calves never go in with sheep.
+- Helpers and reads for milestone 2.4: `addSheepMob`, `ensureSheepState`, `sheepMobsOf`, `occupiedAreas`, `sheepAreas`, `sheepWaterLitres`, `shearMob`, `crutchMob`, `fleeceMicron`, `greasyKg`, `sheepMobsRead`, `sheepJoiningRecord`, `stockingRead`, `fleeceOf`, `dressingShare`, `carcaseKg`, `dseOf`, `aeFromDse`, `sheepClassOf`, `SHEEP_DISTRICTS`, `sheepDistrict`, `WATER_WELFARE_HOURS`. Events: `sheep` (notes), `lambs-born`, `sheep-deaths`, `sheep-weaned`, `mobs-joined`.
+
+**Tested.** Every row of SHEEP_BENCHMARKS.md is a test named by its SB number (`calibration/sheep.units`, `.paddock`, `.mob`, `.year`); the model's figure for each is in CALIBRATION (15 Nov 2026). 61 rows pass in full, 4 pass in Western Victoria (or the Central West) with their Tablelands and Central West parts skipped, 5 are skipped (list below). Rule tests (`sheep/rules.test.ts`) and farm tests (`sheep/farm.test.ts`: refused in Central Queensland and on an occupied paddock, seeded repeatability, save and load mid-run, an older save loads with no sheep, a farm with no sheep saves no sheep, the whole life cycle on a farm, cattle refused into a sheep paddock, and cattle in their own paddock playing the same figures with sheep next door). No calibration band and no `*.mvp.test.ts` file changed; the no-hands digest (engine 0.12.1) still passes.
+
+**Skipped benchmarks, with the reason** (each a `test.skip` named with it):
+
+- SB-40, SB-41, SB-43 (Tablelands and Central West parts) and SB-47 (Tablelands): C18. On native pasture alone with no sheep supplement, the grass model's winter takes ewes from CS 3 to 1.4 (Tablelands) and 2.2 (Central West) at lambing. Western Victoria passes.
+- SB-59, SB-60, SB-61, SB-62: C18. The carrying capacity rule (the grass model's) gives 3.55 DSE/ha on Tablelands native pasture and 5.5 to 7.7 on sown pasture, against 5 and 12 to 23 sourced.
+- SB-65: C26, the sheep-proof fence price is Claudia's, and the netting fence is milestone 2.4.
+
+**Calls for Claudia** (each is one constant in `packages/engine/src/data/sheep.ts` unless it says otherwise):
+
+1. **C18, sheep through a Tablelands or Central West winter.** Unsupplemented ewes on native pasture lamb at CS 1.4 (Tablelands) and 2.2 (Central West), so marking is 53% and 67% and the Tablelands loses 19% of its ewes (first-pass figures; the third pass re-measured 48.8% and 71.1% marking and 31.7% of Tablelands ewes lost, eight seeds). Three ways to fix it, all yours: the grass model's winter green on native pasture, a sheep supplement (hay or grain, milestone 2.4), or running the benchmark on sown pasture and crops. Nothing was changed.
+2. **C18, carrying capacity.** The rule's 26% of growth eaten is far under what 13 to 23 DSE/ha eats on improved pasture (45 to 80%). The growth itself matches EverGraze. To change: the district or planting safe use in the grass model.
+3. **C3, DSE per AE.** Sheep use 8.4 (`DSE_PER_AE`); the cattle screens still say AE × 8 (`DSE_PER_AE` in `cattle/animal.ts`). `stockingRead` adds them at 8.4. Pick one figure and change the other constant.
+4. **C21, Merinos unmulesed.** 17% of Merino ewes struck a year with one shearing and one crutch (`FLYSTRIKE.daily`). For mulesed Merinos, lower `FLYSTRIKE.daily.merino`. Strikes apply to every weaned sheep, though only ewes were measured.
+5. **C26, the sheep-proof fence price.** Not built; SB-65 waits for your figure.
+6. **C27, joining dates.** 1 April (Western Victoria, Central West), 15 May (Tablelands) (`JOIN_START`). Each mob keeps its own date (`joinOn`) so the player can change it later.
+7. **C30, no water.** No source gives the days a sheep lives without water, so the cattle rule stays (dead on day 4). The transport standard's 48 hours off water is kept as `WATER_WELFARE_HOURS` for the screens.
+8. **C31, dressing percentage.** Now sourced (MMFS 3.2, lambs 45 to 50%; MLA 2001, mutton by fat score). The fat score is taken as CS rounded (stand-in). The mutton table is dated 2001.
+9. **C22, worms left out.** Western Victoria's weaners grown to target lose 1.6% a year, under SB-47's 2 to 6% (the national average takes in worm deaths). Held as a known gap of 0.4 points (`SB47_WV_UNDER`), as the cattle tests hold theirs.
+10. **C32, two tables to check.** SB-03 (Agriculture Victoria table 3.1) passes. For lamb survival by CS, S19's table (C32) and its text disagree (the table gives 48% more lambs at CS 3.0 to 3.5 than 2.0 to 2.5, the text 15 to 20%); the slopes sit between them so SB-37 holds (`SURVIVAL_PER_CS`). Please check the printed page.
+11. **Dead feed in the sheep's reach counts in full** (`DEAD_IN_REACH` 1), as for cattle. A quarter (the first build) starved sheep on dry winter feed (LESSONS SH1).
+12. **No chores for the life cycle.** Rams work only in the 5 joining weeks; scanning is counted on day 80 of the joining; ram lambs become wethers at the marking count; lambs are weaned at 14 weeks into an empty watered paddock (or stay). All automatic until milestone 2.4 adds the jobs (marking, shearing, crutching).
+13. **Sheep in the score and the books.** Sheep deaths stay out of the year's death score; sheep have no running or health cost yet. Milestone 2.4 should decide both.
+14. **Crossbred ewe deaths.** First-cross ewes die 3.5% at lambing (S67) and 4.8% a year in Western Victoria, over SB-43's 2 to 4%; SB-43 is tested on Merino ewes (Lifetime Wool's baseline).
+15. **Sheep and cattle in one area after a fence change** both graze it, unjoined, until one is moved. Sheep get through cattle fences in milestone 2.4.
+16. **Stand-ins** (no source; each listed in `data/sheep.ts`): crossbred SRW 60 kg; ram weight 1.8 × SRW and maintenance × 1.25; triplet pregnancy × 2.4, third lamb's milk 2 MJ, triplet birth weight 3.0 kg; triplets 10% of litter above 1.25; the lactation curve; in lamb 5 points a CS; birth weight in proportion to SRW; the sheep's green pick (0.1), short green (100 kg) and bare ground (200 kg); residual 150 kg; a ceiling of 0.4 kg a day gained or lost; orphans weaned from 56 days; milk counted as wool feed at 1/11 kg a MJ; crossbred micron 28; CS to fat score.
+17. **Fitted figures**, each set to a sourced benchmark and named in `data/sheep.ts`: maintenance, young sheep's maintenance, pregnancy, milk, large Merino SRW, gain energy, appetite and short feed, the lamb's milk share and grazing, milk on short feed, lamb survival by CS, crossbred lambing risk, adult and weaner deaths, flystrike rates, wool per kg, crossbred wool, wool and gain, wool by age, micron and growth.
+
+**Not done.** Everything in MODEL section 12, "Not built yet": the market, setup choice, netting fence, shearing and crutching jobs and wool income, sheep supplements, sheep on the map (milestone 2.4). Speed is checked for cattle only (`pnpm test:speed`); a large sheep flock was not timed.
+
+### 15 Nov 2026: m2.3 Sheep model, second pass, and the engine half of m2.4
+
+Same branch. The hands review fixes (b4e8b75) merged in first. Engine 0.15.0, save format 11. Engine and docs only. Claudia was away: every open call below was made, built and is listed here for her.
+
+**Review fixes.** SB-53 back to the document's band (1.8 to 2.2%), measured on 100,000 ewes; every other band checked against the document. SB-43 tested on both breeds (first-cross a known open gap). One mob to a paddock holds by itself across species (breakouts both ways). Weaner deaths carry the cause `weaner`. The losing-weight note gives its reasons. One DSE figure (8.4). The unmarked figures named and listed in DATA. CALIBRATION says which rows pass by construction. Speed: sheep are records with head counts; the largest flock runs at 2.65 ms a day (before: about a second a day).
+
+**Built (engine half of 2.4).** Sheep feeding (lick, grain, hay); contractor shearing and crutching on dates with wool sold at shearing; sheep health costs and deaths in the year score; rams in and out with the joining; the sheep market (buy and sell at MLA indicators, sale days, freight); netting fence and sheep that get through cattle fences; the cattle, sheep or mix choice at setup with start flocks; reads for the screens (`sheepMarketRead`, `fenceKindsRead`, `nettingEdges`, `sheepYearRead`, and on `sheepMobsRead` the feed and the contractors' days).
+
+**Tested.** Every benchmark row as before, the Tablelands and Central West year rows un-skipped (with winter feeding); known open gaps as expected failures; rule tests for counts, feeding, contractors, the market, netting, breakouts, setup, the score and old saves; the sheep speed test.
+
+**Calls for Claudia (second pass), added to the list above:**
+
+18. **The Tablelands winter (the top grass question, C18).** Unfed ewes there lamb at CS 1.4 and 32% die (31.7% over eight seeds, re-measured in the third pass; the 19% first written here was three seeds on the 0.4% adult rate), whatever the stocking. The grass model's native July and August give sheep 24 to 44 kg/ha green, about 1,000 kg/ha dead at 50% digestibility, ME 7.0, CP 5.5%. S57 says unimproved native pasture there carries 5 DSE/ha. The grass model was not changed; the year rows run with winter feeding. Evidence in CALIBRATION (15 Nov 2026, second pass).
+19. **One DSE figure, 8.4, for every display (C3).** `data/stocking.ts`. The cattle screens' DSE figures move by 5% (AE × 8.4, not × 8): `mobSummaries`, `farmTotals` and the paddock summary's DSE per ha. No cattle benchmark moved. To go back: set `DSE_PER_AE` to 8.
+20. **Breakouts across species.** Cattle never push into a paddock with sheep, sheep never into one with cattle; they take another fence or stay put. The other option was letting them box up together.
+21. **Sheep get through every cattle fence** (permanent, electric, tape) when hungry or thirsty, by the cattle rule and chance; only netting, gates and the boundary hold them. Gates holding sheep is a builder's call.
+22. **Joining dates sourced (C27 replaced):** Central West 5 January (June lambing), Tablelands 7 April (September lambing), Western Victoria 1 April. The NSW calendar's generic March joining was not used.
+23. **Shearing and crutching days** follow the joining: crutch 60 days before lambing, shear 80 days after (NSW calendar). The shed hands, classer and presser are not charged (only the 2024 award shearing and crutching rates).
+24. **Wool income** is its own line (`year.wool`); shearing, crutching and animal health go in running costs; sheep sales and purchases go in the cattle `sales` and `buys` lines.
+25. **Sheep deaths in the score** count as one DSE's share of a beast each (÷ 8.4), so a sheep farm's score is not swamped by lamb deaths.
+26. **Feeding** fills the energy gap up to Agriculture Victoria's full ration; the year benchmarks feed when CS falls under 2.7 (weaners under 50 g a day). Grain is charged at the game's pellet price and hay at its hay price (no dated feed prices were read).
+27. **Stand-ins:** netting $10 a metre (C26), rams $1,200, Merino breeding sheep at 1.5 times mutton value, sheep freight $3 a head, health $3.57 a head a year, grain protein 11%, a sheep lick at the cattle rule and cost ÷ 8.4, start flock 1.5 DSE a ewe, young sheep frame under 540 days, the bought-sheep defaults.
+28. **Refit:** adult deaths outside lambing 0.4% a year (was 0.8%), refitted to SB-43 when sheep became records.
+29. **Known open gaps** (expected failures, figures in their names): first-cross ewe deaths (SB-43) 4.2 to 4.7% against 2 to 4% (S67's 3.25% at lambing alone leaves no room); Western Victoria weaner deaths (SB-47) 1.65% against 2 to 6% (worms left out, C22).
+30. **SB-43's "never over 4.5%"** is held on the mean over the blocks, as every year band is; one 675-ewe block in eight went over.
+31. **Flystrike counts strikes**, so a ewe struck twice in a year counts twice (records do not keep which ewe).
+
+**Not done.** Real-year sheep prices (the indicators are pulled; the loader is not wired); booking sheep onto a later sale; Dubbo and Hamilton sheep sale days (the cattle calendar stands in); the marking job and its cost; the map and screens (another milestone). Timings were taken on a busy machine.
+
+### 15 Nov 2026: m2.3 Sheep model, third pass
+
+Same branch, engine and docs only, save format 11. After a second review.
+
+**Built.** Start flocks as they stand on the start date (age classes, pregnant or with lambs at foot by the district's joining day, replacements, wool since shearing); sheep in the year totals (eaten, gain, deaths by size); moving sheep (whole mob, part, plans) with the species and fence rules; adult deaths back to the derived 0.8% and a wether rate; SB-43 per block; the year harness feeds through the player's action; grain at a sourced price; CS floor facts for the to-do list; feed cost a day per mob; the flystrike note at most weekly; shed staff, selling costs and oddments on the clip; the dated EMI; ewe micron 17.8; saves read by format number with real format 9 and 10 fixtures; sheep sales and wool on their own money lines; bought sheep land in the yards next morning; wool on backs in net worth; netting tellable beside the map view.
+
+**Tested.** A test for each item (start flock per district, score, moves and each refusal, feeding, facts, costs, fly note, clip, market, arrivals, money lines, old saves, netting); every year row before and after in CALIBRATION.
+
+**Calls for Claudia (third pass), added to the list above:**
+
+32. **Sheep deaths score by size, sheep only.** (live weight ÷ 450)^0.75 AE a death, so a lamb is about 0.03 of a beast and a ewe 0.2 (replaces call 25's ÷ 8.4). Cattle still count one each: weighing cattle deaths by size too would change every cattle score.
+33. **Adult and wether deaths 0.8% a year, derived** (call 28's 0.4% refit undone). SB-43 Merino then misses: Western Victoria 4.63% mean, and single blocks over 4.5% in the Tablelands (4.67) and Central West (5.00 to 5.53). Known gaps.
+34. **Tablelands winter feeding costs about $19.76 a ewe a year** at feed barley's $330 a tonne (re-measured; it rides on the grass question, call 18).
+35. **Ewe micron 17.8** (males 19.0): the coarsest that keeps SB-51's 1-micron gap, since the districts grow medium wool.
+36. **Wool on backs counts in net worth**, net of the levy and the cost to shear, so a first year does not count wool grown before it.
+37. **Lambs at foot are priced on their own** (MLA's lamb indicators by weight), not with the ewe: MLA has no ewe-and-lamb unit indicator. At the start they cost nothing on the books.
+38. **Past the overdraft** a day's sheep costs come off cash as cattle supplements do, and the bank's limit ends the game; buying sheep is refused.
+39. **The start flock**: ewes 1.5 to 5.5 years, cast for age at 6 (stand-in); this year's wether lambs counted as sold before the start.
+40. **Wool selling costs are stand-ins** (shed staff $1.50 a head, levy 1.5%, $40 a bale selling, $16 cartage, $14 pack, 180 kg bales, oddments 22% of the clip): the pages refused automatic reading. The oddments price (0.9 of fleece) is from Mecardo.
+41. **Several plan moves a day move sheep once a day.**
+42. **The fly season is the same in every district** (known simplification: no district fly season page was read).
+43. **Start-flock first-year profit is a known gap** against DPIRD's $50.46/DSE gross margin: Tablelands $11.6 (unfed winter), Central West $124.7 and Western Victoria $149.9/DSE (no sales, so the lamb crop is valued at 2026 prices; running costs are shearing, feed and health only).
+44. **Netting on the map** waits for a `netting` code in `packages/shared` (outside this milestone's scope); `nettingEdges` tells it until then.
+
+**Not done.** The netting look on the map (VISUALS proposal only). Re-reading the Central West June-lambing page by hand. Overhead costs a year for sheep. The web test `mobcard.test.ts` (DSE × 8) still fails, as agreed.
+
+### 15 Nov 2026: m2.5 Calf growth
+
+Home-bred calves weighed about 80 kg at weaning (9 months) and 82 to 117 kg at 200 days in every district. The sources say about 160 to 175 kg at 180 to 200 days. Two MVP formulas were wrong for calves and are fixed (engine 0.14.0). Figures before and after are in CALIBRATION.md (the m2.5 entry), the sources in DATA.md ("Calf growth to weaning"), the rules in MODEL.md section 3.
+
+- **Calf cost of gain** (`YOUNG_GAIN_COST`, `mjPerKgGain`). Stock up to 100 kg pay 0.52 MJ of ME per kg LW^0.75 for each kg gained (Sekine and Asahida 1990 measured 510 to 520 kJ for calves under 100 kg), moving in a straight line to the MVP's grown figure (20 + 0.045 × LW) by 200 kg, where the paper's data stop. No step at weaning. Before, a 60 kg calf paid twice the measured cost.
+- **Milk falls with the cow's condition** (`milkMJ`, `MILK`). The MVP cut milk to 45% on any feed of ME 7.35 or less. Now the cow keeps milking on poor feed, pays for it in condition, and her milk falls from full at CS 2.25 to nothing at CS 1.5, above the CS 1.4 where deaths begin.
+- **No milk from nothing.** When a cow's loss for the day would pass the 1.5 kg floor, the milk she cannot pay for is not made (`unpaidMilk`), so all her milk is paid for. It moved almost nothing (Tablelands September-start herd gain 101.3 to 100.9 kg).
+- **New benchmarks** in `calibration/herds.test.ts`, by district, from the nearest sourced figures: gain from birth to 200 days, weight at 100 and at 200 days, gain from 100 to 200 days. Every district passes at 100 days; every district is open on daily gain, and the three southern districts on weight at 200 days too (`it.fails`, named with their figures). A plain regression floor beside each district holds today's figures. A plain test holds the found case (`calibration/calvesFoundCase.cq.test.ts`), and `calibration/herdYears.test.ts` pins three years of calving and cow condition.
+- The MVP comparisons load the MVP with these rules put in place (`REBUILD_RULES` in `test-support/mvp.ts`), which keeps the MVP's own lines as the record of what it did.
+
+| District, average year | Birth to 200 days, kg a day | 100 days, kg | 200 days, kg | 100 to 200 days, kg a day |
+|---|---|---|---|---|
+| Central Qld (band 0.6–0.95; 100–146; 140–225; 0.6–0.95) | 0.28 → 0.53 | 73 → 111 | 93 → 142 | 0.20 → 0.33 |
+| Tablelands (band 0.7–1.1; 101–146; 171–256; 0.7–1.1) | 0.34 → 0.54 | 84 → 107 | 103 → 143 | 0.20 → 0.39 |
+| Central West (same band) | 0.32 → 0.57 | 84 → 120 | 101 → 149 | 0.16 → 0.29 |
+| Western Victoria (same band) | 0.41 → 0.63 | 91 → 127 | 117 → 163 | 0.26 → 0.36 |
+
+**Calls for Claudia**
+
+1. **Cows now milk off their backs.** On poor feed a cow keeps milking, gets thin late in the dry season or the winter, and fewer get back in calf. Over three years with no player action, calves born per 100 cows and heifers fall to about 55 by year 3 in Central Qld and on the Tablelands (were about 58 to 61), and on the Tablelands about 17% of cows sit under CS 2.25 from August to October in years 2 and 3 (was none). Deaths did not rise. That is about what a grazier would expect of a herd left alone with no lick and no early weaning. Northern breeder herds wean 72 to 77 calves per 100 cows on average (CashCow), so year 1 sits above that and years 2 and 3 sit at or below the bottom of it. **What a player can do:** put the herd on lick or hay through the dry or the winter, wean earlier (the mob card offers it), or sell cows. **Whether the screens tell them why:** the mob card's reasons already say "milking" with the MJ she puts into milk, and "low ME" and "low protein" on poor feed, but nothing says her condition is falling *because* she is milking, or suggests weaning. A line for that, and a "cows getting thin" item in Things to do, would be screen work for a later milestone.
+2. **The milk condition figures are stand-ins** (`MILK` in `packages/engine/src/data/cattle.ts`: full milk at CS 2.25, none at CS 1.5). No published figure was found. 2.5 and 1.6, 3.0 and 1.8, and 2.25 and 1.5 all keep every herd benchmark in its band; with no fall at all, Tablelands herd deaths are 4.4% (band 1.5 to 3.6%). To change it, change the two numbers.
+3. **The calf cost of gain** (`YOUNG_GAIN_COST`, same file: 0.52, 100 kg, 200 kg) comes from Holstein calves in Japan on milk and concentrate, and here it also prices pasture gain for weaned stock up to 200 kg, whatever the diet's ME. The Australian feeding standards make the cost depend on weight against mature weight, rate of gain and diet quality, but could not be read online. FutureBeef's table gives 13 MJ a kg of gain at 100 kg (close to the game's 16.4) and 37 MJ at 200 kg (above the game's 29), so nothing read supports a cheaper rule for weaners between 100 and 200 kg. Not changed. If you can get the CSIRO 2007 book (Nutrient Requirements of Domesticated Ruminants), its energy value of gain would settle it.
+4. **Every calf row is open except weight at 100 days, and Central Qld weight at 200 days.** The southern floors are now MLA's own (0.7 kg a day, 171 kg); with them Western Victoria (0.63, 163) is open too. The calves grow well to 100 days and slowly after (0.29 to 0.39 kg a day from 100 to 200 days, against 0.6 to 1.1). The grass looks like the binding limit: diet ME 6.9 to 9.5 on the Tablelands and 6.8 to 8.8 in Central Qld, protein under 7% for 5 to 6 months, feed never short in amount. Calving time alone will not close the Tablelands gap (next item).
+5. **When the herds calve (not changed, for you to rule on).** Usual calving: Central Qld calves in the wet season (Brahman-cross herds in the dry tropics from late October, Fordyce et al. 1993); Western Victoria herds calve in autumn, spring or both (the Western District and Limestone Coast businesses in MLA report L.PDS.1908); no source was read for the Northern Tablelands or Central West, where spring calving is the usual reading but needs a source. The game's start herd has its PTIC cows 100 to 210 days in calf on whatever day the farm starts, so on a 1 September start every district calves from late November to early March (a May start calves August to November). The review found that with a May start (spring calving) 79 to 82% of Tablelands cows sit under CS 2.25 in September and October, the herd averages CS 1.99 at its lowest, and those calves do worse (0.51 against 0.56 kg a day). Changing calving time means a calving window per district in the start herd (`startHerd` and the `ptic` and `cowCalf` sale classes, or a district setting beside them), the herds benchmark runs, the map fixtures and web tests that count head and calves, and what a new player sees on 1 September.
+6. **Herd figures that moved** (all still in band, CALIBRATION.md m2.5): herd gain a head rose 5 to 15 kg in every district; Central West's highest single herd lost 3.85% (was 3.37). Tablelands preg tests now run 7.17 points over the expected rate (was 5.54, band up to 9): the yardstick moved, not the cows. Thinner cows make the expected rate fall (83.6% to 81.4%) while the share in calf barely moves (89.1% to 88.5%).
+7. **Why the MVP once recorded 148 to 249 kg at weaning:** most likely bought calves at foot, set at 36 kg + 0.8 kg a day of age, not calves the model grew. No script for that check survives.
+8. Map fixtures were made again (`pnpm dev:map-fixtures`) after each model change; only the cattle figures moved.
+
+### 15 Nov 2026: m2.7 Engine join
+
+Branch `m2.7-engine-joined`: `m2.3-sheep-model` (eff980d) with `m2.5-calf-growth` (2bd90de) merged in. Engine 0.16.0 (one bump for both: the calf change was numbered 0.14.0 on its own branch, which the sheep line had already used), save format 11 (no stored field changed; formats 9, 10 and 11 load, fixtures kept). Engine, docs and map fixtures only.
+
+**The join.** Only `version.ts` and its test clashed in code; both sides' docs were kept in full (CALIBRATION, DATA, DEVELOPMENT_LOG, LESSONS; MODEL merged by itself). No lesson or call number clashed: the sheep lessons are SH1 to SH11, the calf lesson is C7, and calls are numbered within each entry. MODEL's "DSE = AE × 8" in the cattle section was brought up to the sheep branch's 8.4, and the calf rules there are marked as shipped in 0.16.0. The Benchmarks table in CALIBRATION now has a State column for every cattle, calf and sheep row.
+
+**Proved.** Every cattle figure equals the calf branch's and every sheep figure the sheep branch's, to the last digit (CALIBRATION, the m2.7 entry). The no-hands digests the calf branch took pass unchanged, so nothing was regenerated. The map fixtures were made again and none changed. A mixed farm runs two years with no player action with nothing eaten twice, year lines that add up to the cash, both species breeding and weaning, and the same result on the same seed (new test, `sim/mixedFarm.test.ts`).
+
+**For Claudia.**
+
+1. **Sheep and cattle rules stay apart.** No sheep code calls a cattle rule the calf change moved. Sheep have their own cost of gain and milk (fitted to the sheep benchmarks), so lambs do not get the calf fix. That is right while the sheep rows pass on their own figures; if a lamb growth row ever opens, look at the sheep rules, not the cattle ones.
+2. **Sheep profit a DSE is still a known gap** against NSW DPIRD's $50.46/DSE gross margin (start flock, first year, no hands): Tablelands $11.6 (unfed winter), Central West $124.7 and Western Victoria $149.9 (no sales, so the lamb crop is valued at 2026 prices; running costs are shearing, feed and health only). Unchanged by the join (sheep branch call 43).
+3. **On the mixed probe farm** (Western Victoria, 86 cattle and 659 sheep, left alone) 579 sheep died in two years, most of them lambs (1,185 born), and profit fell from $192,435 in year 1 to $25,757 in year 2 (not looked into further: year 1 counts its lamb crop as new worth, as the start-flock gap above does). Nothing was done to the farm, so this is what neglect looks like; it is not a benchmark.
+4. **Weaners go where the other species is not.** On a mixed farm the first lambs went to Paddock 1 because Paddock 6 held cattle. That follows the one-mob-a-paddock rule; it does mean a mixed farm's weaning destinations depend on where the cattle are.
+5. **SB-65's skip reason is stale.** It still says the netting fence is milestone 2.4; netting is built (at the $10 a metre stand-in). The row waits only on your fence price (C26). Not changed here.
+6. The web test `apps/web/server/game/mobcard.test.ts:111` (DSE as AE × 8) still fails, as agreed, until the sheep screens.
+
+**Checks.** Type check, lint, format, every test (one agreed web failure), both speed tests alone (cattle 4.49 ms a day, sheep 1.99 ms), build and the browser-bundle check.
+
+### 15 Nov 2026: m2.7 Review of the sheep third pass
+
+Same branch (`m2.7-engine-joined`). Engine 0.17.0, save format 12 (a joining's `lambingStart` is null before lambing; real-year farms keep `sheep.prices`; formats 9, 10 and 11 load, with a new format 11 fixture pair made by the join commit's own code). Engine, docs only. Figures before and after in CALIBRATION (the m2.7 review entry); sources in DATA ("Review of the third pass"). Every cattle figure is still byte for byte the calf branch's; the no-hands digests pass untouched.
+
+**Done, each with a test written first and seen to fail** (except the real-year sheep prices, item 10, whose tests were written with it):
+
+1. **Start lambs weaned.** A lambing that began before the farm's first day is a negative day, so marking and weaning count from it; no lamb stays at foot past 150 days; a sheep under half the weight it is measured against dies, cause `starved` (a lamb at foot against its age's normal weight, a weaned sheep against the normal weight at weaning, so SB-46's slow weaners live). Central West from 1 September now weans on day 6 at about 22 kg, joins dry, lambs 2,070 (was 628) and shears its start lambs.
+2. **Sheep plans** take a move's daylight when they move the mob, warn of dry stops (`dryAreas`) and give the no-water warning.
+3. **Sheep on their way** count in net worth at what was paid.
+4. **Regression limits** beside every open sheep row (SB-43, SB-47, the start-flock profit, SB-GM); the SB-43 comment fixed (4.5% is per block).
+5. **Adult and wether deaths 0.91%** (3.2 − 1.95 − 0.34; flystrike from S37).
+6. **Start flock shape**: one age class of ewe weaners kept, the oldest class cast at weaning, lambs at foot at the CS the model lambs at (Central West 90.9 a 100 ewes joined, against the model's own 87.4; was 101), mid-joining ewes already in lamb.
+7. **Pause and resume** for sheep plans (`pausePlan`, `resumePlan` work on a sheep mob).
+8. **Nothing eaten twice**, square by square: green and dead feed on every square match the cattle-only or sheep-only farm until day 276, and the feed lost on a day is what was eaten plus trampling.
+9. **SB-65** tested: netting $10 a metre against permanent $7.
+10. **Real-year sheep prices**: the six MLA national indicators for the real date in today's dollars, with their own data version (cattle data versions unchanged). Two long breaks (heavy lamb 37 days, Merino lamb 23 days, both over the 1996 Christmas) are covered by a 45-day hold; wool stays at the dated stand-in.
+11. **Lambs count in the year's births.**
+12. Smaller: the netting comment; dry ewes out of season are "other" (CS floor 2), at the joining stage only from 42 days before joining; format 10 lambs doomed after day 2 still die; the losing-weight note from day 10 then weekly, low condition weekly; **the sheep breakout stream restarted from the seed every day** (the sheep step replaced its stream record), so most thirsty mobs never broke out: fixed. Sheep get through permanent, electric and tape fences, standing or knocked down; netting, gates and the boundary hold them.
+13. **The budget**: the DPIRD pages refuse automatic reading (HTTP 403). The $50.46 was read (Sheep Central, 5 Aug 2026); the October 2024 20-micron budget's figures were seen in search summaries only (DATA).
+14. **Costs from the budget**: shearing $9.81 a head all in, crutching $1.92, ram replacement. Ewe micron and cut not changed (below, call 4).
+15. **SB-GM** a managed flock: Central West $38.69 a budget DSE (passes $37.85 to $63.08); Tablelands $71.88 and Western Victoria $90.33 open, mostly wool. Cattle against sheep on one farm recorded in CALIBRATION.
+
+**Calls for Claudia (review of the third pass), not changed** (1 to 3 are the review's figures):
+
+1. **Death points in the year score mix two rules**: a dead newborn calf costs 60 points, a ewe about 11.6, a newborn lamb 1.9 (sheep by size, cattle one each).
+2. **Old ewes** die at the same rate as young ones, and nothing casts them for age unless the player sells them.
+3. **With no sales** a Western Victoria flock reaches 121% of carrying capacity by year 3.
+4. **Ewe micron 17.8 stays.** C15 says the districts grow 19 to 21 micron, but SB-52 holds wethers at 18 to 20 (S64, 19.0) and SB-51 holds males 1 to 3 micron coarser than ewes (S46). Ewes at 19 would need one of those rows to move. Your call which.
+5. **DSE a ewe.** The model's DSE from energy is 1.6 to 2.0 a ewe joined; the DPIRD budget rates 2.32. The margin row divides by the budget's rating; a screen that shows "per DSE" on the model's own figure reads 20 to 45% higher.
+6. **Wool prices** are the dated September 2026 stand-in on every farm (no real-year wool series). They are why Tablelands and Western Victoria sit over the margin band.
+7. **Stand-ins added**: starved at half the reference weight; no lamb at foot past 150 days; ram working life 4 years; joining stage from 42 days before joining. Costs not charged for want of a figure: marking, freight beyond the $3 head fee, pasture. Animal health stays $3.57 a head.
+8. **Thirsty sheep** get out by the cattle rule (the cattle odds, then a 21-day wait). One that breaks into another dry paddock can still die before its next try, as cattle can.
+9. **Cattle against sheep on one farm** (unmanaged, average year, overheads on each): Western Victoria year 2 cattle −$96 and sheep +$101 a DSE; Central West −$97 and +$59. Not margins; for you to judge whether a managed comparison should be a benchmark.
+10. **SB-GM's band**, ±25% of $50.46, is the builder's: tighter would test the price date.
+
+**Checks.** Type check, lint, format, build, browser bundle: clean. Every test passes but the agreed web test (`mobcard.test.ts:111`); one cattle test that timed out under load passed when run alone. Map fixtures made again: none changed. Speed, each alone: sheep 1.66 ms a day (6,865 sheep). Cattle read 5.4 to 9.1 ms against the 5 ms limit while about 30 other node processes ran; the join commit's own code (44f0583) read 4.36 and then 6.07 in the same minutes, so the miss is the machine, not this change (no cattle code path changed). Run it again on a quiet machine.
+
+**Not done.** Reading the DPIRD budget itself (refused). A managed cattle margin to set beside SB-GM. The web screens for the new sheep plan events and `sheep.prices` (outside this scope).
 
 ## Ideas raised but not built yet
 

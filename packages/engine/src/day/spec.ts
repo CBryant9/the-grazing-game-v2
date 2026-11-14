@@ -63,6 +63,8 @@ const pieceKey = (ref: JobPiece): string =>
 function removalWork(code: number, sideM: number): PieceWork {
   if (code === EDGE.gateShut || code === EDGE.gateOpen) return { minutes: JOB_TIMES.gateMin.value };
   if (code === EDGE.permanent) return { metres: sideM, pace: 'permanent' };
+  // Netting goes up at the permanent fence's pace (STAND-IN: no netting job time was found).
+  if (code === EDGE.netting) return { metres: sideM, pace: 'permanent' };
   if (code === EDGE.electric || code === EDGE.electricDown) {
     return { metres: sideM, pace: 'electric' };
   }
@@ -106,7 +108,7 @@ function linePieces(before: FarmState, after: FarmState, action: Action): Piece[
       if (was === getEdge(after.layout.fences, ref.edge)) continue;
       const work: PieceWork =
         action.type === 'buildFence'
-          ? { metres: sideM, pace: action.fence }
+          ? { metres: sideM, pace: action.fence === 'netting' ? 'permanent' : action.fence }
           : removalWork(was, sideM);
       out.push({ ref, work });
     } else {
@@ -208,6 +210,28 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'cancelSale':
       // Taking stock off a sale is a decision too.
       return { kind: 'free' };
+    case 'moveSheep':
+    case 'moveSheepPart':
+    case 'setSheepPlan': {
+      // Sheep moved by hand or put on a plan's stop: the cattle move time (settle, and by the
+      // head), when the sheep really move. Setting the plan itself is a decision.
+      const moved = trial.events.find((e) => e.type === 'sheep-moved');
+      const head = moved?.type === 'sheep-moved' ? moved.head : 0;
+      if (action.type === 'setSheepPlan' && !moved) return { kind: 'free' };
+      return whole([
+        part('settle', T.moveMobSettleMin.value),
+        part('head', (head / 100) * T.moveMobMinPer100Head.value),
+      ]);
+    }
+    case 'clearSheepPlan':
+      return { kind: 'free' };
+    case 'setSheepFeed':
+    case 'setSheepDates':
+    case 'buySheep':
+    case 'sellSheep':
+      // Sheep decisions (milestone 2.4, engine half): feeding and the contractors' days are set
+      // like the cattle supplement; buying and selling are decisions, as buying cattle is.
+      return { kind: 'free' };
     case 'hireHand':
     case 'letHandGo':
     case 'orderContractFence':
@@ -254,6 +278,14 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
       // not already there. Making the plan is a decision. The moves a plan makes by itself
       // take none of the day (as in the old game).
       const lost = mobsThatLost(before, trial.farm);
+      // A sheep mob's plan resumed on another stop moves the sheep: the sheep move's time.
+      const sheepMoved = trial.events.find((e) => e.type === 'sheep-moved');
+      if (!lost.length && sheepMoved?.type === 'sheep-moved') {
+        return whole([
+          part('settle', T.moveMobSettleMin.value),
+          part('head', (sheepMoved.head / 100) * T.moveMobMinPer100Head.value),
+        ]);
+      }
       if (!lost.length) return { kind: 'free' };
       const head = lost.reduce((n, l) => n + l.head, 0);
       return whole([

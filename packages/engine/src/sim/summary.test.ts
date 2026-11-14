@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { toMvpEdge, type MvpFarm } from '../../test-support/mvpFarm';
 import { WholeFarmRun, loadMvpWhole } from '../../test-support/mvpWhole';
 import { PLENTY, act, twoPaddockFarm } from '../../test-support/wholeFarm';
+import { DSE_PER_AE } from '../data/stocking';
 import { aeOf, classOf } from '../cattle/animal';
 import { EDGE, type EdgeRef } from '../farm/topology';
 import { GRID_N } from '../grid';
@@ -64,7 +65,7 @@ describe('paddock summaries, against the MVP padStats on a whole farm', () => {
         };
         expect(mine, `${v.name} ${when}`).toEqual(m);
         expect(v.name).toBe(mvp.PADS[i]!.name);
-        expect(v.dsePerHa).toBe(v.rate * 8);
+        expect(v.dsePerHa).toBe(v.rate * DSE_PER_AE);
       });
     };
     run.days(25);
@@ -151,7 +152,7 @@ describe('mob summaries and farm totals', () => {
       expect(sum.head).toBe(adults.length);
       expect(sum.calves).toBe(m.animals.length - adults.length);
       expect(sum.ae).toBe(m.animals.reduce((t, a) => t + aeOf(a), 0));
-      expect(sum.dse).toBe(sum.ae * 8);
+      expect(sum.dse).toBe(sum.ae * DSE_PER_AE);
       expect(sum.supp).toBe('lick');
       expect(sum.day).toBe(m.st);
       expect(sum.day!.n).toBe(adults.length);
@@ -195,7 +196,7 @@ describe('mob summaries and farm totals', () => {
       all.reduce((s, a) => s + aeOf(a), 0),
       6,
     );
-    expect(t.dse).toBe(t.ae * 8);
+    expect(t.dse).toBe(t.ae * DSE_PER_AE);
     expect(t.carryingCapacityAE).toBe(carryingCapacityAE('cq', 1000));
     let g = 0;
     let d = 0;

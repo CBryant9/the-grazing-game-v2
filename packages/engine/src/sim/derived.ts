@@ -141,6 +141,30 @@ export function realSourcesOf(farm: FarmState, env: SourceEnv = {}): RealSources
 }
 
 /**
+ * On a real-year farm with sheep, set today's sheep indicators for the real
+ * date behind the farm day (review of the third pass, item 10), in the
+ * market's dollars. The farm keeps the sheep data version it first read; a
+ * later pull with other figures is refused, as for the cattle and weather
+ * tables. A farm with random seasons, or with no sheep, is left alone.
+ */
+export function refreshSheepPrices(farm: FarmState, env: SourceEnv = {}): void {
+  if (!farm.sheep || farm.seasons.kind !== 'real') return;
+  const real = realSourcesOf(farm, env);
+  if (!real || !env.data) return;
+  const sp = env.data.sheep();
+  const kept = farm.sheep.prices;
+  if (kept && kept.dataVersion !== sp.version) {
+    throw new Error(
+      `This farm's sheep prices were started on data version ${kept.dataVersion}. The data given is version ${sp.version}. A farm is never moved to other data without being asked to.`,
+    );
+  }
+  const date = real.plan.realDateOn(farm.day);
+  const dollars = farm.market.kind === 'real' ? farm.market.dollars : 'today';
+  const iso = `${date.year}-${String(date.month + 1).padStart(2, '0')}-${String(date.date).padStart(2, '0')}`;
+  farm.sheep.prices = { dataVersion: sp.version, date: iso, indicators: sp.on(date, dollars) };
+}
+
+/**
  * Give a copy of a real-year farm the sources already worked out for the
  * farm it was copied from. They depend only on the farm's seed, start and
  * years, which a copy shares.

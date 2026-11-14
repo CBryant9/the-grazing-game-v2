@@ -830,3 +830,239 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 ### The farm's standing with workers
 
 All **Stand-in**, for Claudia: 80 to start (of 100); 20 lost for each hand whose wages can't be paid; 5 gained on a pay day when all are paid; at standing 0 the list keeps 40% of its people (the most skilled go first) and people ask 20% above the award, falling in a straight line to all of the list at the award at 100. The pool: 1 to 3 new people a week, each listed for 14 to 42 days; 40% casual, 30% contract, 30% salaried; 3 in 10 salaried hands work a week that takes in the weekend. Names are made up.
+
+## Sheep (milestone 2.3)
+
+Every figure is a constant in `packages/engine/src/data/sheep.ts`, marked there as here. The rules are MODEL section 12. **Sourced** figures come from [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md) (sources S1 to S74, read 14 Nov 2026), or from the two sources below read for this milestone. **Fitted** figures were set so a sourced benchmark holds (the row is named). **Stand-ins** have no source and are listed for Claudia in DEVELOPMENT_LOG ("m2.3 Sheep model").
+
+### Size, energy and intake
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Districts that run sheep | Northern Tablelands, Central West, Western Victoria | Decided | PRD 5.12, section 21 row 24 |
+| One DSE | a 50 kg dry wether at CS 3, at maintenance, 8.3 MJ ME a day | Sourced | S4, S1 (calls C1, C2) |
+| DSE to the AE | 8.4 | Sourced | S1, S2 (call C3; the cattle screens keep 8) |
+| SRW, medium Merino | 50 kg | Sourced | S19 (call C29) |
+| SRW, large Merino | 65 kg | Fitted | S7: a large ewe needs 10 MJ dry against a medium one's 8 (SB-08) |
+| SRW, crossbred | 60 kg | Stand-in | No SRW table by breed found (C29) |
+| kg in one CS | 0.19 × SRW | Sourced | S27 (C28) |
+| Ram weight; ram maintenance | 1.8 × the ewes' SRW; × 1.25 | Stand-in | Chosen together for NSW's 2.0 DSE (S5, SB-12) |
+| Maintenance | 0.401 × LW^0.75 × (1 + walk), 8.3 MJ at 50 kg and the reference walk (0.10) | Fitted | S4 (SB-01, SB-02) |
+| Young sheep's maintenance | × (1 + 0.12 × (1 − age ÷ 730)) | Fitted | S4, S6 weaner rows (SB-13) |
+| Pregnancy, single at day 130; twins; triplets | 3.95 MJ; × 1.85; × 2.4 | Fitted; fitted; stand-in | S7, S4, S5, S6 (SB-04, SB-05, SB-09); S35 for triplets |
+| Gestation | 147 days | Sourced | S29 (international), S18, S19 (C12) |
+| Milk spend at the top of lactation, single; second lamb; third | 12.1 MJ; 7.0 × SRW ÷ 50; 2 | Fitted; fitted; stand-in | S7, S5, S6 (SB-06, SB-07, SB-10, SB-11) |
+| Lactation curve | full to day 42, half by day 100 | Stand-in | The cattle curve, shortened to 14 weeks |
+| Milk energy a lamb gets per MJ spent | 0.45 | Fitted | S20, S68 (SB-48, SB-48a) |
+| Milk on short feed | × clamp(eaten ÷ needs, 0.5, 1)^1.5 | Fitted | S20 (SB-48) |
+| Energy in a kg of gain | 2 + 50 × LW ÷ mature weight MJ | Fitted | S6 weaner rows |
+| Energy from a kg lost | 22 MJ | Sourced (model) | The cattle model's figure (MODEL section 3) |
+| Most gained or lost in a day | 0.4 kg | Stand-in | A ceiling, not a target |
+| Appetite: adult, young, milking, each extra lamb | 2.6%, 4%, 4.2%, + 0.4% of LW | Fitted | Inside S8's ranges (SB-14 to SB-16), set to the Pasture Ruler rows (S9, SB-17 to SB-23) |
+| Lambs start grazing | from 14 days, full at 110 | Stand-in; fitted | The cattle calves' shape; 110 days fitted with the milk share (SB-48, SB-48a) |
+| Short feed | 1 − exp(−(green + dead) ÷ 480) | Fitted | S9, S58 (SB-17 to SB-23, SB-25); dead counts in full as in the cattle rule, S61 gives limits in feed on offer |
+| Sheep's pick of green; short green; bare | G ÷ (G + 0.1 × D + 1); under 100 kg; under 200 kg | Stand-in | S12 says sheep graze closer; no figure found |
+| Sheep's residual | 150 kg DM/ha | Stand-in | S12 |
+
+### Breeding and deaths
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Oestrous cycle; joining | 17 days; 35 days | Sourced | S25, S28 (C14) |
+| Rams | 1% + 1 | Sourced | S25 (C13) |
+| Joining age and weight | 210 days; 75% of SRW | Sourced | S25, S17 |
+| In lamb after 5 weeks at CS 3 | Merino 91.5%, crossbred 95.5% | Sourced | S25 (SB-30, SB-31) |
+| In lamb, change a CS | 5 points | Stand-in | Splits the CS response between conception and litter size |
+| Foetuses per ewe joined at CS 3; a CS | 1.25 Merino, 1.55 non-Merino; + 0.20 | Sourced | S31; S18, S19, S25 (SB-32 to SB-34) |
+| Triplets | 10% of the litter above 1.25, up to 15% | Stand-in | No litter shares by breed read |
+| Birth weight | single 4.9, twin 3.7 kg; triplet 3.0; − 0.32 kg a CS lost early | Sourced; stand-in; sourced | S19; —; S18, S19 |
+| Lamb survival at CS 3 | Merino 91%, 71%, 52.9%; crossbred 93.5%, 83.5%, 60.1% | Sourced | S19, S33, S32, S35 (C11) |
+| Lamb survival a CS | below 3: 12 points singles, 24 twins; above: 6, 16 | Fitted | Between S19's table (C32) and its text (SB-37) |
+| Lamb deaths in the first 3 days | 80% of deaths to marking | Sourced | S31, S36 (SB-38) |
+| Lamb deaths, marking to weaning | 0.009% a day | Sourced | S33 (SB-39) |
+| Orphans | weaned from 56 days; 2% a day before | Stand-in; model | The cattle orphan rate |
+| Weaning | 14 weeks from the start of lambing | Sourced | S17 |
+| Joining start | 1 April (Western Victoria, Central West), 15 May (Tablelands) | Builder | C27, from the district growth curves |
+| Ewe lambing risk | singles 1.35%, twins 3.05%, triplets 6.15% | Sourced | S35 less the adult rate (SB-42) |
+| Crossbred lambing risk | × 1.35 | Fitted | S67 (SB-43a) |
+| Thin ewes at lambing | × (1 + (2.5 − CS)) | Sourced | S18, S19: doubles at CS 1.5 (SB-44) |
+| Pregnancy toxaemia | + 3.8% a CS lost from scanning to lambing, × litter ÷ 3 | Sourced (triplets) | S35 (C23) |
+| Adult deaths outside lambing | 0.91% a year (see the third pass table and the review below) | Derived | S19, S67, S37 (SB-43; C7) |
+| Weaner deaths | by growth and weaning weight (MODEL section 12) | Fitted | S17 table 10.1 (SB-45, SB-46) |
+| Low condition, no water | the cattle rules | Model | MODEL section 3 (C30) |
+| Flystrike a day, unprotected | Merino 0.066%, crossbred 0.018% | Fitted | S37: 17% and 5% a year with one shearing and one crutch (SB-53, SB-54; C21) |
+| Strike cost; deaths | 2.7 kg (Merino), 5.2 kg (crossbred), 0.3 CS; 2% within 7 days | Sourced | S37 |
+| Cover after shearing or crutching | 42 days | Sourced | S38 (SB-55) |
+
+### Wool, water and carcase
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Clean wool per kg DM, dry Merino at peak age | 10.4 g | Fitted | S64: wethers 4.2 kg (SB-52) |
+| Crossbred | × 0.57 | Fitted | S65: first-cross ewes cut 72% of Merino ewes' wool (SB-52c) |
+| Milking; last third of pregnancy | × 8.8 ÷ 14.5; × 0.7 | Sourced | S46 (SB-49) |
+| Wool and gain | × (1 + 5.5 × kg a day), 0.4 to 1.5 | Fitted | S18, S19 (SB-50) |
+| Wool by age | 0.45 of the adult rate at birth, full at 3 years | Fitted | S46 (peak at 3 to 4 years), S62 (SB-52b) |
+| Milk as wool feed | 1 ÷ 11 kg DM a MJ | Stand-in | — |
+| Micron at the reference fleece | Merino ewes 17.0, wethers and rams 19.0; crossbred 28 | Sourced; stand-in | S64, S46; no crossbred micron found |
+| Reference fleece | Merino ewes 4.0, males 4.2, crossbred 2.9 kg | Sourced | S62, S63, S64, S65 |
+| Micron and growth rate | 0.6 a kg a year | Fitted | S18, S19 (SB-50) |
+| Clean yield | 63.6% | Sourced | S45 (C15) |
+| Water, average and summer day | weaners 4 and 6 L; dry 6 and 10; ewes with lambs 10 and 14 | Sourced | S13 (C17) |
+| Netting holds sheep; cattle fences do not | — | Sourced | S48 (SB-63, SB-64) |
+| Dressing, lambs | 47.5% second-cross; Merino 2.5% less | Sourced | MMFS ch. 3.2, below |
+| Dressing, mutton by fat score 1 to 5 | wethers 39, 41, 43, 45, 47%; ewes 38, 40, 42, 44, 46% | Sourced | MLA, below |
+| Fat score from CS | CS rounded | Stand-in | No table read |
+
+### Two figures searched for this milestone (read 14 Nov 2026)
+
+**How long sheep go without water (call C30).** No Australian page that could be read gives the days a sheep survives without water. What was read:
+
+- RSPCA Australia Knowledgebase, "What is the impact on animal welfare of depriving farm animals of water during transport?" (updated 14 May 2021): sheep over 4 months may go at most 48 hours off water, then rest at least 36 hours with water, feed and space, as it quotes the land transport standards. Sheep are about 10% dehydrated after about 72 hours. https://kb.rspca.org.au/knowledge-base/what-is-the-impact-on-animal-welfare-of-depriving-farm-animals-of-water-during-transport/ The standard itself was not read.
+- Making More From Sheep, Tool 5.2: sheep drink up to 40% more in summer than in winter, and up to 80% more in extreme heat (as in S14).
+
+The game keeps the cattle rule (every sheep dies on day 4 without water). The 48 hours is kept as `WATER_WELFARE_HOURS` for the screens.
+
+**Dressing percentage (call C31).**
+
+- Making More From Sheep, chapter 3.2, "Manage the production system to meet market specifications" (no date): lambs dress at 45 to 50% hot standard carcase weight; Merino and Border Leicester × Merino lambs dress 1.5 to 3.5% below second-cross lambs; low-digestibility pasture can lower it by up to 3%. https://www.makingmorefromsheep.com.au/manual/module-3-market-focused-lamb-and-sheepmeat-production/chapter-3-2-manage-the-production-system-to-meet-market-specifications/
+- MLA, "Making the most of mutton" (July 2001, reprinted March 2005), table 3, p. 11: dressing percentage by fat score for Merinos 2 to 3 hours off feed with about 50 mm of wool, as in the table above; sheep dress at 35 to 50%, about 2% a fat score; crossbreds 1.5 to 3.5% above Merinos; shorn sheep higher, pregnant ewes lower. https://www.makingmorefromsheep.com.au/globalassets/mmfs/manual/module-3/mla_making-the-most-of-mutton.pdf (dated 2001: check against a current MLA figure before sheep are sold).
+
+## Sheep in the game (milestone 2.3 second pass and 2.4, engine half)
+
+Constants in `packages/engine/src/data/sheep.ts`, `data/sheepMarket.ts`, `data/stocking.ts` and `money/costs.ts`. Sources read on 15 Nov 2026 unless they are SHEEP_BENCHMARKS sources (S-numbers).
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| DSE to the AE, every display | 8.4 (the MVP's 8 kept as a record) | Sourced, call C3 | S1, S2 |
+| Joining start, Central West | 5 January (lambing from 1 June) | June lambing sourced; **5 January derived** (1 June less the 147-day pregnancy) | NSW DPIRD, "Sheep \| Merino" climate vulnerability page (no date), as quoted by the second pass's research step: "June lambing ... typical of production in the wheat-sheep zone". The third pass could not re-read the page (it refuses automatic reading); check it by hand. https://www.dpird.nsw.gov.au/dpi/climate/climate-vulnerability-assessment/commodity-pages/sheep-merino |
+| Joining start, Northern Tablelands | 7 April (lambing from 1 September) | Sourced | Same page: September lambing is typical of the high rainfall zone |
+| Joining start, Western Victoria | 1 April (lambing from 26 August) | Sourced | EverGraze Hamilton, S54: August to September lambing |
+| Crutching, shearing | 60 days before lambing starts; 80 days after | Sourced (my arithmetic) | NSW Government, "Sheep calendar of operations" (12 Nov 2025): crutch mid-June before an August lambing, shear in November. https://www.nsw.gov.au/regional-and-primary-industries/livestock/sheep/calendar |
+| Shearing, crutching rates | $381.58 a 100 sheep, $763.16 a 100 rams; full crutch $110.66 a 100 | Sourced, dated 2024 (C16) | S47 |
+| Wool price by micron | 17 µm 2,569 to 30 µm 605 c/kg clean | Sourced, dated stand-in (C20) | S53 |
+| Grain ration cap (wheat) | dry 0.54, late pregnancy 0.74, with lambs 1.07 kg a day; 12 MJ ME a kg; +10% each 5 kg over 45 kg | Sourced | Agriculture Victoria, "Drought Feeding and Management of Sheep" (CS 1717 V4), ch. 4, table 4.5. https://www.feedinglivestock.vic.gov.au/wp-content/uploads/2025/06/CS-1717-Drought-Feeding-and-Management-of-Sheep_V4_Chapter-4.pdf |
+| Hay ration cap | dry 0.77, late pregnancy 1.29, with lambs 1.71 kg a day; 8.5 MJ ME a kg (46 MJ ÷ 5.4 kg, my arithmetic) | Sourced | Same table |
+| Young sheep fed for growth | 50 g a day | Sourced | MMFS ch. 10.4, S17 |
+| Grain protein; hay price | 11%; the game's hay price ($0.28/kg) | Stand-in | No dated hay price read |
+| Grain price (third pass) | feed barley $330 a tonne, $0.33/kg | Sourced, dated | Grain Central, "Feedgrain Focus", 9 July 2026 (read 15 Nov 2026) |
+| Sheep lick | the cattle lick's rule, at the cattle cost a head ÷ 8.4 | Stand-in | No sheep lick intake or price read |
+| Winter feeding in the year benchmarks | grain while a mob's CS is under 2.7 (to 2.9); weaners while under 50 g a day (to 70) | Sourced targets, the harness's management | S18 (CS 2.7+ joining to lambing), S17 |
+| MLA national sheep indicators, c/kg cwt | light lamb 1,152.61; trade 1,169.05; heavy 1,156.65; Merino lamb 1,083.55; restocker 1,259.4; mutton 872.92 | Sourced, dated 12 Nov 2026 | MLA statistics service tables in the repo, `packages/engine/data/raw/mla/national/*.csv` (`pnpm data:mla`) |
+| First-cross ewes, 1.5 years | $556 a head | Sourced | MLA, "Weekly cattle and sheep market wrap", 13 Nov 2026 (Bendigo First X Blue Ribbon sale, 6 Nov 2026) |
+| Merino breeding ewes and wethers | mutton value × 1.5 | Stand-in | No Online Sheep (AuctionsPlus) figure read |
+| Rams | $1,200 a head | Stand-in | — |
+| Sheep selling commission; head fee | 5% (the cattle figure); $3 a head each way | Model; stand-in | No dated sheep freight found |
+| Animal health | $30 ÷ 8.4 = $3.57 a head a year | Stand-in | The cattle district figure scaled by one DSE's share; the NSW DPIRD sheep budgets refused automatic reading |
+| Netting fence | $10 a metre (cattle permanent $7) | Stand-in, Claudia's (C26) | S49, S69 give netting fence costs but not beside a cattle fence |
+| Start flock | 1.5 DSE a ewe for the year | Stand-in | The DSE tables (S5, S6) for a dry, pregnant and milking ewe |
+| Adult deaths outside lambing | 0.91% a year (the review of the third pass; the third pass wrote about 0.8%) | Derived | S19's 3.2% a year at CS 3, less 1.95% at lambing (S67) = 1.25%, less flystrike: 17% of unmulesed Merino ewes struck a year (Horton and others 2018, S37) × 2% of the struck dying (S37) = 0.34%, leaves 0.91% |
+| Wether deaths | 0.91% a year | Derived | The ewes' working above (wethers do not lamb; no wether figure was read, C7) |
+| Young sheep put gain into frame | under 540 days (cattle 900) | Stand-in | S25 joins maidens young; no figure found |
+| Sheep bought when age and weight are not given | adults 3 years, hoggets 15 months, weaners 5 months; weaners 0.6 and hoggets 0.8 of mature weight; weaned 40 and 300 days ago; weaned at 45% of SRW | Stand-in; the last sourced | S17 for the weaning weight |
+| Sheep bought by class (age, weight share) | Merino ewes and wethers 3 years, 1.0; first-cross ewes 548 days, 0.95; rams 3 years, 1.0; store weaners and lambs 150 days, 0.55 | Stand-in | — |
+
+### Third pass (15 Nov 2026)
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Wool price level | the micron guide (S53) scaled by 1,890 ÷ 1,722 | Sourced, dated (C20) | S53's sale commentary gives the Eastern Market Indicator as 1,890 c/kg clean for 1 to 2 September 2026; the micron guide on the same page sits under a ticker with no date and an EMI of 1,722. The guide gives the spread by micron, the dated EMI the level (`WOOL_EMI`) |
+| Merino ewe micron | 17.8 (wethers and rams 19.0) | Builder's call | S46 (males 1 to 3 µm coarser); the document's medium-wool districts (19 to 21 µm); the coarsest figure that keeps SB-51's 1-micron gap |
+| Shed staff (wool handlers, presser, classer) | $1.50 a head shorn (not charged from engine 0.17.0: inside the budget's all-in shearing, below) | Stand-in | The Pastoral Award shed hand rates and NSW DPIRD budgets refused automatic reading |
+| Wool levy | 1.5% of the sale | Stand-in | WoolPoll figure seen only in a search summary |
+| Broker's selling, testing and warehousing | $40 a bale | Stand-in | AWI selling systems review refused automatic reading |
+| Cartage to store; wool pack | $16 and $14 a bale | Stand-in | — |
+| Greasy wool in a bale | 180 kg | Stand-in | — |
+| Oddments (bellies, pieces, locks, crutchings) | 22% of the clip, at 0.9 of the fleece price | Share stand-in; price sourced | Mecardo, "Merino wool categories", 9 June 2022 (read): pieces about 125 c/kg clean, about 10% under fleece |
+| CS floors for the to-do facts | joining 2.6, pregnancy 2.3, lambing 2.6, with lambs 2.4; not breeding 2 | Sourced | S19 (Lifetime Wool targets), S7 (CS 2 or less a risk of death) |
+| Start flock: CS, maidens, cast for age | CS 3; maidens joined at 1.5 years; cast at 6 years | Sourced, sourced, stand-in | S22; S25; search summaries only (5 to 6 years) |
+| Start flock: lamb growth to weaning; after | 0.198 kg a day; 0.05 kg a day | Sourced | S68; S17 |
+| Start flock: mean conception day of the joining | day 12 | Derived | The model's own conception: about 70% on the first heat (mean day 8 of the 17-day cycle), the rest 17 days later |
+| Merino gross margin, for comparison only | $50.46/DSE, self-replacing 20-micron Merino, 2025 | Comparison, not used by the model | NSW DPIRD release, 6 Aug 2026, as found by the research step; check the figure by hand before it is quoted outside the docs |
+| Flystrike season | the same in every district | Known simplification | No district fly season page was read |
+
+**MLA indicators for the real-year sheep prices** (wired in engine 0.17.0, below): National Light Lamb, Trade Lamb, Heavy Lamb, Merino Lamb, Restocker Lamb and Mutton (S52). Store and breeding ewes by the head (Online Sheep and Online Lamb, AuctionsPlus) are not pulled: Merino breeding sheep stay at mutton value × 1.5 and first-cross ewes at the dated $556.
+
+### Review of the third pass (m2.7, 15 Nov 2026)
+
+**The sheep gross margin budget (item 13).** The source behind the $50.46/DSE is NSW DPIRD's 2025 sheep gross margin budgets. The DPIRD budget pages and PDFs (dpird.nsw.gov.au, dpi.nsw.gov.au and their mirror) all returned HTTP 403 to automatic reading on 15 Nov 2026, so the budget itself could not be read. What was read, and what was seen only in search summaries:
+
+| Figure | Value | How it was got | Source |
+|---|---|---|---|
+| Self-replacing 20-micron Merino gross margin, 2025 | $50.46 a DSE | Read | Sheep Central, "Lower costs and fertility underpin 2025 NSW sheep gross margins", 5 Aug 2026 (sheepcentral.com/?p=168454): April to September 2025 prices; 20-micron ewes to terminal rams $49.70; average sheep enterprise $43.73 (2024: $24.53); wool harvesting about 28% of total costs in Merino enterprises; Merino sheep sale income up 102% on 2024 |
+| 20-micron Merino ewe budget, October 2024 prices: flock and DSE | 1,000 ewes, 59 kg, 2.32 DSE a ewe | Search summary only | NSW DPIRD Farm Enterprise Budget Series, "Merino ewes 20 micron" (dpi.nsw.gov.au/__data/assets/pdf_file/0009/1596141) |
+| Same: wool | 5.64 kg greasy a head at $8.10/kg greasy (20 µm $13.30/kg clean at 65% yield) | Search summary only | Same |
+| Same: flock figures | marking 89%, weaning 86%, flock deaths 4%, rams 2% | Search summary only | Same |
+| Same: gross margin | $27.81 a DSE ($21.87 with fodder), $278.05 a ha | Search summary only | Same |
+| 25% terminal variant, October 2024: shearing; crutching | $9.81 a head; $1.92 a head (deaths 5%, 5-year productive life, 87% weaning) | Search summary only | NSW DPIRD, "Merino ewes 25 terminal" (dpird-web.matrix.squiz.cloud/__data/assets/pdf_file/0005/1596137) |
+| Marking, animal health, ram cost, freight and selling, supplementary feed, pasture costs | not found | — | The budget's cost lines were in no summary read |
+
+**Used in the engine (item 14).** `SHEEP_BUDGET_COSTS` in `data/sheepMarket.ts`: shearing $9.81 a head all in (rams twice), in place of the award piece rate plus $1.50 shed staff ($5.32); crutching $1.92 a head (was the award's $1.11); ram replacement, the rams at the ram price ($1,200, stand-in) over 4 working years (stand-in), a running cost a ram a day. Animal health stays the $3.57 stand-in: no budget figure was read. Marking, freight on stock sold beyond the $3 head fee, and pasture costs are not charged: no figure was found.
+
+**Micron and cut, not changed (item 14).** The review asked for ewes at 19 to 20 micron (C15's medium wool). Two sourced rows hold the ewe micron down: SB-52 holds wethers at 18 to 20 micron (S64's NSW bloodline average, 19.0) and SB-51 holds males 1 to 3 micron coarser than ewes on the same feed (S46). Ewes at 19 micron would need wethers at 20 or more, outside SB-52. So 17.8 (the coarsest that keeps both) stays, now with that reason; listed for Claudia. The cut is grown from feed (`WOOL.gPerKgDm`, fitted to S64's wethers): ewes cut 4.1 to 4.4 kg clean, inside SB-52a (3.3 to 4.7) and above the budget's 3.67 kg clean (5.64 greasy at 65%). Not changed: the biology figures are sourced.
+
+**Model figures added (all for Claudia).**
+
+| Figure | Value | Mark | Source |
+|---|---|---|---|
+| Starved: dead under this share of normal weight for age | 0.5 (`STARVED`), normal weight from a triplet's birth weight on the start flock's growth path | Stand-in | No figure read for the weight at which a sheep dies |
+| No lamb at foot past | 150 days (`LAMBING_TIMES.weanByAge`) | Stand-in | The usual weaning (98 days from the first lamb) plus the 35 days of joining, with room |
+| Start flock lambs: CS at lambing | Tablelands 2.66, Central West 2.69, Western Victoria 2.92 | Derived (the model's own) | The Merino ewe year runs' CS at lambing (SB-43, third pass) |
+| Start flock replacements | one age class (ewes ÷ 5) of this year's ewe lambs; the oldest class cast at weaning | Model | START_FLOCK (cast at 6, stand-in) |
+| Joining stage for the CS floor | from 42 days before the joining day to its end (`JOINING_PREP_DAYS`) | Stand-in | S19's targets are at joining; six weeks is about half a CS gained |
+| Losing-weight and low-condition notes | from the 10th day of losses, then at most once a week (`LOSS_NOTE_DAYS`) | Model | — |
+| Real-year sheep prices | the six MLA national indicators on the real date, in today's dollars by the CPI; rows under 20 head passed over; the newest usable row stands 45 days | Sourced tables; the 45 days is the builder's | Only two breaks are longer than the cattle's 21 days: heavy lamb, 3 Dec 1996 to 9 Jan 1997 (37 days), and Merino lamb, 17 Dec 1996 to 9 Jan 1997 (23 days). Every other break from 1997 is 12 days or less. Wool has no MLA series and stays at the dated stand-in |
+
+## Calf growth to weaning (m2.5, 15 Nov 2026)
+
+Looked up for the calf growth benchmark (CALIBRATION.md, the m2.5 entry). In the engine: `YOUNG_GAIN_COST` (`data/cattle.ts`) is 0.52 MJ per kg LW^0.75 for each kg of gain up to 100 kg, moving in a straight line to the grown figure (20 + 0.045 × LW) by 200 kg: from Sekine and Asahida below (510 to 520 kJ for calves under 100 kg; the 200 kg end is where their data stop, at 195 kg). To change it, change the three numbers there. The weaning figures are the benchmark bands in `calibration/herds.test.ts`.
+
+**Milk and condition, `MILK` (`data/cattle.ts`): STAND-IN, for Claudia.** A cow gives full milk for her condition at CS 2.25 and above, falling in a straight line to none at CS 1.5 (engine 0.14.0). No published figure was found for the condition at which a beef cow's milk falls away. The stop sits above CS 1.4, where deaths start to rise, so a cow does not milk herself to death; 2.25 and 1.5 is the lowest stop tried that keeps every herd benchmark in its band (CALIBRATION.md, the m2.5 entry). Searched and not found: a beef trial giving milk yield by body condition (MLA, FutureBeef, NSW DPI and peer-reviewed searches turned up only general statements that thin cows give less milk). "Read" means the figure was read on the page or in the PDF; "search only" means it came from a search result and the page was not read.
+
+**Growth to weaning and weaning weight**
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Brahman-Shorthorn crosses (half and three-quarter), Swan's Lagoon near Ayr, dry tropics of north Queensland. Calving from late October, weaning on set dates in April, June or August. **Nearest sourced figure for Central Queensland**: no Central Queensland source was read | Birth to weaning about 0.75 to 0.79 kg a day; weight adjusted to 180 days about 161 to 173 kg; birth weight about 26 to 28 kg. Year-to-year differences in growth up to 25%, higher when the wet season started earlier. Calves of mature cows 4 to 10 kg heavier at weaning | Fordyce et al., Aust. J. Exp. Agric. 1993, 33:119-27 (Qld DPI), read: https://era.dpi.qld.gov.au/id/eprint/13231/1/ . The scan's table columns are jumbled, so the kg a day and 180-day weights are approximate |
+| Northern Australia, weaning practice | About 100 kg (about three months old) is the usual lowest weaning weight; under 100 kg is a drought wean. Calves of 3 months and over, well fed, can be 150 kg or more by the end of their first wet season | FutureBeef (Qld DAF), "Weaning: a critical component of herd management", https://futurebeef.com.au/resources/weaning/ , no date shown, read |
+| Northern Australia, weaners (calving season not stated) | Mean weaning age and weight 192 to 203 days and 187 to 199 kg across three herds | MLA final report B.NBP.0390, table 5, read: https://www.mla.com.au/contentassets/4a9fb5eb39034ef6be6eb5653c75af8f/b.nbp.0390_final_report.pdf |
+| British breeds, projections from NSW Agriculture's crossbreeding work at Grafton (high, medium and low pre-weaning pasture). **Nearest sourced figure for the Northern Tablelands, Central West and Western Victoria**: no Armidale, Dubbo or Hamilton source was read | 0.7 kg a day on pasture of ME 9.0: 31 kg at birth, 101 kg at 100 days, 171 kg at 200 days, 206 kg at 250 days. 0.9 kg a day at ME 10.5: 214 kg at 200 days. 1.1 kg a day at ME 12.0: 256 kg at 200 days | MLA More Beef from Pastures, tool 5.05 "Weaning age and projected liveweights", https://mbfp.mla.com.au/weaner-throughput/tool-55-weaning-age-and-projected-liveweights/ (page copyright 2024), read |
+| Wagyu x Hereford steers born August to November at Grafton, weaned in April at 200 days, on deliberately slow and rapid pre-weaning nutrition | 0.63 kg a day (slow) and 0.98 kg a day (rapid) from birth to weaning | Cafe et al., Aust. J. Exp. Agric. 2006, 46:951-5, read (the weaning weights of about 157 and 236 kg were search only) |
+| Western District of Victoria and Limestone Coast, 11 beef businesses | Calves weaned early in a very dry 2024 at four to five months averaged 150 kg. True early weaning is at least three months and 130 kg; in many southern systems calves are weaned at nine months or older | MLA final report L.PDS.1908, "Post weaning management strategies for beef herds", 30 June 2025, read |
+| NSW, general | Calves "ideally" grow 0.7 to 0.8 kg a day before weaning | NSW DPI, "Weaning beef calves", search only (the page refused a fetch) |
+
+**The energy cost of a calf's growth**
+
+| Figure | Value | Source |
+|---|---|---|
+| ME for maintenance, young calves | about 480 (milk-fed) and 500 (ruminant) kJ per kg LW^0.75 a day | Sekine and Asahida, "Energy metabolism of calf", JARQ 1990, 24:141-148 (Holstein calves, Hokkaido University), read: https://www.jircas.go.jp/sites/default/files/publication/jarq/24-2-141-148_0.pdf |
+| ME for 1 kg of daily gain | 413 kJ per kg LW^0.75 (calves on milk replacer gaining about 0.5 kg a day); 510 to 520 (ruminant calves under 100 kg); 520, 575 and 483 for calves of 55-99, 100-149 and 150-195 kg | Same paper |
+| The game's figure for comparison | ME per kg of gain = 20 + 0.045 x LW (MJ), the same for every animal. At 60 kg that is about 1,050 kJ per kg LW^0.75, at 100 kg 775, at 150 kg 620, at 300 kg 465 | MODEL.md, section 3 |
+
+**Beef cow milk**
+
+| Figure | Value | Source |
+|---|---|---|
+| Brahman cows on tropical pasture, Venezuela (no Australian source was read) | 6.2 kg a day on average over a 216-day lactation (1,340 kg), peaking in the second month | Neidhardt et al., J. Anim. Sci. 1979, 48:1-6, abstract read: https://academic.oup.com/jas/article-abstract/48/1/1/4697779 |
+
+**The limit of the calf cost of gain (m2.5 third pass).** The 0.52 MJ per kg LW^0.75 comes from Holstein calves in Japan on milk, hay and calf starter. In the game it also prices gain on pasture for weaned stock up to 200 kg, whatever the diet's ME. In the Australian feeding standards (SCA 1990, CSIRO 2007) the cost of gain depends on the animal's weight against its mature weight, its rate of gain and the diet's quality, but neither book could be read online, so no figure from them is used. What was read:
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Cattle, daily energy needs | Extra ME on top of maintenance to gain 0.5 kg a day: 6.5 MJ for a 100 kg weaner (13 MJ a kg of gain), 18.5 MJ for a 200 kg weaner (37 MJ a kg), 28.5 MJ for a 300 kg yearling. No source is given for the table and it does not vary with diet quality | FutureBeef, "Energy supplements", table 2, published 19 Sep 2011, read 15 Nov 2026: https://futurebeef.com.au/resources/energy-supplements/ |
+| Growing cattle, drought feeding | Needs set as multiples of maintenance (0.1 × LW + 5 MJ) by weight class and gain, for example 2.2 × maintenance to gain 1 kg a day under 300 kg | Agriculture Victoria, "Drought feeding and management of beef cattle", appendix II, search only |
+| The game, for comparison | 16.4 MJ a kg of gain at 100 kg, 29 MJ at 200 kg (the grown figure) | `mjPerKgGain` |
+
+At 100 kg FutureBeef's figure (13 MJ) is close to Sekine and Asahida's (16.4 MJ). At 200 kg FutureBeef's (37 MJ) is above the game's grown figure (29 MJ), so it does not support a cheaper rule for weaned stock between 100 and 200 kg. No change was made; on Claudia's list.
+
+**Calving and weaning rates in breeder herds (m2.5 third pass), for the three-year observation in CALIBRATION.md.**
+
+| Applies to | Figure | Source |
+|---|---|---|
+| Northern Australia breeder herds (CashCow: 78,000 cows, 142 mobs, 72 businesses, three to four years); Southern Forest, Central Forest and Northern Downs. **Nearest for Central Qld** | Weaning rate averaged 72 to 77% | McGowan et al. 2014 (MLA, "CashCow"), as reported by Beef Central, 12 Sep 2023, read: https://www.beefcentral.com/genetics/weekly-genetics-review-breeding-cattle-in-northern-australia-what-have-we-learnt-so-far/ |
+| The national herd, since 1985 | 9.8 million calves weaned a year from 18.6 million beef females over a year old (about 53 per 100); ABARES surveys put national branding rates (a stand-in for lactation rate) at 70 to 80% | Fordyce, Shephard, Moravek and McGowan, Animal Production Science 2023, 63:410-421, read: https://era.dpi.qld.gov.au/id/eprint/8060/1/AN20342.pdf |
+| Southern Australia | Calving rate 82% (heifers) and 91% (cows) | National Tribune, from a producer survey, no date shown, search only |
+
+No district figure was found for the Northern Tablelands, Central West or Western Victoria.
+
+Not found: the Australian feeding standards' efficiencies for milk-fed calves (SCA 1990, CSIRO 2007) could not be read online, and no Australian lactation curve for Brahman-cross or British cows was read.

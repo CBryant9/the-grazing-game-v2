@@ -340,11 +340,12 @@ Mob intake is then limited by what the paddock supplies (`f` = supplied ÷ deman
 ```
 maintenance  = 0.45 × LW^0.75 × (1 + walk),  walk = 0.05 + 0.12 × min(1, distance to water / 3000)
 pregnancy    = + 0.13 × LW^0.75 × (days − 190)/93 after day 190
-milk MJ/day  = 24 × (1 until 60 days, then falling to 0 by 280) × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((ME − 6)/3, 0.45, 1)
+milk MJ/day  = 24 × (1 until 60 days, then falling to 0 by 280) × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((CS − 1.5)/(2.25 − 1.5), 0, 1)   (m2.5, numbered engine 0.14.0 on its own branch; in engine 0.16.0)
 lactation    = + milk / 0.65
 calf energy  = its pasture + its dam's milk
 balance      = ME intake − needs
-gain kg/day  = balance/(20 + 0.045·LW) if positive, balance/22 if negative
+gain kg/day  = balance/cost if positive, balance/22 if negative
+cost MJ/kg   = 20 + 0.045·LW from 200 kg; 0.52 × LW^0.75 up to 100 kg; a straight line between (m2.5, numbered engine 0.14.0 on its own branch; in engine 0.16.0)
 caps: steers 1.6, bulls 1.4, calves 1.15, others 1.1; floor −1.5
 no water: −4% of LW a day
 condition    CS += gain/(0.15·LW) (× 0.3 for gains in young growing stock under 900 days). 1 CS ≈ 15% of LW.
@@ -356,7 +357,10 @@ Details from the code (milestone 1.2a):
 - Live weight never falls below 25 kg. CS is held between 1 and 5.
 - The daily gain shown for an animal is smoothed: 93% of yesterday's figure plus 7% of today's.
 - Calves are worked out after the adults in their mob, so a calf gets its dam's milk for the same day. The milk energy is added to the calf's intake as it is.
-- In the feedlot the ration is DMD 0.77, ME 11.6, CP 14%. Milk in the lot is worked from the DMD (ME about 11.5).
+- **The cost of a kg of gain for light stock (m2.5; in engine 0.16.0).** The MVP charged every animal 20 + 0.045 × LW MJ for each kg it gained. For a 60 kg calf that is about 1,050 kJ per kg LW^0.75, about twice the 510 to 520 kJ Sekine and Asahida (1990) measured in calves under 100 kg. The rebuild charges 0.52 × LW^0.75 MJ up to 100 kg and the MVP's figure from 200 kg, with a straight line between, so the cost never steps: not at weaning, not at any weight. Weight decides it, not age or kind. The move is finished by 200 kg because the paper's data stop at 195 kg and the steer benchmarks hold the grown figure from there. Constants: `YOUNG_GAIN_COST` in `data/cattle.ts`; function `mjPerKgGain` in `cattle/gains.ts`, used by the daily step and `gainOn`. The MVP comparisons load the MVP with this rule put in its place (`REBUILD_RULES` in `test-support/mvp.ts`, which keeps the MVP's own line as the record).
+- **Milk falls with the cow's condition, not the feed (m2.5; in engine 0.16.0).** The MVP multiplied milk by clamp((ME − 6)/3, 0.45, 1), so on feed of ME 7.35 or less a cow gave 45% of her milk whatever her condition, and her calf sat near maintenance from about 100 days. Brahman cows on tropical pasture are measured giving about 6.2 kg of milk a day over 216 days (DATA.md). Now the feed does not cut milk directly. The cow pays for her milk (milk / 0.65 on her needs), so on poor feed she loses condition milking, and her milk falls in a straight line from full at CS 2.25 to nothing at CS 1.5, above the CS 1.4 where deaths start to rise, so she does not milk herself to death. Both CS figures are stand-ins (`MILK` in `data/cattle.ts`), the lowest tried that keep every herd benchmark in its band; with no fall at all, Tablelands herd deaths run 4.4% against 1.5 to 3.6%. The MVP comparisons load the MVP with this rule in place (`REBUILD_RULES`).
+- **No milk from nothing (m2.5 third pass; in engine 0.16.0).** A day's loss stops at 1.5 kg (`MOST_LOSS_KG`; 1.5 × 22 = 33 MJ). Before, a cow whose needs ran past that still made her full milk, so the milk beyond the floor came from nothing: about 3.4 MJ a day on about 5% of milking cow-days on the Tablelands. Now, when her balance with the full milk counted is under −33 MJ, the milk she cannot pay for is not made: milk falls by (−33 − balance) × 0.65 MJ, never below none (`unpaidMilk` in `cattle/gains.ts`, applied in the daily step before her calf drinks). What she shares between herself and her milk is unchanged, and her loss is then one she pays for, unless she has no milk left. The floor itself still lets a dry animal lose less than its energy says; that is the MVP's rule and is not changed here.
+- In the feedlot the ration is DMD 0.77, ME 11.6, CP 14%. (Up to engine 0.13.0 milk in the lot was worked from the DMD, ME about 11.5; milk no longer reads the feed.)
 - Each animal carries a running cost for the stock book: its feed, plus the district's health cost a day.
 
 ### Breeding
@@ -402,7 +406,7 @@ Cattle bought as PTIC come 100 to 210 days in calf, so they are on the record as
 - 1 AE = 450 kg dry beast at maintenance, scaled by (LW/450)^0.75.
 - Lactating × 1.3; late pregnant × 1.1.
 - Calves count 0 under 90 days, then 0.5 × (LW/450)^0.75.
-- DSE = AE × 8.
+- DSE = AE × 8.4 (`DSE_PER_AE` in `data/stocking.ts`, one figure for every display since engine 0.15.0, call C3; the MVP's × 8 is kept as `MVP_DSE_PER_AE`).
 
 ### Expected gains and the reasons (`gainOn`, `gainWhy`, `predictGains`)
 
@@ -1047,3 +1051,146 @@ At first light, for each hand who worked yesterday, one draw from the farm's own
 ### Saves
 
 Save format 9. `farm.labour` (hands, standing, people taken, the next pay day, runs under way, today's help, the injury stream, wages owed from before and plan moves credited) is saved, loaded and hashed with the farm. A save from format 8 or older has none and loads with no hands and no contract fencing. Save, load and carry on equals running straight through, mid-run.
+
+## 12. Sheep (rebuild, milestone 2.3)
+
+Sheep are a second species on the one grass model. The figures are in `packages/engine/src/data/sheep.ts` and [DATA.md](DATA.md) ("Sheep"), each with its source or marked FITTED or STAND-IN. The benchmarks they hit are in [SHEEP_BENCHMARKS.md](SHEEP_BENCHMARKS.md), and the run is logged in [CALIBRATION.md](CALIBRATION.md) ("Sheep"). The shape follows the cattle model (section 3): each sheep is kept on its own and each day it eats, gains or loses, breeds, grows wool and may die.
+
+### On the farm
+
+- A farm's sheep live in `farm.sheep`: its sheep mobs and the sheep's own random streams (`sheep:breeding`, `sheep:deaths`, `sheep:flies`). It is left off a farm that has never had sheep, which plays and saves exactly as before (the digest test from milestone 2.1 still holds). Each sheep mob carries `species: 'sheep'`. Its id comes from the same count as the cattle mobs', and sheep take tag numbers from the cattle's count.
+- Sheep are offered only in the Northern Tablelands, Central West and Western Victoria (`SHEEP_DISTRICTS`). `addSheepMob` puts a mob on the farm. It is an engine and test helper until the market sells sheep in milestone 2.4. It is refused in Central Queensland and where any mob grazes.
+- **The day.** After the cattle's deaths are settled (step 5), each sheep mob in turn: wean the lambs if due, then the mob's day. Then the sheep's dead are taken out. Water use counts sheep with the cattle, and sheep mobs that come to share an area join, after the cattle mobs do (step 6). The farm counts as eaten out with sheep on it as with cattle.
+- **One mob to an area, one species to a paddock** (PRD section 21 row 25). Sheep are never put where a mob is. Cattle are never moved where sheep are: `moveMob` and the like refuse with `sheep-there`, a plan waits with `why: 'sheep-there'`, and weaner calves never go in with sheep. If a fence change or an open gate puts both in one area, both graze it, unjoined, until one is moved. Sheep mobs that share an area join the biggest.
+- Sheep stay in their grazing area. A cattle fence does not hold sheep (`fenceHoldsSheep`), but sheep getting through cattle fences, the netting fence and its price come with milestone 2.4.
+- Sheep deaths are kept out of the year's cattle totals and score until milestone 2.4 decides how sheep score. Sheep have no running cost, no supplement and no lick yet.
+
+### Where sheep graze (`sheepDietOf`, `sheepGrazeAlloc`)
+
+The cattle rules of section 2, with sheep figures:
+
+```
+green share of what they take off a square  pgS = G/(G + 0.1·D + 1), × G/100 if G < 100     (cattle: 0.25·D, 150)
+diet DMD and CP                              pgS·green + (1 − pgS)·dead, on each square
+preference weight                            (G + 0.1·D + 20) × exp((ME − 8) × 0.45) × exp(−distance to water m / 3000), × 0.15 if G + D < 200
+availability                                 1 − exp(−(G + D) / 480)                         (cattle: total mass / 650)
+residual                                     150 kg DM/ha                                     (cattle: 250)
+```
+
+The green and dead figures on a square are the cattle's (section 1, Quality). The graze takes the demand off the squares by preference, in up to 4 passes, green first by `pgS`, with the cattle's trampling (stock density counted in AE: DSE ÷ 8.4), leaf age, rankness, grazing marks and planted squares grazed. So sheep get their fill from shorter feed (96% at 1,600 kg green, 6 cm, against cattle's 91%) and pick greener feed than cattle.
+
+### Intake, kg DM/day
+
+```
+appetite, share of LW: adults 2.6%; young sheep 4% up to 60% of mature weight, falling to 2.6% at it;
+                       a milking ewe 4.2%, + 0.4% for each lamb after the first; a lamb 4% × clamp((age − 14)/96, 0, 1)
+                       × max(0.55, 1 − (CS − 3.5) × 0.4) if CS > 3.5     (the cattle rule)
+pasture = LW × share × clamp(0.62 + (DMD − 0.5) × 2, 0.5, 1.05) × availability,  × (1 − (7 − CP) × 0.05) if CP < 7
+```
+
+Mature weight is the SRW (medium Merino 50 kg, large Merino 65, crossbred 60), or SRW × 1.8 for an entire male. The mob's demand is limited by what the area supplies (`f`), as for cattle.
+
+### Energy (MJ ME a day) and weight
+
+```
+maintenance = 0.401 × LW^0.75 × (1 + 0.12 × max(0, 1 − age/730)) × (1.25 for a mature ram) × (1 + walk)
+              walk = 0.05 + 0.12 × min(1, distance to water / 3000); 0.10 is the reference DSE's walk, where a 50 kg wether needs 8.3 MJ
+pregnancy   = 3.95 × shape × (1 single, 1.85 twins, 2.4 triplets); shape 0 to day 70, rising to 1 at day 130, then + 1% a day
+milk spend  = (12.1 + 7.0 × SRW/50 for a second lamb + 2 for a third) × lactation curve (1 to day 42, falling to 0.5 at day 100)
+              × clamp(0.55 + 0.15·CS, 0.6, 1.2) × clamp((ME − 6)/3, 0.45, 1) × clamp(ME eaten ÷ needs at full milk, 0.5, 1)^1.5
+a lamb gets = its dam's milk spend × 0.45 ÷ her lambs at foot, plus its own pasture
+gain        = balance ÷ (2 + 50 × LW/mature weight) if positive, balance ÷ 22 if negative; −0.4 to +0.4 kg a day
+              no water: −4% of LW a day
+condition   CS += gain ÷ (0.19 × mature weight), × 0.3 for gains in sheep under 540 days old
+```
+
+A sheep's **DSE** is the energy it needs at CS 3 on full feed over 8.3 MJ: maintenance at the reference walk, pregnancy, full milk, and growth at its recent rate for sheep under two. Lambs at foot are 0: they are inside their ewe's figure. **AE** = DSE ÷ 8.4. The cattle figures use the same 8.4 (call C3, second pass below).
+
+### Breeding
+
+- **Joining** starts each year on the mob's date (`joinOn`; by default the district's: 1 April in Western Victoria and the Central West, 15 May on the Tablelands) and lasts 35 days, two 17-day cycles. The rams in the mob work only in those weeks. A ewe can join if she is weaned, empty, has no lambs at foot, is 210 days old or more and is at least 75% of SRW. Each is given a day of her cycle (0 to 16, one draw) and is on heat on that day of the joining and every 17 days after.
+- **Conception on heat** = `1 − (1 − P)^(17/35)` × ram cover. P is the 5-week share in lamb at her CS (Merino 91.5%, crossbred 95.5%, 5 points a CS, held 30% to 98%). Ram cover is rams ÷ (1% of the ewes joined + 1), up to 1.
+- **Litter**, drawn at conception: foetuses per ewe joined = 1.25 (Merino) or 1.55 (crossbred) + 0.20 a CS (CS held 1.5 to 4.5). The litter of a pregnant ewe averages that ÷ P. Triplets are 10% of the litter above 1.25 (up to 15%); twins make up the rest above 1.
+- **Scanning count** on day 80 of the joining: ewes in lamb and lambs carried. A ewe's CS on day 80 of her pregnancy is kept (`csScan`).
+- **Lambing** at 147 days. The ewe's risk of dying is drawn first: singles 1.35%, twins 3.05%, triplets 6.15%; crossbred × 1.35; × (1 + (2.5 − CS)) under CS 2.5; plus 3.8% × the CS lost since scanning × litter ÷ 3 (pregnancy toxaemia). If she dies, her lambs are born and die with her. Each lamb is a ewe lamb or a ram lamb (50:50), Merino only if both parents are, with the mean of their SRWs. Birth weight is 4.9 kg for a single, 3.7 for a twin, 3.0 for a triplet (× SRW ÷ 50), less 0.32 kg for each CS the ewe lost from joining to scanning.
+- **Lamb survival to marking**, by the ewe's CS at lambing: Merino 91% singles, 71% twins, 52.9% triplets at CS 3; crossbred 93.5%, 83.5% and 60.1%. Each CS below 3 takes off 12 points (singles) or 24 (twins and triplets); each CS above adds 6 or 16. Held 5% to 98%. Of the lambs that die, 80% die on their first or second day (drawn at birth); the rest die at a daily risk from 3 days old to 42. From 42 days to weaning the risk is 0.009% a day.
+- **Marking count** 49 days after the first lamb (every lamb is then 14 days or more): lambs alive. Ram lambs become wethers that day (the marking job and its cost come in milestone 2.4).
+- **Weaning** 98 days (14 weeks) after the first lamb, or as soon as any lamb at foot is 150 days old (a lamb with no joining record, or born late): every lamb is weaned and every ewe dried off. The weaners go to another empty grazing area with water (the one with most green feed first), or stay if there is none. A lamb whose dam dies is weaned at 56 days or more, and before that dies at 2% a day (the cattle orphan rate). A ewe whose last lamb dies is dried off.
+
+### Wool
+
+```
+clean wool g/day = 10.4 × kg DM eaten (a lamb's milk counts at 1/11 kg a MJ)
+                   × 0.57 for crossbreds × (8.8/14.5 while milking, or 0.7 in the last third of pregnancy, from day 98)
+                   × (0.45 + 0.55 × min(1, age/1095)) × clamp(1 + 5.5 × gain kg/day, 0.4, 1.5)
+micron           = base + 0.6 × (g/day × 365/1000 − reference fleece), held 11 to 40
+                   base: Merino ewes 17.0, wethers and rams 19.0, crossbreds 28; reference fleece 4.0, 4.2 and 2.9 kg
+```
+
+Each sheep carries its fleece (clean kg), the fleece kg × micron, and its days of wool. `shearMob` takes every weaned sheep's fleece and gives the clean and greasy kg (greasy at the national 63.6% yield), the micron by weight and the months of wool, and starts the count again. `crutchMob` does not weigh the crutchings. Both give 42 days of cover from flystrike. Selling wool and the shearing job are milestone 2.4.
+
+### Deaths
+
+- Adults, wethers, and weaners from a year after weaning: 0.91% a year (3.2 − 1.95 − 0.34, the document's own figures; review of the third pass), as well as lambing.
+- Starved: a sheep whose live weight falls under half its normal weight for its age (`STARVED`; normal weight from a triplet's birth weight on the start flock's growth path, to 95% of SRW) dies that day, cause `starved`.
+- Weaners in their first year after weaning: `0.000124 × exp(−0.02743 × g/day) × exp(−17.19 × (weaning kg ÷ SRW − 0.478))` a day, held to 40 times the base. Growth is the smoothed figure.
+- Low condition: + (1.4 − CS) × 1.5% a day under CS 1.4 (the cattle rule).
+- No water: every sheep dies on day 4 (the cattle rule, call C30), with notes on day 1 and day 3.
+- **Flystrike** (Merinos taken as unmulesed, call C21): every weaned sheep without cover is struck at 0.066% a day (Merino) or 0.018% (crossbred). A strike takes 2.7 kg (Merino) or 5.2 kg (crossbred) and 0.3 CS, and gives a 2% chance of dying over the next 7 days. Worms are left out (call C22).
+- The cause recorded: `noWater` from the third day without water, `starved`, `poorCondition` under CS 1.6, `flystrike` within 7 days of a strike, `lambing`, `newborn` (a lamb under 42 days), `orphaned`, otherwise `natural`.
+
+### Water
+
+Litres a head a day (call C17): weaners 4 (6 from December to February), dry sheep 6 (10), ewes with lambs at foot 10 (14). Lambs at foot drink inside their ewe's figure. The sheep's litres come off portable troughs with the cattle's.
+
+### Notes and events (facts only)
+
+The sheep step returns notes: `noWater`, `shortOfFeed`, `lowCondition` (CS under 2, at most once a week), `losingWeight` (from the 10th day of losses, then once a week while they go on, with the reasons), `joiningStarted` (with the rams in and the rams needed), `joiningEnded`, `scanned`, `lambingStarted`, `marked` and `flystrike`. The tick reports them as `sheep` events, with `lambs-born` (lambs also count in the year's `births`), `sheep-deaths` (by cause), `sheep-weaned` (and where to) and `mobs-joined`. On a farm with sheep, `DayResult` carries `sheepDeaths` and `lambs`.
+
+### Reads and what a screen may show
+
+- `sheepMobsRead`: head and lambs; classes with head, weight and CS; DSE and AE; fleece kg a head, micron and months of wool; litres drunk; weight change and intake; days without water; the joining record and the joining date.
+- `sheepJoiningRecord`: ewes joined and rams; from the scanning count, the ewes in lamb and lambs carried; then lambs born, and lambs marked and weaned per 100 ewes joined.
+- `stockingRead`: cattle AE, sheep DSE, and both together in AE and in DSE at 8.4.
+- `fleeceOf`, `dressingShare` and `carcaseKg`, for the sale.
+
+A sheep's `preg` and `litter` are not for the screens: a screen shows pregnancy only from the scanning count. Never a chance, a formula or a table (CLAUDE.md rule 14).
+
+### Saves
+
+Save format 10. `farm.sheep` is saved with each mob's sheep in columns, like the cattle. A save from format 9 or older has none and loads with no sheep.
+
+### Second pass and the engine half of 2.4 (engine 0.15.0)
+
+These rules replace the ones above where they differ.
+
+- **Sheep are records, not single animals.** A record stands for `n` like animals (same sex, breed, SRW, age, pregnancy, litter, the litter a lamb was born in, joining day, strike, weaning age, wool count); its figures are each animal's. Every rate is drawn as a count from the seeded stream (`counts.ts`: exact for small counts and small means, the normal approximation otherwise), so the same seed still gives the same farm. At joining each ewe record is shared out by the day of her cycle; on her heat day the conceptions are a count, shared over litters. At lambing the ewes that die are a count; the rest become the milking record and their lambs a ewe-lamb record and a ram-lamb record, with the early deaths drawn as counts for the first and second day. Lambs at foot point to their dams' record: a ewe's milk is shared by her lambs (lambs a ewe can be part of a lamb; under one, that share of the ewes is milking). When ewes die off a milking record their share of the lambs is orphaned (a count). Like records are joined each day (never records with lambs at foot, or lambs at foot). A sheep death is a count by record in `DayResult.sheepDeaths`.
+- **Feeding** (`feed` on the mob, the action `setSheepFeed`): grain or hay fills the gap between what the pasture gives and what the sheep needs (maintenance, pregnancy, full milk, and 50 g a day of growth for sheep under a year), never more than Agriculture Victoria's full ration for the class (`SHEEP_RATION`). A lick is the cattle lick's rule. Each is charged every day it is fed (`year.feed`).
+- **Contractors** shear and crutch each mob on its days (`shearOn`, `crutchOn`; by default crutching 60 days before lambing starts and shearing 80 days after, from the NSW sheep calendar), by themselves, taking none of the player's day; `setSheepDates` moves them or cancels them. Shearing takes the fleece off, sells the wool at the dated stand-in price by micron (`year.wool`, its own money line) and pays the NSW DPIRD budget's $9.81 a head all in, rams twice (`year.running`, `SHEEP_BUDGET_COSTS`); crutching pays $1.92 a head. Rams are replaced at the ram price over 4 working years, a running cost a ram a day. Both give 6 weeks of fly cover.
+- **Running costs and the score.** Sheep pay an animal health cost a head a day (`year.running`). Sheep deaths are counted in `year.sheepDeaths`, and the year score counts each as one DSE's share of a beast (deaths + sheep deaths ÷ 8.4). Sheep count in net worth at what they would fetch.
+- **Rams** go in on the joining day and out when the joining ends, by themselves (they work only in those 5 weeks; they stay in the mob's paddock).
+- **The market** (`buySheep`, `sellSheep`): classes to buy at sourced or stand-in prices a head plus a head fee; sheep sell at MLA's indicators on their carcase weight (the dated stand-in, or on a real-year farm the indicators for the real date in today's dollars, `sheep.prices`, refreshed each day; `market/realSheepPrices.ts`) (lambs by the lamb indicators for their weight and breed, adults at mutton) less 5% commission and the head fee. On the farm clock, sheep are traded only on a sale day (the district's sale calendar). Ewes sold take their share of their lambs at foot; lambs at foot are not sold apart. Never in Central Queensland, never into a paddock with cattle.
+- **Netting fence** (`EDGE.netting`, fence kind `netting`): holds sheep and cattle; cattle fences (permanent, electric, tape, standing or down) do not hold sheep. Hungry or thirsty sheep (the cattle rule and chance, their own stream, the 21-day wait) get through one such fence into the next area; the fence stays up. They never go into an area that holds cattle, and cattle never push through tape into an area that holds sheep: each takes another fence or stays put. Netting is drawn as permanent fence on the map until the map has its own code (`nettingEdges` says which is which).
+- **Setup** (`stock` on `createFarm`): cattle (the default), sheep (a start flock of Merino ewes at the start-herd share of carrying capacity in DSE, 1.5 DSE a ewe, rams at 1% + 1, in the biggest watered paddock) or a mix (half each; the cattle weaners run with the cows so the sheep have a paddock). Sheep or a mix in Central Queensland is refused.
+- **Death causes**: a weaner in its first year after weaning that dies of its weaner risk is `weaner` (light weaners not growing, S17).
+- **The losing-weight note** gives its reasons, as the cattle warnings do: not enough feed (under 85% supplied or under 75% availability), low energy (ME under 8), protein under 7%, milking, late pregnancy (from day 98).
+- **One DSE figure**: `DSE_PER_AE` is 8.4 in `data/stocking.ts` for every display, cattle included (call C3; the MVP's 8 is kept as `MVP_DSE_PER_AE`).
+
+### Third pass (15 Nov 2026)
+
+These rules replace the ones above where they differ.
+
+- **Moving sheep** (`sheep/moves.ts`): `moveSheep` (a whole mob), `moveSheepPart` (a class and a head count; ewes take their share of their lambs at foot, and lambs at foot are never moved apart), `setSheepPlan` and `clearSheepPlan` (the cattle plan templates). Refusals: `cattle-there` (sheep never go where cattle graze), `already-there`, `nothing-to-move`, `no-such-mob`, `no-such-plan`, `no-plan`, `bad-request`. Sheep put with sheep join them. A move costs the player's day as a cattle move does (settling plus a time a head, `day/spec.ts`). Plans run after the cattle plans each day (`runSheepPlans`): by days or by grazed-down kg, one move a day at most; a stop with cattle in it or no water waits, told once a stop (`sheep-plan-waiting`). Setting a plan whose stop is another paddock, or resuming one there, is a move: the move's daylight, `sheep-moved` and the no-water warning; `sheep-plan-set` names the plan's dry stops. A hand move pauses the plan; `pausePlan` and `resumePlan` (the cattle actions) pause it and put the mob back on it at a step, as for cattle. Fences: any paddock takes sheep; only netting, gates and the boundary hold them.
+- **The start flock** (`sheep/start.ts`, `buildStartFlock`): a running farm's flock as it would stand on the start date. Ewes in age classes from 1.5 to 5.5 years (cast at 6), at CS 3; by the days since the district's joining day they are joining (shared over the cycle), pregnant (litters drawn), in lamb (a ewe whose heat came before the first day had her chance then, at the model's conception), with lambs at foot (the ewes that died lambing and lamb survival both at the CS the model's own flocks lamb at in the district, lambs grown at 0.198 kg a day, marked from day 49) or weaned (one age class of ewe weaners kept, the rest and the wether lambs sold, the oldest class cast for age). The first lambs' day can be before the farm's first day (a negative `lambingStart`); marking and weaning count from it like any other. Last year's ewe drop kept as replacements, rams at 1% + 1, and wool on every sheep for the days since the district's shearing day. The joining record is filled in to match. Lambs at foot cost nothing on the books at the start (they come with their ewes).
+- **The year totals** count sheep: pasture eaten and live weight gained (lamb birth weights included) go into `eaten` and `gain`, so a sheep farm's utilisation and gain points work as a cattle farm's. A sheep death scores by its size in AE, (live weight ÷ 450)^0.75 (`sheepDeathAe`): a newborn lamb about 0.03 of a beast, a ewe about 0.2. Cattle deaths count one each, unchanged.
+- **Money lines**: wool after selling costs (`wool`), sheep sold after selling costs (`sheepSales`), sheep bought (`sheepBuys`); the cattle `sales` and `buys` are cattle only. Net worth counts the wool on the sheep's backs at the day's price, less the levy and the cost to shear it (`woolOnBack`).
+- **Wool harvest and sale**: shearing pays the budget's all-in rate a head; the clip is sold in bales after the levy, the broker's selling costs, cartage and the pack; oddments are their share of the clip at their own price (`sellClip`). The price by micron is the guide's line scaled to the dated EMI.
+- **Bought sheep on the farm clock** are paid for on the sale day and land in the stock yards at first light next day (`sheep-on-the-way`, `sheep-arrived`), in a sheep yards mob that grazes the yards' square with water, as cattle there do.
+- **Past the overdraft**: a day's sheep costs (feed, health, shearing) come off cash as the cattle's supplements do, and the bank's limit ends the game as it does for cattle. Buying sheep is refused past the limit (`bank-limit`).
+- **Feeding**: grain at feed barley's price. `sheepFeedCosts` gives what each feed would cost a mob today (a trial day on a copy). `sheepConditionFacts` lists mobs under the CS floor for their stage, as facts (a dry ewe is at the joining stage only from 42 days before the joining day to its end; out of season she has the dry floor, CS 2).
+- **Flystrike** is told at most once a week a mob, with the count since the last note (`FLY_NOTE_DAYS`). The fly season is the same in every district (a known simplification).
+- **Saves**: format 11. A save is read by its format number: format 10 sheep load through the old columns (a sheep's days left to live become the day it dies) as records of one; format 9 and older load with no sheep.
+
+### Not built yet
+
+Real-year sheep prices (the six national sheep indicators are pulled by `pnpm data:mla` but not wired into the real-data bundle), booking sheep onto a later sale, the sheep sale days of Dubbo and Hamilton (the cattle calendar stands in), the marking job and its cost, sheep on the map, out-of-season joining (S25: about 10% fewer in lamb), and feed on offer at lambing as a cause of lamb deaths.

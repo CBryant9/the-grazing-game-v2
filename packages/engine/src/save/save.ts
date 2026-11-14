@@ -9,6 +9,8 @@
  */
 
 import type { Animal, AnimalKind, Sex } from '../cattle/types';
+import { sheepJobDates } from '../sheep/farm';
+import type { Sheep, SheepSex } from '../sheep/types';
 import { GRID_N } from '../grid';
 import { startDay } from '../sim/clock';
 import { emptyLedger, type FarmState } from '../sim/state';
@@ -194,9 +196,149 @@ function unpackAnimals(p: PackedAnimals): Animal[] {
 const isAnimalList = (key: string, v: unknown): v is Animal[] =>
   key === 'animals' && Array.isArray(v);
 
+/** A sheep mob's sheep, in columns (format 10), like the cattle. */
+interface PackedSheep {
+  $: 'sheep';
+  n: number;
+  /** One letter a sheep: F, M or W. */
+  sex: string;
+  /** One letter a sheep: m Merino, x crossbred. */
+  breed: string;
+  /** One digit a sheep: 1 weaned, 2 died today, 4 has had a day. */
+  flags: string;
+  ints: string;
+  nums: string;
+}
+
+const SHEEP_INTS = [
+  'id',
+  'n',
+  'age',
+  'dam',
+  'preg',
+  'litter',
+  'lact',
+  'reared',
+  'parity',
+  'oes',
+  'wage',
+  'woolDays',
+  'flyCover',
+  'struck',
+  'doomed',
+  'doomed2',
+] as const satisfies readonly (keyof Sheep)[];
+const SHEEP_NUMS = [
+  'srw',
+  'wt',
+  'cond',
+  'csJoin',
+  'csScan',
+  'milk',
+  'adg',
+  'wwt',
+  'fleece',
+  'micronKg',
+  'lambRisk',
+  'paid',
+  'cost',
+] as const satisfies readonly (keyof Sheep)[];
+
+/** The sheep columns of a format 10 save (the first pass, before head counts). */
+const SHEEP_INTS_FORMAT_10 = SHEEP_INTS.filter((k) => k !== 'n' && k !== 'doomed2');
+
+const isSheepList = (key: string, v: unknown): v is Sheep[] => key === 'sheep' && Array.isArray(v);
+
+function packSheep(list: readonly Sheep[]): PackedSheep {
+  const n = list.length;
+  const NI = SHEEP_INTS.length;
+  const NN = SHEEP_NUMS.length + 1;
+  const ints = new Int32Array(n * NI);
+  const nums = new Float64Array(n * NN);
+  let sex = '';
+  let breed = '';
+  let flags = '';
+  for (let i = 0; i < n; i++) {
+    const s = list[i]!;
+    sex += s.sex;
+    breed += s.breed === 'merino' ? 'm' : 'x';
+    flags += ((s.weaned ? 1 : 0) | (s.dead ? 2 : 0) | (s.di !== undefined ? 4 : 0)).toString(16);
+    for (let k = 0; k < NI; k++) {
+      const v = s[SHEEP_INTS[k]!];
+      if (!Number.isInteger(v) || v < -2147483648 || v > 2147483647) {
+        throw new Error(`saveFarm: sheep ${s.id} has a figure that should be a whole number`);
+      }
+      ints[i * NI + k] = v;
+    }
+    for (let k = 0; k < NN - 1; k++) nums[i * NN + k] = s[SHEEP_NUMS[k]!];
+    nums[i * NN + NN - 1] = s.di ?? 0;
+  }
+  return {
+    $: 'sheep',
+    n,
+    sex,
+    breed,
+    flags,
+    ints: toBase64(new Uint8Array(ints.buffer)),
+    nums: toBase64(new Uint8Array(nums.buffer)),
+  };
+}
+
+/**
+ * A format 10 lamb's doom (the days it had left, or -1) as this engine's: it
+ * dies on day 1 or 2 of life (`doomed`, `doomed2`), or, if its day was later
+ * (the first pass let a doomed lamb live to day 3), on its next day, by a
+ * daily risk of 1 from day 3 (`lambRisk`). Before, a later day was dropped
+ * and the lamb lived.
+ */
+export function format10Doom(
+  age: number,
+  left: number,
+  lambRisk: number,
+): { doomed: number; doomed2: number; lambRisk: number } {
+  const dieAt = left >= 0 ? age + left + 1 : -1;
+  return {
+    doomed: dieAt === 1 ? 1 : 0,
+    doomed2: dieAt === 2 ? 1 : 0,
+    lambRisk: dieAt > 2 ? 1 : lambRisk,
+  };
+}
+
+function unpackSheep(p: PackedSheep, format: number): Sheep[] {
+  const ints = new Int32Array(ownBuffer(fromBase64(p.ints)));
+  const nums = new Float64Array(ownBuffer(fromBase64(p.nums)));
+  // A format 10 save (the first pass, a sheep each) has no head count or second-day column,
+  // and its `doomed` was the days a doomed lamb had left (or -1). Read by the save's format.
+  const old = format <= 10;
+  const cols: readonly string[] = old ? SHEEP_INTS_FORMAT_10 : SHEEP_INTS;
+  const NI = cols.length;
+  const NN = SHEEP_NUMS.length + 1;
+  const out: Sheep[] = [];
+  for (let i = 0; i < p.n; i++) {
+    const f = parseInt(p.flags[i]!, 16);
+    const s = {
+      sex: p.sex[i] as SheepSex,
+      breed: p.breed[i] === 'm' ? 'merino' : 'xb',
+      weaned: !!(f & 1),
+      dead: !!(f & 2),
+      di: f & 4 ? nums[i * NN + NN - 1]! : undefined,
+    } as Record<string, unknown>;
+    for (let k = 0; k < NI; k++) s[cols[k]!] = ints[i * NI + k]!;
+    for (let k = 0; k < NN - 1; k++) s[SHEEP_NUMS[k]!] = nums[i * NN + k]!;
+    if (old) {
+      // A sheep each, and a doomed lamb's days left turned into the day of life it dies on.
+      s.n = 1;
+      Object.assign(s, format10Doom(s.age as number, s.doomed as number, s.lambRisk as number));
+    }
+    out.push(s as unknown as Sheep);
+  }
+  return out;
+}
+
 function pack(v: unknown, key = ''): unknown {
   if (ArrayBuffer.isView(v)) return packArray(v as Numbers);
   if (isAnimalList(key, v)) return packAnimals(v);
+  if (isSheepList(key, v)) return packSheep(v);
   if (Array.isArray(v)) return v.map((x) => pack(x));
   if (v !== null && typeof v === 'object') {
     const out: Record<string, unknown> = {};
@@ -212,14 +354,15 @@ function pack(v: unknown, key = ''): unknown {
   return v;
 }
 
-function unpack(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(unpack);
+function unpack(v: unknown, format: number): unknown {
+  if (Array.isArray(v)) return v.map((x) => unpack(x, format));
   if (v !== null && typeof v === 'object') {
     const tag = (v as { $?: unknown }).$;
     if (tag === 'animals') return unpackAnimals(v as PackedAnimals);
+    if (tag === 'sheep') return unpackSheep(v as PackedSheep, format);
     if (typeof tag === 'string') return unpackArray(v as PackedArray);
     const out: Record<string, unknown> = {};
-    for (const k of Object.keys(v)) out[k] = unpack((v as Record<string, unknown>)[k]);
+    for (const k of Object.keys(v)) out[k] = unpack((v as Record<string, unknown>)[k], format);
     return out;
   }
   return v;
@@ -244,7 +387,7 @@ export function saveFarm(farm: FarmState): SavedFarm {
  * was added after the first saves were made, with the value it had before
  * it existed.
  */
-function upgrade(f: Record<string, unknown>): void {
+function upgrade(f: Record<string, unknown>, format: number): void {
   const farm = f as unknown as Partial<FarmState> & Record<string, unknown>;
   farm.inbox ??= [];
   farm.inboxSeq ??= farm.inbox.reduce((m, x) => Math.max(m, x.seq), 0) + 1;
@@ -307,6 +450,29 @@ function upgrade(f: Record<string, unknown>): void {
     farm.labour.wagesOwed ??= 0;
     farm.labour.planMoves ??= [];
   }
+  // Sheep (format 10): a farm saved before had none. `sheep` is left out until the first
+  // sheep come, so there is nothing to fill in.
+  if (farm.sheep === null) delete farm.sheep;
+  // Format 11: a format 10 sheep is a record of one; mobs get no feed, the district's
+  // shearing and crutching days, and no fence got through yet.
+  for (const m of farm.sheep?.mobs ?? []) {
+    m.feed ??= 'none';
+    m.flyCount ??= 0;
+    m.flyNoted ??= -99;
+    m.lastBreak ??= null;
+    if (m.shearOn === undefined || m.crutchOn === undefined) {
+      const d = sheepJobDates(m.joinOn);
+      m.shearOn ??= d.shearOn;
+      m.crutchOn ??= d.crutchOn;
+    }
+    for (const x of m.sheep) {
+      x.n ??= 1;
+      x.doomed2 ??= 0;
+    }
+    // Format 12: a joining's `lambingStart` is null before lambing, so a lambing that began
+    // before the farm's first day can be a negative day. Older saves stored -1 for "not yet".
+    if (format < 12 && m.join && m.join.lambingStart === -1) m.join.lambingStart = null;
+  }
 }
 
 /**
@@ -319,8 +485,8 @@ export function loadFarm(saved: SavedFarm): FarmState {
   if (format > SAVE_FORMAT_VERSION) {
     throw new Error('This farm was saved by a newer version of the game.');
   }
-  const raw = unpack(saved) as Record<string, unknown>;
-  upgrade(raw);
+  const raw = unpack(saved, format) as Record<string, unknown>;
+  upgrade(raw, format);
   const farm = raw as unknown as FarmState;
   farm.saveFormat = SAVE_FORMAT_VERSION;
   farm.engineVersion = ENGINE_VERSION;

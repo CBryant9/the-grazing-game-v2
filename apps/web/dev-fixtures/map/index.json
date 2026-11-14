@@ -21,7 +21,7 @@
     "calves": 265,
     "mobs": 2,
     "paddocks": 3,
-    "bytes": 43930
+    "bytes": 43932
   },
   {
     "name": "nsw-small-running",
@@ -66,10 +66,10 @@
     "district": "cw",
     "farmHa": 6000,
     "head": 1472,
-    "calves": 259,
+    "calves": 261,
     "mobs": 2,
     "paddocks": 6,
-    "bytes": 44636
+    "bytes": 44637
   },
   {
     "name": "wv-small-running",
@@ -101,11 +101,11 @@
     "note": "A mixed farm run until crops ripen. Ripe grain crops are harvested, which leaves stubble. The rotation has a block in fallow.",
     "district": "cw",
     "farmHa": 2000,
-    "head": 437,
+    "head": 438,
     "calves": 110,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 43522
+    "bytes": 43521
   },
   {
     "name": "cq-dry-season",
@@ -113,11 +113,11 @@
     "note": "A running farm held in a dry season for 240 days: little growth, dry feed, short paddocks.",
     "district": "cq",
     "farmHa": 4000,
-    "head": 972,
-    "calves": 238,
+    "head": 970,
+    "calves": 241,
     "mobs": 2,
     "paddocks": 2,
-    "bytes": 40629
+    "bytes": 40618
   },
   {
     "name": "wv-green-season",
