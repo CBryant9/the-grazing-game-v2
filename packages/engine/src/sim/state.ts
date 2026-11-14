@@ -74,7 +74,7 @@ export interface PlanTemplate {
 }
 
 /** Why a plan can not move a mob today. */
-export type PlanWaitReason = 'no-water' | 'occupied';
+export type PlanWaitReason = 'no-water';
 
 /** A mob running a template: where it is on it, and the counts so far. */
 export interface PlanRun {
@@ -99,6 +99,8 @@ export interface PlanRun {
   rounds: number;
   eatenKg: number;
   headDays: number;
+  /** Live weight gained by the mob's animals while on the plan, kg. */
+  gainKg: number;
 }
 
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */

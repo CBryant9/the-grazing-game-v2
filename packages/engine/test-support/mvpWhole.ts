@@ -562,6 +562,11 @@ export function farmDifferences(farm: FarmState, mvp: MvpWhole, o: CompareOption
       same(`${who} plan eaten`, ep.eatenKg, p.rep.eaten);
       same(`${who} plan head-days`, ep.headDays, p.rep.headDays);
       same(`${who} plan start`, ep.start, p.rep.start);
+      // Kg gained: the old game sums each animal's gain inside the cattle step. The engine reads the
+      // change in each animal's weight around the day, so the sums agree to rounding, not to the bit.
+      if (Math.abs(ep.gainKg - p.rep.gain) > 1e-6) {
+        diffs.push(`${who} plan gain: engine ${ep.gainKg}, MVP ${p.rep.gain}`);
+      }
       if (!o.skipPlanRounds) {
         same(`${who} plan leg`, ep.leg, p.leg);
         same(`${who} plan round`, ep.round, p.round);

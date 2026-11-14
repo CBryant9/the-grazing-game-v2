@@ -234,6 +234,14 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
         });
       }
     }
+    // A mob on a plan: its animals' weights before the day, to work out the plan's gain.
+    // The old game summed each animal's gain inside the cattle step. The rebuild
+    // leaves the cattle step alone and reads the change in each animal's weight.
+    let weights: Map<number, number> | null = null;
+    if (m.plan && !m.plan.paused && m.where.kind === 'paddock') {
+      weights = new Map();
+      for (const a of m.animals) if (!a.dead) weights.set(a.id, a.wt);
+    }
     const res = simMob(m, {
       place: placeFor(farm, survey, m),
       land,
@@ -249,6 +257,14 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     if (m.plan && !m.plan.paused && m.where.kind === 'paddock' && m.st) {
       m.plan.eatenKg += m.st.demand * m.st.f;
       m.plan.headDays += m.st.n;
+      if (weights) {
+        let gain = 0;
+        for (const a of m.animals) {
+          const was = weights.get(a.id);
+          if (was !== undefined) gain += a.wt - was;
+        }
+        m.plan.gainKg += gain;
+      }
     }
     const area = areaNameOf(survey, m);
     for (const note of res.notes) {

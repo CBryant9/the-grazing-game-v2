@@ -621,9 +621,12 @@ The figures are in `packages/engine/src/data/plans.ts` (`PLAN_FIGURES`). Each is
 | Most legs in a plan | 8 | builder | The same |
 | Most stops in a leg | 30 | builder | The same |
 | Most plans kept on a farm | 20 | builder | The same |
-| Light a plan move takes | The ordinary move time: 15 min and 1 min per 100 head | builder | PRD 5.15 says, [Proposed], "it uses the farmer's daylight". Built as the move time off the light of the day it happens on, never below zero. A hand (Stage 2) will do it for nothing. **Question for Claudia** |
-| Setting, pausing, resuming and clearing a plan | None of the day | builder | They are decisions, not work. Setting or resuming puts the mob on the stop for nothing, as the old game did |
-| Another mob in the next area | The plan waits | builder | One mob to a paddock. The old game joined the mobs |
+| Light a plan's own moves take | None | old game | The old game's plan moves took no time. PRD 5.15 proposed they use the farmer's daylight. The first build took the move time off the day's light, and the review found it only lowered the reported light. **Question for Claudia** |
+| Setting or resuming a plan, when the mob is not on the stop | The ordinary move time: 15 min and 1 min per 100 head | builder | Putting the mob on its stop is a move, the same figure as `moveMob`. Free when the mob is already there. Refused if the light left does not cover it |
+| Making, pausing and clearing a plan | None of the day | builder | They are decisions, not work |
+| Another mob in the next area | The mob moves in and the two join | old game | `moveMob` then `mergeStrays`. The bigger mob keeps its name and its own plan, or takes the mover's if it has none |
+| Editing a template | Resets the round and the waiting state of every other mob on it | builder | For Claudia to check |
+| A move by hand | Pauses the plan (a move to the feedlot ends it) | builder | The old game ended the plan on every move by hand |
 
 `every` is also kept to 0.25 or more, and a rule under a day needs at least two stops. The old game quietly made a one-stop leg "every 1 day". The engine refuses it with the reason.
 

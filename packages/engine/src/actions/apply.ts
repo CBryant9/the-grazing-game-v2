@@ -783,29 +783,56 @@ function stopAreaId(j: Job, cell: number): number {
   return j.survey.topology.areaOf[cell]!;
 }
 
-/** Put a mob in the area of a plan's stop, at once. Refused if another mob is there. */
-function putOnStop(j: Job, m: FarmMob, cell: number): Out {
+/**
+ * Put a mob in the area of a plan's stop, at once, unless it is already
+ * there. If another mob is in the area the two join, as when a mob is moved
+ * by hand (and as the old game's plan did).
+ */
+function putOnStop(j: Job, m: FarmMob, cell: number): void {
   const s = j.survey;
-  const areaId = stopAreaId(j, cell);
-  const there = j.farm.mobs.find(
-    (o) =>
-      o !== m &&
-      o.animals.length > 0 &&
-      o.where.kind === 'paddock' &&
-      s.topology.areaOf[o.where.anchor] === areaId,
-  );
-  if (there) {
-    return refuse(
-      'area-occupied',
-      `${there.name} is already in ${s.topology.areas[areaId]!.name}, so ${m.name} can't be put there. One mob to a paddock.`,
-    );
+  const here =
+    m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor] === stopAreaId(j, cell);
+  if (here) return;
+  m.where = { kind: 'paddock', anchor: cell };
+  const first = m.animals[0]?.id;
+  const head = m.animals.length;
+  mergeShared(j.farm, j.survey, j.events);
+  const now = first === undefined ? undefined : j.mobOf(first);
+  if (now) j.arrived(now, head);
+}
+
+/** The stops of a template that hold another mob now, one for each area: the area, and that mob's name and head. */
+function joinsOf(
+  j: Job,
+  m: FarmMob,
+  tpl: PlanTemplate,
+): { area: string; mob: number; mobName: string; head: number }[] {
+  const s = j.survey;
+  const out: { area: string; mob: number; mobName: string; head: number }[] = [];
+  const seen = new Set<number>();
+  for (const l of tpl.legs) {
+    for (const c of l.stops) {
+      const id = s.topology.areaOf[c]!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const other = j.farm.mobs.find(
+        (o) =>
+          o !== m &&
+          o.animals.length > 0 &&
+          o.where.kind === 'paddock' &&
+          s.topology.areaOf[o.where.anchor] === id,
+      );
+      if (other) {
+        out.push({
+          area: s.topology.areas[id]!.name,
+          mob: other.id,
+          mobName: other.name,
+          head: other.animals.length,
+        });
+      }
+    }
   }
-  const here = m.where.kind === 'paddock' && s.topology.areaOf[m.where.anchor] === areaId;
-  if (!here) {
-    m.where = { kind: 'paddock', anchor: cell };
-    j.arrived(m, m.animals.length);
-  }
-  return null;
+  return out;
 }
 
 /** The squares of a template whose area has no water, as area names, each once. */
@@ -881,9 +908,11 @@ function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
       r.waiting = null;
     }
   }
-  const no = putOnStop(j, m, tpl.legs[pos.leg]!.stops[pos.idx]!);
-  if (no) return no;
+  const joins = joinsOf(j, m, tpl);
+  const dryAreas = dryAreasOf(j, tpl);
+  // The plan is on the mob before it is put on the stop, so a join keeps it as the old game's did.
   m.plan = newRun(farm, tpl, pos.leg, pos.idx);
+  putOnStop(j, m, tpl.legs[pos.leg]!.stops[pos.idx]!);
   j.events.push({
     type: 'plan-set',
     mob: m.id,
@@ -894,7 +923,8 @@ function setPlan(j: Job, a: Extract<Action, { type: 'setPlan' }>): Out {
     step,
     steps: stepsIn(tpl),
     area: j.survey.topology.areas[stopAreaId(j, tpl.legs[pos.leg]!.stops[pos.idx]!)]!.name,
-    dryAreas: dryAreasOf(j, tpl),
+    dryAreas,
+    joins,
   });
   return null;
 }
@@ -933,8 +963,7 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
     );
   }
   const cell = tpl.legs[pos.leg]!.stops[pos.idx]!;
-  const no = putOnStop(j, m, cell);
-  if (no) return no;
+  const joins = joinsOf(j, m, tpl);
   // The counts so far are kept. The place, the round and the days on the stop start again.
   run.leg = pos.leg;
   run.idx = pos.idx;
@@ -943,6 +972,7 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
   run.noted = 0;
   run.waiting = null;
   run.paused = false;
+  putOnStop(j, m, cell);
   const id = stopAreaId(j, cell);
   j.events.push({
     type: 'plan-resumed',
@@ -951,6 +981,7 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
     template: tpl.id,
     step,
     area: j.survey.topology.areas[id]!.name,
+    joins,
   });
   return null;
 }

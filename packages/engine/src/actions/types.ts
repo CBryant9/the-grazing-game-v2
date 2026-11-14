@@ -148,8 +148,6 @@ export type ActionRefusalReason =
   | 'no-plan'
   /** The plan is already paused. */
   | 'already-paused'
-  /** Another mob is in the area the plan wants to put the mob in. */
-  | 'area-occupied'
   | 'nothing-to-move'
   | 'already-there'
   | 'no-calves-to-wean'
@@ -266,6 +264,18 @@ export interface JobCard {
     nothingPaidNow: true;
     /** Always true: the price is set on the sale day, at that day's price. */
     priceSetOnSaleDay: true;
+  };
+  /**
+   * For setting or resuming a plan: what a screen needs to warn before the
+   * player commits. `dryAreas` are the areas in the plan with no water.
+   * `joins` are the stops that hold another mob now: the plan will join the
+   * two mobs when it moves in, as the old game did.
+   */
+  plan?: {
+    template: number;
+    step: number;
+    dryAreas: string[];
+    joins: { area: string; mob: number; mobName: string; head: number }[];
   };
   /** For cattle bought: they arrive in the stock yards at first light on this farm day. */
   arrival?: { arriveDay: number; date: CalendarDate; head: number };

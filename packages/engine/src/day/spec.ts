@@ -238,13 +238,23 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
         part('head', (head / 100) * T.moveMobMinPer100Head.value),
       ]);
     }
-    case 'setPlan':
     case 'pausePlan':
-    case 'resumePlan':
     case 'clearPlan':
-      // Plans are decisions. Setting, pausing, resuming and clearing one take none of the day.
-      // (The moves a plan makes by itself take move time off the day they happen on: sim/plans.ts.)
+      // Pausing and clearing a plan are decisions: they take none of the day.
       return { kind: 'free' };
+    case 'setPlan':
+    case 'resumePlan': {
+      // Putting the mob on the plan's stop is a move: the ordinary move time, when the mob is
+      // not already there. Making the plan is a decision. The moves a plan makes by itself
+      // take none of the day (as in the old game).
+      const lost = mobsThatLost(before, trial.farm);
+      if (!lost.length) return { kind: 'free' };
+      const head = lost.reduce((n, l) => n + l.head, 0);
+      return whole([
+        part('settle', T.moveMobSettleMin.value * Math.max(1, lost.length)),
+        part('head', (head / 100) * T.moveMobMinPer100Head.value),
+      ]);
+    }
     case 'setSupplement':
       // Switching a supplement on or off is a decision at a daily price. It takes none of the
       // daylight (Claudia, 14 Nov 2026).

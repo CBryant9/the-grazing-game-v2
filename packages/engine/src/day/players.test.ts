@@ -1,4 +1,4 @@
-import { DISTRICT_IDS } from '@gg/shared';
+import { DISTRICT_IDS, type DistrictId } from '@gg/shared';
 import { describe, expect, it, vi } from 'vitest';
 import {
   PLAYERS,
@@ -22,9 +22,18 @@ import { endDay } from './days';
  * players are in test-support/players.ts, with their rules written at the
  * top of that file.
  *
- * This test asserts only what must hold. It does not assert who does well:
- * the facts for each run are reported (set GG_PLAYERS_RUN=1 to print them
- * as a Markdown table, as put in docs/CALIBRATION.md).
+ * This test asserts only what must hold. It does not assert who does well.
+ * It does hold a floor against a broken run (some head left, some live
+ * weight gained, and the ordinary player's plans making moves): that is a
+ * check on the engine, not a judgement of any player.
+ *
+ * To print the facts for every run as the Markdown table in
+ * docs/CALIBRATION.md, run exactly:
+ *
+ *   GG_PLAYERS_RUN=1 pnpm exec vitest run packages/engine/src/day/players.test.ts
+ *
+ * The table is written to standard output after the tests (it is also
+ * shown with `--reporter=verbose`).
  */
 
 vi.setConfig({ testTimeout: 600_000 });
@@ -32,7 +41,17 @@ vi.setConfig({ testTimeout: 600_000 });
 const SEEDS = [1, 2] as const;
 const DAYS = 180;
 
-const runs: RunFacts[] = [];
+/** Every run is made once, in the order asked for, and kept. */
+const made = new Map<string, RunFacts>();
+function run(district: DistrictId, seed: number, player: PlayerName): RunFacts {
+  const key = `${district}/${seed}/${player}`;
+  let facts = made.get(key);
+  if (!facts) {
+    facts = playRun(district, seed, player, DAYS);
+    made.set(key, facts);
+  }
+  return facts;
+}
 
 /** Every animal is in one place only: one mob, and not also on its way. */
 function expectNoBeastTwice(facts: RunFacts, where: string): void {
@@ -57,8 +76,7 @@ describe.each(DISTRICT_IDS)('%s: 180 days with three kinds of player', (district
     it(`${player} player, two seeds: no error, finite, nobody in two places, the days add up`, () => {
       for (const seed of SEEDS) {
         const where = `${district} seed ${seed} ${player}`;
-        const facts = playRun(district, seed, player, DAYS);
-        runs.push(facts);
+        const facts = run(district, seed, player);
         expect(notFinite(facts.farm), where).toEqual([]);
         expectOneMobPerArea(facts.farm, where);
         expectNoBeastTwice(facts, where);
@@ -71,13 +89,18 @@ describe.each(DISTRICT_IDS)('%s: 180 days with three kinds of player', (district
           expect(facts.days, where).toBe(DAYS);
           expect(facts.farm.day, where).toBe(DAYS);
         }
+        // A floor against a broken run, not a judgement of the player: there are still cattle,
+        // and the live weight gained is a figure that is not exactly zero.
+        expect(facts.headEnd, where).toBeGreaterThan(0);
         expect(Number.isFinite(facts.gainKg), where).toBe(true);
-        // A farm with no plan never made a plan move: only the ordinary player has plans.
-        if (player !== 'ordinary') expect(facts.planMoves, where).toBe(0);
+        expect(facts.gainKg, where).not.toBe(0);
+        // Only the ordinary player has a plan. Its plans move the mobs in every run.
+        if (player === 'ordinary') expect(facts.planMoves, where).toBeGreaterThan(0);
+        else expect(facts.planMoves, where).toBe(0);
       }
       // The same run gives the same result again (one seed, to keep the time down).
-      const first = runs.find((r) => r.district === district && r.player === player)!;
-      const again = playRun(district, first.seed, player, DAYS);
+      const first = run(district, SEEDS[0], player);
+      const again = playRun(district, SEEDS[0], player, DAYS);
       expect(again.hash, `${district} ${player} again`).toBe(first.hash);
       expect(JSON.stringify({ ...again, farm: 0 })).toBe(JSON.stringify({ ...first, farm: 0 }));
     });
@@ -85,7 +108,7 @@ describe.each(DISTRICT_IDS)('%s: 180 days with three kinds of player', (district
 });
 
 describe('the ordinary player', () => {
-  it('moves stock out of the yards and puts it on the rotation, and the careless player waits for a look', () => {
+  it('moves stock out of the yards and puts it on the rotation, and the absent player leaves it there', () => {
     const farm = createFarm({
       seed: 1,
       district: 'nsw',
@@ -98,29 +121,28 @@ describe('the ordinary player', () => {
     const bought = applyAction(sale, { type: 'buyCattle', cls: 'yearSteer', qty: 20 });
     expect(bought.ok).toBe(true);
     if (!bought.ok) return;
-    // Day 0 of the farm is not 21 days on: toSaleDay ran some days, so the careless player may not look today.
     const landed = endDay(bought.farm).farm;
     const inYards = (f: typeof landed): boolean => thingsToDo(f).some((t) => t.type === 'in-yards');
     expect(inYards(landed)).toBe(true);
     const done = PLAYERS.ordinary(landed);
     expect(inYards(done)).toBe(false);
-    const mob = done.mobs.find((m) => m.animals.length === 20 || m.where.kind === 'paddock')!;
-    expect(mob).toBeDefined();
     expect(done.mobs.every((m) => m.plan && !m.plan.paused)).toBe(true);
     expect(done.plans).toHaveLength(1);
-    // The absent player leaves them there.
     expect(inYards(PLAYERS.absent(landed))).toBe(true);
   });
 });
 
 describe('the play-test table', () => {
-  it('is printed when GG_PLAYERS_RUN is set', () => {
-    const wanted = (['cq', 'nsw', 'cw', 'wv'] as const).length * 3 * SEEDS.length;
-    if (runs.length < wanted) return;
-    const order = (r: RunFacts): string =>
-      `${DISTRICT_IDS.indexOf(r.district)}${r.seed}${PLAYER_NAMES.indexOf(r.player as PlayerName)}`;
-    const table = factsTable([...runs].sort((a, b) => order(a).localeCompare(order(b))));
-    expect(table.split('\n').length).toBe(wanted + 2);
-    if (process.env.GG_PLAYERS_RUN === '1') console.log('\n' + table + '\n');
+  it('has a row for every district, seed and player, and is printed when GG_PLAYERS_RUN is 1', () => {
+    const rows: RunFacts[] = [];
+    for (const district of DISTRICT_IDS) {
+      for (const seed of SEEDS)
+        for (const player of PLAYER_NAMES) rows.push(run(district, seed, player));
+    }
+    // A missing run fails here: there must be 4 districts x 2 seeds x 3 players.
+    expect(rows).toHaveLength(DISTRICT_IDS.length * SEEDS.length * PLAYER_NAMES.length);
+    const table = factsTable(rows);
+    expect(table.split('\n')).toHaveLength(rows.length + 2);
+    if (process.env.GG_PLAYERS_RUN === '1') process.stdout.write('\n' + table + '\n\n');
   });
 });

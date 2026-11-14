@@ -7,9 +7,6 @@ import { setUp } from '../../test-support/workingDay';
 import type { PlanSpec } from '../actions/types';
 import { DISTRICT_IDS } from '@gg/shared';
 import { newYear } from '../money/worth';
-import { createFarm } from './create';
-import type { FarmState } from './state';
-import { stepDay } from './tick';
 
 /*
  * Grazing plans, day by day, against the old game's own plan code
@@ -39,23 +36,52 @@ const at = (id: DistrictId): number => DISTRICT_IDS.indexOf(id);
 /** The four paddocks in a row, with some steers in paddock `into` (0 to 3). */
 function begin(
   id: DistrictId,
-  o: { dry?: number[]; into?: number; head?: number; seed?: number } = {},
-): { run: WholeFarmRun; stops: number[]; troughs: number[]; open: number; mob: number } {
+  o: {
+    dry?: number[];
+    into?: number;
+    head?: number;
+    seed?: number;
+    /** A second mob: its head and the paddock (0 to 3) it starts in. */
+    second?: { head: number; into: number };
+  } = {},
+): {
+  run: WholeFarmRun;
+  stops: number[];
+  troughs: number[];
+  open: number;
+  mob: number;
+  mob2: number;
+} {
   const pf = planFarm(id, {
     seed: o.seed ?? 900 + at(id),
     start: { year: 2023, month: STARTS[id] },
     dry: o.dry,
   });
-  const farm = setUp(pf.farm, {
+  let farm = setUp(pf.farm, {
     type: 'buyCattle',
     cls: 'yearSteer',
     qty: o.head ?? 12,
     to: { cell: pf.stops[o.into ?? 0]! },
   });
+  if (o.second) {
+    farm = setUp(farm, {
+      type: 'buyCattle',
+      cls: 'yearSteer',
+      qty: o.second.head,
+      to: { cell: pf.stops[o.second.into]! },
+    });
+  }
   // The year starts here: what was spent setting the farm up is not in this year's totals.
   farm.year = newYear(farm);
   const run = new WholeFarmRun(loaded, farm, 5000 + at(id));
-  return { run, stops: pf.stops, troughs: pf.troughs, open: pf.open, mob: farm.mobs[0]!.id };
+  return {
+    run,
+    stops: pf.stops,
+    troughs: pf.troughs,
+    open: pf.open,
+    mob: farm.mobs[0]!.id,
+    mob2: farm.mobs[1]?.id ?? 0,
+  };
 }
 
 /** Set a plan in the engine and in the old game. */
@@ -235,24 +261,76 @@ describe('no water at a stop, beside the old game', () => {
   });
 });
 
-// The engine stands alone as well: a farm with no plan is untouched by any of it.
-describe('a farm with no plan', () => {
-  it('runs exactly as it did, day after day', () => {
-    const a = createFarm({
-      seed: 3,
-      district: 'nsw',
-      size: 'small',
-      start: { year: 2023, month: 8 },
-      startType: 'running',
-      difficulty: 'medium',
+describe('the "grazed down to" rule at a figure the paddock really crosses', () => {
+  it.each(['wv', 'cw'] as const)(
+    '%s: 1,500 kg DM/ha with no day limit moves part-way through a stay, equal every day',
+    (id) => {
+      const { run, stops, mob } = begin(id);
+      setPlan(run, mob, {
+        legs: [{ stops, rule: { mode: 'kg', kg: 1500, maxDays: 0 }, rounds: 0 }],
+        after: 'repeat',
+      });
+      const days: number[] = [];
+      let last = 0;
+      for (let d = 1; d <= 60; d++) {
+        run.day();
+        const moves = planOf(run, mob)!.moves;
+        if (moves !== last) days.push(d);
+        last = moves;
+      }
+      // It moved on feed, not on a clock: some stays were a day and some were much longer.
+      expect(last).toBeGreaterThan(5);
+      expect(last).toBeLessThan(59);
+      const gaps = days.slice(1).map((d, i) => d - days[i]!);
+      expect(Math.max(...gaps)).toBeGreaterThan(3);
+      expect(planOf(run, mob)!.gainKg).not.toBe(0);
+    },
+  );
+});
+
+describe('mobs that join when a plan moves in, beside the old game', () => {
+  it.each([
+    ['the planned mob is the bigger', 12, 6],
+    ['the other mob is the bigger', 6, 20],
+  ] as const)(
+    '%s: they join, and every animal and the mob are equal every day',
+    (_name, head, other) => {
+      const { run, stops, mob, mob2 } = begin('nsw', {
+        head,
+        into: 0,
+        second: { head: other, into: 1 },
+        seed: 990,
+      });
+      setPlan(run, mob, { legs: [days(2, stops)], after: 'repeat' });
+      run.days(2);
+      // The planned mob moved into the other's paddock and they joined: one mob where there were two.
+      expect(run.farm.mobs).toHaveLength(1);
+      const keeper = run.farm.mobs[0]!;
+      expect(keeper.id).toBe(head >= other ? mob : mob2);
+      expect(keeper.animals).toHaveLength(head + other);
+      expect(run.seen).toContain('mobs-joined');
+      // The mob that is left has the plan, with its counts, whichever mob it was.
+      expect(keeper.plan).toMatchObject({ moves: 1, idx: 1 });
+      run.days(40);
+      expect(planOf(run, keeper.id)!.moves).toBeGreaterThan(10);
+    },
+  );
+
+  it("both mobs on a plan: the bigger keeps its own and the mover's is dropped, as in the old game", () => {
+    const { run, stops, mob, mob2 } = begin('cw', {
+      head: 12,
+      into: 0,
+      second: { head: 8, into: 1 },
+      seed: 991,
     });
-    const b: FarmState = structuredClone(a);
-    for (let d = 0; d < 20; d++) {
-      stepDay(a);
-      stepDay(b);
-    }
-    expect(a.plans).toEqual([]);
-    expect(a.mobs.every((m) => m.plan === undefined)).toBe(true);
-    expect(a.cash).toBe(b.cash);
+    setPlan(run, mob, { legs: [days(2, stops)], after: 'repeat' });
+    setPlan(run, mob2, { legs: [days(3, stops)], after: 'repeat' }, 1);
+    run.days(2);
+    // The first mob moved into the second's paddock and they joined. The 12 head mob keeps its plan.
+    expect(run.farm.mobs).toHaveLength(1);
+    expect(run.farm.mobs[0]!.id).toBe(mob);
+    expect(run.farm.mobs[0]!.plan).toMatchObject({ moves: 1 });
+    run.days(45);
+    expect(run.farm.mobs).toHaveLength(1);
   });
 });

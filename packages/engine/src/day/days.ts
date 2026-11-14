@@ -356,8 +356,8 @@ export function waterCheck(farm: FarmState): SkipStop[] {
 /**
  * What in a day's events stops a skip. These are the MVP's stops: a mob's
  * first day without water, a portable trough run dry, a crop ready to
- * harvest, the end of a year, and game over; and, once plans are built, a
- * plan that can not move a mob because the next area has no water.
+ * harvest, the end of a year, and game over; and a plan that can not move
+ * a mob because the next area has no water.
  */
 export function stopsIn(day: DayResult): SkipStop[] {
   const stops: SkipStop[] = [];
@@ -412,10 +412,8 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
   const before = snapshot(farm);
   const next = workingCopy(farm);
   const day = stepDay(next, env);
-  // Plan moves made during the tick took their move time off this day's light.
-  let planUsed = 0;
-  for (const e of day.events) if (e.type === 'plan-moved') planUsed += e.time.lightUsedMin;
-  const lightLeftMin = Math.max(0, lightLeft(farm) - planUsed);
+  // Plan moves take none of the day's light, as in the old game.
+  const lightLeftMin = lightLeft(farm);
   // First light on the new day: cattle land, booked stock sells. Before the player can act.
   const atDawn = dawn(next);
   return {

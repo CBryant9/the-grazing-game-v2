@@ -201,7 +201,7 @@ export interface RunFacts {
   worthEnd: number;
   /** Set when the game ended: why, and the farm day. */
   over: { reason: string; day: number } | null;
-  /** Days a mob was without water when the day ended. */
+  /** Days on which a mob was standing on ground with no water when the player had finished and pressed Next day. */
   dryDays: number;
   /** Things to do still listed at the end. */
   undone: number;
@@ -303,15 +303,30 @@ export function factsTable(runs: readonly RunFacts[]): string {
       ended,
       String(r.dryDays),
       String(r.undone),
+      String(r.planMoves),
+      waitingText(r.farm),
     ].join(' | ');
   });
   return [
-    '| District | Seed | Player | Head, start to end | Deaths | Live weight gained | Cash, start to end | Net worth, start to end | Game ended | Days a mob had no water | Things to do left |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
+    '| District | Seed | Player | Head, start to end | Deaths | Live weight gained | Cash, start to end | Net worth, start to end | Game ended | Days a mob was on dry ground at the end of the day | Things to do left | Plan moves made | Plans waiting at the end |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
     ...rows.map((r) => `| ${r} |`),
   ].join('\n');
 }
 
-/** Whether a run has any plan listed by `plansView` that is waiting, for the report. */
+/** The plans waiting at the end, with the reason, for the table: "none", or "1 no-water". */
+export function waitingText(farm: FarmState): string {
+  const why = plansView(farm).flatMap((p) =>
+    p.mobs.flatMap((m) => (m.waiting ? [m.waiting.why] : [])),
+  );
+  if (!why.length) return 'none';
+  const by: Record<string, number> = {};
+  for (const w of why) by[w] = (by[w] ?? 0) + 1;
+  return Object.entries(by)
+    .map(([w, n]) => `${n} ${w}`)
+    .join(', ');
+}
+
+/** The number of plans waiting at the end, for the report. */
 export const plansWaiting = (farm: FarmState): number =>
   plansView(farm).reduce((n, p) => n + p.mobs.filter((m) => m.waiting).length, 0);

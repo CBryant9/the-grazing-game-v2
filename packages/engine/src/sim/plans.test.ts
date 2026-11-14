@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { planFarm, type PlanFarm } from '../../test-support/plans';
-import { atLastLight, setUp, turnedDown, withLightLeft, work } from '../../test-support/workingDay';
+import {
+  atLastLight,
+  setUp,
+  toSaleDay,
+  turnedDown,
+  withLightLeft,
+  work,
+} from '../../test-support/workingDay';
 import type { Action, PlanSpec } from '../actions/types';
-import { applyAction } from '../day/act';
+import { applyAction, previewAction } from '../day/act';
 import { endDay, skipDays } from '../day/days';
 import { plansView as view, thingsToDo } from '../index';
-import { JOB_TIMES } from '../data/jobTimes';
 import { farmHash, loadFarm, saveFarm } from '../save/save';
 import { surveyOf } from './derived';
 import { cloneFarm, type FarmMob, type FarmState } from './state';
@@ -58,12 +64,11 @@ const areaOf = (farm: FarmState, id: number): number => {
 const areaAt = (farm: FarmState, cell: number): number => surveyOf(farm).topology.areaOf[cell]!;
 
 describe('setting a plan', () => {
-  it('makes a template, puts the mob on its first stop and takes none of the day', () => {
+  it('makes a template and puts the mob on its stop, which is a move (making the plan takes none of the day)', () => {
     const { pf, farm, mob } = stocked();
     const done = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 2 });
-    expect(done.job.outcome).toBe('free');
-    expect(done.job.workMin).toBe(0);
-    expect(done.farm.clock.used).toBe(0);
+    expect(done.job.outcome).toBe('done');
+    expect(done.job.workMin).toBeCloseTo(15.12, 9);
     expect(done.farm.plans).toHaveLength(1);
     expect(done.farm.plans[0]).toMatchObject({ id: 1, name: 'Plan 1', after: 'repeat' });
     expect(done.farm.nextPlanId).toBe(2);
@@ -78,7 +83,7 @@ describe('setting a plan', () => {
       moves: 0,
       rounds: 0,
     });
-    expect(done.events.map((e) => e.type)).toEqual(['mob-moved', 'plan-set']);
+    expect(done.events.map((e) => e.type)).toEqual(['job-worked', 'mob-moved', 'plan-set']);
     expect(done.events.at(-1)).toMatchObject({
       type: 'plan-set',
       template: 1,
@@ -188,7 +193,7 @@ describe('setting a plan', () => {
     expect(turnedDown(paused, { type: 'pausePlan', mob }).reason).toBe('already-paused');
   });
 
-  it('is refused when another mob is in the paddock the plan would put the mob in', () => {
+  it('says up front which stops hold another mob, and joins the two when the mob is put there', () => {
     const { pf, farm, mob } = stocked();
     const two = setUp(farm, {
       type: 'buyCattle',
@@ -196,9 +201,77 @@ describe('setting a plan', () => {
       qty: 6,
       to: { cell: pf.stops[2]! },
     });
-    const no = turnedDown(two, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 2 });
-    expect(no.reason).toBe('area-occupied');
-    expect(no.message).toMatch(/One mob to a paddock/);
+    const other = two.mobs.find((m) => m.id !== mob)!;
+    const card = previewAction(two, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 2 });
+    expect(card.ok).toBe(true);
+    if (!card.ok) return;
+    // The job card carries the facts: the paddock, and that mob's name and head.
+    const area = surveyOf(two).topology.areas[areaAt(two, pf.stops[2]!)]!.name;
+    expect(card.card.plan).toEqual({
+      template: 1,
+      step: 2,
+      dryAreas: [],
+      joins: [{ area, mob: other.id, mobName: other.name, head: 6 }],
+    });
+    expect(card.card.workMin).toBeCloseTo(15.12, 9);
+    const done = work(two, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 2 });
+    expect(done.events.find((e) => e.type === 'plan-set')).toMatchObject({
+      joins: [{ area, mob: other.id, mobName: other.name, head: 6 }],
+    });
+    expect(done.events.find((e) => e.type === 'mobs-joined')).toMatchObject({ area });
+    // The two are one mob now: the bigger (this one, 12 head) keeps its name and its plan.
+    expect(done.farm.mobs).toHaveLength(1);
+    expect(done.farm.mobs[0]!.id).toBe(mob);
+    expect(done.farm.mobs[0]!.animals).toHaveLength(18);
+    expect(done.farm.mobs[0]!.plan).toMatchObject({ idx: 2 });
+    // A stop with no other mob has no joins.
+    const clear = previewAction(two, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 1 });
+    expect(clear.ok && clear.card.plan!.joins).toHaveLength(1);
+  });
+
+  it('putting a mob on its stop is the ordinary move: it costs the move time and needs the light', () => {
+    const { pf, farm, mob } = stocked();
+    const cost = 15 + 0.12;
+    // Not on the stop: the move time, through the same clock path as a move by hand.
+    const away = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 1 });
+    expect(away.job.outcome).toBe('done');
+    expect(away.job.workMin).toBeCloseTo(cost, 9);
+    expect(away.farm.clock.used).toBeCloseTo(cost, 9);
+    expect(away.job.parts.map((x) => x.what)).toEqual(['settle', 'head']);
+    // Already on the stop: free.
+    const here = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 0 });
+    expect(here.job.outcome).toBe('free');
+    expect(here.farm.clock.used).toBe(0);
+    // Not enough light left: refused with the plain reason, and nothing changes.
+    const late = withLightLeft(farm, 10);
+    const no = turnedDown(late, { type: 'setPlan', mob, plan: rotation(pf.stops), step: 1 });
+    expect(no.reason).toBe('not-enough-daylight');
+    expect(no.message).toMatch(/enough time/);
+    expect(farmHash(late)).toBe(farmHash(withLightLeft(farm, 10)));
+    // The same when resuming at a step the mob is not on.
+    const planned = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops) }).farm;
+    const paused = work(planned, { type: 'pausePlan', mob }).farm;
+    expect(work(paused, { type: 'resumePlan', mob }).job.outcome).toBe('free');
+    const resumed = work(paused, { type: 'resumePlan', mob, step: 3 });
+    expect(resumed.job.workMin).toBeCloseTo(cost, 9);
+    expect(turnedDown(withLightLeft(paused, 10), { type: 'resumePlan', mob, step: 3 }).reason).toBe(
+      'not-enough-daylight',
+    );
+    // Pausing and clearing are decisions: free, even after last light.
+    expect(work(atLastLight(planned), { type: 'pausePlan', mob }).job.outcome).toBe('free');
+    expect(work(atLastLight(planned), { type: 'clearPlan', mob }).job.outcome).toBe('free');
+    // Getting stock out of the yards by a plan is a move, not a free one.
+    const sale = toSaleDay(farm);
+    const bought = work(sale, { type: 'buyCattle', cls: 'yearSteer', qty: 10 }).farm;
+    const yards = endDay(bought).farm;
+    const yardMob = yards.mobs.find((m) => m.where.kind === 'yards')!;
+    const out = work(yards, {
+      type: 'setPlan',
+      mob: yardMob.id,
+      plan: rotation(pf.stops),
+      step: 2,
+    });
+    expect(out.job.workMin).toBeGreaterThan(15);
   });
 });
 
@@ -227,8 +300,8 @@ describe('a manual move pauses the plan', () => {
     const planned = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops) }).farm;
     const moved = work(planned, { type: 'moveMob', mob, to: { cell: pf.open } }).farm;
     const resumed = work(days(moved, 4), { type: 'resumePlan', mob, step: 3 });
-    expect(resumed.job.outcome).toBe('free');
-    expect(resumed.events.map((e) => e.type)).toEqual(['mob-moved', 'plan-resumed']);
+    expect(resumed.job.outcome).toBe('done');
+    expect(resumed.events.map((e) => e.type)).toEqual(['job-worked', 'mob-moved', 'plan-resumed']);
     expect(areaOf(resumed.farm, mob)).toBe(areaAt(resumed.farm, pf.stops[3]!));
     expect(mobOf(resumed.farm, mob).plan).toMatchObject({
       paused: false,
@@ -328,64 +401,34 @@ describe('a plan moves the mob by itself', () => {
   });
 });
 
-describe('the light a plan move takes', () => {
-  it('takes the ordinary move time off the day it happens on', () => {
+describe('plan moves take none of the day', () => {
+  it('the light left at the end of the day is all of it, and the move still happens', () => {
     const { pf, farm, mob } = stocked();
     const planned = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops, 1) }).farm;
     const res = endDay(planned);
     const m = res.day.events.find((e) => e.type === 'plan-moved')!;
-    expect(m).toMatchObject({ type: 'plan-moved' });
-    if (m.type !== 'plan-moved') throw new Error('no move');
-    // 15 minutes and 1 minute for each 100 head: the ordinary move.
-    const want =
-      JOB_TIMES.moveMobSettleMin.value + (12 / 100) * JOB_TIMES.moveMobMinPer100Head.value;
-    expect(m.time.workMin).toBeCloseTo(want, 9);
-    expect(m.time.lightUsedMin).toBeCloseTo(want, 9);
-    expect(m.time.startsAt).toBe(planned.clock.firstLight);
-    expect(m.time.endsAt - m.time.startsAt).toBeCloseTo(want, 9);
-    expect(res.lightLeftMin).toBeCloseTo(
-      planned.clock.lastLight - planned.clock.firstLight - want,
-      6,
-    );
-    // It is the same time the player would spend moving the mob by hand.
-    const hand = work(farm, { type: 'moveMob', mob, to: { cell: pf.stops[1]! } });
-    expect(hand.job.workMin).toBeCloseTo(want, 9);
-  });
-
-  it('never takes the light below zero and never stops the move', () => {
-    const { pf, farm, mob } = stocked();
-    const planned = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops, 1) }).farm;
-    // 5 minutes of light left: the move takes the 5, and happens.
-    const late = endDay(withLightLeft(planned, 5));
-    const m = late.day.events.find((e) => e.type === 'plan-moved')!;
-    expect(m).toMatchObject({ type: 'plan-moved', time: { lightUsedMin: 5 } });
-    expect(m.type === 'plan-moved' && m.time.workMin).toBeGreaterThan(15);
-    expect(late.lightLeftMin).toBe(0);
-    expect(areaOf(late.farm, mob)).toBe(areaAt(late.farm, pf.stops[1]!));
-    // No light at all: still moves, takes nothing.
-    const dark = endDay(atLastLight(planned));
-    expect(dark.day.events.find((e) => e.type === 'plan-moved')).toMatchObject({
-      time: { lightUsedMin: 0 },
-    });
-    expect(areaOf(dark.farm, mob)).toBe(areaAt(dark.farm, pf.stops[1]!));
-    // Four moves in a day on a short day: the light used is never more than the day has.
+    expect(m).toMatchObject({ type: 'plan-moved', movesADay: 1, head: 12 });
+    expect('time' in m).toBe(false);
+    expect(res.lightLeftMin).toBe(planned.clock.lastLight - planned.clock.firstLight);
+    expect(areaOf(res.farm, mob)).toBe(areaAt(res.farm, pf.stops[1]!));
+    // With little or no light left the move happens all the same, and the day's used light is not touched.
+    for (const left of [5, 0]) {
+      const late = withLightLeft(planned, left);
+      const ran = endDay(late);
+      expect(ran.lightLeftMin).toBe(left);
+      expect(areaOf(ran.farm, mob)).toBe(areaAt(ran.farm, pf.stops[1]!));
+    }
+    // Four moves in a day take none of it either.
     const four = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops, 0.25) }).farm;
-    const ran = endDay(withLightLeft(four, 20));
-    const used = ran.day.events.flatMap((e) =>
-      e.type === 'plan-moved' ? [e.time.lightUsedMin] : [],
-    );
-    expect(used).toHaveLength(4);
-    expect(used.reduce((a, b) => a + b, 0)).toBeCloseTo(20, 9);
-    expect(used[0]).toBeCloseTo(15.12, 9);
-    expect(used[1]).toBeCloseTo(4.88, 9);
-    expect(used.slice(2)).toEqual([0, 0]);
+    const ran = endDay(four);
+    expect(ran.day.events.filter((e) => e.type === 'plan-moved')).toHaveLength(4);
+    expect(ran.lightLeftMin).toBe(four.clock.lastLight - four.clock.firstLight);
   });
 
   it('a new day starts with all of its light', () => {
     const { pf, farm, mob } = stocked();
     const planned = work(farm, { type: 'setPlan', mob, plan: rotation(pf.stops, 1) }).farm;
-    const next = endDay(planned).farm;
-    expect(next.clock.used).toBe(0);
+    expect(endDay(planned).farm.clock.used).toBe(0);
   });
 });
 
@@ -464,7 +507,7 @@ describe('when a plan can not move a mob', () => {
     expect(on.stops).toEqual([]);
   });
 
-  it('waits when another mob is in the next paddock, and says so, without stopping a skip', () => {
+  it('moves into a paddock that holds another mob and the two join, as the old game did', () => {
     const { pf, farm, mob } = stocked();
     const two = setUp(farm, {
       type: 'buyCattle',
@@ -472,22 +515,25 @@ describe('when a plan can not move a mob', () => {
       qty: 6,
       to: { cell: pf.stops[1]! },
     });
-    const other = two.mobs.find((m) => m.id !== mob)!.id;
+    const other = two.mobs.find((m) => m.id !== mob)!;
     const planned = work(two, { type: 'setPlan', mob, plan: rotation(pf.stops, 2) }).farm;
     const skip = skipDays(planned, 6);
     expect(skip.daysRun).toBe(6);
     expect(skip.stops).toEqual([]);
-    const waits = skip.days.flatMap((d) => d.events.filter((e) => e.type === 'plan-waiting'));
-    expect(waits).toHaveLength(1);
-    expect(waits[0]).toMatchObject({ why: 'occupied', cell: pf.stops[1], step: 1 });
-    expect(skip.farm.mobs).toHaveLength(2);
-    expect(thingsToDo(skip.farm).find((t) => t.type === 'plan-waiting')).toMatchObject({
-      why: 'occupied',
+    const events = skip.days.flatMap((d) => d.events);
+    expect(events.some((e) => e.type === 'plan-waiting')).toBe(false);
+    const joined = events.find((e) => e.type === 'mobs-joined');
+    const area = surveyOf(planned).topology.areas[areaAt(planned, pf.stops[1]!)]!.name;
+    // The event names both mobs and the paddock. The bigger mob (the planned one, 12 head) keeps its name.
+    expect(joined).toMatchObject({
+      from: other.id,
+      fromName: other.name,
+      into: mob,
+      intoName: mobOf(planned, mob).name,
+      area,
     });
-    // The other mob is moved out. The plan moves in on the next day.
-    const clear = work(skip.farm, { type: 'moveMob', mob: other, to: { cell: pf.open } }).farm;
-    const moved = endDay(clear).farm;
-    expect(areaOf(moved, mob)).toBe(areaAt(moved, pf.stops[1]!));
+    expect(skip.farm.mobs.some((m) => m.id === other.id)).toBe(false);
+    expect(thingsToDo(skip.farm).some((t) => t.type === 'plan-waiting')).toBe(false);
   });
 });
 
@@ -671,6 +717,29 @@ describe('mobs that join, and other places a plan meets the farm', () => {
     expect(joined.mobs).toHaveLength(1);
     expect(joined.mobs[0]!.id).toBe(big);
     expect(joined.mobs[0]!.plan).toMatchObject({ template: 1, paused: true });
+  });
+
+  it("when the mob that is joined is the bigger, it keeps its own plan; if it has none it takes the mover's", () => {
+    const { pf, farm, mob } = stocked({ head: 6 });
+    const two = setUp(farm, {
+      type: 'buyCattle',
+      cls: 'yearSteer',
+      qty: 20,
+      to: { cell: pf.stops[1]! },
+    });
+    const big = two.mobs.find((m) => m.id !== mob)!.id;
+    // Only the small mob has a plan: it moves in on the plan, the big mob keeps its name and takes the plan.
+    const planned = work(two, { type: 'setPlan', mob, plan: rotation(pf.stops, 1) }).farm;
+    const day = endDay(planned).farm;
+    expect(day.mobs).toHaveLength(1);
+    expect(day.mobs[0]!.id).toBe(big);
+    expect(day.mobs[0]!.plan).toMatchObject({ template: 1, moves: 1, idx: 1 });
+    // Both on a plan: the big mob keeps its own, the mover's is dropped.
+    const both = work(planned, { type: 'setPlan', mob: big, plan: { template: 1 }, step: 3 }).farm;
+    const next = endDay(both).farm;
+    expect(next.mobs.length).toBeGreaterThanOrEqual(1);
+    const bigMob = next.mobs.find((m) => m.id === big)!;
+    expect(bigMob.plan).toBeDefined();
   });
 
   it('a farm with no plan is not changed by any of it', () => {

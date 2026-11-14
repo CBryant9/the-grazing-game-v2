@@ -37,6 +37,8 @@ export interface PlanReport {
   rounds: number;
   /** Feed the mob ate in the paddock while on the plan, kg DM. */
   eatenKg: number;
+  /** Live weight the mob's animals gained while on the plan, kg (the change in each animal's weight over the day, summed). */
+  gainKg: number;
   /** Head-days on the plan: each day, the head in the mob (calves not counted). */
   headDays: number;
 }
@@ -118,20 +120,12 @@ export type TickEvent =
       /** Full rounds and moves so far on this plan. */
       rounds: number;
       moves: number;
-      /**
-       * The ordinary move time, and how much of that day's light it took
-       * (less than the move time when little light was left, never more
-       * than was left). Times are minutes after midnight on the district
-       * town's clock. Builder's rule, for Claudia (docs/DATA.md).
-       */
-      time: { startsAt: number; endsAt: number; workMin: number; lightUsedMin: number };
       /** For a plan that moves once a day or less: the classes expected to lose weight in the new area, and why. */
       losing: GainForecast[];
     }
   /**
    * A plan could not move a mob. Said once for each stop the plan is
-   * waiting for. `why`: `no-water` (the area has no water) or `occupied`
-   * (another mob is in it). The mob stays where it is and the plan tries
+   * waiting for. `why`: `no-water` (the area has no water). The mob stays where it is and the plan tries
    * again each day.
    */
   | {
@@ -263,6 +257,12 @@ export type ActionEvent =
       steps: number;
       area: string | null;
       dryAreas: string[];
+      /**
+       * Stops that hold another mob now: the area, and that mob's name and
+       * head. The plan will join the two mobs when it moves in, as the old
+       * game did. A screen can warn before the player commits.
+       */
+      joins: { area: string; mob: number; mobName: string; head: number }[];
     }
   /** A plan was paused, because the player asked or because they moved the mob by hand. */
   | {
@@ -281,6 +281,8 @@ export type ActionEvent =
       template: number;
       step: number;
       area: string | null;
+      /** Stops that hold another mob now, as for `plan-set`. */
+      joins: { area: string; mob: number; mobName: string; head: number }[];
     }
   /** A mob was taken off its plan. The template stays. */
   | {

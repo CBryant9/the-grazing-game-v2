@@ -109,7 +109,24 @@ function finish(
   // Stock booked onto a sale, and cattle on their way: the card says so.
   const sale = did.find((e) => e.type === 'sale-booked');
   const buy = did.find((e) => e.type === 'cattle-on-the-way');
-  const extra: Partial<Pick<JobCard, 'booking' | 'arrival'>> = {};
+  const extra: Partial<Pick<JobCard, 'booking' | 'arrival' | 'plan'>> = {};
+  const set = did.find((e) => e.type === 'plan-set');
+  const resumed = did.find((e) => e.type === 'plan-resumed');
+  if (set?.type === 'plan-set') {
+    extra.plan = {
+      template: set.template,
+      step: set.step,
+      dryAreas: set.dryAreas,
+      joins: set.joins,
+    };
+  } else if (resumed?.type === 'plan-resumed') {
+    extra.plan = {
+      template: resumed.template,
+      step: resumed.step,
+      dryAreas: [],
+      joins: resumed.joins,
+    };
+  }
   if (sale?.type === 'sale-booked') {
     extra.booking = {
       head: sale.head,

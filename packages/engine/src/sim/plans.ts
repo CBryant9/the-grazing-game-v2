@@ -23,10 +23,9 @@
 import type { GrazingLand } from '../cattle/types';
 import { predictGains } from '../cattle/gains';
 import { PLAN_FIGURES } from '../data/plans';
-import { JOB_TIMES } from '../data/jobTimes';
 import type { Survey } from '../farm/layout';
-import { lightLeft, timeNow } from './clock';
 import { areaIdOf, grazingArea, surveyOf } from './derived';
+import { mergeShared } from './mobs';
 import type { TickEvent, PlanReport } from './events';
 import type {
   FarmMob,
@@ -98,6 +97,7 @@ export function reportOf(farm: Pick<FarmState, 'day'>, run: PlanRun): PlanReport
     rounds: run.rounds,
     eatenKg: run.eatenKg,
     headDays: run.headDays,
+    gainKg: run.gainKg,
   };
 }
 
@@ -122,6 +122,7 @@ export function newRun(
     rounds: 0,
     eatenKg: 0,
     headDays: 0,
+    gainKg: 0,
   };
 }
 
@@ -137,26 +138,12 @@ function areaMass(farm: FarmState, cells: readonly number[]): number {
   return (g + d) / cells.length;
 }
 
-/** The mob, if any, other than `self` that is in an area. */
-function otherMobIn(
-  farm: FarmState,
-  survey: Survey,
-  areaId: number,
-  self: FarmMob,
-): FarmMob | null {
-  for (const m of farm.mobs) {
-    if (m === self || !m.animals.length || m.where.kind !== 'paddock') continue;
-    if (survey.topology.areaOf[m.where.anchor] === areaId) return m;
-  }
-  return null;
-}
-
 type StepResult = 'moved' | 'blocked' | 'finished';
 
 /**
  * One move of a plan: the old game's `planStep`. Works out where the plan
  * goes next. It finishes the plan if its rounds are done, waits if the next
- * area has no water or another mob is in it, and otherwise moves the mob.
+ * area has no water, and otherwise moves the mob.
  *
  * The one fix: nothing about the rounds changes unless the mob moves (or
  * the plan finishes). A plan that is waiting looks at the same next stop
@@ -211,19 +198,16 @@ function planStep(
   const areaId = survey.topology.areaOf[target]!;
   const area = grazingArea(survey, areaId);
   const step = stepOf(tpl, leg, ni);
-  let why: PlanWaitReason | null = null;
-  if (!area.hasWater) why = 'no-water';
-  else if (otherMobIn(farm, survey, areaId, m)) why = 'occupied';
-  if (why) {
-    // Said once for each stop and reason, as the old game said it once for each stop.
-    if (run.waiting?.target !== target || run.waiting.why !== why) {
-      run.waiting = { target, why };
+  if (!area.hasWater) {
+    // Said once for each stop, as the old game said it once for each stop.
+    if (run.waiting?.target !== target) {
+      run.waiting = { target, why: 'no-water' };
       events.push({
         type: 'plan-waiting',
         mob: m.id,
         mobName: m.name,
         template: tpl.id,
-        why,
+        why: 'no-water',
         area: survey.topology.areas[areaId]!.name,
         cell: target,
         step,
@@ -232,17 +216,13 @@ function planStep(
     return 'blocked';
   }
 
-  // The move takes the ordinary move time off today's light, never more
-  // than is left and never stopping the move.
+  // The move takes none of the day's light, as in the old game. If another mob
+  // is in the area the two join, as in the old game (`mergeShared`: the bigger
+  // keeps its name, and its own plan, or takes this one if it has none).
   const head = m.animals.length;
-  const workMin =
-    JOB_TIMES.moveMobSettleMin.value + (head / 100) * JOB_TIMES.moveMobMinPer100Head.value;
-  const startsAt = timeNow(farm);
-  const lightUsedMin = Math.min(workMin, lightLeft(farm));
-  farm.clock.used += lightUsedMin;
-
   const from = areaIdOf(survey, m);
   m.where = { kind: 'paddock', anchor: target };
+  mergeShared(farm, survey, events);
   run.leg = leg;
   run.idx = ni;
   run.round = round;
@@ -277,7 +257,6 @@ function planStep(
     restarted,
     rounds: run.rounds,
     moves: run.moves,
-    time: { startsAt, endsAt: startsAt + lightUsedMin, workMin, lightUsedMin },
     losing,
   });
   return 'moved';
@@ -416,6 +395,7 @@ export interface PlanMobView {
   /** Feed the mob ate in the paddock while on the plan, kg DM, and head-days. */
   eatenKg: number;
   headDays: number;
+  gainKg: number;
 }
 
 export interface PlanView {
@@ -526,6 +506,7 @@ export function plansView(farm: FarmState): PlanView[] {
         next,
         eatenKg: run.eatenKg,
         headDays: run.headDays,
+        gainKg: run.gainKg,
       });
     }
     return {
