@@ -173,11 +173,67 @@ if (existsSync(APP)) {
     if (isPlay && /\.(html|rsc|body|txt|json|meta)$/.test(f)) pages.push(f);
   }
 }
+// Since milestone 5.5 /play is made for each request (it gets its own nonce for the
+// Content-Security-Policy), so a build has no play.html to read. Then, on the real build only,
+// the built site is started on this machine with no keys and /play is asked for twice, as a page
+// and as page data, and both answers are searched: that is exactly what a browser is sent.
+let rendered = null;
+if (!existsSync(join(APP, 'play.html')) && !process.argv.includes('--app')) {
+  rendered = await renderPlay();
+  pages.push(...rendered.files);
+}
 if (!pages.length) {
   console.error(
     `No HTML or page data for /play was found in ${relative(ROOT, APP)}. Build the site first.`,
   );
   process.exit(1);
+}
+
+async function renderPlay() {
+  const { spawn } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { createServer } = await import('node:net');
+  const out = mkdtempSync(join(tmpdir(), 'gg-bundle-play-'));
+  const port = await new Promise((ok) => {
+    const s = createServer().listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => ok(p));
+    });
+  });
+  const child = spawn(process.execPath, [join(ROOT, 'scripts/load/server.mjs'), String(port)], {
+    env: { ...process.env, NODE_ENV: 'production', GG_FARMS_DIR: join(out, 'farms') },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  try {
+    await new Promise((ok, fail) => {
+      const timer = setTimeout(() => fail(new Error('The built site did not start.')), 60_000);
+      child.stdout.on('data', (d) => {
+        if (String(d).includes('READY')) {
+          clearTimeout(timer);
+          ok();
+        }
+      });
+      child.on('exit', () => fail(new Error('The built site stopped before it was ready.')));
+    });
+    const files = [];
+    for (const [name, headers] of [
+      ['play.html', {}],
+      ['play.rsc', { RSC: '1' }],
+    ]) {
+      const res = await fetch(`http://127.0.0.1:${port}/play`, { headers });
+      if (!res.ok) throw new Error(`/play answered ${res.status}.`);
+      const file = join(out, name);
+      writeFileSync(file, await res.text());
+      files.push(file);
+    }
+    return { files, html: files[0] };
+  } catch (e) {
+    console.error(`Could not render /play from the build: ${e.message}`);
+    process.exit(1);
+  } finally {
+    child.kill();
+  }
 }
 
 // The built service worker and everything in its precache list.
@@ -202,7 +258,7 @@ for (const url of precacheUrls) {
   if (path === '/') {
     const home = join(dirname(APP), 'pages', 'index.html');
     file = existsSync(home) ? home : join(APP, 'index.html');
-  } else if (path === '/play') file = join(APP, 'play.html');
+  } else if (path === '/play') file = rendered ? rendered.html : join(APP, 'play.html');
   else if (path.startsWith('/_next/static/'))
     file = join(STATIC, path.slice('/_next/static/'.length));
   else file = join(PUBLIC, path);

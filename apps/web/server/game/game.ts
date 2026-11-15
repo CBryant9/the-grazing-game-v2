@@ -714,8 +714,23 @@ export class GameServer {
     this.cache.set(farmId, held);
     if (this.cache.size > CACHE_LIMIT) {
       const oldest = this.cache.keys().next().value;
-      if (oldest !== undefined) this.cache.delete(oldest);
+      if (oldest !== undefined) {
+        this.cache.delete(oldest);
+        this.touched.delete(oldest);
+      }
     }
+    // "When was this farm last marked opened" only matters for a farm held in the cache. Without
+    // this, one entry stayed for every farm ever loaded by this server, for as long as it ran
+    // (found by the m5.5 load test review). Anything not held is dropped once the list is twice
+    // the cache.
+    if (this.touched.size > CACHE_LIMIT * 2) {
+      for (const id of this.touched.keys()) if (!this.cache.has(id)) this.touched.delete(id);
+    }
+  }
+
+  /** For tests: how many farms this server holds, and how many it remembers marking opened. */
+  heldCounts(): { cache: number; touched: number; queues: number } {
+    return { cache: this.cache.size, touched: this.touched.size, queues: this.queues.size };
   }
 
   /** The farm, brought up to today first if it is a Daily Farm that has days owed (PRD 14.3). */

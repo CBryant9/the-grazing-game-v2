@@ -20,6 +20,9 @@
  * - The screen's pixel ratio is capped (2 by default) and can step down.
  */
 
+// The site's Content-Security-Policy allows no eval (apps/web/lib/csp.ts). This swaps PixiJS's
+// generated shader and uniform code for its plain versions, so the map never calls `new Function`.
+import 'pixi.js/unsafe-eval';
 import {
   Application,
   CanvasSource,

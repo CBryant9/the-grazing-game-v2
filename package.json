@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:speed": "vitest run --config vitest.speed.config.ts",
+    "test:load": "node scripts/load-test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lighthouse": "lhci autorun",

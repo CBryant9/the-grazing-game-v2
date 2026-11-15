@@ -11,3 +11,29 @@ export function register(): void {
   const accounts = accountsWarning(process.env);
   if (accounts) console.warn(accounts);
 }
+
+/**
+ * An error nothing caught while a page or route was being made (milestone 5.5). Sent to Sentry
+ * when `SENTRY_DSN` is set, with the route's template (`/community/u/[username]`), never the
+ * address asked for, its query, its headers or the error's message.
+ */
+export async function onRequestError(
+  error: unknown,
+  _request: unknown,
+  context: { routePath?: string; routeType?: string },
+): Promise<void> {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+  try {
+    const { reportError } = await import('./server/errors/sentry');
+    const { errorKind } = await import('./server/logging');
+    await reportError({
+      source: 'server',
+      route: typeof context?.routePath === 'string' ? context.routePath : 'unknown',
+      reason: `uncaught_${context?.routeType === 'route' ? 'route' : 'render'}`,
+      errorClass: errorKind(error).error,
+      stack: typeof error === 'object' && error !== null ? (error as Error).stack : undefined,
+    });
+  } catch {
+    // Reporting must never add a failure of its own.
+  }
+}

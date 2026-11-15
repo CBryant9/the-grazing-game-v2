@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import { SITE } from '@gg/shared';
 import { fontVariables } from '@/lib/fonts';
 import { SITE_URL } from '@/lib/site';
 import { themeScript } from '@/lib/themeScript';
+import { clientErrorScript } from '@/lib/clientErrorScript';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -38,11 +40,16 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Every app page is made for each request, so each gets its own nonce for the
+// Content-Security-Policy (proxy.ts, lib/csp.ts). The public website pages are pages-router
+// pages and stay static.
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await connection();
   return (
     <html lang="en-AU" className={fontVariables} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: clientErrorScript }} />
       </head>
       <body>
         <a className="skip-link" href="#main">

@@ -163,6 +163,30 @@ describe('the JavaScript budget check', () => {
     expect(over.stdout).toMatch(/OVER\s+\/sign-in\s/);
   });
 
+  it('measures an app page made for each request (no HTML) from its manifests, with the same limit (m5.5)', () => {
+    const asManifest = (b: ReturnType<typeof pretend>, kb: number) => {
+      rmSync(join(b.app, 'play.html'));
+      writeFileSync(join(dirname(b.stat), 'static', 'chunks', 'dyn.js'), randomBytes(kb * 1024));
+      mkdirSync(join(b.app, 'play', 'page'), { recursive: true });
+      writeFileSync(
+        join(b.app, 'play', 'page', 'build-manifest.json'),
+        JSON.stringify({ rootMainFiles: ['static/chunks/dyn.js'] }),
+      );
+      writeFileSync(join(b.app, 'play', 'page_client-reference-manifest.js'), '{}');
+      return b;
+    };
+    const ok = run(asManifest(pretend(0, 100), 200));
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/ok\s+\/play\s+200\.\d KB/);
+    const over = run(asManifest(pretend(0, 100), 260));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/play/);
+    // With neither the HTML nor a manifest, the check still refuses to pass.
+    const b = pretend(0, 100);
+    rmSync(join(b.app, 'play.html'));
+    expect(run(b).status).toBe(1);
+  });
+
   it('gives /admin its own line, measured from its manifests, and fails it when it grows past it', () => {
     const ok = run(pretend(0, 100, false, 20, 20));
     expect(ok.status).toBe(0);

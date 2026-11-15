@@ -1,8 +1,8 @@
 import { withSerwist } from '@serwist/turbopack';
 import type { NextConfig } from 'next';
 
-// Security headers for every page. A full Content-Security-Policy is added in
-// Stage 3, once every outside source (Supabase, Stripe, PostHog) is known.
+// Security headers for every page. The Content-Security-Policy is set per page by proxy.ts
+// (lib/csp.ts): a fixed hash policy on the static website pages, a fresh nonce on the app pages.
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },

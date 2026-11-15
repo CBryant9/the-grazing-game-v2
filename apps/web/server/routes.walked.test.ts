@@ -40,6 +40,7 @@ describe('every route, walked with no keys', () => {
       'notify',
       'leaderboards',
       'ticker',
+      'client-error',
     ]) {
       expect(
         files.some((f) => f.startsWith(`../app/api/${family}/`)),

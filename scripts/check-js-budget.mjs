@@ -103,12 +103,22 @@ function scriptsOf(html) {
 let failed = false;
 for (const page of PAGES) {
   const htmlFile = join(page.dir, page.file);
-  if (!existsSync(htmlFile)) {
+  // Since milestone 5.5 the app pages are made for each request (each gets its own nonce for the
+  // Content-Security-Policy), so there is no built HTML to read. Such a page is measured from its
+  // manifests, the same way as /admin and /community below. The limits are unchanged. (On the
+  // last static build the two ways gave the same figure for every one of these pages.)
+  const fromManifest = !existsSync(htmlFile) && page.dir === APP;
+  if (!existsSync(htmlFile) && !fromManifest) {
     console.error(`Missing ${htmlFile}. Run \`pnpm build\` first.`);
     process.exit(1);
   }
-  const html = readFileSync(htmlFile, 'utf8');
-  const srcs = scriptsOf(html);
+  const manifestSrcs = fromManifest ? adminScripts(page.file.replace(/\.html$/, '')) : null;
+  if (fromManifest && manifestSrcs === null) {
+    console.error(`Missing ${htmlFile} and its build manifest. Run \`pnpm build\` first.`);
+    process.exit(1);
+  }
+  const html = fromManifest ? '' : readFileSync(htmlFile, 'utf8');
+  const srcs = manifestSrcs ?? scriptsOf(html);
   if (srcs.length === 0 && page.mayHaveNoScripts && /<main[\s>]/.test(html)) {
     console.log(
       `ok   ${page.path.padEnd(20)} 0.0 KB compressed in 0 scripts (limit ${page.limitKb} KB)`,

@@ -2220,6 +2220,80 @@ Branch `m6-joined`, cut from `m2.8-sheep-screens` (8d594fa: Stage 1, the website
 - **Accounts-off answers are 404s now**, not 503s.
 - The evening warning has its words and queue rule but no job that sends it.
 
+### 15 Nov 2026: m5.5 Launch check
+
+Branch `m5.5-launch-check`, cut from `m6-joined` (32ca9cf). Built beside the 5.3 builder (dashboard and analytics), so nothing here touches analytics, the dashboard or `/api/collect`. The launch checklist is `docs/LAUNCH_CHECK.md`; the runbook, backups and restore drill are `docs/RUNBOOK.md`.
+
+**What was built**
+
+1. **Error reporting to Sentry, from the server only** (`server/errors/sentry.ts`). No Sentry package: a small sender posts one event to the DSN's envelope endpoint, with a 2 second timeout, at most 30 events a minute per server, and never throws. With no `SENTRY_DSN` nothing is sent. An event carries the source (server or browser), the route name, a fixed reason code, the error's class, the release, the environment and a trimmed stack (function names and paths inside the app, no hosts, queries or home folders). Never cookies, tokens, emails, usernames, bodies, query strings, the request or who asked; a server error's message is never sent. Every `logFailure` line also goes to Sentry, and `instrumentation.ts` sends errors nothing caught (`onRequestError`, with the route's template only).
+2. **Browser errors** go through `/api/client-error` (`server/errors/clientError.ts`). The app layout writes about 600 bytes of inline script (`lib/clientErrorScript.ts`) on `/play` and every signed-in page: an uncaught error or rejected promise is sent with `sendBeacon`, five a page at most. No script file, so no page's budget moved for it. The public website pages never carry it. The route takes the CSRF rule, 10 a minute per caller and 120 for the whole server, a 4 KB body and a fixed shape (`kind`, `name`, `message`, `stack`, `route`, each short). The page path becomes a template with no ids (`/community/u/:id`). The message is scrubbed (emails, addresses, `name=value` pairs, ids, tokens, long numbers) and cut to 120 characters, and only reaches Sentry; the server log gets the page, the reason and the class.
+3. **Load test** (`pnpm test:load`, not part of `pnpm test`; `scripts/load-test.mjs` and `scripts/load/server.mjs`). Results below.
+4. **End-to-end flows** at the HTTP level through the real route handlers (`apps/web/server/e2e/`, 7 tests in 5 files): a guest plays a year; a guest becomes an account and the old cookie no longer reaches the farm; Daily Farm start, rollover and next morning; a purchase through the fake Stripe and a refund; a rescue; a post, a report and its removal by an admin; download my data then delete the account. Playwright is not a dependency, so none of these drive a browser.
+5. **Backups and restore.** `pnpm test:restore` (`packages/db/src/restore.ts`, also tested in `restore.test.ts`): builds the database from every migration and the seed, copies it two ways (a table-by-table data dump into a fresh database built from the migrations with triggers held off, and the whole data folder), and compares the row count and an md5 checksum of every table. Run on 15 Nov 2026: 67 tables, 192 rows, every one the same both ways. `pg_dump` is not on this PC and PGlite has no server for it. File-store farms: `pnpm farms:export` and `pnpm farms:import` (`server/game/farmexport.ts`), one JSON with a format number and a sha256, refusing a changed file, a newer format, a bad id or an existing farm unless `--overwrite`.
+6. **Runbook** (`docs/RUNBOOK.md`): deploying, every environment variable and what breaks without it, backups and the restore drill as exact steps, the first admin, each switch and what to check, the scheduled jobs and how to tell they ran, and what to do for a bad deploy, a failed migration, Stripe webhooks, push or email, a stale feed, a leaked secret, a moderation emergency, maintenance mode and privacy requests. Plan facts are marked "check in the dashboard".
+7. **Launch checklist** (`docs/LAUNCH_CHECK.md`): 42 rows, each passes (with the test), needs keys or a device (with what Claudia does), or not done.
+
+**Security review fixes (all 14).** Each has a test that was seen to fail without the fix (item 9 needed no fix; its tests pin the behaviour).
+
+1. Day cards follow the farm view setting: none with it off; public only when the profile and the farm view are both public (`server/community/share.ts`; `community.test.ts`).
+2. Content-Security-Policy on every page (`proxy.ts`, `lib/csp.ts`; `lib/csp.test.ts`). `default-src 'self'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` (no form posts to Stripe: checkout is a navigation), `frame-ancestors 'none'`, `img-src 'self' data: blob:` plus the Supabase origin from `NEXT_PUBLIC_SUPABASE_URL`, `connect-src 'self'` (the browser calls no outside service). Scripts never get `'unsafe-inline'` or `'unsafe-eval'`. The static website pages get a fixed hash policy for their two inline theme lines and stay static. The app pages get a fresh nonce per request (the Next 16 proxy, as `node_modules/next/dist/docs` describes) with `'strict-dynamic'`; the fixed inline lines are allowed by hash. Styles have `'unsafe-inline'` (React writes `style` attributes, which a nonce can not cover). The map imports `pixi.js/unsafe-eval`, PixiJS's build that never calls `new Function`. Consequences: `/play`, `/account`, `/store`, sign-in and the purchase return pages were built ahead and are now made for each request (the root layout awaits `connection()`), because a nonce needs a request. So `check:js-budget` measures those pages from their build manifests, the way `/admin` and `/community` were already measured (on the last static build the two ways gave the same figure for every one of them; same limits; tested), and `check:browser-bundle` starts the built site and searches the `/play` page and page data it really sends. Checked in a production build with no keys (`next start`): `/` (the theme button works), `/play` (a farm started, a supplement job, Next day, the map zoomed in to the cattle), `/account`, `/admin` and `/community` (their no-keys answers): no CSP violation reported. A real signed-in community or admin page was not loaded in a browser (no database here).
+3. Sign-in rate limits key on the verified account id, else the address; a made-up `sb-*` cookie is ignored (`server/auth/route.ts`, `supabase.ts`; `auth/ratekey.test.ts`).
+4. An ad click counts only with a valid, unexpired impression token for that creative, campaign and slot, once per impression; it always goes to the stored link (`server/ads/events.ts`, `serve.ts`, `routes.ts`; `ads.test.ts`).
+5. Push endpoints are parsed with WHATWG URL and the sender's host list before the insert; migration `20261116000200_push_host_strict.sql` lets the database guard's host part hold only hostname characters (`server/notify/store.ts`; `notify.test.ts`).
+6. No-ads fails closed: any error shows no ads (`server/ads/serve.ts`; `ads.test.ts`).
+7. A keep-going checkout asks `roomFor` before any purchase row or Stripe session (`server/billing/checkout.ts`; `billing.test.ts`).
+8. The read-only farm view never runs the owner's missed nights, never saves, never moves `last_opened_at` (`server/game/game.ts`; `daily/viewonly.test.ts`).
+9. Players can not rename paddocks or mobs: every name comes from fixed patterns ("Paddock 3", "Mob 2", "Weaners 1"). The only typed name is a plan's, and plans are not on the farm view. A comment and `community/farmviewnames.test.ts` pin this (it fails if a rename action is ever added).
+10. Ad media only while the creative and its campaign are on (an admin still sees it for the preview), `Cache-Control: private, max-age=300`; migration `20261116000100_ad_media_private.sql` makes the `ad-media` bucket private (`server/ads/routes.ts`; `adminads.test.ts`).
+11. `safeDecode` (`server/decode.ts`): a broken escape no longer throws. Fixed in `/api/leaderboards` and in the ad click and media routes; nothing else in the app decodes request data bare (`decode.test.ts`).
+12. JSON-LD writes the six characters `<` for every `<` (`components/site/PageHead.tsx`; `PageHead.test.ts`).
+13. A push endpoint saved by another account is refused with `push_endpoint_taken`; the same account still refreshes its device (`server/notify/store.ts`; `notify.test.ts`). docs/DATABASE.md is updated to say so.
+14. The daily notification cap is counted and claimed in one transaction under a per-account advisory lock, and the claim is visible to the next count; a place is given back when a send does not go. Two senders at once never pass the cap (`server/notify/sender.ts`; `notify.test.ts`).
+
+**Load test results** (`pnpm test:load --players 60 --rounds 2`, this PC, Windows 11, one production server process, file store, no keys). 60 guest farms a round, started 30 at a time a minute (the server's own cap), two rounds, 196 s. Each player: create, open, preview, act, Next day, +1 year until a year closed.
+
+| Route | Requests | Errors | p50 ms | p95 ms | p99 ms | Max ms |
+|---|---|---|---|---|---|---|
+| create | 120 | 0 | 1,077 | 1,629 | 1,653 | 1,667 |
+| open | 120 | 0 | 125 | 157 | 166 | 166 |
+| preview | 120 | 0 | 164 | 219 | 267 | 328 |
+| act | 120 | 0 | 444 | 586 | 601 | 657 |
+| Next day | 120 | 0 | 1,384 | 3,821 | 4,296 | 4,491 |
+| +1 year | 120 | 0 | 3,030 | 4,750 | 4,755 | 4,760 |
+
+Memory after a full collection (heap / RSS): 76.8 / 181 MB before, 119.4 / 459 after round 1, 117.1 / 485 after round 2, 116.6 / 485 after 5 s idle. The heap stops growing after the first round: the farm cache (64 farms) and the real-year tables fill once and stay. No server failure line was logged.
+
+The first full run of the same test, while another builder's work was running on this PC, had 8 of 120 year skips with no answer at all (the client saw the connection close with no reason it could read) and times up to 16 s. A 60-farm one-round rerun and the two-round run above had none. The cause is not known. It is not tuned away and is listed (LESSONS LC15).
+
+What it found and fixed: one entry stayed in memory for every farm a server had ever opened (the "last marked opened" list beside the capped cache). It is now capped with the cache (`server/game/game.ts`, `server/game/held.test.ts`, which fails without the fix). No unbounded cache otherwise, no lock held across farms (each farm has its own queue, which empties), and the game routes make no outside call that could hang (Sentry's send has a 2 s timeout).
+
+What it does not prove: a real database (no Postgres, no pooler, no network between servers), more than one server process, a real network or real phones. Every request runs on one Node process, so the times are the engine's work queued on one core; the load generator shares the same processor. Times grow with how many farms run a long skip at the same moment, which is what one process does; on Vercel each request can get its own function.
+
+**How it was tested.** `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 228 files, 4,164 tests: 4,138 passed, 22 expected failures (the open calibration rows), 4 skipped, 0 failed (564 s). `pnpm build` passes. `pnpm check:browser-bundle` clean (89 script files, the rendered `/play` page and page data, 116 service worker files). `pnpm check:js-budget`, no limit raised: `/` 0 KB, `/play` 207.6 of 250, sign-in, account, store and purchase pages 141.7 to 147.3 of 150, `/admin` 149.5 and `/admin/ads` 147.7 of 150, community pages 145.6 to 149.8 of 150, `/leaderboards` 0, `/ticker.js` 1,345 bytes. Every page grew 0.3 to 0.4 KB with the nonce work (the inline error hook is not a script file and is not counted). `/community/groups/[id]` sits 0.2 KB under its limit.
+
+**Calls made for Claudia**
+
+- Day cards follow the farm view as well as the profile: none with the farm view off, public only when both are public. The default farm view is "followers", so a public profile on default settings now posts day cards to followers only. (Decided in the security review; listed for you.)
+- No Sentry package anywhere. Browser errors come through the site's own `/api/client-error`; Sentry sees only the server sending.
+- The app pages are now made for each request so each gets its own nonce. `/play`'s Lighthouse Performance may move; it was not measured on this branch.
+- Styles are allowed inline (`'unsafe-inline'` for styles only). Scripts are not.
+- The map uses PixiJS's no-eval build. Its uniform code is a little slower than the generated kind; the 60 fps check on a phone is still owed.
+- The load test keeps to the 30-farms-a-minute creation cap rather than lifting it for the test.
+- The restore drill is on PGlite; the real drill on Supabase is a written procedure for you to run once.
+
+**Environment variables added:** `SENTRY_DSN` (server only; unset, nothing is sent), `GG_RELEASE` (optional release name; Vercel's commit is used without it). Both in `.env.example`.
+
+**Not done or not verified**
+
+- Events reaching a real Sentry project (needs `SENTRY_DSN`).
+- Lighthouse on this branch (the app pages are now dynamic).
+- A browser walk on a phone in both orientations and both themes, and real phones.
+- A signed-in community or admin page loaded in a browser under the new policy (no database on this PC).
+- Supabase's own backups and restore; Storage files are not in the drill.
+- The 8 unanswered year skips in the first load run.
+- The `realism-guardian` agent was not run (no change to the model, data or pictures).
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

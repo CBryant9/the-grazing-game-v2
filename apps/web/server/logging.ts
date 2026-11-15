@@ -1,4 +1,5 @@
 import 'server-only';
+import { reportError } from './errors/sentry';
 
 /**
  * Failure logging that says what failed without ever carrying a person's data. A line is the
@@ -42,7 +43,18 @@ export function failureLine(f: Failure, e?: unknown): string {
   ].join(' ');
 }
 
-/** Log a failure to the server log. */
+/**
+ * Log a failure to the server log, and send it to Sentry when `SENTRY_DSN` is set (milestone 5.5).
+ * Sentry gets the same three facts as the line (route, reason, error class) and a trimmed stack,
+ * never the message (server/errors/sentry.ts).
+ */
 export function logFailure(f: Failure, e?: unknown): void {
   console.error(failureLine(f, e));
+  void reportError({
+    source: 'server',
+    route: f.route,
+    reason: f.reason,
+    errorClass: e === undefined ? 'none' : errorKind(e).error,
+    stack: typeof e === 'object' && e !== null ? (e as { stack?: unknown }).stack : undefined,
+  });
 }
