@@ -237,11 +237,12 @@ describe('looking is free', () => {
       // Things to do and the bank (m8): facts, and how far to the year end.
       allThingsToDo: (f, env) => engine.allThingsToDo(f, env),
       bankLevel: (f) => engine.bankLevel(f),
-      headToSell: (f) => engine.headToSell(f),
+      headOnFarm: (f) => engine.headOnFarm(f),
       daysToYearEnd: (f) => engine.daysToYearEnd(f),
       // The stock book, the feed forecast and screen facts (engine 0.21.0).
       stockBook: (f) => engine.stockBook(f),
       originOf: (f) => engine.originOf(f, 1, 100),
+      costIn: (f) => (f.mobs[0]?.animals[0] ? engine.costIn(f, f.mobs[0].animals[0]) : 0),
       feedForecast: (f, env) => engine.feedForecast(f, env),
       lastRainMm: (f, env) => engine.lastRainMm(f, env),
       paddockRestDays: (f) => engine.paddockRestDays(f),

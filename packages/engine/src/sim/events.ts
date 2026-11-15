@@ -68,6 +68,14 @@ export type TickEvent =
       into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
     }
   | { type: 'births'; mob: number; mobName: string; count: number }
+  /**
+   * Calving in a mob, told once a week through the drop (engine 0.22.0): the calves born in the
+   * week just gone (`born`) and in the drop so far (`total`). A week with no births is not told.
+   * Calves lost at birth are their own facts (`calfLostAtBirth`) and are not counted here.
+   */
+  | { type: 'calving-week'; mob: number; mobName: string; born: number; total: number }
+  /** Calving in a mob's drop has finished: no cow or heifer in the mob is due before the drop ends. */
+  | { type: 'calving-finished'; mob: number; mobName: string; total: number }
   /** Cattle that died today in one mob of one cause. */
   | { type: 'deaths'; mob: number; mobName: string; cause: DeathCause; count: number }
   /** A portable trough is low or empty. */
@@ -274,7 +282,7 @@ export type TickEvent =
    * Cash went below zero (`level` 1), or past three quarters of the way to
    * the bank's limit (`level` 2), for the first time since it was last
    * above that mark. `limit` is where the bank takes the farm (negative
-   * dollars). `head` is the head on hand that could be sold.
+   * dollars). `head` is the head on the farm (`headOnFarm`).
    */
   | { type: 'bank'; level: 1 | 2; cash: number; limit: number; head: number }
   | { type: 'game-over'; reason: GameOverReason };

@@ -32,8 +32,8 @@ const book = (rows: StockRowWire[]): StockBookWire => ({
     { id: 'pticCow', label: 'PTIC cow' },
   ],
   mobs: [
-    { id: 1, name: 'Steers A', head: 2 },
-    { id: 2, name: 'Breeders', head: 1 },
+    { id: 1, name: 'Steers A', head: 2, calves: 0 },
+    { id: 2, name: 'Breeders', head: 1, calves: 1 },
   ],
   originText: {
     bought: 'Bought',
@@ -41,7 +41,7 @@ const book = (rows: StockRowWire[]): StockBookWire => ({
     bred: 'Bred here',
     boughtOrStart: 'Bought or taken over',
   },
-  totals: { head: rows.length, paid: 0, spent: 0, value: 0, profit: 0 },
+  totals: { head: rows.length, calves: 1, paid: 0, spent: 0, value: 0, profit: 0 },
   notes: ['Profit is value now less bought and spent.'],
 });
 
@@ -74,6 +74,13 @@ describe('the stock book', () => {
     expect(html).toContain('Bred here');
     expect(html).toContain('Steers A');
     expect(html).toContain('How the figures are worked out');
+  });
+
+  it('says what its head count counts: calves at foot are in it (engine 0.22.0)', () => {
+    const html = renderToStaticMarkup(createElement(StockBook, { book: book(rows) }));
+    expect(html).toContain('4 head, including 1 calf at foot.');
+    const steers = renderToStaticMarkup(createElement(StockBook, { book: book(rows), mob: 1 }));
+    expect(steers).toContain('2 head. Profit');
   });
 
   it('sorts by any column and filters by mob', () => {
@@ -147,6 +154,7 @@ describe('the Feed panel', () => {
     head: 612,
     lines: ['At 612 head the stock eat about 165 t DM a month.'],
     note: 'Average-season forecast: grass grows at the district’s long-term average from today.',
+    assumptions: ['Feed is taken across the whole farm’s pasture, not paddock by paddock.'],
     summary: 'Feed on offer, tonnes of dry matter by month from Nov.',
     supplements: [
       {
@@ -186,7 +194,10 @@ describe('the Feed panel', () => {
     const html = renderToStaticMarkup(createElement(FeedPanel, { feed }));
     expect(html).toContain('role="img"');
     expect(html).toContain('aria-label="Feed on offer, tonnes of dry matter by month from Nov."');
-    expect(html).toContain('Ground cover floor (800 kg DM/ha)');
+    expect(html).toContain('Grazing floor (800 kg DM/ha)');
+    expect(html).not.toContain('Ground cover');
+    expect(html).toContain('How this is worked out');
+    expect(html).toContain('not paddock by paddock');
     expect(html).toContain('Crops');
     expect(html).toContain('<rect');
     expect(html).toContain('Average-season forecast');

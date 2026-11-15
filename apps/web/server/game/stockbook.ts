@@ -1,7 +1,10 @@
 import 'server-only';
 import {
   CLASS_LABELS,
+  HEAD_FEE,
+  SELL_COMMISSION,
   animalLookup,
+  costIn,
   netSaleValue,
   originOf,
   pricesOf,
@@ -43,12 +46,19 @@ const PAID_TEXT: Record<StockOrigin, string> = {
   boughtOrStart: 'Bought or taken over at',
 };
 
-/** What the stock book says about its own figures. Facts, no advice. */
+const commission = `${Math.round(SELL_COMMISSION * 1000) / 10}%`;
+const headFee = `$${HEAD_FEE.toLocaleString('en-AU')}`;
+
+/**
+ * What the stock book says about its own figures. Facts, no advice. The commission and the head
+ * fee are the engine's own figures, so the sentence can not drift from the sum.
+ */
 export const STOCK_BOOK_NOTES = [
-  'Bought is the price paid with the head fee and freight. Taken over is the value on the day the farm was taken over. Bred here starts at $0.',
-  'Spent is what has gone on the animal since: supplement or feedlot ration, health, and marking. The cow carries the cost of her own feed, not her calf.',
-  'Value now is what it would put in the bank sold today: its weight at today’s price for its class, less 5% commission and $30 a head.',
+  'Bought is the price paid with the head fee and freight. Taken over is what it would have put in the bank sold on the day the farm was taken over, after selling costs, so the book starts at $0 profit. Bred here starts at $0.',
+  'Spent is what has gone on the animal since: supplement or feedlot ration, health, and marking. Each head carries its own costs. A calf at foot has its own health and supplement costs, and they are not added to its mother.',
+  `Value now is what it would put in the bank sold today: its weight at today’s price for its class, adjusted for condition score, plus the in-calf premium for a PTIC cow or heifer, less ${commission} commission and ${headFee} a head.`,
   'Profit is value now less bought and spent.',
+  'Bulls are bought for breeding and sell by weight, so a bull shows as a loss if sold.',
 ];
 
 /** The stock book for Herd: every head of cattle, whole dollars and kg. */
@@ -76,10 +86,26 @@ export function stockBookWire(farm: FarmState): StockBookWire {
     seen.add(r.cls);
     classes.push({ id: r.cls, label: CLASS_LABELS[r.cls] });
   }
+  // Head counts every row, calves at foot included; `calves` says how many of them are calves,
+  // so the stock book and the herd's head total (calves left out) each say what they count.
+  const calvesIn = (list: readonly Animal[]): number =>
+    list.filter((a) => a.kind === 'calf' && !a.dead).length;
   const mobs = farm.mobs
     .filter((m) => m.animals.length > 0)
-    .map((m) => ({ id: m.id, name: m.name, head: m.animals.length }));
-  const totals = { head: book.length, paid: 0, spent: 0, value: 0, profit: 0 };
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      head: m.animals.filter((a) => !a.dead).length,
+      calves: calvesIn(m.animals),
+    }));
+  const totals = {
+    head: book.length,
+    calves: mobs.reduce((n, m) => n + m.calves, 0),
+    paid: 0,
+    spent: 0,
+    value: 0,
+    profit: 0,
+  };
   for (const r of book) {
     totals.paid += r.paid;
     totals.spent += r.spent;
@@ -93,6 +119,7 @@ export function stockBookWire(farm: FarmState): StockBookWire {
     originText: ORIGIN_TEXT,
     totals: {
       head: totals.head,
+      calves: totals.calves,
       paid: round(totals.paid),
       spent: round(totals.spent),
       value: round(totals.value),
@@ -123,7 +150,7 @@ export function sellMoney(
     const calf = a.calf ? all.get(a.calf) : undefined;
     if (calf) list.push(calf);
     for (const x of list) {
-      paid += x.paid || 0;
+      paid += costIn(farm, x);
       spent += (x.cost || 0) - (x.paid || 0);
       value += Math.max(0, netSaleValue(x, prices));
     }

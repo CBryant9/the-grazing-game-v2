@@ -67,16 +67,18 @@ describe('the bank', () => {
     expect(s.totals.bankLimit).toBeLessThan(0);
   });
 
-  it('says the cash, the limit and the head that could be sold, in the inbox, Things to do and the stop', () => {
+  it('says the cash, the limit and the head on the farm, in the inbox, Things to do and the stop', () => {
     const farm = cloneFarm(farmOf());
     farm.cash = 5;
     const day = endDay(farm);
     const event = day.day.events.find((e) => e.type === 'bank')!;
     const words = inboxMessage(event, () => ({ year: 2026, month: 8, date: 2 }))!.text;
     expect(words).toMatch(
-      /^Cash is -\$[\d,]+\. The bank takes the farm at -\$[\d,]+\. On hand: [\d,]+ head that could be sold\.$/,
+      /^Cash is -\$[\d,]+\. The bank takes the farm at -\$[\d,]+\. [\d,]+ head on the farm\.$/,
     );
     expect(words).not.toMatch(BANNED);
+    // A fact, not a remedy: nothing about selling.
+    expect(words).not.toMatch(/sold|sell/);
     const stop = day.stops.find((x) => x.type === 'bank')!;
     expect(stopWord(stop)).toBe(words);
     const item = thingsToDo(day.farm).find((t) => t.type === 'bank')!;
@@ -120,7 +122,7 @@ describe('the mob card', () => {
     expect(lines.details).toEqual([
       'Cows is gaining about 0.03 kg a head a day.',
       'The paddock gave the mob 80% of the feed it wanted.',
-      'Feed is about 760 kg DM/ha. Under about 900 they eat less.',
+      'Feed is about 760 kg DM/ha. At this level they get about 69% of what they could eat.',
       'Cows with calves put about 60 MJ a day into milk, on top of about 40 MJ for themselves.',
       'They eat about 7.3 kg DM a head a day of feed at ME 8.5 MJ/kg.',
     ]);
@@ -130,10 +132,13 @@ describe('the mob card', () => {
   it('a mob that is losing weight, or in low condition, gets the reasons as warnings', () => {
     const losing = mobLines({ ...base, adg: -0.2 });
     expect(losing.why[0]).toBe('Cows is losing about 0.20 kg a head a day.');
-    expect(losing.why).toContain('Feed is about 760 kg DM/ha. Under about 900 they eat less.');
+    expect(losing.why).toContain(
+      'Feed is about 760 kg DM/ha. At this level they get about 69% of what they could eat.',
+    );
     expect(losing.details).toEqual([]);
     const thin = mobLines({ ...base, adg: 0.1, cs: 2.2 });
     expect(thin.why[0]).toBe('Cows averages condition score 2.2.');
+    expect(thin.why[1]).toBe('Cows is gaining about 0.10 kg a head a day.');
     // Holding at -0.04 is not losing.
     expect(mobLines({ ...base, adg: -0.04 }).why).toEqual([]);
   });

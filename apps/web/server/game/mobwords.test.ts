@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { GainForecast, GainReason } from '@gg/engine';
-import { breedingLines, mobLines, mobWhy, moveNotes, pticWords, reasonWord } from './mobwords';
+import { feedAvailShare } from '@gg/engine';
+import {
+  breedingLines,
+  feedLevelWord,
+  mobLines,
+  mobWhy,
+  moveNotes,
+  pticWords,
+  reasonWord,
+} from './mobwords';
 import { doneWord } from './words';
 
 const BANNED = /\bshould\b|\bmust\b|overgraz|\bbad\b|\bgood\b|—|–/i;
@@ -8,7 +17,7 @@ const BANNED = /\bshould\b|\bmust\b|overgraz|\bbad\b|\bgood\b|—|–/i;
 const REASONS: [GainReason, RegExp][] = [
   [
     { reason: 'notEnoughFeed', mass: 423 },
-    /^Feed is about 420 kg DM\/ha\. Under about 900 they eat less\.$/,
+    /^Feed is about 420 kg DM\/ha\. At this level they get about 48% of what they could eat\.$/,
   ],
   [{ reason: 'lowMe', me: 7.34 }, /^The feed is low in energy: ME 7\.3 MJ\/kg\.$/],
   [{ reason: 'lowProtein' }, /^The feed is under 7% CP, so they eat less\.$/],
@@ -69,11 +78,42 @@ describe('why a mob is losing weight or short', () => {
     expect(why).toEqual([
       'Steers A is losing about 0.31 kg a head a day.',
       'The paddock gave the mob 62% of the feed it wanted.',
-      'Feed is about 500 kg DM/ha. Under about 900 they eat less.',
+      'Feed is about 500 kg DM/ha. At this level they get about 54% of what they could eat.',
       'The feed is low in energy: ME 7.1 MJ/kg.',
       'Cows with calves put about 60 MJ a day into milk, on top of about 40 MJ for themselves.',
     ]);
     for (const w of why) expect(w).not.toMatch(BANNED);
+  });
+
+  it("the feed line's share is the engine's own intake curve, and still bites well above 900 (engine 0.22.0)", () => {
+    // 1 - e^(-mass / 650): no round figure where it stops, so none is quoted.
+    for (const mass of [300, 760, 900, 1200, 1500]) {
+      const pct = Math.round(feedAvailShare(mass) * 100);
+      expect(feedLevelWord(mass)).toBe(
+        `Feed is about ${Math.round(mass / 10) * 10} kg DM/ha. At this level they get about ${pct}% of what they could eat.`,
+      );
+    }
+    expect(feedLevelWord(760)).toContain('about 69%');
+    expect(feedLevelWord(1200)).toContain('about 84%');
+    expect(feedLevelWord(760)).not.toMatch(/Under about/);
+  });
+
+  it('a mob in low condition that is gaining still gets its fact lines: the score and the gain (engine 0.22.0)', () => {
+    const why = mobWhy({ ...base, adg: 0.35, cs: 2.3 });
+    expect(why).toEqual([
+      'Steers A averages condition score 2.3.',
+      'Steers A is gaining about 0.35 kg a head a day.',
+    ]);
+    // Holding weight: said as holding, with the figure.
+    expect(mobWhy({ ...base, adg: -0.02, cs: 2.3 })).toEqual([
+      'Steers A averages condition score 2.3.',
+      'Steers A is holding weight (-0.02 kg a head a day).',
+    ]);
+    // Losing: the loss first, then the score, and the loss is not said twice.
+    expect(mobWhy({ ...base, adg: -0.3, cs: 2.3 })).toEqual([
+      'Steers A is losing about 0.30 kg a head a day.',
+      'Steers A averages condition score 2.3.',
+    ]);
   });
 
   it('gives no warning for a mob that is only just gaining (m8): the figure is a detail', () => {

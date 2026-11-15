@@ -2566,6 +2566,42 @@ Branch `m8-look-game`, after merging `m7-final` (the playability fixes, engine 0
 
 At about 1024 px the PC game header squeezed the date block into a few characters and wrapped it one word a line (about 200 px tall), and the panel tabs wrapped to two rows. Fixed in `play.module.css` (rules in VISUALS "The PC header at every PC width"): a 150 px minimum and an ellipsis for the date block, parts dropped in a set order at 1365, 1279 and 1180 px, a second row only below 1024 px, tabs on one row, the panel capped at 42% of the window. Also fixed: "PTIC" in the Herd rows (a word-boundary character had gone in as a backspace). New `components/play/pcheader.test.ts` guards the rules. Checked on the production build with a guest farm at 768 x 1024 (phone layout), 1024 x 768, 1180 x 820, 1280 x 720, 1366 x 768, 1440 x 900 and 1920 x 1080: the header is one row of 63 px at every PC size, no sideways scroll, the map at least 594 px wide.
 
+## m8 realism 2: realism fixes after the review of the stock book pass (engine 0.22.0, save format 17)
+
+Branch `m8-realism-2` from `m7-final` at ea8fa24. A read-only review of the day's work found 17 faults: five rule breaks and twelve things that look off to a grazier. All fixed, each with a test that fails without it (checked by undoing each engine fix and running its test).
+
+**Rule breaks**
+
+1. Marking counts this drop's calves only: once when most of the drop's bull calves are old enough or 30 days after calving started, then not again until calving in the mob has finished, then once more if unmarked calves remain. Test: a player who marks every time it shows is asked at most twice a drop (`day/playability.test.ts`).
+2. Stock at sale weight is one item a class, keyed by class, with the head and the next sale; put away, it stays away until the class has no head at sale weight; breeding heifers are not counted. Tests: the key holds through a month of sales; put away for 35 days; breeding heifers (`day/playability.test.ts`).
+3. The eaten-out inbox line states the tick's own test with its own constants (`UNGRAZEABLE_KG`, `EATEN_OUT_KG`). Test: `server/game/stockfeed.test.ts`.
+4. On a mob's first day in a paddock only the standing feed lines show. Tests: `stockfeed.test.ts` (the words) and `server/game/realism2.test.ts` (the snapshot).
+5. The forecast's points fall on the first of each month: 12 different months in order. Tests: `sim/stockbook.test.ts`, `stockfeed.test.ts` (the wire, the table and the sentence).
+
+**Looks off to a grazier**
+
+6. "High impact" needs over twice what grows and the feed above the floor gone in under 30 days (stand-in); otherwise "Not much is growing. They're eating standing feed". 7. "A little more than grows" up to 1.25 times; "more than grows" to twice. 8. The green near the base needs green and a greener diet. 9. "Feed is about 760 kg DM/ha. At this level they get about 69% of what they could eat." from the engine's intake curve. 10. The 800 is the grazing floor everywhere. 11. The stock book starts at $0 on the takeover day (`startNet`, `costIn`), with the bull note. 12. The value note reads the commission and head fee from the engine, names the in-calf premium and the condition score adjustment, and says each head carries its own costs. 13. The stock book says "N head, including M calves at foot". 14. "How this is worked out" in the Feed panel. 15. A mob under CS 2.5 always says its score and its gain or loss. 16. The bank fact says the head on the farm. 17. The inbox tells calving weekly and when it has finished; a day's births stay on the day card. Tests: `mobwords.test.ts`, `playability.test.ts`, `stockfeed.test.ts`, `realism2.test.ts`, `components/play/stockfeed.test.ts`, `sim/stockbook.test.ts`, `day/playability.test.ts`.
+
+**Replay through the real `GameServer`** (Central West, medium, running, a real-years farm and a random-seasons farm, 426 days, a player who marks and sells every time it is asked):
+
+- Marking was listed 3 times in 14 months (two drops): at most twice a drop.
+- The sale-weight item was on the list in 37 of 61 weeks (real years) and 38 (random seasons). The player booked every head the day it showed; it came back as each next head reached 280 kg (about 1.4 head each time). A player who puts it away does not see it again while that class has head at sale weight.
+- Day-0 stock book: $0 profit on 404 head (47 calves at foot).
+- Forecast months: Sep Oct Nov Dec Jan Feb Mar Apr May Jun Jul Aug.
+- "High impact" showed on no paddock-day of either farm; "eating standing feed" showed on 74 paddock-days on the real-years farm and none on the random one.
+- The inbox had no daily births line; each drop had a start line, weekly lines and one "calving has finished".
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 244 files, 4,373 tests: 4,347 passed, 22 expected failures, 4 skips. `pnpm test:speed`: 2 of 2 passed, run alone.
+- `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget`: passes with no limit raised (/play 218.4 KB of 250 KB).
+
+**Not done or not checked**
+
+- The `realism-guardian` agent was not run. No browser check: `FeedPanel` and `StockBook` are still not mounted by the play screens.
+- `apps/web/lib/game/types.ts` (two wire fields) and `components/play/stockfeed.test.ts` (the tests of the two components) were edited beside the two components.
+- The inbox's marking note (the engine's 45-day note, shown once a drop or again after marking) is unchanged.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

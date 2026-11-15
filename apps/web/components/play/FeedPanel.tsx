@@ -7,7 +7,7 @@ import styles from './FeedPanel.module.css';
 
 /**
  * The Feed panel (mockup E; More, Feed on a phone): the average-season feed
- * forecast drawn in SVG, against the ground cover floor, with crops as
+ * forecast drawn in SVG, against the grazing floor, with crops as
  * spikes, then each cattle mob's supplement at its daily price with what it
  * adds. Self-contained: it takes the snapshot's `feed`.
  *
@@ -129,8 +129,8 @@ function FeedChart({ feed }: { feed: FeedWire }) {
           <i className={styles.keyArea} aria-hidden="true" /> Feed on offer
         </span>
         <span>
-          <i className={styles.keyFloor} aria-hidden="true" /> Ground cover floor (
-          {num(feed.floorKgHa)} kg DM/ha)
+          <i className={styles.keyFloor} aria-hidden="true" /> Grazing floor ({num(feed.floorKgHa)}{' '}
+          kg DM/ha)
         </span>
         {hasCrops ? (
           <span>
@@ -164,6 +164,14 @@ export function FeedPanel({
         ))}
         <p className={styles.note}>{feed.note}</p>
       </div>
+      <details className={styles.figures}>
+        <summary>How this is worked out</summary>
+        <ul>
+          {feed.assumptions.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      </details>
       <details className={styles.figures}>
         <summary>Forecast figures</summary>
         <table className={styles.tbl} aria-describedby={tableId}>

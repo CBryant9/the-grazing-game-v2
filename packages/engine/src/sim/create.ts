@@ -15,7 +15,7 @@ import type { SaleClassId } from '../data/cattle';
 import { FARM_SIZES } from '../data/farms';
 import { generateFarm, type StartType } from '../farm/generate';
 import type { GrazingArea as TopologyArea } from '../farm/topology';
-import { buyPrice } from '../market/prices';
+import { buyPrice, netSaleValue } from '../market/prices';
 import { realMarket, type RealMarket } from '../market/realMarket';
 import { standInMarket } from '../market/standIn';
 import { carryingCapacityAE, startMoney, type Difficulty, type StartMoney } from '../money/costs';
@@ -393,6 +393,10 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
   // Every tag below this one was on the farm when it was taken over (save format 16), so the
   // stock book can tell a start value from a purchase price.
   farm.startTags = farm.animalIds.next;
+  // What each head taken over would have put in the bank sold that day, after selling costs
+  // (save format 17): the stock book's cost for it, so the book starts at $0 profit. The herd
+  // itself keeps the old game's start values (`Animal.paid`), so nothing else moves.
+  if (farm.mobs.some((m) => m.animals.length)) farm.startNet = startNetValues(farm);
   // A real-year farm with sheep sells and values them at the real date's indicators.
   refreshSheepPrices(farm, env);
   farm.year = newYear(farm);
@@ -412,4 +416,20 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
   };
   toInbox(farm, 0, [started]);
   return farm;
+}
+
+/**
+ * What each head of cattle on the farm at takeover would put in the bank sold today, after
+ * selling costs and never below 0, by tag (`FarmState.startNet`). For the stock book only.
+ */
+function startNetValues(farm: FarmState): Float64Array {
+  const prices = pricesOf(farm);
+  const end = farm.startTags ?? farm.animalIds.next;
+  const out = new Float64Array(Math.max(0, end - 1));
+  for (const m of farm.mobs) {
+    for (const a of m.animals) {
+      if (a.id >= 1 && a.id < end) out[a.id - 1] = Math.max(0, netSaleValue(a, prices));
+    }
+  }
+  return out;
 }

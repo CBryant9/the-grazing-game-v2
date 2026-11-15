@@ -128,6 +128,13 @@ export interface FarmMob extends CattleMob {
   lastBreak: number | null;
   /** The grazing plan the mob is running. Left out when it has none. */
   plan?: PlanRun;
+  /**
+   * The drop being counted for the weekly calving lines (engine 0.22.0): the day calving started
+   * (the mob's `calvNote` then), calves born in the drop and in the week so far, and whether
+   * calving has finished. Left out on a mob that has not calved. A record for the words only:
+   * no rule reads it.
+   */
+  calving?: { start: number; born: number; week: number; done?: true };
 }
 
 /**
@@ -503,6 +510,16 @@ export interface FarmState {
    * says "bought or taken over" for any animal that was not bred on the farm.
    */
   startTags?: number;
+
+  /**
+   * What each head of cattle taken over would have put in the bank sold on the takeover day,
+   * dollars after selling costs and never below 0, by tag: entry `tag - 1` (save format 17). The
+   * stock book's cost for a taken-over head, on the same net basis as its value now, so the book
+   * starts at $0 profit. A record for the stock book only: no rule reads it. Left out on a farm
+   * with no herd at takeover and on a farm saved before format 17, whose stock book keeps the
+   * start value it had.
+   */
+  startNet?: Float64Array;
 
   /**
    * The last farm day cattle or sheep spent on each square's grazing area (save format 16), for

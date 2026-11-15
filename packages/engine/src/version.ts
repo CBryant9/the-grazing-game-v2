@@ -146,12 +146,25 @@
  * 0.21.0 (m8, the stock book and the feed panel): reads only. `stockBook` (each animal's start
  * value or purchase price, what has been spent on it since, what it would fetch today after
  * selling costs, and the difference), `feedForecast` (feed on offer ahead by month in an average
- * season, against what the stock on hand eat and the ground cover floor, with crops apart),
+ * season, against what the stock on hand eat and the grazing floor, with crops apart),
  * `supplementCosts` also says what each supplement adds, `lastRainMm` and `paddockRestDays`.
  * `createFarm` records `startTags` and the tick records `stockedOn`. No grass, cattle, sheep, crop, season, price or score formula changed: every
  * benchmark was re-run (docs/CALIBRATION.md, the m8 stock book entry). Save format 16.
+ *
+ * 0.22.0 (m8, realism fixes after the review of the stock book pass): words and the reads the
+ * words come from. Things to do lists marking for this drop's calves only, at most twice a drop
+ * (`calvingFinished`, `DROP_DAYS`); stock at sale weight is one item a class, keyed by class
+ * (`sale-weight`), with breeding heifers left out; a low condition item carries the mob's gain.
+ * The inbox has a weekly calving line and one when calving has finished (`calving-week`,
+ * `calving-finished`, counted in `FarmMob.calving`) in place of a births line every day; the bank
+ * fact names the head on the farm (`headOnFarm`). The feed forecast's points fall on the first of
+ * each month. The stock book counts a taken-over head in at its net value that day
+ * (`FarmState.startNet`, `costIn`), so the book starts at $0 profit; the herd keeps the old game's
+ * start values. `feedAvailShare` and `UNGRAZEABLE_KG` are exported for the words. No grass,
+ * cattle, sheep, crop, season, price or score formula changed: every benchmark was re-run
+ * (docs/CALIBRATION.md, the m8 realism 2 entry). Save format 17.
  */
-export const ENGINE_VERSION = '0.21.0';
+export const ENGINE_VERSION = '0.22.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -241,5 +254,13 @@ export const ENGINE_VERSION = '0.21.0';
  * either: the stock book then names any animal not bred on the farm as "bought or taken over",
  * and `stockedOn` is made at its next night from the pasture's last hard grazing. An engine that knows only
  * format 15 refuses a format 16 save, which is right: it would drop `startTags` on its next save.
+ *
+ * 17: realism fixes (engine 0.22.0). A mob may have `calving` (the drop being counted for the
+ * weekly calving lines), left out until a mob calves, and a farm may have `startNet` (what each
+ * head taken over would have put in the bank that day, for the stock book), set on every farm
+ * made from now on with a herd. A format 9 to 16 save loads unchanged: a mob mid-drop starts
+ * counting from the drop's calves at foot, a drop already finished is not told again, and the
+ * stock book keeps the start value each animal carries. An engine that knows only format 16 refuses a format 17 save, which
+ * is right: it would drop the count and tell a drop's calving twice.
  */
-export const SAVE_FORMAT_VERSION = 16;
+export const SAVE_FORMAT_VERSION = 17;

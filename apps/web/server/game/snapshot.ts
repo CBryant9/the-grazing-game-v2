@@ -317,6 +317,8 @@ function paddockComments(
 ): Map<number, string | null> {
   const survey = surveyOf(farm);
   const out = new Map<number, string | null>();
+  // The last day stock spent on each square (before the first night, the last hard grazing).
+  const lastOn = farm.stockedOn ?? farm.pasture.lastG;
   for (const p of summaries) {
     const cattle = farm.mobs.filter((m) => p.mobs.includes(m.id) && m.animals.length > 0);
     const sheep = (farm.sheep?.mobs ?? []).filter(
@@ -357,6 +359,8 @@ function paddockComments(
         eatKgHa: (p.eat + sheepEat) / p.ha,
         dietMe,
         paddockMe: p.me,
+        // A mob's first day here: its last day was somewhere else, so what it ate waits a day.
+        grazedHere: survey.topology.areas[p.areaId]!.cells.some((i) => lastOn[i] === farm.day - 1),
       }),
     );
   }

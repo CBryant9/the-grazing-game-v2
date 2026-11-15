@@ -6,7 +6,10 @@
  * Each animal already carries its own money (`Animal.paid` and
  * `Animal.cost`): `paid` is the purchase price with the head fee and any
  * freight, its value on the day the farm was taken over, or 0 for a calf
- * bred on the farm; `cost` is `paid` plus everything spent on the animal
+ * bred on the farm; the book counts a taken-over head in at what it would
+ * have put in the bank sold that day (`costIn`, `FarmState.startNet`: net of
+ * commission and the head fee, the same basis as value now, so the book
+ * starts at $0 profit; engine 0.22.0); `cost` is `paid` plus everything spent on the animal
  * since (its supplement or feedlot ration, the district's health cost a day,
  * and marking). Profit is what it would put in the bank sold today
  * (`netSaleValue`: the class's c/kg on its weight, the in-calf premium from
@@ -18,6 +21,7 @@
 import type { CattleClassId } from '../data/cattle';
 import { netSaleValue } from '../market/prices';
 import { pricesOf } from './derived';
+import type { Animal } from '../cattle/types';
 import type { FarmState } from './state';
 import { onRecordPtic, recordClassOf } from './told';
 
@@ -45,7 +49,7 @@ export interface StockBookRow {
   /** True for a cow or heifer on the record as PTIC. */
   ptic: boolean;
   origin: StockOrigin;
-  /** Purchase price with fees and freight, value when the farm was taken over, or 0 if bred here. Dollars. */
+  /** Purchase price with fees and freight, net value when the farm was taken over, or 0 if bred here. Dollars. */
   paid: number;
   /** Spent on it since: feed, health and marking. Dollars. */
   spent: number;
@@ -63,9 +67,26 @@ export function originOf(
   id: number,
   paid: number,
 ): StockOrigin {
+  // A taken-over animal is known by its tag, so one worth $0 that day is still taken over.
+  if (farm.startTags !== undefined && id < farm.startTags) return 'start';
   if (paid <= 0) return 'bred';
   if (farm.startTags === undefined) return 'boughtOrStart';
-  return id < farm.startTags ? 'start' : 'bought';
+  return 'bought';
+}
+
+/**
+ * What the stock book counts as an animal's cost in: what was paid for it, or for a head taken
+ * over, what it would have put in the bank sold on the takeover day (`FarmState.startNet`, save
+ * format 17), so the book starts at $0 profit. A farm saved before format 17 keeps the start
+ * value the animal carries (`Animal.paid`).
+ */
+export function costIn(farm: Pick<FarmState, 'startTags' | 'startNet'>, a: Animal): number {
+  const paid = a.paid || 0;
+  const net = farm.startNet;
+  if (net && farm.startTags !== undefined && a.id < farm.startTags && a.id - 1 < net.length) {
+    return net[a.id - 1]!;
+  }
+  return paid;
 }
 
 /**
@@ -81,8 +102,10 @@ export function stockBook(farm: FarmState): StockBookRow[] {
   for (const m of farm.mobs) {
     for (const a of m.animals) {
       if (a.dead) continue;
-      const paid = a.paid || 0;
-      const cost = a.cost || 0;
+      // Spent since is what the animal has run up beyond what it came in at.
+      const spent = (a.cost || 0) - (a.paid || 0);
+      const paid = costIn(farm, a);
+      const cost = paid + spent;
       const value = Math.max(0, netSaleValue(a, prices));
       rows.push({
         id: a.id,
@@ -93,9 +116,9 @@ export function stockBook(farm: FarmState): StockBookRow[] {
         wt: a.wt,
         cs: a.cond,
         ptic: onRecordPtic(a),
-        origin: originOf(farm, a.id, paid),
+        origin: originOf(farm, a.id, a.paid || 0),
         paid,
-        spent: cost - paid,
+        spent,
         value,
         profit: value - cost,
         booked: booked.has(a.id),

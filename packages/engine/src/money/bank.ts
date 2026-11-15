@@ -27,15 +27,14 @@ export function bankLevel(farm: Pick<FarmState, 'cash' | 'broke'>): BankLevel {
 }
 
 /**
- * Head on hand that could be sold: cattle that are not calves at foot and
- * not already booked onto a sale, and sheep. Calves go with their mothers.
+ * Head on the farm, for the bank fact: cattle that are not calves at foot (the same count as the
+ * farm's head total on the screens), and sheep. Booked cattle are still on the farm and count.
+ * A fact only: it says nothing about what could or should be sold.
  */
-export function headToSell(farm: Pick<FarmState, 'mobs' | 'saleBookings' | 'sheep'>): number {
-  const booked = new Set<number>();
-  for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
+export function headOnFarm(farm: Pick<FarmState, 'mobs' | 'sheep'>): number {
   let n = 0;
   for (const m of farm.mobs) {
-    for (const a of m.animals) if (a.kind !== 'calf' && !booked.has(a.id)) n++;
+    for (const a of m.animals) if (a.kind !== 'calf' && !a.dead) n++;
   }
   for (const m of sheepMobsOf(farm)) {
     for (const s of m.sheep) if (!s.dead && s.n > 0) n += s.n;

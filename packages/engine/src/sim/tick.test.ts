@@ -97,8 +97,10 @@ describe('the inbox', () => {
     let total = 1;
     for (let d = 0; d < 3000 && total < 200; d++) {
       const r = stepDay(farm);
-      total += r.events.length;
-      if (r.events.length) last = r.events.at(-1)!;
+      // A day's births stay out of the inbox: the weekly calving lines tell them (engine 0.22.0).
+      const told = r.events.filter((e) => e.type !== 'births');
+      total += told.length;
+      if (told.length) last = told.at(-1)!;
     }
     expect(total).toBeGreaterThan(150);
     expect(farm.inbox.length).toBe(120);

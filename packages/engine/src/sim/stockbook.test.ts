@@ -10,7 +10,7 @@ import { FORECAST_DAYS, FORECAST_POINTS, feedForecast } from './forecast';
 import { lastRainMm, paddockRestDays } from './paddockfacts';
 import { supplementCosts } from './reads';
 import { cloneFarm, type FarmState } from './state';
-import { originOf, stockBook } from './stockbook';
+import { costIn, originOf, stockBook } from './stockbook';
 import { stepDay } from './tick';
 
 /*
@@ -47,9 +47,10 @@ describe('the stock book', () => {
         const r = rows.find((x) => x.id === a.id)!;
         expect(r.mob).toBe(m.id);
         expect(r.value).toBeCloseTo(Math.max(0, netSaleValue(a, prices)), 9);
-        expect(r.paid).toBe(a.paid);
+        // A taken-over head is in at its net value that day; anything bought at what was paid.
+        expect(r.paid).toBe(costIn(farm, a));
         expect(r.spent).toBeCloseTo(a.cost - a.paid, 9);
-        expect(r.profit).toBeCloseTo(r.value - a.cost, 9);
+        expect(r.profit).toBeCloseTo(r.value - r.paid - r.spent, 9);
       }
     }
   });
@@ -59,9 +60,40 @@ describe('the stock book', () => {
     expect(farm.startTags).toBe(farm.animalIds.next);
     for (const r of stockBook(farm)) expect(r.origin).toBe('start');
     expect(originOf(farm, farm.startTags!, 900)).toBe('bought');
-    expect(originOf(farm, 1, 0)).toBe('bred');
+    expect(originOf(farm, farm.startTags! + 5, 0)).toBe('bred');
     // A farm saved before format 16 did not keep which it was.
     expect(originOf({}, 1, 900)).toBe('boughtOrStart');
+  });
+
+  it('starts at $0 profit on the takeover day: a taken-over head costs its net value that day (engine 0.22.0)', () => {
+    for (const seed of [21, 22, 23]) {
+      const farm = running(seed);
+      const rows = stockBook(farm);
+      expect(rows.length).toBeGreaterThan(50);
+      // Each head is in at what it would put in the bank sold that day: profit 0, bulls too.
+      for (const r of rows) {
+        expect(r.profit, `tag ${r.id} ${r.cls}`).toBeCloseTo(0, 6);
+        expect(r.origin).toBe('start');
+      }
+      expect(rows.reduce((t, r) => t + r.profit, 0)).toBeCloseTo(0, 4);
+    }
+    // A taken-over head worth $0 that day is still taken over, not bred here.
+    const farm = running();
+    expect(originOf(farm, 1, 0)).toBe('start');
+    // The herd keeps the old game's start values; the book's cost in is the net value that day.
+    const prices = pricesOf(farm);
+    for (const m of farm.mobs) {
+      for (const a of m.animals) {
+        expect(costIn(farm, a)).toBeCloseTo(Math.max(0, netSaleValue(a, prices)), 9);
+      }
+    }
+    // Kept through a save; a farm saved before format 17 keeps its stated start value.
+    const loaded = loadFarm(saveFarm(farm));
+    expect([...loaded.startNet!]).toEqual([...farm.startNet!]);
+    const old = cloneFarm(farm);
+    delete old.startNet;
+    const a = old.mobs[0]!.animals[0]!;
+    expect(costIn(old, a)).toBe(a.paid);
   });
 
   it('cattle bought on a farm are "bought", with what was paid, fees in', () => {
@@ -111,7 +143,7 @@ describe('save format 16', () => {
     const loaded = loadFarm(old as SavedFarm);
     expect(loaded.startTags).toBeUndefined();
     expect(loaded.stockedOn).toBeUndefined();
-    expect(loaded.saveFormat).toBe(16);
+    expect(loaded.saveFormat).toBe(17);
     const rows = stockBook(loaded);
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(r.origin).toBe(r.paid > 0 ? 'boughtOrStart' : 'bred');
@@ -149,6 +181,20 @@ describe('the feed forecast', () => {
       }
     }
     expect(f.points[0]!.pastureKg).toBeCloseTo(kg, 0);
+  });
+
+  it('puts its points on the first of each month: 12 different months in order (engine 0.22.0)', () => {
+    // Starts on the 1st of August, and part way through a month, on both kinds of farm.
+    for (const d of [0, 2, 17, 45, 200]) {
+      const farm = days(running(), d);
+      const f = feedForecast(farm);
+      const months = f.points.map((p) => p.date.month);
+      expect(new Set(months).size, `day ${d}: ${months.join(' ')}`).toBe(FORECAST_POINTS);
+      for (let i = 1; i < months.length; i++) {
+        expect(months[i], `day ${d}`).toBe((months[i - 1]! + 1) % 12);
+        expect(f.points[i]!.date.date).toBe(1);
+      }
+    }
   });
 
   it('is the same on a farm in a drought year and in a good one: it never reads the season to come', () => {

@@ -7,15 +7,16 @@
 import type { Action, ActionType } from '../actions/types';
 import type { CalendarDate } from '../calendar';
 import { marketClass } from '../cattle/animal';
-import { MARK_NOTE_MIN_AGE } from '../cattle/breeding';
+import { MARK_NOTE_MIN_AGE, calvingFinished } from '../cattle/breeding';
 import type { MarketClassId } from '../data/cattle';
 import { SPECIES, type SpeciesId } from '../data/species';
 import { EDGE, H_EDGES, V_EDGES, type EdgeRef } from '../farm/topology';
 import { PORTABLE_CAPACITY_L, PORTABLE_LOW_SHARE } from '../farm/water';
-import { bankLevel, headToSell } from '../money/bank';
+import { bankLevel, headOnFarm } from '../money/bank';
 import { FEED_FLOOR_KG_HA } from '../pasture/summary';
 import { areaIdOf, nextSaleDay, surveyOf, type SourceEnv } from '../sim/derived';
 import { stepOf, templateOf } from '../sim/plans';
+import { onRecordPtic } from '../sim/told';
 import type { FarmState, PlanWaitReason } from '../sim/state';
 
 /**
@@ -24,11 +25,15 @@ import type { FarmState, PlanWaitReason } from '../sim/state';
  * do. `does` names the action that deals with it, and `action` is that
  * action ready to send when it needs no further choice (null when the
  * player has to pick something first, such as a paddock). A fact with no
- * job of its own (the bank, a sale coming up, a mob's condition, calving,
+ * job of its own (the bank, stock at sale weight, a mob's condition, calving,
  * feed under the floor) has `does` null.
  */
 export type ThingToDo =
-  /** Bull calves of a drop to mark, once most of the drop is old enough or 30 days after calving started. */
+  /**
+   * Bull calves of a drop to mark: listed once when most of the drop's bull calves are old
+   * enough or 30 days after calving started; once the player has marked in the drop, not again
+   * until calving in the mob has finished, then once more if unmarked calves remain.
+   */
   (
     | {
         type: 'calves-to-mark';
@@ -98,29 +103,37 @@ export type ThingToDo =
     /**
      * Cash is below zero (`level` 1), or past three quarters of the way to the
      * bank's limit (`level` 2). `limit` is where the bank takes the farm
-     * (negative dollars). `count` is the head on hand that could be sold.
+     * (negative dollars). `count` is the head on the farm (`headOnFarm`).
      */
     | { type: 'bank'; level: 1 | 2; cash: number; limit: number; count: number }
     /**
-     * A cattle sale within the next `SALE_SOON_DAYS` days, and head on the farm
-     * in the heavier market classes (`MARKET_WEIGHTS`) that are not booked.
-     * `count` is those head.
+     * Head of one market class at sale weight (`MARKET_WEIGHTS`) on the farm and not booked,
+     * with the next cattle sale. A fact about the stock, not the date: one item for each class,
+     * there while the class has head at sale weight. Breeding females (heifers in a mob with a
+     * joining under way, and heifers PTIC on the record) are not counted. `count` is the head.
+     * `saleDay` and `date` are null when the next sale is not known (a real-year farm read
+     * without its data).
      */
     | {
-        type: 'sale-soon';
-        saleDay: number;
-        date: CalendarDate;
-        daysAway: number;
-        classes: { cls: MarketClassId; head: number }[];
+        type: 'sale-weight';
+        cls: MarketClassId;
+        saleDay: number | null;
+        date: CalendarDate | null;
+        /** Days from today to the next sale, or null when it is not known. */
+        daysAway: number | null;
         count: number;
       }
-    /** A mob's average condition score is under `LOW_CS`. `count` is its head. */
+    /**
+     * A mob's average condition score is under `LOW_CS`. `count` is its head. `adg` is what it
+     * gained (or lost, below 0) on its last day, kg a head a day, or null before its first day.
+     */
     | {
         type: 'low-condition';
         mob: number;
         mobName: string;
         area: string | null;
         cs: number;
+        adg: number | null;
         count: number;
       }
     /** Calving has started in a mob. `count` is the calves born so far. Shown for `CALVING_SHOWN_DAYS`. */
@@ -147,15 +160,13 @@ export type ThingToDo =
     action: Action | null;
   };
 
-/** A sale this many days away or sooner is listed with the head at sale weight. A stand-in. */
-export const SALE_SOON_DAYS = 7;
 /** A mob whose average condition score is under this is listed. A stand-in. */
 export const LOW_CS = 2.5;
 /** Marking is listed this many days after a mob's calving started, if most of the drop is not old enough by then. */
 export const MARK_AFTER_CALVING_DAYS = 30;
 /** Calving is listed for this many days after it starts. Marking takes over from then. */
 export const CALVING_SHOWN_DAYS = MARK_AFTER_CALVING_DAYS;
-/** The market classes a sale-soon item counts: steers and heifers past weaner weight. */
+/** The market classes a sale-weight item counts: steers and heifers past weaner weight. */
 const AT_SALE_WEIGHT: readonly MarketClassId[] = ['feed', 'heavy', 'heifer'];
 
 /** A stable key for a thing to do, so the browser can name it and the server can find it again. */
@@ -178,8 +189,8 @@ export function todoKey(t: ThingToDo): string {
       return `${t.type}:${t.portId}`;
     case 'bank':
       return `${t.type}:${t.level}`;
-    case 'sale-soon':
-      return `${t.type}:${t.saleDay}`;
+    case 'sale-weight':
+      return `${t.type}:${t.cls}`;
   }
 }
 
@@ -187,7 +198,7 @@ export function todoKey(t: ThingToDo): string {
  * What needs doing on the farm now, for the banner and the mob card, as
  * facts. It uses only what the model already knows and the player can see:
  * the calves, a mob's water, a crop's maturity, fences that are down, the
- * level in a portable trough, cash against the bank's limit, the next sale,
+ * level in a portable trough, cash against the bank's limit, stock at sale weight,
  * a mob's condition, calving and the feed where a mob grazes. Weaning is
  * not listed, because the model weans a drop by itself when it is due.
  * Weaning earlier is the player's choice, offered on the mob card. In the
@@ -270,38 +281,38 @@ export function allThingsToDo(farm: FarmState, env: SourceEnv = {}): ThingToDo[]
       level: level as 1 | 2,
       cash: farm.cash,
       limit: farm.broke,
-      count: headToSell(farm),
+      count: headOnFarm(farm),
       does: null,
       action: null,
     });
   }
 
-  // A sale coming up, and the head at sale weight that are not booked.
-  if (farm.seasons.kind !== 'real' || env.data) {
-    const sale = nextSaleDay(farm, env, farm.day);
-    if (sale && sale.day - farm.day <= SALE_SOON_DAYS) {
-      const booked = new Set<number>();
-      for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
-      const byClass = new Map<MarketClassId, number>();
-      for (const m of farm.mobs) {
-        for (const a of m.animals) {
-          if (booked.has(a.id)) continue;
-          const cls = marketClass(a);
-          if (AT_SALE_WEIGHT.includes(cls)) byClass.set(cls, (byClass.get(cls) ?? 0) + 1);
-        }
+  // Stock at sale weight that is not booked, by class, with the next sale.
+  {
+    const booked = new Set<number>();
+    for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
+    const byClass = new Map<MarketClassId, number>();
+    for (const m of farm.mobs) {
+      for (const a of m.animals) {
+        if (booked.has(a.id)) continue;
+        // Breeding females are not sale stock: heifers joined or kept in a joining mob.
+        if (a.kind === 'heifer' && (m.join !== null || onRecordPtic(a))) continue;
+        const cls = marketClass(a);
+        if (AT_SALE_WEIGHT.includes(cls)) byClass.set(cls, (byClass.get(cls) ?? 0) + 1);
       }
-      const classes = AT_SALE_WEIGHT.filter((c) => byClass.has(c)).map((cls) => ({
-        cls,
-        head: byClass.get(cls)!,
-      }));
-      const count = classes.reduce((n, c) => n + c.head, 0);
-      if (count > 0) {
+    }
+    if (byClass.size) {
+      const sale =
+        farm.seasons.kind !== 'real' || env.data ? nextSaleDay(farm, env, farm.day) : null;
+      for (const cls of AT_SALE_WEIGHT) {
+        const count = byClass.get(cls);
+        if (!count) continue;
         out.push({
-          type: 'sale-soon',
-          saleDay: sale.day,
-          date: sale.date,
-          daysAway: sale.day - farm.day,
-          classes,
+          type: 'sale-weight',
+          cls,
+          saleDay: sale ? sale.day : null,
+          date: sale ? sale.date : null,
+          daysAway: sale ? sale.day - farm.day : null,
           count,
           does: null,
           action: null,
@@ -330,7 +341,6 @@ export function allThingsToDo(farm: FarmState, env: SourceEnv = {}): ThingToDo[]
       });
     }
     let calves = 0;
-    let oldEnough = 0;
     let bullCalves = 0;
     let youngBulls = 0;
     let adults = 0;
@@ -338,7 +348,6 @@ export function allThingsToDo(farm: FarmState, env: SourceEnv = {}): ThingToDo[]
     for (const a of m.animals) {
       if (a.kind === 'calf') {
         calves++;
-        if (a.age >= MARK_NOTE_MIN_AGE) oldEnough++;
         if (a.sex === 'M') bullCalves++;
       } else {
         adults++;
@@ -361,10 +370,29 @@ export function allThingsToDo(farm: FarmState, env: SourceEnv = {}): ThingToDo[]
         action: null,
       });
     }
-    // Marking: one item for the drop, once most of it is old enough or 30 days after calving started.
+    // Marking: this drop's calves only (born since calving started; all calves when the farm
+    // has no calving day for them). Last drop's calves, marked or not, never bring it back.
+    const inDrop = (a: { kind: string; age: number }): boolean =>
+      a.kind === 'calf' && (since === null || since < 0 || a.age <= since);
+    let dropBulls = 0;
+    let dropOldEnough = 0;
+    let dropMarked = 0;
+    for (const a of m.animals) {
+      if (!inDrop(a)) continue;
+      if (a.sex === 'M') {
+        dropBulls++;
+        if (a.age >= MARK_NOTE_MIN_AGE) dropOldEnough++;
+      } else if (a.sex === 'S') dropMarked++;
+    }
+    // Before any marking in the drop: once most of its bull calves are old enough, or 30 days
+    // after calving started. After the player has marked in the drop: not again until calving
+    // in the mob has finished, then once more if unmarked calves remain. At most two a drop.
     const dropReady =
-      oldEnough * 2 > calves || (since !== null && since >= MARK_AFTER_CALVING_DAYS);
-    if (bullCalves > 0 && dropReady) {
+      dropBulls > 0 &&
+      (dropMarked > 0
+        ? calvingFinished(m, farm.day)
+        : dropOldEnough * 2 > dropBulls || (since !== null && since >= MARK_AFTER_CALVING_DAYS));
+    if (dropReady) {
       out.push({
         type: 'calves-to-mark',
         mob: m.id,
@@ -386,6 +414,7 @@ export function allThingsToDo(farm: FarmState, env: SourceEnv = {}): ThingToDo[]
         mobName: m.name,
         area,
         cs,
+        adg: m.st ? m.st.adg : null,
         count: m.animals.length,
         does: null,
         action: null,

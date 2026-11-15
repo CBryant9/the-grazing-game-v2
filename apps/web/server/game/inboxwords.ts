@@ -1,12 +1,19 @@
 import 'server-only';
-import { SPECIES, type CattleNote, type FarmEvent, PTIC_DAYS } from '@gg/engine';
+import {
+  EATEN_OUT_KG,
+  SPECIES,
+  UNGRAZEABLE_KG,
+  type CattleNote,
+  type FarmEvent,
+  PTIC_DAYS,
+} from '@gg/engine';
 import type { InboxKind } from '../../lib/game/types';
 import { isLabourEvent, labourMessage, type DateOf } from './labourwords';
 import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText, waitWhyWord } from './planwords';
 import { isSheepEvent, sheepMessage } from './sheepwords';
-import { UNDER_FLOOR, bankWords, causeWord, gameOverWord } from './words';
+import { bankWords, causeWord, gameOverWord } from './words';
 
 /**
  * The messages in the inbox: one or two plain sentences for each thing the
@@ -77,11 +84,11 @@ const sold = (e: Extract<FarmEvent, { type: 'cattle-sold' }>): string =>
   `${plural(e.head, 'head', 'head')} sold${e.booked ? ' from the booking' : ''}, averaging ${Math.round(e.avgKg)} kg. ${money(e.net)} paid into the bank after selling costs.`;
 
 /**
- * The whole farm eaten out: the fact, in the paddock sheet's words for feed under the floor, and
- * what happens if it stays that way. Never "days of feed left".
+ * The whole farm eaten out: the model's own condition, with its own figures (`EATEN_OUT_KG`,
+ * `UNGRAZEABLE_KG`), and what happens if it stays that way. Never "days of feed left".
  */
 export function outOfFeedWords(daysLeft: number): string {
-  return `The whole farm is eaten out with stock on it. Feed averages ${UNDER_FLOOR.replace('Under', 'under')}. The game ends if it stays that way for ${plural(daysLeft, 'more day')}.`;
+  return `The whole farm is eaten out with stock on it. Over the whole farm, feed above ${UNGRAZEABLE_KG} kg DM/ha averages under ${EATEN_OUT_KG} kg DM/ha. Stock can't graze the last ${UNGRAZEABLE_KG} kg DM/ha. The game ends if it stays that way for ${plural(daysLeft, 'more day')}.`;
 }
 
 /**
@@ -134,7 +141,18 @@ export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
       return text ? msg('cattle', text) : null;
     }
     case 'births':
+      // A day's births go on the day card; the inbox has the weekly calving lines (engine 0.22.0).
       return msg('cattle', `${e.mobName}: ${plural(e.count, 'calf', 'calves')} born.`);
+    case 'calving-week':
+      return msg(
+        'cattle',
+        `${e.mobName}: ${plural(e.born, 'calf', 'calves')} born in the past week. ${plural(e.total, 'calf', 'calves')} born in this drop so far.`,
+      );
+    case 'calving-finished':
+      return msg(
+        'cattle',
+        `Calving has finished in ${e.mobName}: ${plural(e.total, 'calf', 'calves')} born in this drop.`,
+      );
     case 'deaths':
       return msg(
         'cattle',
