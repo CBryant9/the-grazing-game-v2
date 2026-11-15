@@ -2,7 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import type { AdSlotId } from '@gg/shared';
-import { SLOTS, type AdScreen } from '@/lib/ads/registry';
+// Type only: the registry itself is loaded with the live half, so a page with every slot off
+// does not carry it (m6: the community pages' budget).
+import type { AdScreen } from '@/lib/ads/registry';
 import { useMe } from '@/lib/auth/store';
 
 /**
@@ -41,5 +43,5 @@ export function AdSlot({
   ) {
     return null;
   }
-  return <Live id={id} screen={screen ?? SLOTS[id].screens[0]!} hold={hold} onBlock={onBlock} />;
+  return <Live id={id} screen={screen} hold={hold} onBlock={onBlock} />;
 }

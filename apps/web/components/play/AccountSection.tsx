@@ -58,9 +58,9 @@ export function AccountSection() {
             )}
             {me.leaderboards && (
               // PRD 6.4 puts the boards beside Community in the signed-in shell, behind their switch.
-              <a href="/leaderboards" className="btn ghost">
+              <Link href="/leaderboards" className="btn ghost">
                 Leaderboards
-              </a>
+              </Link>
             )}
             <Link href="/account" className="btn ghost">
               Your account

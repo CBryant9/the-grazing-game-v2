@@ -30,16 +30,18 @@ function Seen({ ad, children }: { ad: WireAd; children: React.ReactNode }) {
 
 export default function AdSlotLive({
   id,
-  screen,
+  screen: screenGiven,
   hold,
   onBlock,
 }: {
   id: AdSlotId;
-  screen: AdScreen;
+  /** Left out: the slot's first screen. */
+  screen?: AdScreen;
   hold: boolean;
   onBlock?: (blocking: boolean) => void;
 }) {
   const def = SLOTS[id];
+  const screen = screenGiven ?? def.screens[0]!;
   const layout = useLayout();
   const size = def.sizes[layout];
   const [ads, setAds] = useState<WireAd[]>([]);
