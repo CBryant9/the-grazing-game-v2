@@ -2547,6 +2547,21 @@ Three things in the mockups and REQUIREMENTS that milestone 1.7 never built (LES
 - The diary still lists the engine's marking note every 45 days.
 - The `realism-guardian` agent was not run.
 
+### 15 Nov 2026: m8 the mockups' screens with the real fields, the stock book, the Feed panel and plan legs
+
+Branch `m8-look-game`, after merging `m7-final` (the playability fixes, engine 0.20.0) and `m8-stockbook-feed` (engine 0.21.0, save format 16, snapshot version 8). Calls B169 to B172.
+
+**Built**
+
+- The new fields are read from the game's own types, no casts left: the bank limit beside Cash when cash is below zero, `feedText` in place of the days on the paddock sheet, `details` in the mob card's details (plain text), the setup money on each difficulty card (starting cash by the chosen start, and the bank limit), Put away (`dismissTodo`) on each thing to do, `gainWhy` as the reason on the Herd rows, `restDays` (a Rest days sort and a column on the PC table), `rainMm` in the phone bar's facts line, `comment` in italics on the paddock sheet, and `lastWeekCKg` as a Week column with ▲ or ▼ on the price table.
+- Mounted: the stock book behind "Mobs | Stock book" on Herd (phone and PC), fetched with the record the first time it opens, with a loading line; the Sell money line under the Market's Sell pickers (by class and by mob) and the mob card's; the Feed panel as a row in More on a phone and a tab between Paddocks and Market on a PC, its supplement buttons asking for the mob card's own job card, which draws under that mob's row. The stock book and the Feed panel load only when opened (`next/dynamic`).
+- The plan form as mockup F: Leg 1, "Add a leg" up to eight, each leg a card with its paddocks as chips joined by arrows, "+ add" to tap paddocks into that leg, its own rule and rounds; Repeat | Stay; the water line; Start from across every leg; Save plan and New plan. The form sends the extra legs as `moreLegs` with `step` counted across them (`lib/game/plans.ts`, a new test in `plans.test.ts`). Change shows on every plan, so a plan of several legs opens in the form.
+- Tour and Help words name the Build tab, the things-to-check banner and Put away. The tour's steps are the server branch's (paddock, mob, fence, market, day); none of them depends on where a control sits, and each was walked on a phone.
+
+**Calls made:** B169 to B172 (Build as the first tab, water under the paddock's name on a phone, Build and More kept as PC tabs, the slim bar staying on a phone on its side).
+
+**Still hidden for want of a field:** the weekly arrow on the Buy rows (a buy class has no last-week price; its price is worked out from the market classes on the server, so the screen does not guess it), Fast Farm "2 of 3" in the PC farm box, a Groups switch, an unread count on the site bell, a year's price change on the price table.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

@@ -181,12 +181,6 @@ function PricesView({ market }: { market: MarketWire }) {
   );
 }
 
-/** This week's change in c/kg for a class, from the price rows' last-week price. Null when not known. */
-function weekChange(market: MarketWire, id: string): number | null {
-  const row = market.prices.find((p) => p.id === id);
-  return row && row.lastWeekCKg !== null ? row.cKg - row.lastWeekCKg : null;
-}
-
 /** This week's change as the mockup: ▲6, ▼4 or "no change". Shown only when the server sends it. */
 function WeekChange({ c }: { c: number | null | undefined }) {
   if (c === null || c === undefined) return null;
@@ -247,7 +241,7 @@ function BuyView({ market }: { market: MarketWire }) {
                   <small>{c.weightText}</small>
                 </span>
                 <b className={styles.ppr}>{c.cKg === null ? 'by the head' : `${num(c.cKg)}c/kg`}</b>
-                <WeekChange c={weekChange(market, c.id)} />
+                {/* The weekly arrow needs a buy class's last-week price, which the server does not send yet. */}
               </button>
               {open && (
                 <div className={styles.expand}>

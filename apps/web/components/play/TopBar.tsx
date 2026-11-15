@@ -162,7 +162,16 @@ function Bell({ small }: { small?: boolean }) {
   );
 }
 
-function Cash({ snapshot, worth }: { snapshot: Snapshot; worth?: boolean }) {
+function Cash({
+  snapshot,
+  worth,
+  limitHere = true,
+}: {
+  snapshot: Snapshot;
+  worth?: boolean;
+  /** False on a phone held upright: the bank limit goes in the facts line, so the name keeps its room. */
+  limitHere?: boolean;
+}) {
   const { cash, netWorth } = snapshot.totals;
   const limit = snapshot.totals.bankLimit;
   return (
@@ -170,7 +179,7 @@ function Cash({ snapshot, worth }: { snapshot: Snapshot; worth?: boolean }) {
       <p className={styles.cash} aria-label={`Cash ${money(cash)}`}>
         {money(cash)}
       </p>
-      {cash < 0 && <p className={styles.cashsub}>Bank limit {money(limit)}</p>}
+      {cash < 0 && limitHere && <p className={styles.cashsub}>Bank limit {money(limit)}</p>}
       {worth && <p className={styles.cashsub}>net worth {shortMoney(netWorth)}</p>}
     </div>
   );
@@ -276,7 +285,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
             {day} · {dayDate(date)} · <ModeTag daily={daily} />
           </p>
         </div>
-        <Cash snapshot={snapshot} />
+        <Cash snapshot={snapshot} limitHere={false} />
         <Bell />
         <HelpButton />
       </div>
@@ -292,6 +301,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
         </span>
         <span className={styles.season}>{season}</span>
         <span>{plural(totals.head, 'head', 'head')}</span>
+        {totals.cash < 0 && <span>Bank limit {money(totals.bankLimit)}</span>}
       </p>
       <div className={styles.toptimes}>{times}</div>
       {busy && <span className={styles.busybar} role="status" aria-label="Working" />}

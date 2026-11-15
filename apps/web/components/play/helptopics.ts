@@ -87,7 +87,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     title: 'Husbandry',
     lines: [
       'Stock work is done where the mob is. The cattle never have to come to the yards for it.',
-      'Things to do lists facts that need you, such as calves to mark, a mob with no water, cash below zero, a sale in the next week with cattle at sale weight, a mob under CS 2.5, calving under way, or a paddock with stock under the grazing floor. Each shows once, while it is true. On a phone it is the "things to check" banner under the top bar: the first three show, and See all opens the rest. Where there is a job, its button sits right there. Open mob goes to the mob card. Put away takes an item off the list while it stays true.',
+      'Things to do lists facts that need you, such as calves to mark, a mob with no water, cash below zero, a sale in the next week with cattle at sale weight, a mob under CS 2.5, calving under way, or a paddock with stock under the grazing floor. Each shows once, while it is true.',
+      'On a phone it is the "things to check" banner under the top bar: the first three show, and See all opens the rest. Where there is a job, its button sits right there. Open mob goes to the mob card. Put away takes an item off the list while it stays true.',
       'Marking shows once for a drop, with the count, when most of the calves are old enough or a month after calving started.',
       'The mob card has the jobs as buttons: Mark calves, Wean, Sell, Move and the supplement. A button that is off says why.',
       'There is no preg testing. A cow goes on the record as PTIC by herself, once she is far enough along. The mob card shows how many head are known in calf.',
