@@ -188,7 +188,7 @@ export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
       )}
 
       <h3 className={`px ${styles.minihead}`}>When it moves</h3>
-      <div className={styles.seg3} role="group" aria-label="Rule">
+      <div className={styles.seg} role="group" aria-label="Rule">
         {RULES.map((r) => (
           <button
             key={r.id}

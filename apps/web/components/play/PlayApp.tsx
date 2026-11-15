@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { SiteHeader } from '@/components/SiteHeader';
 import { useMe } from '@/lib/auth/store';
 import { onSavingAgain } from '@/lib/game/api';
 import { wireTour } from '@/lib/game/helpstore';
@@ -9,6 +8,7 @@ import { useGame } from '@/lib/game/store';
 import type { SetupOptions } from '@/lib/game/types';
 import { FarmPicker } from './FarmPicker';
 import { PastDay } from './PastDay';
+import { PlayHeader } from './PlayHeader';
 import { PlayScreen } from './PlayScreen';
 import { SetupFlow } from './SetupFlow';
 import styles from './play.module.css';
@@ -67,7 +67,7 @@ export function PlayApp({ setup = null }: { setup?: SetupOptions | null }) {
           is not one long task (TBT). Nothing in them suspends, so nothing else changes. */}
       <div className={styles.plainhdr}>
         <Suspense fallback={null}>
-          <SiteHeader />
+          <PlayHeader theme />
         </Suspense>
       </div>
       <main id="main" className={styles.plainmain} tabIndex={-1}>

@@ -44,7 +44,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: 'move',
     title: 'Moving cattle',
     lines: [
-      'Tap a paddock on the map to open it, then tap Move a mob here. Or open a mob from the Herd tab and tap Move.',
+      'Tap a paddock on the map to open it, then tap Move cattle in here. Or open a mob from the Herd tab and tap Move.',
       'Pick the paddock on the map or from the list, check the card, then press Move. Moving a mob is pick the paddock, done.',
       'You can move the whole mob or part of it, by class and number. Calves go with their mothers.',
       'There is one mob to a paddock. If a mob is already there, the two join. The card says so before you confirm. It also says when the paddock has no water.',
@@ -55,7 +55,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: 'build',
     title: 'Building',
     lines: [
-      'Open the build tools (the Build button on a phone). The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
+      'Open the build tools (the Build tab on a phone). The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
       'Fence: pick permanent, electric or tape, then drag along the paddock lines. Gate: tap a fence to put a gate in it, and tap a gate to open or shut it. Pipe: drag across squares, starting from the bore, a trough, a hub or pipe that is already there. Trough: tap a square that water reaches. Water hub: tap a fence corner or a square.',
       'Every job shows a card first, with its cost and the light it uses. You confirm, and the tool goes back to Look.',
       'Red on the map while you draw means one thing: this can not be done. The part of a line that does not fit in today shows red and is not built. Only the part that fits is built. Draw the rest again another day. A line the game can not build at all shows red too.',

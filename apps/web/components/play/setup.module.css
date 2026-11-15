@@ -13,8 +13,16 @@
   gap: 6px;
 }
 .count {
-  font-size: 0.75rem;
-  color: var(--muted);
+  justify-self: start;
+}
+/* The row of step badges, as the mockup: done and current in lime. */
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .bar {
   height: 8px;

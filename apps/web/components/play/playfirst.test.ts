@@ -30,6 +30,15 @@ describe('the first HTML of /play', () => {
     expect(html).not.toContain('Loading your farm');
   });
 
+  it('the recommended start is picked in the HTML, with the next step named on the button', () => {
+    const html = renderToString(createElement(PlayApp, { setup: OPTIONS }));
+    // Fast Farm is chosen already, so a new player can tap straight through (m8, the mockups).
+    expect(html).toMatch(
+      /<input[^>]*value="fast"[^>]*checked=""|<input[^>]*checked=""[^>]*value="fast"/,
+    );
+    expect(html).toContain('Next: choose district');
+  });
+
   it('without them: the loading line, as before', () => {
     const html = renderToString(createElement(PlayApp));
     expect(html).toContain('Loading your farm');

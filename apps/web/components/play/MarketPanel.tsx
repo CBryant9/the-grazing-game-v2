@@ -8,8 +8,10 @@ import { useGame } from '@/lib/game/store';
 import type { MarketWire, MobWire, SellGroupId, SimpleAction, Snapshot } from '@/lib/game/types';
 import { ActJob } from './ActJob';
 import { EmptyState } from './EmptyState';
+import { PanelHead } from './PanelHead';
 import { QtyField } from './QtyField';
 import { SheepMarket } from './SheepMarket';
+import type { PendingBuyClass } from './ui';
 import styles from './play.module.css';
 
 type View = 'prices' | 'buy' | 'sell';
@@ -177,15 +179,30 @@ function PricesView({ market }: { market: MarketWire }) {
   );
 }
 
+/** This week's change as the mockup: ▲6, ▼4 or "no change". Shown only when the server sends it. */
+function WeekChange({ c }: { c: number | null | undefined }) {
+  if (c === null || c === undefined) return null;
+  if (Math.round(c) === 0) return <span className={styles.flat}>no change</span>;
+  return (
+    <span className={c > 0 ? styles.up : styles.dn}>
+      <span aria-hidden="true">{c > 0 ? '▲' : '▼'}</span>
+      {num(Math.abs(c))}
+      <span className="sr-only"> c/kg this week, {c > 0 ? 'up' : 'down'}</span>
+    </span>
+  );
+}
+
+/**
+ * Buy, as the mockup: one row a class with its c/kg. Tapping a row opens how many, the sum and
+ * the confirm card right under that row. The money on the card is the server's.
+ */
 function BuyView({ market }: { market: MarketWire }) {
   const startAct = useGame((s) => s.startAct);
   const job = useGame((s) => s.acts['market:buy']);
-  const [cls, setCls] = useState(market.buy.classes[0]?.id ?? '');
+  const [cls, setCls] = useState<string | null>(null);
   const [qty, setQty] = useState(10);
   const reasonId = useId();
-  const picked = market.buy.classes.find((c) => c.id === cls);
   const off = market.buy.reason !== null;
-  const action: SimpleAction = { type: 'buyCattle', cls, qty: clampQty(qty, market.buy.maxQty) };
   return (
     <div className={styles.stack}>
       {market.onTheWay.length > 0 && (
@@ -203,45 +220,60 @@ function BuyView({ market }: { market: MarketWire }) {
           {market.buy.reason}
         </p>
       )}
-      <ul className={styles.pickrows} aria-label="Class to buy">
-        {market.buy.classes.map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              className={styles.pickrow}
-              aria-pressed={cls === c.id}
-              disabled={!!job}
-              onClick={() => setCls(c.id)}
-            >
-              <span className={styles.pickname}>
-                <b>{c.label}</b>
-                <span className="muted">{c.weightText}</span>
-              </span>
-              <span className={styles.pickfacts}>
-                {c.cKg === null ? 'Priced by the head' : `${num(c.cKg)} c/kg`}, about{' '}
-                {money(c.perHead)} {c.perText} with fees
-              </span>
-            </button>
-          </li>
-        ))}
+      <ul className={styles.prows} aria-label="Classes to buy">
+        {market.buy.classes.map((c) => {
+          const open = cls === c.id;
+          const n = clampQty(qty, market.buy.maxQty);
+          const action: SimpleAction = { type: 'buyCattle', cls: c.id, qty: n };
+          return (
+            <li key={c.id}>
+              <button
+                type="button"
+                className={styles.prow}
+                aria-expanded={open}
+                disabled={!!job && !open}
+                onClick={() => setCls(open ? null : c.id)}
+              >
+                <span className={styles.pcl}>
+                  {c.label}
+                  <small>{c.weightText}</small>
+                </span>
+                <b className={styles.ppr}>{c.cKg === null ? 'by the head' : `${num(c.cKg)}c/kg`}</b>
+                <WeekChange c={(c as PendingBuyClass).weekChangeCKg} />
+              </button>
+              {open && (
+                <div className={styles.expand}>
+                  {!job && (
+                    <>
+                      <QtyField
+                        label="How many?"
+                        value={qty}
+                        max={market.buy.maxQty}
+                        onChange={setQty}
+                      />
+                      <p className={styles.hhint}>
+                        About {money(c.perHead)} {c.perText} with fees. Check the buy for the total.
+                      </p>
+                      <div className={styles.jobbtns}>
+                        <button
+                          type="button"
+                          className="btn coral"
+                          disabled={off || n < 1}
+                          aria-describedby={off ? reasonId : undefined}
+                          onClick={() => void startAct('market:buy', 'Buy', action)}
+                        >
+                          Check the buy
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  <ActJob slot="market:buy" title="Buy cattle" confirmLabel="Confirm" />
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
-      {!job && (
-        <>
-          <QtyField label="How many" value={qty} max={market.buy.maxQty} onChange={setQty} />
-          <div className={styles.jobbtns}>
-            <button
-              type="button"
-              className="btn coral"
-              disabled={off || !picked}
-              aria-describedby={off ? reasonId : undefined}
-              onClick={() => void startAct('market:buy', 'Buy', action)}
-            >
-              Check the buy
-            </button>
-          </div>
-        </>
-      )}
-      <ActJob slot="market:buy" title="Buy cattle" confirmLabel="Confirm" />
     </div>
   );
 }
@@ -431,8 +463,7 @@ export function MarketPanel({ snapshot }: { snapshot: Snapshot }) {
   const sheep = market.sheep !== null && kind === 'sheep';
   return (
     <section className={styles.listpanel} aria-label="Market">
-      <h2 className={`px ${styles.soontitle}`}>Market</h2>
-      <p className={styles.saleline}>{market.saleLine}</p>
+      <PanelHead title="Market" sub={market.saleLine} />
       {market.sheep && (
         <div className={styles.seg} role="group" aria-label="Cattle or sheep">
           <button type="button" aria-pressed={!sheep} onClick={() => setKind('cattle')}>
@@ -464,7 +495,7 @@ function CattleViews({
   const { market } = snapshot;
   return (
     <>
-      <div className={styles.seg3} role="group" aria-label="Market view">
+      <div className={styles.seg} role="group" aria-label="Market view">
         {(['prices', 'buy', 'sell'] as const).map((v) => (
           <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>
             {v === 'prices' ? 'Prices' : v === 'buy' ? 'Buy' : 'Sell'}

@@ -17,7 +17,7 @@ export function HelpButton() {
   return (
     <button
       type="button"
-      className="btn ghost"
+      className="btn sm ghost"
       aria-expanded={open}
       onClick={open ? closeHelp : openHelp}
     >

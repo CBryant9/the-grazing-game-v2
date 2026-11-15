@@ -117,6 +117,8 @@ function deltaMoney(c: ChangeWire): string {
 export function SummaryCard({ summary }: { summary: SummaryWire }) {
   const dismiss = useGame((s) => s.dismissSummary);
   const skip = useGame((s) => s.skip);
+  const farmName = useGame((s) => s.snapshot?.farm.name ?? '');
+  const dayNow = useGame((s) => s.snapshot?.day ?? null);
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
@@ -129,12 +131,15 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
     (reporting ? nextRef : closeRef).current?.focus();
   }, [reporting, at]);
 
+  // "Day 34 done", as the mockup: the farm is now on the next day, which the screens show as day + 1.
   const title =
     summary.kind === 'day' && summary.daysRun === 1
-      ? 'Overnight'
+      ? dayNow !== null
+        ? `Day ${num(dayNow)} done`
+        : 'Overnight'
       : summary.daysRun === 0
         ? 'Nothing ran'
-        : plural(summary.daysRun, 'day') + ' passed';
+        : `${plural(summary.daysRun, 'day')} done`;
   const when =
     summary.daysRun === 0
       ? dateText(summary.from)
@@ -188,10 +193,15 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
           />
         ) : (
           <>
+            <p className={styles.sumwhen}>
+              {farmName ? `${farmName} · ` : ''}
+              {summary.kind === 'day' && summary.daysRun === 1
+                ? `overnight to ${dateText(summary.to)}`
+                : when}
+            </p>
             <h2 id="summary-title" className={`px ${styles.sumtitle}`}>
               {title}
             </h2>
-            <p className={styles.sumwhen}>{when}</p>
             {summary.stops.length > 0 && (
               <ul className={styles.sumstops}>
                 {summary.stops.map((s) => (
@@ -204,7 +214,7 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
                 Stopped after {plural(summary.daysRun, 'day')} of {summary.daysAsked}.
               </p>
             )}
-            <dl className={styles.sumlist}>
+            <dl className={`card ${styles.sumlist}`}>
               <Change label="Cash" c={summary.cash} dollars />
               {/* On a farm with sheep these rows are the cattle's, and left out with no cattle. */}
               {!(sheepy && none(summary.head)) && (
@@ -296,7 +306,12 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
                   Run it anyway
                 </button>
               )}
-              <button ref={closeRef} type="button" className="btn coral" onClick={dismiss}>
+              <button
+                ref={closeRef}
+                type="button"
+                className={`btn coral ${styles.sumback}`}
+                onClick={dismiss}
+              >
                 Back to the farm
               </button>
             </div>

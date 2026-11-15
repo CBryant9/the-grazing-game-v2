@@ -12,7 +12,7 @@ export function YearParts({ view }: { view: YearView }) {
   return (
     <ul className={styles.parts} aria-label={`${view.title} score parts`}>
       {view.parts.map((p) => (
-        <li key={p.key} className={styles.part} data-negative={p.pts < 0}>
+        <li key={p.key} className={styles.part} data-key={p.key} data-negative={p.pts < 0}>
           <span className={styles.partname}>{p.label}</span>
           <span className={styles.parttrack} aria-hidden="true">
             <span

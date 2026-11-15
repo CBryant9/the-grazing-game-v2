@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { SiteHeader } from '@/components/SiteHeader';
 import { buildAnchor, buildDraft, mapToolFor } from '@/lib/game/build';
 import { pickable } from '@/lib/game/lists';
 import { mapBadges } from '@/lib/game/plans';
@@ -22,6 +21,8 @@ import { MorePanel } from './MorePanel';
 import { MoveFlow } from './MoveFlow';
 import { ComingSoon, Nav } from './Nav';
 import { PaddockSheet } from './PaddockSheet';
+import { PlayHeader } from './PlayHeader';
+import { useUi } from './ui';
 import { PlanFlow } from './PlanFlow';
 import { PlansPanel } from './PlansPanel';
 import { GameOverCard, OverStrip } from './GameOverCard';
@@ -122,6 +123,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const theme = useTheme();
   const reduceMotion = useReducedMotion();
   const tab = useGame((s) => s.tab);
+  const morePage = useGame((s) => s.morePage);
   const paddockId = useGame((s) => s.paddockId);
   const mobId = useGame((s) => s.mobId);
   const move = useGame((s) => s.move);
@@ -140,6 +142,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const buildEnd = useGame((s) => s.buildEnd);
   const startFix = useGame((s) => s.startFix);
   const helpOpen = useHelp((s) => s.helpOpen);
+  const trayOpen = useUi((s) => s.trayOpen);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
@@ -225,16 +228,31 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   // The tool bar and the card show on the farm tab, when no sheet is open.
   const showBuild = tab === 'farm' && !sheetOpen && !(helpOpen && !pc);
 
+  const phone = layout === 'phone';
+  const banner = !pc && tab === 'farm' && !sheetOpen && !build && !helpOpen;
+  // The panel's width on a PC follows the tab, as the mockup (Herd is the widest).
+  const panel = tab === 'more' && (morePage === 'scores' || morePage === 'diary') ? 'scores' : tab;
+
   return (
-    <div className={styles.screen} data-layout={layout} data-evening={clock.evening}>
+    <div
+      className={styles.screen}
+      data-layout={layout}
+      data-evening={clock.evening}
+      data-panel={panel}
+    >
       {pc && (
         <div className={styles.webhdr}>
-          <SiteHeader />
+          <PlayHeader />
         </div>
       )}
-      <TopBar snapshot={snapshot} />
-      <TourStrip hasCattle={snapshot.mobs.length > 0} />
+      {!phone && <TopBar snapshot={snapshot} />}
+      {!phone && <TourStrip hasCattle={snapshot.mobs.length > 0} />}
       <div className={styles.body}>
+        {pc && (
+          <div className={styles.railslot}>
+            <AdSlot id="pc_farm_rail" />
+          </div>
+        )}
         {pc && (
           <aside className={styles.side} aria-label="Farm panel">
             <Nav />
@@ -247,7 +265,6 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             )}
           </aside>
         )}
-        {pc && <AdSlot id="pc_farm_rail" />}
         <div className={styles.stagecol}>
           <main id="main" className={styles.stage} tabIndex={-1}>
             <FarmMap
@@ -296,16 +313,29 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             <NoticeBar />
             <DailyOverlay snapshot={snapshot} />
             {snapshot.over && overHidden && <OverStrip />}
-            {!pc && tab === 'farm' && !sheetOpen && !build && !helpOpen && (
-              <TodoBanner snapshot={snapshot} />
+            {phone && (
+              // The top bar floats over the map on a phone held upright, with the things to check under it.
+              <div className={styles.hudstack}>
+                <TopBar snapshot={snapshot} />
+                <TourStrip hasCattle={snapshot.mobs.length > 0} />
+                {banner && <TodoBanner snapshot={snapshot} />}
+              </div>
             )}
+            {!pc && !phone && banner && <TodoBanner snapshot={snapshot} />}
             {sheetOpen && <Opened snapshot={snapshot} />}
             {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
             {!pc && showBuild && (
-              <div className={styles.buildstack}>
+              <div className={`${styles.buildstack} ${trayOpen || build ? styles.trayon : ''}`}>
                 <AdSlot id="phone_banner" hold={adHold} />
-                <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
-                <BuildBar build={snapshot.build} docked={false} />
+                {(trayOpen || build) && (
+                  <div className={styles.tray}>
+                    <div className={styles.grab} aria-hidden="true" />
+                    <BuildBar build={snapshot.build} docked={false} />
+                    <div className={styles.traycard}>
+                      <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {!pc && helpOpen && <HelpPanel />}

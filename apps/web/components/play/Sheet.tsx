@@ -8,17 +8,20 @@ import styles from './play.module.css';
  * The container for anything opened from the farm: a bottom sheet on a
  * phone held upright, the whole screen on a phone on its side, and a side
  * panel on a PC (the layout is set by the stylesheet, so one component
- * serves all three). The next piece fills it with the full paddock sheet.
+ * serves all three). `aside` sits on the title row: the paddock's label
+ * chip and its hectares and water, for example.
  *
  * It takes focus when it opens, closes on Escape, and gives focus back to
  * what opened it.
  */
 export function Sheet({
   title,
+  aside,
   onClose,
   children,
 }: {
   title: string;
+  aside?: ReactNode;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -46,10 +49,16 @@ export function Sheet({
     >
       <div className={styles.grab} aria-hidden="true" />
       <header className={styles.sheethead}>
-        <h2 className={`px ${styles.sheettitle}`}>{title}</h2>
-        <button type="button" className="iconbtn" onClick={onClose} aria-label={`Close ${title}`}>
-          <Icon name="close" size={20} />
+        <button
+          type="button"
+          className={`iconbtn sm ${styles.sheetclose}`}
+          onClick={onClose}
+          aria-label={`Close ${title}`}
+        >
+          <Icon name="close" size={16} />
         </button>
+        <h2 className={`px ${styles.sheettitle}`}>{title}</h2>
+        {aside}
       </header>
       <div className={styles.sheetbody}>{children}</div>
     </aside>

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, type Ref } from 'react';
 import { isLineTool } from '@/lib/game/build';
-import { cardLines, num } from '@/lib/game/format';
+import { aboutTime, cardLines, money, num } from '@/lib/game/format';
 import { lineFacts } from '@/lib/game/linecard';
 import { useGame } from '@/lib/game/store';
-import type { BuildWire, TeamOptionWire } from '@/lib/game/types';
+import type { BuildWire, JobCardWire, TeamOptionWire } from '@/lib/game/types';
 import styles from './play.module.css';
 
 /**
@@ -66,6 +66,24 @@ function TeamChoice({
       <p className="muted">A team uses none of your day.</p>
     </>
   );
+}
+
+/** A key and value row on the job card, as the mockup. */
+function Kv({ k, v, cls }: { k: string; v: string; cls?: string }) {
+  return (
+    <div className={styles.kv}>
+      <dt>{k}</dt>
+      <dd className={cls}>{v}</dd>
+    </div>
+  );
+}
+
+/** The cost of a line card in a few words: what the part that fits costs, or what it pays back. */
+function costWords(card: JobCardWire, part: boolean): string {
+  if (card.cost < 0 || card.costToday < 0)
+    return `Pays ${money(-Math.min(card.cost, card.costToday))}`;
+  if (card.cost === 0 && card.costToday === 0) return 'None';
+  return part ? `${money(card.costToday)} for the part that fits` : money(card.cost);
 }
 
 /**
@@ -259,19 +277,32 @@ export function BuildCard({
       </h3>
       {choose}
       {card && facts ? (
-        <ul className={styles.joblines}>
-          <li>{facts.cost}</li>
-          <li>{facts.time}</li>
-          {facts.notFit.map((w) => (
-            <li key={w} className={styles.cardlate}>
-              {w}
-            </li>
-          ))}
-          {facts.fullDay && <li>{facts.fullDay}</li>}
-          {card.notes.map((n) => (
-            <li key={n}>{n}</li>
-          ))}
-        </ul>
+        <>
+          <dl className={styles.kvlist}>
+            <Kv k="Takes" v={aboutTime(card.workMin)} />
+            <Kv k="Cost" v={costWords(card, facts.lateM > 0)} />
+            <Kv
+              k="Fits in today's light"
+              v={facts.lateM > 0 ? `${num(facts.fitsM)} m of ${facts.length}` : '✓'}
+              cls={facts.lateM > 0 ? styles.cardlate : 'ok'}
+            />
+            <Kv
+              k="Daylight left after"
+              v={card.usesRestOfDay ? 'None' : aboutTime(card.leftAfterMin)}
+            />
+          </dl>
+          <ul className={styles.joblines}>
+            {facts.notFit.map((w) => (
+              <li key={w} className={styles.cardlate}>
+                {w}
+              </li>
+            ))}
+            {facts.fullDay && <li>{facts.fullDay}</li>}
+            {card.notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </>
       ) : card ? (
         <ul className={styles.joblines}>
           {cardLines(card).map((l) => (
@@ -279,17 +310,23 @@ export function BuildCard({
           ))}
         </ul>
       ) : null}
-      <div className={styles.jobbtns}>
+      <div className={styles.cardbtns}>
+        <button type="button" className="btn ghost" disabled={working} onClick={end}>
+          Cancel
+        </button>
         <button
           type="button"
-          className="btn sm coral"
+          className="btn coral"
           disabled={!canBuild}
           onClick={() => void confirm()}
         >
-          {working ? 'Working' : line ? (b.team ? 'Order the team' : 'Build') : b.picked!.confirm}
-        </button>
-        <button type="button" className="btn sm ghost" disabled={working} onClick={end}>
-          Cancel
+          {working
+            ? 'Working'
+            : line
+              ? b.team
+                ? 'Order the team'
+                : 'Build it'
+              : b.picked!.confirm}
         </button>
       </div>
     </>,

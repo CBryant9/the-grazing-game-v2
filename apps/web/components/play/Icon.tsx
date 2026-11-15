@@ -1,29 +1,252 @@
-/** Small line icons for the navigation. They are decoration: every button carries its own words. */
-const PATHS = {
-  farm: 'M3 11 12 4l9 7M6 10v10h12V10M10 20v-6h4v6',
-  market: 'M4 7h16l-1.5 5H5.5L4 7ZM6 12v8h12v-8M9 20v-5h6v5',
-  herd: 'M5 8 3 5m16 3 2-3M7 8h10v6a5 5 0 0 1-10 0V8ZM10 14h.01M14 14h.01M10 17h4',
-  paddocks: 'M4 4h16v16H4V4Zm0 8h16M12 4v16',
-  plans: 'M5 5a2 2 0 1 0 0 .01M19 19a2 2 0 1 0 0 .01M7 5h7a4 4 0 0 1 0 8H10a4 4 0 0 0 0 8h7',
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
-  close: 'M6 6l12 12M18 6 6 18',
-  back: 'M15 5l-7 7 7 7',
-  chevron: 'M6 9l6 6 6-6',
+/**
+ * The game's pixel icons: 8 by 8 grids from the mockups (docs/mockups/index.html, `ICONS`),
+ * drawn filled and crisp. They are decoration: every button carries its own words.
+ */
+const GRIDS = {
+  hammer: [
+    'XXXXXX..',
+    'XXXXXX..',
+    '..XX....',
+    '..XX....',
+    '..XX....',
+    '..XX....',
+    '..XX....',
+    '..XX....',
+  ],
+  cow: [
+    'XX......',
+    'XXX.....',
+    '.XXXXXXX',
+    '.XXXXXXX',
+    '.XXXXXX.',
+    '.X.X.X.X',
+    '.X.X.X.X',
+    '........',
+  ],
+  grass: [
+    '........',
+    '..X..X..',
+    'X.X.XX.X',
+    'XXX.X.XX',
+    '.XXXXXX.',
+    'XXXXXXXX',
+    'XXXXXXXX',
+    '........',
+  ],
+  tag: [
+    '...X....',
+    '.XXXXX..',
+    'XX.X....',
+    '.XXXX...',
+    '...X.XX.',
+    'XXXXXX..',
+    '...X....',
+    '........',
+  ],
+  dots: [
+    '........',
+    '........',
+    '........',
+    'XX.XX.XX',
+    'XX.XX.XX',
+    '........',
+    '........',
+    '........',
+  ],
+  bell: [
+    '...XX...',
+    '..XXXX..',
+    '.XXXXXX.',
+    '.XXXXXX.',
+    '.XXXXXX.',
+    'XXXXXXXX',
+    '...XX...',
+    '........',
+  ],
+  house: [
+    '...XX...',
+    '..XXXX..',
+    '.XXXXXX.',
+    'XXXXXXXX',
+    '.X....X.',
+    '.X.XX.X.',
+    '.X.XX.X.',
+    '.XXXXXX.',
+  ],
+  chat: [
+    'XXXXXXX.',
+    'X.....X.',
+    'X.X.X.X.',
+    'X.....X.',
+    'XXXXXXX.',
+    'XX......',
+    'X.......',
+    '........',
+  ],
+  trophy: [
+    'XXXXXXXX',
+    'X.XXXX.X',
+    'X.XXXX.X',
+    '.XXXXXX.',
+    '..XXXX..',
+    '...XX...',
+    '..XXXX..',
+    '.XXXXXX.',
+  ],
+  user: [
+    '..XXXX..',
+    '..XXXX..',
+    '..XXXX..',
+    '...XX...',
+    '.XXXXXX.',
+    'XXXXXXXX',
+    'XXXXXXXX',
+    '........',
+  ],
+  heart: [
+    '.XX.XX..',
+    'XXXXXXX.',
+    'XXXXXXX.',
+    '.XXXXX..',
+    '..XXX...',
+    '...X....',
+    '........',
+    '........',
+  ],
+  lock: [
+    '..XXX...',
+    '.X...X..',
+    '.X...X..',
+    'XXXXXXX.',
+    'XXX.XXX.',
+    'XXX.XXX.',
+    'XXXXXXX.',
+    '........',
+  ],
+  check: [
+    '........',
+    '.......X',
+    '......XX',
+    '.....XX.',
+    'X...XX..',
+    'XX.XX...',
+    '.XXX....',
+    '..X.....',
+  ],
+  plan: [
+    'XX......',
+    'XX..XX..',
+    '....XX..',
+    'XX......',
+    'XX..XX..',
+    '....XX..',
+    'XX......',
+    'XX......',
+  ],
+  book: [
+    'XXXXXXX.',
+    'X.....X.',
+    'X.XXX.X.',
+    'X.....X.',
+    'X.XXX.X.',
+    'X.....X.',
+    'XXXXXXX.',
+    '........',
+  ],
+  star: [
+    '...X....',
+    '...X....',
+    'XXXXXXX.',
+    '.XXXXX..',
+    '..XXX...',
+    '.XX.XX..',
+    'X.....X.',
+    '........',
+  ],
+  // Drawn for the game in the same 8 by 8 style.
+  drop: [
+    '...X....',
+    '...X....',
+    '..XXX...',
+    '.XXXXX..',
+    '.XXXXX..',
+    '.XXXXX..',
+    '..XXX...',
+    '........',
+  ],
+  help: [
+    '..XXX...',
+    '.X...X..',
+    '.....X..',
+    '....X...',
+    '...X....',
+    '........',
+    '...X....',
+    '........',
+  ],
+  close: [
+    '........',
+    '.X....X.',
+    '..X..X..',
+    '...XX...',
+    '...XX...',
+    '..X..X..',
+    '.X....X.',
+    '........',
+  ],
+  back: [
+    '........',
+    '....X...',
+    '...X....',
+    '..X.....',
+    '..X.....',
+    '...X....',
+    '....X...',
+    '........',
+  ],
+  chevron: [
+    '........',
+    '........',
+    '.X....X.',
+    '..X..X..',
+    '...XX...',
+    '........',
+    '........',
+    '........',
+  ],
 } as const;
 
-export type IconName = keyof typeof PATHS;
+export type IconName = keyof typeof GRIDS;
 
-export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
+/** One path per icon: each row's runs of filled cells as rectangles. Worked out once. */
+const PATHS = Object.fromEntries(
+  Object.entries(GRIDS).map(([name, rows]) => {
+    let d = '';
+    rows.forEach((row, y) => {
+      let x = 0;
+      while (x < row.length) {
+        if (row[x] !== 'X') {
+          x++;
+          continue;
+        }
+        let w = 0;
+        while (row[x + w] === 'X') w++;
+        d += `M${x} ${y}h${w}v1h-${w}z`;
+        x += w;
+      }
+    });
+    return [name, d];
+  }),
+) as Record<IconName, string>;
+
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 8 8"
       width={size}
       height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
+      shapeRendering="crispEdges"
       aria-hidden="true"
       focusable="false"
     >

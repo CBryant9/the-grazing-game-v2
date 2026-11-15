@@ -9,6 +9,7 @@ import { JobBox } from './JobBox';
 import { Fact, Job, WhereLine, signed } from './MobParts';
 import { SheepCard } from './SheepCard';
 import { Sheet } from './Sheet';
+import { pendingMob } from './ui';
 import styles from './play.module.css';
 
 function SellPicker({ mob, snapshot }: { mob: MobWire; snapshot: Snapshot }) {
@@ -276,6 +277,12 @@ export function MobCard({
 
       <details className={styles.details}>
         <summary>Details</summary>
+        {/* Plain facts for a mob that is holding or gaining (m8). Ordinary text, never a warning. */}
+        {(pendingMob(mob).details ?? []).map((line) => (
+          <p key={line} className={styles.joinline}>
+            {line}
+          </p>
+        ))}
         <table className={styles.classtable}>
           <caption className="sr-only">Head by class</caption>
           <thead>

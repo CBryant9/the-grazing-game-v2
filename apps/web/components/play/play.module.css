@@ -21,22 +21,18 @@
 .top {
   flex: none;
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas:
-    'name cash theme'
-    'dl dl dl'
-    'times times times';
-  gap: 6px 10px;
+  display: flex;
   align-items: center;
-  padding: 8px var(--gutter) 10px;
+  gap: 14px;
+  padding: 6px 18px;
+  min-height: 54px;
   background: var(--gamehdr);
   border-top: 3px solid var(--accent);
   border-bottom: 2px solid var(--gamehdr-line);
 }
 .topname {
-  grid-area: name;
   min-width: 0;
+  line-height: 1.25;
 }
 .fname {
   font-size: 0.9375rem;
@@ -54,26 +50,33 @@
   color: var(--text);
 }
 .cash {
-  grid-area: cash;
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
-.cashlabel {
-  font-weight: 400;
-  font-size: 0.6875rem;
+.cashbox {
+  text-align: right;
+  line-height: 1.25;
+  flex: none;
+}
+.cashsub {
+  font-size: 0.625rem;
   color: var(--muted);
+  white-space: nowrap;
 }
 .topextra {
-  grid-area: theme;
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex: none;
 }
 .topdl {
-  grid-area: dl;
+  width: 250px;
+  flex: none;
 }
 .toptimes {
-  grid-area: times;
+  margin-left: auto;
+  flex: none;
 }
 
 .daylight {
@@ -82,7 +85,7 @@
 }
 .dltrack {
   position: relative;
-  height: 8px;
+  height: 12px;
   border-radius: 3px;
   border: 1px solid #000;
   background: linear-gradient(
@@ -111,19 +114,59 @@
   background: #fff;
   box-shadow: 0 0 0 1px #000;
 }
+.dljob {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(201, 79, 68, 0.95) 0 4px,
+    rgba(201, 79, 68, 0.55) 4px 8px
+  );
+}
 .dlnote {
-  font-size: 0.6875rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.625rem;
   color: var(--muted);
   line-height: 1.2;
+  white-space: nowrap;
+}
+.dlnote b {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .times {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
 }
-.times :global(.btn) {
-  padding-inline: 4px;
+/* The time controls as the mockup's flat chips; Next day is the coral main one. */
+.tb {
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  padding: 6px 9px;
+  min-height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.tb:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.tbpri {
+  background: var(--btn);
+  border-color: var(--btn-hi);
+  color: #fff;
 }
 /* Evening: Next day invites a click. No words, just a quiet pulse. */
 .invite {
@@ -244,7 +287,7 @@
   border: 0;
   border-radius: 10px;
   font-family: var(--font-px);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   color: var(--text);
 }
 .navon {
@@ -259,16 +302,31 @@
 
 /* Phone on its side: slim one-row bar, tabs in a rail on the right, panels full screen. */
 .screen[data-layout='landscape'] .top {
-  grid-template-columns: minmax(110px, 1.1fr) minmax(90px, 1.3fr) auto auto auto;
-  grid-template-areas: 'name dl cash times theme';
-  padding: 4px 10px;
-  gap: 4px 10px;
+  min-height: 46px;
+  padding: 0 10px;
+  gap: 8px;
+  background: var(--hud);
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+.screen[data-layout='landscape'] .fname {
+  font-size: 0.75rem;
 }
 .screen[data-layout='landscape'] .sub {
-  display: none;
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.screen[data-layout='landscape'] .topdl {
+  width: auto;
+  flex: 1 1 60px;
+  min-width: 40px;
+  max-width: 150px;
 }
 .screen[data-layout='landscape'] .times {
   gap: 4px;
+}
+.screen[data-layout='landscape'] .cash {
+  font-size: 0.75rem;
 }
 .screen[data-layout='landscape'] .body {
   flex-direction: row;
@@ -288,22 +346,6 @@
 }
 
 /* PC and tablet: the website header, then the game header in one row, a side panel and the map. */
-.screen[data-layout='pc'] .top {
-  grid-template-columns: minmax(160px, 1fr) minmax(220px, 320px) auto auto auto;
-  grid-template-areas: 'name dl cash times theme';
-  padding: 6px var(--gutter);
-  gap: 6px 22px;
-}
-/* On a PC the theme switch is in the site header; Help stays here. */
-.screen[data-layout='pc'] .themeslot {
-  display: none;
-}
-.screen[data-layout='pc'] .times {
-  gap: 8px;
-}
-.screen[data-layout='pc'] .times :global(.btn) {
-  padding-inline: 12px;
-}
 .screen[data-layout='pc'] .body {
   flex-direction: row;
 }
@@ -320,7 +362,8 @@
 }
 .side {
   flex: none;
-  width: 360px;
+  width: 500px;
+  max-width: 45vw;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1090,24 +1133,29 @@
   display: grid;
   gap: 8px;
 }
+/* Segmented controls as the mockup: a padded pill, the chosen one coral with white words. */
 .seg {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--ghost);
-  border-radius: 8px;
-  overflow: hidden;
-  min-height: calc(var(--tap) + 2px);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 3px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 .seg button {
-  min-height: var(--tap);
-  padding: 4px 8px;
-  background: var(--panel2);
-  font-size: 0.75rem;
+  min-height: 38px;
+  padding: 6px 4px;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
 }
 .seg button[aria-pressed='true'] {
-  background: var(--sel);
-  font-weight: 700;
-  box-shadow: inset 0 -3px 0 var(--accent);
+  background: var(--btn);
+  color: #fff;
 }
 .partrows {
   list-style: none;
@@ -1154,18 +1202,19 @@
   font-size: 0.75rem;
   color: var(--muted);
 }
+/* Sort chips as the mockup: the chosen one is inverted. */
 .sortbtn {
-  min-height: 36px;
-  padding: 4px 10px;
-  border: 1px solid var(--ghost);
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel2);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
 }
 .sortbtn[aria-pressed='true'] {
-  border-color: var(--accent-line);
-  background: var(--sel);
-  font-weight: 700;
+  background: var(--text);
+  color: var(--frame);
+  border-color: var(--text);
 }
 .rows {
   list-style: none;
@@ -1238,14 +1287,14 @@
 }
 .tool {
   flex: none;
-  min-height: var(--tap);
+  min-height: 40px;
   min-width: var(--tap);
-  padding: 4px 12px;
+  padding: 0 9px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel2);
   font-family: var(--font-px);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   white-space: nowrap;
 }
 .tool[aria-pressed='true'] {
@@ -1468,14 +1517,15 @@
 
 /* The price chart. Colours pass 3:1 on the dark and the light panel, and each line has its own dash. */
 .chartbox {
-  --chart-1: #2f80ed;
-  --chart-2: #e8590c;
-  --chart-3: #2f9e44;
-  --chart-4: #ae3ec9;
-  --chart-5: #d6336c;
-  --chart-6: #0c8599;
-  --chart-7: #a07a00;
-  --chart-8: #7d8597;
+  /* One colour per class, the mockup's series tokens (both themes, globals.css). */
+  --chart-1: var(--s0);
+  --chart-2: var(--s1);
+  --chart-3: var(--s2);
+  --chart-4: var(--s3);
+  --chart-5: var(--s4);
+  --chart-6: var(--s5);
+  --chart-7: var(--s6);
+  --chart-8: var(--muted);
   display: grid;
   gap: 8px;
 }
@@ -1761,16 +1811,26 @@
 }
 .parttrack {
   display: block;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--track);
-  overflow: hidden;
+  height: 12px;
 }
+/* Each part's bar in its own colour, as the mockup: 12 px, radius 2, no track. */
 .partbar {
   display: block;
   height: 100%;
-  border-radius: 5px;
-  background: var(--accent);
+  border-radius: 2px;
+  background: var(--s0);
+}
+.part[data-key='gain'] .partbar {
+  background: var(--s1);
+}
+.part[data-key='util'] .partbar {
+  background: var(--s3);
+}
+.part[data-key='cover'] .partbar {
+  background: var(--s2);
+}
+.part[data-key='death'] .partbar {
+  background: var(--s6);
 }
 .part[data-negative='true'] .partbar {
   background: var(--knob);
@@ -1997,4 +2057,716 @@
   grid-column: 1 / -1;
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+/* ==== The mockups' look (m8, 15 Nov 2026) ================================== */
+
+/* ---- Phone held upright: the top bar floats over the map ---------------- */
+
+.hudstack {
+  position: absolute;
+  z-index: 10;
+  left: 8px;
+  right: 8px;
+  top: max(8px, env(safe-area-inset-top));
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.hudstack > * {
+  pointer-events: auto;
+  flex: none;
+}
+.screen[data-layout='phone'] .top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-height: 0;
+  padding: 8px 10px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.hudrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hudrow .topname {
+  flex: 1;
+}
+.screen[data-layout='phone'] .fname {
+  font-size: 0.875rem;
+}
+.screen[data-layout='phone'] .sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen[data-layout='phone'] .times > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.meta svg {
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--s2);
+}
+.hudstack .banner {
+  position: relative;
+  inset: auto;
+  max-height: none;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.hudstack > section[aria-label='First day tour'] {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.bell {
+  position: relative;
+}
+.bellcount {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 2px solid #000;
+  background: var(--btn);
+  color: #fff;
+  font-size: 0.625rem;
+  line-height: 1;
+}
+.farmbtn {
+  color: var(--accent-text);
+}
+
+/* ---- PC game header pieces ------------------------------------------------ */
+
+.farmbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  min-height: 44px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+  flex: none;
+}
+.farmicon {
+  color: var(--accent-text);
+  display: inline-flex;
+}
+.farmboxtext {
+  display: grid;
+  line-height: 1.2;
+  font-size: 0.625rem;
+}
+.farmboxtext .fname {
+  font-size: 0.8125rem;
+}
+.topdate {
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+.screen[data-layout='pc'] .sub {
+  font-size: 0.625rem;
+}
+
+/* The website header's game links on /play */
+.pcnav {
+  display: flex;
+  gap: 4px;
+  margin-left: 20px;
+  margin-right: auto;
+}
+.pcnavlink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.pcnavlink[aria-current='page'] {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+.pcme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #000;
+  background: var(--text);
+  color: var(--frame);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-px);
+  text-decoration: none;
+}
+
+/* The side panel's tabs on a PC, as the mockup */
+.ptabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.ptab {
+  position: relative;
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+}
+.ptabon {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+.ptabbadge {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--btn);
+  color: #fff;
+  font-size: 0.625rem;
+}
+
+/* The panel's width follows the tab (mockup: Paddocks 440, Herd 640, the rest 500). */
+.screen[data-layout='pc'][data-panel='farm'] .side {
+  width: 420px;
+}
+.screen[data-layout='pc'][data-panel='paddocks'] .side {
+  width: 440px;
+}
+.screen[data-layout='pc'][data-panel='herd'] .side {
+  width: 640px;
+}
+.screen[data-layout='pc'] .side {
+  background: var(--panel);
+}
+
+/* The sponsor rail sits at the far left, 180 px (off by default). */
+.railslot {
+  display: contents;
+}
+.railslot > * {
+  width: 180px;
+}
+
+/* ---- Things to check --------------------------------------------------------- */
+
+.peeklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+.peeklist li {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+.peeklist i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 2px;
+}
+.bannerbody > .linkbtn {
+  justify-self: start;
+  font-size: 0.75rem;
+}
+.todohead {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.putaway {
+  flex: none;
+  min-height: 32px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+/* ---- The sheet head and the paddock sheet ------------------------------------- */
+
+.sheethead {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.sheetclose {
+  order: 2;
+  margin-left: auto;
+}
+.padmeta {
+  order: 3;
+  flex-basis: 100%;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* A phone on its side: ✕ first, and the whole head on one row. */
+.screen[data-layout='landscape'] .sheethead {
+  flex-wrap: nowrap;
+}
+.screen[data-layout='landscape'] .sheetclose {
+  order: 0;
+  margin-left: 0;
+}
+.screen[data-layout='landscape'] .padmeta {
+  flex-basis: auto;
+}
+.stat3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.stat3 div {
+  padding: 6px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.stat3 b {
+  display: block;
+  font-size: 0.875rem;
+}
+.stat3 span {
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+.mobline {
+  font-size: 0.75rem;
+}
+.sayline {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--ok);
+}
+.padbtns {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+}
+.padbtns :global(.btn) {
+  min-height: var(--tap);
+  white-space: normal;
+}
+/* A phone on its side: the sheet is the whole screen, in two columns. */
+.screen[data-layout='landscape'] .sheetbody {
+  display: block;
+  columns: 2;
+  column-gap: 16px;
+}
+.screen[data-layout='landscape'] .sheetbody > * {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+/* ---- The build tray on a phone, docked on the tabs --------------------------- */
+
+.screen[data-layout='phone'] .buildstack {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  gap: 8px;
+  max-height: 62%;
+}
+/* The card has its own Cancel, so the tool bar's is not drawn beside it. */
+.tray:has(.traycard .buildcard) .toolbar > :global(.btn) {
+  display: none;
+}
+.screen[data-layout='phone'] .buildstack > :not(.tray) {
+  margin: 0 8px;
+}
+.tray {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: var(--hud);
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px var(--shadow);
+  overflow-y: auto;
+  min-height: 0;
+}
+.tray .grab {
+  margin-bottom: 0;
+}
+.tray .toolbar {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.traycard:empty {
+  display: none;
+}
+.traycard .buildcard {
+  padding: 10px 0 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+/* A phone on its side: the tools bottom left, the card on the right, the map between. */
+.screen[data-layout='landscape'] .buildstack {
+  inset: 8px;
+  width: auto;
+  display: block;
+  max-height: none;
+  overflow: visible;
+}
+.screen[data-layout='landscape'] .tray {
+  display: contents;
+}
+.screen[data-layout='landscape'] .tray .grab {
+  display: none;
+}
+.screen[data-layout='landscape'] .tray .toolbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  max-width: 58%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  pointer-events: auto;
+}
+.screen[data-layout='landscape'] .traycard {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: min(280px, 38%);
+  max-height: 100%;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+.screen[data-layout='landscape'] .traycard .buildcard {
+  padding: 10px 12px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* The job card's key and value rows, and Cancel | Build it */
+.kvlist {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.cardbtns {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+.cardbtns :global(.btn) {
+  min-height: var(--tap);
+}
+
+/* ---- The day summary: the whole screen on a phone held upright --------------- */
+
+.sumlist {
+  padding: 4px 12px;
+}
+.screen[data-layout='phone'] .scrim {
+  padding: 0;
+  place-items: stretch;
+}
+.screen[data-layout='phone'] .summary {
+  width: 100%;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  align-content: start;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: linear-gradient(var(--panel2), var(--frame) 45%);
+}
+.screen[data-layout='phone'] .sumtitle {
+  font-size: 1.375rem;
+}
+.screen[data-layout='phone'] .sumbtns {
+  display: grid;
+  justify-content: stretch;
+}
+.screen[data-layout='phone'] .sumback {
+  width: 100%;
+}
+
+/* ---- Full-screen panels: the head with ✕, and More as a sheet ---------------- */
+
+.panelhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.paneltitle {
+  flex: 1;
+  min-width: 0;
+}
+.panelsub {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.screen[data-layout='pc'] .panelclose {
+  display: none;
+}
+.screen[data-layout='phone'] .stage > .moresheet {
+  top: auto;
+  max-height: 78%;
+  padding: 10px 0 0;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.moresheet .grab {
+  margin-bottom: 6px;
+}
+.moresheet .panelhead {
+  padding: 0 16px 6px;
+}
+.moresheet .panelhead .soontitle {
+  flex: 1;
+}
+.screen[data-layout='landscape'] .moresheet .grab,
+.screen[data-layout='pc'] .moresheet .grab {
+  display: none;
+}
+.morelist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.moreitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.moreicon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+.moretext {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.kindicon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+/* ---- Herd and Paddocks lists ------------------------------------------------- */
+
+.rowgain {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.padrows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.padrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 9px 4px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.padname {
+  width: 82px;
+  flex: none;
+}
+.padha {
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+.padkg {
+  margin-left: auto;
+  font-weight: 700;
+}
+.padrow > :last-child {
+  width: 14px;
+  text-align: center;
+}
+.padtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.padtable th,
+.padtable td {
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.padtable thead th {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.padtable .r {
+  text-align: right;
+}
+.selrow th,
+.selrow td {
+  background: var(--sel);
+}
+.cellbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.screen[data-layout='landscape'] .rows,
+.screen[data-layout='landscape'] .padrows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+/* ---- Market: price rows that open in place ------------------------------------ */
+
+.prows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.prow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 4px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.prow[aria-expanded='true'] {
+  border-bottom: 0;
+}
+.pcl small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.625rem;
+}
+.ppr {
+  text-align: right;
+}
+.up,
+.dn,
+.flat {
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.up {
+  color: var(--ok);
+}
+.dn {
+  color: var(--bad);
+}
+.flat {
+  color: var(--muted);
+}
+.expand {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }

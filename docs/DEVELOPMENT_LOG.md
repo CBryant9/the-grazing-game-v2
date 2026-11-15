@@ -2430,6 +2430,31 @@ Same branch. Lighthouse Performance on `/play` against the 0.95 target in `light
 
 **Proof (both m8 parts).** `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 236 files, 4,267 tests: 4,240 passed, 22 expected failures, 4 skipped, 1 failed on time only (`boards.test.ts` "Your row pins at the bottom", 30 s timeout while Lighthouse and a server ran on the same PC); rerun alone, 13 of 13 passed. `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised (`/play` 208.4 KB). Production build with no keys: `/` (no script file, the Daily Farm card shows), `/play` as a new visitor (setup in the HTML, Daily Farm says it needs the game database), a Fast Farm taken through setup, Lick switched on, Next day and the overnight card. No policy error in the console. Every server started was stopped.
 
+### 15 Nov 2026: m8 the game screens match the mockups
+
+Branch `m8-look-game` (from `m8-daily-on-and-speed`). Claudia asked that the built game match `docs/mockups/index.html` and its feel (REQUIREMENTS "15 Nov 2026: the game screens match the mockups"). Colours, fonts, buttons and radius already matched; this pass is layout and parts. Recorded requirements that differ from the mock were kept (Plans tab, Help in the top bar, Workforce in More, the extra setup steps, four labels, time shown lightly and the rest listed there).
+
+**Built**
+
+- Pixel icons: the mock's 8 by 8 grids in `Icon.tsx`, crisp and filled, plus drop, help, close, back and chevron in the same style. Every old line icon is replaced.
+- Phone upright: the top bar floats over the full-height map (farm button, name, day, date and mode, cash with "Bank limit $X" under it when cash is below zero, the bell with the unread count, Help, the 12 px daylight bar with first light, a light note and last light, a facts line, the time chips). The theme switch moved to More, Settings. "N things to check" under it, open with three square-bullet lines, collapsible, "See all" for the full list with its buttons, contract fencing and the paddock buttons. Each thing to do has "Put away" (the playability branch's `dismissTodo`).
+- Tabs: Build, Herd, Paddocks, Market, Plans, More, 10 px labels. Build opens the tray docked on the tabs (grab handle, tools, then the job card). The job card is key and value rows and Cancel | Build it at 1fr / 1.4fr; the daylight bar shows the open job as a striped slice.
+- Paddock sheet as the mock: title, chip, "ha · Water ✓/✗"; six tiles; "Mob: …, about N days of feed at this rate" (or the server's `feedText`); the picture; a slot for the comment line; Move cattle in here | Details.
+- Day summary: full screen on a phone, "Day N done" or "N days done", every figure kept, full-width Back to the farm.
+- More: a sheet of icon rows (Plans, Scores, Diary, Inbox with its coral count, Workforce, Help, Farm, Account when sign-in is set up, Settings). Inbox, Help, Farm, Account and Settings each open their own page; inbox messages carry kind icons. The bell opens the inbox; the farm button opens the farm list (signed in) or the Farm page.
+- Segmented controls, sort chips and tool buttons at the mock's sizes. Market buy rows with c/kg that open the stepper and the confirm card under the row; the chart uses one series token per class (`--s0` to `--s6`, both themes, added to `globals.css`). Herd rows "180 steers · avg 342 kg · CS 3.5" with the gain in ok or bad colour and the reason. Paddocks: one line each on a phone, a table on a PC with the open paddock marked, a Water sort (and Rest days once the server sends them). Score bars in their own colours, 12 px, radius 2, no track.
+- Setup: the row of step badges, "Next: choose district" and so on, and a recommended start picked on every step (Fast Farm, first district, small, grazing, random seasons, running, medium). It is in the server's first HTML because `SetupFlow` starts its draft from the choices sent with the page, so no change to `server/game/firstScreen.ts` was needed (test in `playfirst.test.ts`). Difficulty cards show starting cash and the bank limit when the server sends `sizes[].money`.
+- Phone on its side: a slim bar (date on one line, short skip chips, cash at the far right); the paddock sheet and lists in two columns with ✕; build tools bottom left and the card top right.
+- PC: the website header on /play with Farm (and Community, Leaderboard, Groups when switched on), the bell and the avatar when signed in, no "Play free"; the game header in the mock's order with cash over net worth; side tabs Build, Herd, Plans, Paddocks, Market, Scores · Diary, More (Scores and the Diary together); panel width by tab; the sponsor rail at the far left at 180 px.
+
+**Calls made**
+
+- Build and More stay as PC tabs (the mock has neither): the tools, things to do and the inbox, workforce, help and settings must be reachable.
+- The market's buy row does not multiply price by head: the server's card gives the total, so the browser never shows a sum that could differ from it.
+- Panels on a phone on its side keep the slim bar above them (the mock covers it).
+
+**Waiting on server fields** (drawn when present, read through `components/play/ui.ts`): `totals.rainMm`, `market.buy.classes[].weekChangeCKg` (and a week and year change on the price table), `paddocks[].restDays`, `paddocks[].comment`, the Feed panel and the Stock book components (slots left in More, the PC tabs and Herd).
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

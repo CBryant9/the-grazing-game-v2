@@ -1,13 +1,14 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { useGame } from '@/lib/game/store';
 import type { BuildToolId, BuildWire } from '@/lib/game/types';
+import { useUi } from './ui';
 import styles from './play.module.css';
 
 /**
- * The tool bar: Look (the default) and the build tools. On a phone it is a
- * compact bar that opens. On a PC it sits at the top of the side panel.
+ * The tool bar: Look (the default) and the build tools. On a phone it is the
+ * tray the Build tab opens. On a PC it sits at the top of the side panel.
  * Each tool shows one short line of help and its price when picked. The
  * prices and the help lines come from the server (the snapshot's `build`).
  * Cancel, Look and Escape all go back to Look.
@@ -17,7 +18,8 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
   const select = useGame((s) => s.selectTool);
   const setFence = useGame((s) => s.setFence);
   const setHubOn = useGame((s) => s.setHubOn);
-  const [opened, setOpened] = useState(false);
+  const opened = useUi((s) => s.trayOpen);
+  const setOpened = useUi((s) => s.setTray);
   const id = useId();
 
   // Once a job is done the tool is back to Look, while its result shows on the card.
@@ -27,21 +29,8 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
   const info = tool ? build.tools.find((t) => t.id === tool) : null;
   const fence = build.fences.find((f) => f.id === state?.fence);
 
-  if (!open) {
-    return (
-      <div className={styles.toolclosed}>
-        <button
-          type="button"
-          className="btn sm"
-          aria-expanded={false}
-          aria-controls={id}
-          onClick={() => setOpened(true)}
-        >
-          Build
-        </button>
-      </div>
-    );
-  }
+  // On a phone the Build tab opens the tray.
+  if (!open) return null;
 
   const pick = (t: BuildToolId): void => select(tool === t ? 'look' : t);
 

@@ -121,6 +121,22 @@ Colour tokens (CSS `:root`):
 - The market chart shows the indicator as a gold line with a fill, and today's price as a cream square.
 - Setup cards have small pixel scenes: from scratch (bare ground, windmill), established (fences, trough, grass), mixed (crop rows beside pasture).
 
+### The game screens as the mockups (m8, 15 Nov 2026)
+
+The built screens follow `docs/mockups/index.html` (Claudia, 15 Nov 2026). What is drawn:
+
+- **Icons** are the mockups' 8 by 8 pixel grids (`ICONS`), drawn filled with crisp edges (`components/play/Icon.tsx`): hammer (Build), cow (Herd), grass (Paddocks), tag (Market), plan (Plans), dots (More), bell, house, trophy, book, user, lock. Drawn for the game in the same style: drop (water), help, close, back, chevron. The smooth line icons are gone.
+- **Phone held upright:** the top bar is a card floating over the map (inset 8 px, radius 12, the translucent `--hud` background, a 1 px `--line` border, no lime top border). The map fills the screen behind it. The card holds the farm button, the farm name, day, date and mode, cash (and "Bank limit $X" under it when cash is below zero), the bell with the unread count, Help, the daylight bar (12 px) with first light, a light note and last light under it, a line of facts (town, season, head, and last night's rain when the server sends it), and the time buttons. "N things to check" sits under it, open with the first three as short lines with square bullets (coral for urgent, amber for the rest).
+- **Daylight bar:** an open job card's slice of the day is a striped coral part from now. The note says "This job: about N h" while it is open. Time stays light: no countdown.
+- **Bottom tabs:** Build, Herd, Paddocks, Market, Plans, More, 10 px pixel labels, 24 px icons. Build opens the build tray, docked full width on the tabs with its grab handle. The job card is key and value rows (Takes, Cost, Fits in today's light, Daylight left after) and Cancel | Build it.
+- **Paddock sheet:** title, label chip and "ha · Water ✓/✗" on one row; six tiles in three columns (kg DM/ha, height, % green, ME, CP, AE/ha); "Mob: … about N days of feed at this rate" (or the server's feed words); the side-view picture; the comment line in italics when the server sends one; Move cattle in here (coral) beside Details (ghost) at 1.6 fr / 1 fr.
+- **Segmented controls:** a padded pill, pixel font 11 px, the chosen one coral with white words. **Sort chips:** the chosen one inverted.
+- **Market chart:** one colour per class, the series tokens `--s0` to `--s6` (both themes), still with a dash per line so colour is never the only signal.
+- **Scores:** each part's bar in its own series colour, 12 px, radius 2, no track. A part that took points off stays muted.
+- **Day summary:** the whole screen on a phone held upright, "Day N done" or "N days done", the lines, and a full-width Back to the farm.
+- **Phone on its side:** a slim bar with the date on one line and cash at the far right; panels full screen with ✕, the paddock sheet and the lists in two columns; the build tools bottom left and the job card on the right.
+- **PC:** the website header (logo, Farm, and Community, Leaderboard and Groups when switched on, the bell and the account when signed in; no "Play free"), then the game header (farm box, "Year N · date" over district, ha and head, the 250 px daylight bar with labels, the time chips with Next day in coral, cash over net worth at the far right). The side panel's tabs: Build, Herd, Plans, Paddocks, Market, Scores · Diary, More; its width follows the tab (Paddocks 440 px, Herd 640 px, the rest 500 px). The sponsor rail, when on, is 180 px at the far left.
+
 ## Narrow screens
 
 - No horizontal scroll at phone width. Info-bar items wrap, and the feed charts shrink.

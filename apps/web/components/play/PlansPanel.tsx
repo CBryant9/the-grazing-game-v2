@@ -7,6 +7,7 @@ import { useGame } from '@/lib/game/store';
 import type { PlanMobWire, PlanWire, Snapshot } from '@/lib/game/types';
 import { ActJob } from './ActJob';
 import { EmptyState } from './EmptyState';
+import { PanelHead } from './PanelHead';
 import styles from './play.module.css';
 
 function status(m: PlanMobWire): { text: string; kind: 'run' | 'paused' | 'wait' } {
@@ -168,7 +169,7 @@ export function PlansPanel({ snapshot }: { snapshot: Snapshot }) {
   const free = mobsWithoutPlan(snapshot);
   return (
     <section className={styles.listpanel} aria-label="Plans">
-      <h2 className={`px ${styles.soontitle}`}>Plans</h2>
+      <PanelHead title="Plans" sub={plural(snapshot.plans.length, 'plan')} />
       <p className="muted">
         A grazing plan moves a mob round the paddocks by itself each day. Moving the mob by hand
         pauses its plan.

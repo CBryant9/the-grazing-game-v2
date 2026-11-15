@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/game/api';
-import { num } from '@/lib/game/format';
+import { money, num } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import type {
   FarmMode,
@@ -100,6 +100,67 @@ function Cards({
   );
 }
 
+/** The short name of each step, for the row of step badges (the mockup). */
+const BADGES: Record<StepId, string> = {
+  mode: 'Mode',
+  district: 'District',
+  size: 'Farm size',
+  enterprise: 'Farm type',
+  arable: 'Arable',
+  years: 'Years',
+  start: 'Start',
+  stock: 'Stock',
+  difficulty: 'Difficulty',
+  name: 'Name',
+  summary: 'Check',
+};
+
+/** What the button says on the step before each one: "Next: choose district". */
+const NEXT: Record<StepId, string> = {
+  mode: 'choose how to play',
+  district: 'choose district',
+  size: 'choose farm size',
+  enterprise: 'choose what you farm',
+  arable: 'choose the arable share',
+  years: 'choose the years',
+  start: 'choose the start',
+  stock: 'choose the stock',
+  difficulty: 'choose difficulty',
+  name: 'name your farm',
+  summary: 'check the farm',
+};
+
+/** One difficulty's money on a district and size, when the server sends it (m8). */
+interface SetupMoney {
+  difficulty: SetupDifficulty;
+  cashRunning: number;
+  cashScratch: number;
+  lendLimit: number;
+  bankLimit: number;
+}
+
+/**
+ * The recommended start, picked already on every step so a new player can tap straight
+ * through: Fast Farm, the first district, a small farm, grazing, random seasons, a running
+ * farm, medium. Only what the server offers is picked.
+ */
+function recommended(options: SetupOptions | null): Draft {
+  const district = options?.districts[0];
+  const has = <T extends { id: string }>(list: T[] | undefined, id: string): boolean =>
+    !!list?.some((x) => x.id === id);
+  return {
+    name: '',
+    mode: 'fast',
+    district: district?.id,
+    size: has(district?.sizes, 'small') ? 'small' : district?.sizes[0]?.id,
+    enterprise: has(options?.enterprises, 'grazing') ? 'grazing' : undefined,
+    years: has(options?.years, 'random') ? 'random' : undefined,
+    startType: has(options?.starts, 'running') ? 'running' : undefined,
+    stock: has(options?.stocks, 'cattle') ? 'cattle' : undefined,
+    difficulty: has(options?.difficulties, 'medium') ? 'medium' : undefined,
+  };
+}
+
 const TITLES: Record<StepId, string> = {
   mode: 'How do you want to play?',
   district: 'Where is your farm?',
@@ -124,7 +185,13 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
   // The choices sent with the page (a visitor with no cookies), or null to ask the server for them.
   const [options, setOptions] = useState<SetupOptions | null>(initial);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ name: '' });
+  const [draft, setDraft] = useState<Draft>(() => recommended(initial));
+  // Choices that came later (not with the page) get the same recommended start, once.
+  const [defaulted, setDefaulted] = useState(initial !== null);
+  if (!defaulted && options) {
+    setDefaulted(true);
+    setDraft((d) => ({ ...recommended(options), ...stripUndefined(d) }));
+  }
   const [index, setIndex] = useState(0);
   const [taking, setTaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +287,10 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
   };
   const label = <T extends { id: string; label: string }>(list: T[], id?: string): string =>
     list.find((x) => x.id === id)?.label ?? '';
+  const moneyFor = (id: SetupDifficulty): SetupMoney | null =>
+    ((size as { money?: SetupMoney[] } | undefined)?.money ?? []).find(
+      (m) => m.difficulty === id,
+    ) ?? null;
 
   const take = async (): Promise<void> => {
     const daily = draft.mode === 'daily';
@@ -275,19 +346,20 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
         noValidate
       >
         <div className={styles.progress}>
-          <p className={styles.count}>
+          <p className={`badge ${styles.count}`}>
             Step {index + 1} of {steps.length}
           </p>
-          <div
-            className={styles.bar}
-            role="progressbar"
-            aria-label="Setup progress"
-            aria-valuemin={1}
-            aria-valuemax={steps.length}
-            aria-valuenow={index + 1}
-          >
-            <span style={{ width: `${((index + 1) / steps.length) * 100}%` }} />
-          </div>
+          <ol className={styles.steps} aria-label="Setup steps">
+            {steps.map((id, i) => (
+              <li
+                key={id}
+                className={`badge ${i <= index ? 'lime' : ''}`}
+                aria-current={i === index ? 'step' : undefined}
+              >
+                {BADGES[id]}
+              </li>
+            ))}
+          </ol>
         </div>
 
         <h1 ref={headRef} tabIndex={-1} className={`px ${styles.title}`}>
@@ -330,14 +402,16 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
             name="district"
             legend="District"
             value={draft.district}
-            onChange={(v) =>
+            onChange={(v) => {
+              const sizes = options.districts.find((d) => d.id === v)?.sizes ?? [];
               set({
                 district: v as DistrictId,
-                size: undefined,
+                // The recommended size again for the new district.
+                size: sizes.some((x) => x.id === 'small') ? 'small' : sizes[0]?.id,
                 arablePct: undefined,
                 croppedPct: undefined,
-              })
-            }
+              });
+            }}
             cards={options.districts.map((d) => ({
               value: d.id,
               title: d.name,
@@ -435,13 +509,24 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
               legend="Difficulty"
               value={draft.difficulty}
               onChange={(v) => set({ difficulty: v as SetupDifficulty })}
-              cards={options.difficulties.map((d) => ({
-                value: d.id,
-                title: d.label,
-                text: d.text,
-              }))}
+              cards={options.difficulties.map((d) => {
+                const m = moneyFor(d.id);
+                const cash = m
+                  ? draft.startType === 'scratch'
+                    ? m.cashScratch
+                    : m.cashRunning
+                  : null;
+                return {
+                  value: d.id,
+                  title: d.label,
+                  text:
+                    m && cash !== null
+                      ? `${d.text} Starting cash ${money(cash)}. Bank limit ${money(m.bankLimit)}.`
+                      : d.text,
+                };
+              })}
             />
-            <p className="muted">Money is shown once you take the farm.</p>
+            {!moneyFor('medium') && <p className="muted">Money is shown once you take the farm.</p>}
           </>
         )}
         {step === 'name' && (
@@ -554,10 +639,17 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
                 : error
                   ? 'Try again'
                   : 'Take the farm'
-              : 'Next'}
+              : `Next: ${NEXT[steps[index + 1] ?? 'summary']}`}
           </button>
         </div>
       </form>
     </div>
   );
+}
+
+/** A draft's set choices only, so the recommended start fills the gaps. */
+function stripUndefined(d: Draft): Partial<Draft> {
+  return Object.fromEntries(
+    Object.entries(d).filter(([, v]) => v !== undefined && v !== ''),
+  ) as Partial<Draft>;
 }

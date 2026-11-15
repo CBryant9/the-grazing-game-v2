@@ -38,6 +38,14 @@
   --ghost: #34425f;
   --track: #2a3654;
   --knob: #8f9bb5;
+  /* One colour per series (market classes, score parts), from the mockups. */
+  --s0: #c6f432;
+  --s1: #7fe05a;
+  --s2: #4fb3e8;
+  --s3: #f0b43a;
+  --s4: #e0a860;
+  --s5: #ec6a48;
+  --s6: #b79cff;
   --sky: #6fb6e6;
 
   --font-display: var(--font-anton), 'Arial Narrow', Impact, sans-serif;
@@ -83,6 +91,13 @@
     --ghost: #cdbf9f;
     --track: #d6ccb8;
     --knob: #ffffff;
+    --s0: #5f8a00;
+    --s1: #2f8f22;
+    --s2: #1f7fb8;
+    --s3: #b07a0c;
+    --s4: #a3602a;
+    --s5: #c43f28;
+    --s6: #6a4bcc;
     --sky: #2f7fb8;
   }
 }
@@ -119,6 +134,13 @@
   --ghost: #cdbf9f;
   --track: #d6ccb8;
   --knob: #ffffff;
+  --s0: #5f8a00;
+  --s1: #2f8f22;
+  --s2: #1f7fb8;
+  --s3: #b07a0c;
+  --s4: #a3602a;
+  --s5: #c43f28;
+  --s6: #6a4bcc;
   --sky: #2f7fb8;
 }
 
@@ -333,6 +355,11 @@ svg {
   color: var(--accent-ink);
   border-color: var(--accent-line);
 }
+.badge.coral {
+  background: var(--btn);
+  color: #fff;
+  border-color: var(--btn-lo);
+}
 
 .card {
   background: var(--panel);
@@ -349,6 +376,13 @@ svg {
   display: grid;
   place-items: center;
   flex: none;
+}
+/* The smaller icon button of the mockups, for a mouse. A touch screen keeps the 44 px one. */
+@media (pointer: fine) {
+  .iconbtn.sm {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 /* Website pages: big heading, generous spacing (PRD 6.3) */
