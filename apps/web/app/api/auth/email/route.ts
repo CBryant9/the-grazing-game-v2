@@ -19,7 +19,7 @@ const SENT = SENT_WORDS;
  * hour for one address, and a few a minute from one place.
  */
 export const POST = authRoute({ name: 'email', max: 10, write: true }, async (ctx) => {
-  if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
+  if (!ctx.deps) throw new GameError(404, NOT_SET_UP);
   const body = (await readJson(ctx.req, 2048)) as { email?: unknown; next?: unknown } | null;
   const email = typeof body?.email === 'string' ? normaliseEmail(body.email) : null;
   if (!email || email.length > 254) {

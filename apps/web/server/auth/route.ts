@@ -116,7 +116,7 @@ export function authRoute(
 
 /** The signed-in user, asked of the auth server, or a plain 401. */
 export async function requireUser(ctx: AuthContext): Promise<{ deps: AuthDeps; user: AuthUser }> {
-  if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
+  if (!ctx.deps) throw new GameError(404, NOT_SET_UP);
   const user = await ctx.deps.provider.user(ctx.jar).catch(() => null);
   if (!user || user.anonymous) throw new GameError(401, 'Sign in first.');
   return { deps: ctx.deps, user };

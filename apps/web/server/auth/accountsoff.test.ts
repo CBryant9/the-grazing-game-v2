@@ -83,19 +83,19 @@ const CASES: [string, () => Promise<Response>, number][] = [
   [
     '/api/auth/email',
     () => call('email', 'POST', '/api/auth/email', { email: 'a@example.test' }),
-    503,
+    404,
   ],
-  ['/api/auth/google', () => call('google', 'POST', '/api/auth/google', {}), 503],
-  ['/auth/callback', () => call('callback', 'GET', '/auth/callback?code=x'), 503],
+  ['/api/auth/google', () => call('google', 'POST', '/api/auth/google', {}), 404],
+  ['/auth/callback', () => call('callback', 'GET', '/auth/callback?code=x'), 404],
   [
     '/api/auth/username',
     () => call('username', 'POST', '/api/auth/username', { name: 'abc' }),
-    503,
+    404,
   ],
-  ['/api/auth/finish', () => call('finish', 'POST', '/api/auth/finish', {}), 503],
-  ['/api/auth/signout', () => call('signout', 'POST', '/api/auth/signout', {}), 503],
-  ['/api/account/data', () => call('data', 'GET', '/api/account/data'), 503],
-  ['/api/account/delete', () => call('delete', 'POST', '/api/account/delete', {}), 503],
+  ['/api/auth/finish', () => call('finish', 'POST', '/api/auth/finish', {}), 404],
+  ['/api/auth/signout', () => call('signout', 'POST', '/api/auth/signout', {}), 404],
+  ['/api/account/data', () => call('data', 'GET', '/api/account/data'), 404],
+  ['/api/account/delete', () => call('delete', 'POST', '/api/account/delete', {}), 404],
 ];
 
 const checkAll = async (): Promise<void> => {

@@ -881,11 +881,11 @@ describe('with no sign-in keys', () => {
     const b = new Browser();
     expect(await b.me()).toMatchObject({ accounts: false, signedIn: false });
     const email = await b.call('email', 'POST', '/api/auth/email', { email: 'a@example.com' });
-    expect(email.status).toBe(503);
+    expect(email.status).toBe(404);
     expect((await email.json()).error).toBe('Sign-in is not set up on this copy of the game yet.');
-    expect((await b.call('google', 'POST', '/api/auth/google', {})).status).toBe(503);
-    expect((await b.call('callback', 'GET', '/auth/callback?code=x')).status).toBe(503);
-    expect((await b.call('data', 'GET', '/api/account/data')).status).toBe(503);
+    expect((await b.call('google', 'POST', '/api/auth/google', {})).status).toBe(404);
+    expect((await b.call('callback', 'GET', '/auth/callback?code=x')).status).toBe(404);
+    expect((await b.call('data', 'GET', '/api/account/data')).status).toBe(404);
     const made = await b.call('farm', 'POST', '/api/game/farm', choices);
     expect(made.status).toBe(200);
     expect(b.cookies.get('gg_session')).toMatch(/^[0-9a-f]{32}$/);

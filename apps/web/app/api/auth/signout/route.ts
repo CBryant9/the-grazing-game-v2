@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export const POST = authRoute(
   { name: 'signout', max: 20, write: true, by: 'session' },
   async (ctx) => {
-    if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
+    if (!ctx.deps) throw new GameError(404, NOT_SET_UP);
     const body = (await readJson(ctx.req, 512)) as { everywhere?: unknown } | null;
     // Signing out everywhere also forgets every device this account had for notifications.
     if (body?.everywhere === true) {

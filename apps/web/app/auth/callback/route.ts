@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * (`safeNext`), never an address from the link.
  */
 export const GET = authRoute({ name: 'callback', max: 30 }, async (ctx) => {
-  if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
+  if (!ctx.deps) throw new GameError(404, NOT_SET_UP);
   const params = new URL(ctx.req.url).searchParams;
   const next = safeNext(params.get('next'));
   const code = params.get('code');

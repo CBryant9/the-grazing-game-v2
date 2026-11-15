@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export const POST = authRoute(
   { name: 'username', max: 40, write: true, by: 'session' },
   async (ctx) => {
-    if (!ctx.deps) throw new GameError(503, NOT_SET_UP);
+    if (!ctx.deps) throw new GameError(404, NOT_SET_UP);
     const user = await ctx.deps.provider.session(ctx.jar).catch(() => null);
     if (!user || user.anonymous) throw new GameError(401, 'Sign in first.');
     if (!allow(`auth-username-user:${user.id}`, 30, 60_000)) {

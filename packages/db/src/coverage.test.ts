@@ -1,4 +1,5 @@
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { AD_SLOTS, FARM_LIMITS, FEATURE_SWITCHES } from '@gg/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -161,6 +162,7 @@ const SERVER_FUNCTIONS = [
   'daily_days_owed',
   'daily_finish',
   'daily_rollover_ping',
+  'notify_send_ping',
   'farm_limit',
   'prune_housekeeping',
   'rollup_ad_events',
@@ -421,9 +423,23 @@ describe('the reference data matches packages/shared', () => {
     expect(jobs.map((j) => j.jobname)).toEqual([
       'gg-daily-rollover',
       'gg-housekeeping',
+      'gg-notify-send',
       'gg-rollup-ad-events',
     ]);
     expect(jobs[0]!.schedule).toBe('*/15 * * * *');
+    expect(jobs[2]!.schedule).toBe('*/5 * * * *');
+  });
+
+  it('the database scheduler and Vercel run the same two routes on the same timetable (m6)', async () => {
+    const vercel = JSON.parse(
+      readFileSync(join(MIGRATIONS_DIR, '..', '..', 'apps', 'web', 'vercel.json'), 'utf8'),
+    ) as { crons: { path: string; schedule: string }[] };
+    expect(vercel.crons).toEqual([
+      { path: '/api/daily/rollover', schedule: '*/15 * * * *' },
+      { path: '/api/notify/send', schedule: '*/5 * * * *' },
+    ]);
+    const [r] = await rows<{ v: string | null }>(db, `select public.notify_send_ping()::text as v`);
+    expect(r!.v).toBeNull();
   });
 
   it('the rollover job does nothing, and does not fail, where pg_net or Vault is not there', async () => {
@@ -477,6 +493,11 @@ describe('migration files', () => {
       ['system', 'notify_queue'],
       ['money', 'ads_events'],
       ['system', 'ads_events'],
+      ['admin_fixes', 'stage4_review'],
+      ['community', 'stage4_review'],
+      ['stage4_review', 'stage4_community'],
+      ['notify_queue', 'notify_cron'],
+      ['daily_cron', 'notify_cron'],
     ];
     for (const [first, then] of after) {
       expect(at(first), `${first} before ${then}`).toBeLessThan(at(then));
