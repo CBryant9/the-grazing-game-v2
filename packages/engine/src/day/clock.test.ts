@@ -234,6 +234,11 @@ describe('looking is free', () => {
       clockView: (f) => engine.clockView(f),
       jobsToday: (f) => engine.jobsToday(f),
       thingsToDo: (f) => engine.thingsToDo(f),
+      // Things to do and the bank (m8): facts, and how far to the year end.
+      allThingsToDo: (f, env) => engine.allThingsToDo(f, env),
+      bankLevel: (f) => engine.bankLevel(f),
+      headToSell: (f) => engine.headToSell(f),
+      daysToYearEnd: (f) => engine.daysToYearEnd(f),
       // Grazing plans: the plans, and the stops a mob's plan gives it today.
       plansView: (f) => engine.plansView(f),
       stopsToday: (f) => engine.stopsToday(f, f.mobs[0]!),

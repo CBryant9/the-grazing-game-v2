@@ -201,6 +201,13 @@ export const MARKET_CLASSES = {
 } as const;
 export type MarketClassId = keyof typeof MARKET_CLASSES;
 
+/**
+ * The weights that split the market classes, kg live weight: steers under
+ * `weanerUnderKg` are weaner steers, then yearling steers, and heavy steers
+ * from `heavyFromKg`; heifers under `weanerUnderKg` are weaner heifers.
+ */
+export const MARKET_WEIGHTS = { weanerUnderKg: 280, heavyFromKg: 450 } as const;
+
 /** Vaccines, drench and tags, dollars a head a year. */
 export const HEALTH_COST_PER_HEAD_YEAR: Record<DistrictId, number> = {
   cq: 20,

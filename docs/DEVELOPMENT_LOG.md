@@ -2403,7 +2403,7 @@ Branch `m7.1-realism-fixes`, cut from `m7-final` (ca7ff39). Engine 0.19.0, save 
 
 Branch `m8-look-site`, cut from `m7-final` (6a27291). The website, admin, community pages and the map's surround brought into line with `docs/mockups/index.html`. No game rule, figure or engine code changed. Lesson LS1.
 
-- **Landing page:** the title sits over the dusk farm with the mockup's fade (`--hero-fade`, both themes, in `globals.css`): from the left on PC, from the top on a phone, where the farm shows under the buttons. Hero buttons: Play free, then Leaderboard while `leaderboards` is in the site's switch list, otherwise How a day works. The three cards under the hero (Daily Farm, Fast Farm, Community) follow the switch list. **Daily Farm is now on by default** in the site's list (`SITE_DEFAULT_ON`; `SITE_SWITCHES_OFF=daily_farm` turns it off). The game's own switch default in `@gg/shared` is unchanged. The other sections stay lower down. The admin's announcement shows as a bar at the top when there is one and a database is set: the page is built with `getStaticProps` and rebuilt every 5 minutes only when `SUPABASE_DB_POOLER_URL` is set, otherwise fully static. It still sends no script file. The announcement rules moved to `lib/announcement.ts` so the page and the admin form share them (a pages-router page can not load a `server-only` module). Sections below the first screen use `content-visibility: auto`.
+- **Landing page:** the title sits over the dusk farm with the mockup's fade (`--hero-fade`, both themes, in `globals.css`): from the left on PC, from the top on a phone, where the farm shows under the buttons. Hero buttons: Play free, then Leaderboard while `leaderboards` is in the site's switch list, otherwise How a day works. The three cards under the hero (Daily Farm, Fast Farm, Community) follow the switch list. **Daily Farm is on by default** in the site's list (`SITE_SWITCHES_DEFAULT_ON`; `SITE_SWITCHES_OFF=daily_farm` turns it off). The other sections stay lower down. The admin's announcement shows as a bar at the top when there is one and a database is set: the page is built with `getStaticProps` and rebuilt every 5 minutes only when `SUPABASE_DB_POOLER_URL` is set, otherwise fully static. It still sends no script file. The announcement rules moved to `lib/announcement.ts` so the page and the admin form share them (a pages-router page can not load a `server-only` module). Sections below the first screen use `content-visibility: auto`.
 - **Public header:** links are the mockup's small ghost buttons.
 - **Map surround:** bush country in both themes (VISUALS, "The surround"), in `packages/render/src/surround.ts`, drawn as a screen tile under the farm. No farm view changed, so the map fixtures did not need making again.
 - **Admin:** headings in Silkscreen 20 px, chunky buttons in every button row (coral for the main one), the switch look on the switches screen with its confirm step kept, the mockup's menu (logo and ADMIN, active item, a coral count of open reports on Moderation), KPI tiles four to a row from 900 px. The logo and the count are drawn by the server layout and handed to the menu, so no script was added.
@@ -2418,6 +2418,80 @@ Branch `m8-look-site`, cut from `m7-final` (6a27291). The website, admin, commun
 - Signed-in admin and community pages (no database here): only their not-set-up answers were seen.
 - The announcement bar with a real database.
 - Lighthouse on this PC was noisy while another build ran beside it; the quiet runs matched the m7 figures.
+
+**Merged with `m7-final` (53da309).** Both branches had made the site show Daily Farm by default. One mechanism is kept: the default-on list `SITE_SWITCHES_DEFAULT_ON` in `lib/site.ts`, turned off by name with `SITE_SWITCHES_OFF=daily_farm`. The minus form in `SITE_SWITCHES_ON` (`-daily_farm`, in the m8 Daily Farm entry below) is removed and now does nothing; `.env.example`, SETUP, RUNBOOK, CALLS_FOR_CLAUDIA and the tests say the same.
+
+### 15 Nov 2026: m8 Daily Farm on by default
+
+Branch `m8-daily-on-and-speed`, cut from `m7-final` (6a27291). Claudia asked: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." (REQUIREMENTS, 15 Nov 2026.)
+
+- **The default.** `daily_farm: true` in `FEATURE_SWITCHES`; new migration `20261120000100_daily_farm_on.sql` sets it on where no admin has set it by hand; the seed test checks the two agree (on). The admin switches screen reads its default from the shared list, so it follows. The website's own default now shows Daily Farm (`SITE_SWITCHES_DEFAULT_ON` in `lib/site.ts`); `-daily_farm` in `SITE_SWITCHES_ON` takes it off.
+- **No database.** Setup no longer says "Daily Farm is coming". With no database it says: "Daily Farm needs the game database, which keeps each farm from day to day and runs its nights. This copy of the game has no database set up yet. Fast Farm is ready to play now." With a database but no sign-in: Daily Farm needs an account and sign-in is not set up. Switched off by the admin: "Daily Farm is switched off at the moment." The setup state `coming` is renamed `off`.
+- **Trying it before the database.** `GG_DEV_LOCAL_DAILY=1`, honoured only in `pnpm dev` with no database: a guest can start a Daily Farm on farm files (`DailyData(null)`, so the baked tables then the averages and last prices). No rollover job: the nights owed run when the farm is opened, by the same `bringUp` code. A small change: a `local` flag on the Daily runtime and two guards in `createDaily`.
+- **What Daily Farm needs to run** is written down in `docs/RUNBOOK.md` section 5.1. `.env.example` said a farm with no feed runs "only as far as the days already kept"; it runs on, on averages and last prices, with a diary line. Fixed there and in the RUNBOOK.
+- **Proof.** `daily.e2e.test.ts` no longer forces the switch: it reads the migrations' default from the database (on), checks setup offers Daily Farm to the new account, starts a farm, runs the rollover route after midnight and opens the farm next morning on the next day (passes). New `server/daily/offer.test.ts` (7 tests): the no-database line, the sign-in line, the development setting ignored in production and with a database, and a guest's local farm moving on overnight. `start.test.ts`, `rollover.test.ts`, `coverage.test.ts`, `sitePages.test.ts` pass.
+
+### 15 Nov 2026: m8 /play speed
+
+Same branch. Lighthouse Performance on `/play` against the 0.95 target in `lighthouserc.json` (no rule, threshold or config changed). Lessons SP1 and SP2.
+
+**Measured first** (5 mobile runs back to back with the repo settings, `lhci collect --url=http://localhost:3000/play --numberOfRuns=5`, local production build; the PC was busy with other work, so the scores are noisy):
+
+- Before: 0.86, 0.86, 0.82, 0.86, 0.85 (median 0.86). Largest paint 3.49 s (median), first paint 0.93 s, total blocking time 249 ms, layout shift 0.
+- The largest paint was a setup card's text (since this branch, the Daily Farm card's longer line). It was not in the server's HTML, which held "Loading your farm". Before it could draw: 14 script files (about 217 KB over the wire), then `/api/game/farm` and `/api/auth/me` side by side, then `/api/game/setup` (mounted only after the farm answer), then React's render. Lighthouse's breakdown: 0.6 to 0.9 s of "element render delay" after the HTML. Fonts (4 files, preloaded) and the 2 style sheets come with the HTML and were not the cause. The PixiJS map already loads only when a farm is drawn. The main thread: script evaluation about 0.7 s, mostly React (one long hydration task of 250 to 400 ms).
+
+**Fixed**
+
+1. `server/game/firstScreen.ts`: a request with none of the game's cookies (`gg_session`, `gg_farm`, or a `sb-*` sign-in cookie) can have no farm, so `/play` gets the setup choices on the server (the same `setupOptions` and `dailyOffer` the setup route sends) and draws the first setup step in its HTML. `PlayApp` shows setup in place of "Loading your farm" until the farm request answers, then follows the answer as before. `SetupFlow` uses the choices it was given and skips the setup request. With any cookie, or if the server read fails, the page is exactly as before.
+2. The site header and the setup flow each sit in their own `<Suspense>`, so React hydrates them as separate pieces of work. Within the noise; kept because it changes nothing on screen.
+
+- After: 0.96, 0.94, 0.98, 0.87, 0.95 (median 0.95). Largest paint 0.92 s, the same as the first paint, and the element is in the server's HTML (the document grew from 7.4 KB to 9.0 KB over the wire). Total blocking time 250 ms (median). Layout shift 0. Accessibility, best practices and SEO 100 every run.
+- What is left: total blocking time, mostly React's own first hydration (one task of about 260 to 350 ms on this PC). A busy machine can still read under 0.95. Taking it lower needs less to hydrate on the first screen (for example a setup step that is plain HTML until it is used), which is a redesign of how the page starts, not done.
+
+**Rules kept.** No Lighthouse rule or JS budget changed: `/play` is 208.4 KB (208.3 KB before). `pnpm check:browser-bundle` clean (no engine code in the browser). The CSP is unchanged; the page's nonce and hashes still match (no policy errors in any run, best practices 100). The service worker still precaches `/play`: a headless Chrome check (puppeteer-core) opened `/play` as a new visitor (setup in the HTML), let the worker install, made a farm through the setup screen, opened `/play` again, then stopped the server. Offline, the worker served its install copy, which holds the setup HTML, and the page still showed the kept farm with "You are offline. This is the farm as you last saw it." and Next day switched off. The browser pane in the app can not register a service worker at all ("An unknown error occurred when fetching the script"), so that check was done in headless Chrome. Tests: `apps/web/server/game/firstScreen.test.ts`, `apps/web/components/play/playfirst.test.ts`, and the offline, maintenance and CSP tests rerun.
+
+**Proof (both m8 parts).** `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 236 files, 4,267 tests: 4,240 passed, 22 expected failures, 4 skipped, 1 failed on time only (`boards.test.ts` "Your row pins at the bottom", 30 s timeout while Lighthouse and a server ran on the same PC); rerun alone, 13 of 13 passed. `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised (`/play` 208.4 KB). Production build with no keys: `/` (no script file, the Daily Farm card shows), `/play` as a new visitor (setup in the HTML, Daily Farm says it needs the game database), a Fast Farm taken through setup, Lick switched on, Next day and the overnight card. No policy error in the console. Every server started was stopped.
+
+### 15 Nov 2026: m8 Playability fixes
+
+Branch `m8-playability`, cut from `m7-final` (6a27291). Engine 0.20.0, save format 15, snapshot version 7. From a playtest of 144 three-year games. Calls B141 to B150, A10 (doing nothing out-scores sensible play, for Claudia, nothing changed), stand-ins and G10. Lessons PF1 to PF8. Only the engine, `apps/web/server`, `lib/game/tour.ts`, `lib/game/types.ts` (new fields only), `components/play/helptopics.ts` and docs were touched: the screens are other builders'.
+
+**What was built**
+
+1. The bank: two facts before it takes the farm (cash below zero, three quarters of the way to the limit), in the inbox, Things to do and as skip stops; `totals.bankLimit` and `totals.lendLimit` as display numbers. Nothing came off the browser deny list. Tests: `day/playability.test.ts`, `server/game/playability.test.ts`.
+2. Skip stops for the first eaten-out day, the bank facts, deaths other than natural, and calving starting, each with its words. Tests: `day/playability.test.ts`, `day/days.test.ts`.
+3. A year skip runs to the farm's year end: 366 days across 29 February (a Central West farm from September 2007). Test: `day/playability.test.ts`.
+4. Things to do facts: a sale within 7 days with the head at sale weight by class, a mob under CS 2.5, calving started, feed under the floor; each once while true; `dismissTodo` puts one away. Tests: both playability files, `day/todo.test.ts`.
+5. Marking once per drop, when most calves are old enough or 30 days after calving started. Test: `day/playability.test.ts`.
+6. Mob card warnings only when losing worse than 0.05 kg a head a day, CS under 2.5 or no water; otherwise `details`. Tests: `mobwords.test.ts`, `server/game/playability.test.ts`.
+7. "Under 800 kg DM/ha" in place of "0 days" (`feedText`); "Feed is about 760 kg DM/ha. Under about 900 they eat less." Tests: same.
+8. The tour: open a mob, look at the fence card; never join mobs or spend money. Test: `lib/game/tour.test.ts`.
+9. The year card's change lines. Test: `server/game/playability.test.ts`.
+10. Setup money per difficulty for each district and size (`sizes[].money`). Test: `server/game/playability.test.ts`.
+
+**A small playtest through the real `GameServer`** (real years, small farms, three years; sensible player on week skips doing every job with a button, selling steers and heifers at sale weight when a sale is near, moving mobs out of the yards; do-nothing player on month skips):
+
+| District | Player | New to-do items a week | Items shown | Warning lines at each look | Skips | Stopped early | Missed stops |
+|---|---|---|---|---|---|---|---|
+| Central Queensland | sensible | 0.40 | 0.87 | 2.7 | 161 | 10 | 0 |
+| Central Queensland | nothing | 0.33 | 2.87 | 3.6 | 44 | 15 | 0 |
+| Central West | sensible | 0.37 | 0.61 | 3.1 | 160 | 8 | 0 |
+| Central West | nothing | 0.35 | 2.68 | 2.9 | 43 | 13 | 0 |
+
+The first item came on day 74 in Central Queensland and day 0 in Central West (before: day 133 to 160). On hard difficulty the Central Queensland do-nothing farm was taken by the bank in year 3; its skips stopped first at -$44 (below zero) and again at -$45,095 (three quarters of the way), then at the end. A buyer spending to the overdraft on hard was warned the night each buy took cash below zero. "Missed stops" counts inbox facts that should stop a skip on a day that was not the last of its skip: none.
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 235 files, 4,278 tests: 22 expected failures and 4 skips (as on `m7-final`); after the fixes to the tests listed in CALIBRATION (the m8 entry), the two tests that failed only on time under load (`cattle/gains.test.ts`, `server/boards/boards.test.ts`) pass alone.
+- `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised (`/play` 208.6 KB).
+- `pnpm test:speed` alone: sheep 2.27 ms a day (passes). The cattle case failed on time on every run (45, 20, 6.7 and 7.7 ms a day) while other builders were running on the same PC; `m7-final`'s own engine, run the same way in the same hour, gave 17 ms. No change here touches the cattle tick's work (the bank check is two comparisons a day). Not yet seen under 5 ms on this tip.
+
+**Not done or not checked**
+
+- The screens do not yet draw the new fields: `totals.bankLimit` and `totals.lendLimit` beside Cash, `paddocks[].feedText` in place of the days, `mobs[].details` in the mob card's details, `setup` `sizes[].money` on the difficulty step, and a "put away" button on each Things to do item that sends `{ action: { type: 'dismissTodo', key } }`. Until then the paddock sheet still shows "About 0 days", and Help does not mention putting an item away.
+- The inbox's own out-of-feed line still says "The farm has about N days of feed left"; the skip stop words are the new ones.
+- The marking note in the inbox (`toMark`, every 45 days) is unchanged.
+- Engine tests were compared with `m7-final` by count (22 expected failures, 4 skips), not file by file by name. The `realism-guardian` agent was not run. No browser check.
 
 ## Ideas raised but not built yet
 

@@ -101,6 +101,59 @@ export function yearFacts(y: Closed): string[] {
   return out;
 }
 
+/**
+ * A part of the score moved "a lot" from one year to the next when it changed by at least this
+ * share of the larger figure and by at least `MOVED_MIN_PTS` points. Stand-ins, listed for Claudia.
+ */
+export const MOVED_SHARE = 0.25;
+export const MOVED_MIN_PTS = 500;
+
+/** A figure changed by at least `share` of the larger of the two. */
+const movedBy = (a: number, b: number, share: number): boolean =>
+  Math.abs(a - b) >= share * Math.max(Math.abs(a), Math.abs(b));
+
+/**
+ * For each part of the score that moved a lot from last year: one fact line naming the part and
+ * both figures. Where the year's own record holds a cause that moved the same way, it is named
+ * as a fact with its two figures (births for weight gain, feed grown for pasture use, deaths for
+ * deaths). Otherwise just the figures. Facts only: no praise, no blame, no advice.
+ */
+export function changeLines(prev: Closed, cur: Closed): string[] {
+  const out: string[] = [];
+  const last = scoreParts(prev.score);
+  const now = scoreParts(cur.score);
+  const t = (kg: number): string => `${n0(kg / 1000)} t DM`;
+  for (let i = 0; i < now.length; i++) {
+    const a = last[i]!.pts;
+    const b = now[i]!.pts;
+    if (Math.abs(a - b) < MOVED_MIN_PTS || !movedBy(a, b, MOVED_SHARE)) continue;
+    const up = b > a;
+    let cause = '';
+    const same = (x: number, y: number): boolean => y > x === up && movedBy(x, y, 0.15);
+    switch (now[i]!.key) {
+      case 'gain':
+        if (same(prev.births, cur.births)) {
+          cause = ` Births: ${n0(prev.births)} last year, ${n0(cur.births)} this year.`;
+        } else if (same(prev.grown, cur.grown)) {
+          cause = ` Pasture grown: ${t(prev.grown)} last year, ${t(cur.grown)} this year.`;
+        }
+        break;
+      case 'util':
+        if (movedBy(prev.grown, cur.grown, 0.15)) {
+          cause = ` Pasture grown: ${t(prev.grown)} last year, ${t(cur.grown)} this year.`;
+        }
+        break;
+      case 'death':
+        cause = ` Deaths: ${n0(prev.deaths)} last year, ${n0(cur.deaths)} this year.`;
+        break;
+      default:
+        break;
+    }
+    out.push(`${now[i]!.label} points: ${n0(a)} last year, ${n0(b)} this year.${cause}`);
+  }
+  return out;
+}
+
 /** The year's money, in (positive) and out (negative). Rows that are zero are left out. */
 export function yearMoney(y: YearTotals): { label: string; dollars: number }[] {
   const rows: { label: string; dollars: number }[] = [
@@ -141,12 +194,14 @@ function viewOf(
   y: Closed,
   realYear?: number,
 ): YearView {
+  // The year before, when there is one: each part that moved a lot gets its fact line.
+  const prev = n >= 2 ? farm.years[n - 2] : undefined;
   return {
     n,
     title: titleOf(farm, setup, n, y.start, realYear),
     total: y.score.total,
     parts: scoreParts(y.score),
-    facts: yearFacts(y),
+    facts: [...yearFacts(y), ...(prev ? changeLines(prev, y) : [])],
     money: yearMoney(y),
   };
 }

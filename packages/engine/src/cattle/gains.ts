@@ -11,7 +11,7 @@ import type { Supplement } from '../data/feed';
 import { clamp } from '../num';
 import { meFromDmd } from '../pasture/quality';
 import { classOf } from './animal';
-import { dietOf, intakeOf, type Diet } from './graze';
+import { AVAIL_KG_HA, dietOf, intakeOf, type Diet } from './graze';
 import type { GainForecast, GainReason } from './notes';
 import type { Animal, CattleMob, GrazingArea, GrazingLand } from './types';
 
@@ -67,6 +67,16 @@ export function mjPerKgGain(wt: number): number {
   return young + (grown - young) * t;
 }
 
+/** Under this share of their fill on offer, "not enough feed" is a reason a class is not gaining. */
+export const NOT_ENOUGH_FEED_AVAIL = 0.75;
+
+/**
+ * The feed, kg DM/ha, under which cattle can not get that share of their
+ * fill: about 900 kg DM/ha. Worked out from the two figures above, so the
+ * words on the screens always match the model.
+ */
+export const FEED_SHORT_KG_HA = -AVAIL_KG_HA * Math.log(1 - NOT_ENOUGH_FEED_AVAIL);
+
 /** Expected weight change, kg a day, for one animal on a diet with its fill of feed. */
 export function gainOn(a: Animal, diet: Diet, supp: Supplement): number {
   const it = intakeOf(a, diet, supp, false);
@@ -85,7 +95,7 @@ export function gainWhy(a: Animal, diet: Diet, supp: Supplement): GainReason[] {
   const it = intakeOf(a, diet, supp, false);
   const meF = meFromDmd(diet.dmd);
   const why: GainReason[] = [];
-  if (diet.avail < 0.75) why.push({ reason: 'notEnoughFeed', mass: diet.mass });
+  if (diet.avail < NOT_ENOUGH_FEED_AVAIL) why.push({ reason: 'notEnoughFeed', mass: diet.mass });
   if (meF < 8) why.push({ reason: 'lowMe', me: meF });
   if (diet.cp < 7 && supp !== 'lick') why.push({ reason: 'lowProtein' });
   if (a.lact >= 0 && a.calf) {

@@ -272,6 +272,9 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
     case 'clearPlan':
       // Pausing and clearing a plan are decisions: they take none of the day.
       return { kind: 'free' };
+    case 'dismissTodo':
+      // Putting a thing to do away is looking, not work.
+      return { kind: 'free' };
     case 'setPlan':
     case 'planMove':
     case 'resumePlan': {

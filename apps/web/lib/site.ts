@@ -45,10 +45,11 @@ export const DETAILS_TO_COME = 'Contact details will be added before launch.';
 export type SiteSwitchKey = FeatureSwitchKey | 'sheep' | 'farm_hands' | 'analytics';
 
 /**
- * The switches the website treats as on unless the environment turns them off.
- * Daily Farm is built, so the home page names it (decided for milestone 8).
+ * Switches the website shows as on when the build environment says nothing about them. Daily Farm
+ * is on in the game by default (FEATURE_SWITCHES, at Claudia's request of 15 November 2026), so the
+ * landing and pricing pages show it too, and the site and the game agree.
  */
-export const SITE_DEFAULT_ON: readonly SiteSwitchKey[] = ['daily_farm'];
+export const SITE_SWITCHES_DEFAULT_ON: readonly SiteSwitchKey[] = ['daily_farm'];
 
 const listFrom = (value: string | undefined): string[] =>
   (value ?? '')
@@ -57,20 +58,23 @@ const listFrom = (value: string | undefined): string[] =>
     .filter(Boolean);
 
 /**
- * The website's switch list, read when the site is built.
+ * The website's read of a switch, made when the site is built.
  *
- * The public pages must never promise what is not there, so every switch is
- * OFF unless the environment turns it on, except the few in `SITE_DEFAULT_ON`,
- * which are on unless the environment turns them off:
+ * The public pages must never promise what is not there, so every switch is OFF unless the
+ * environment turns it on, except the ones in SITE_SWITCHES_DEFAULT_ON, which are on unless the
+ * environment turns them off:
  *
  *   SITE_SWITCHES_ON=community,leaderboards
  *   SITE_SWITCHES_OFF=daily_farm
  *
- * The keys are the ones in `@gg/shared` so the two line up.
+ * The keys are the ones in `@gg/shared` so the two line up. The game and account routes read the
+ * live switches; these pages change only when the site is built again.
  */
 export function siteSwitchOn(key: SiteSwitchKey): boolean {
   if (listFrom(process.env.SITE_SWITCHES_OFF).includes(key)) return false;
-  return SITE_DEFAULT_ON.includes(key) || listFrom(process.env.SITE_SWITCHES_ON).includes(key);
+  return (
+    SITE_SWITCHES_DEFAULT_ON.includes(key) || listFrom(process.env.SITE_SWITCHES_ON).includes(key)
+  );
 }
 
 /** For tests: the shared switch keys. */

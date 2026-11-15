@@ -8,12 +8,14 @@ import {
   dateOn,
   sheepDistrict,
   sheepMobsRead,
+  startMoney,
 } from '@gg/engine';
 import { DISTRICTS, DISTRICT_IDS, type DistrictId } from '@gg/shared';
 import type {
   SetupChoices,
   SetupDifficulty,
   SetupEnterprise,
+  SetupMoneyWire,
   SetupOptions,
   SetupSize,
   SetupStart,
@@ -23,6 +25,13 @@ import type {
 import { startFlockText } from './sheepwords';
 
 export const NAME_MAX = 40;
+
+/** What the player reads when this copy of the game has no database, so Daily Farm can not run. */
+export const DAILY_NO_DATABASE =
+  'Daily Farm needs the game database, which keeps each farm from day to day and runs its nights. This copy of the game has no database set up yet. Fast Farm is ready to play now.';
+/** What the player reads when the admin has switched Daily Farm off. */
+export const DAILY_SWITCHED_OFF =
+  'Daily Farm is switched off at the moment. Fast Farm is ready to play now.';
 const SIZES: readonly SetupSize[] = ['small', 'medium', 'large'];
 const YEARS: readonly SetupYears[] = ['real-in-order', 'real-random', 'random'];
 const STARTS: readonly SetupStart[] = ['running', 'scratch'];
@@ -72,10 +81,29 @@ const DIFFICULTY_TEXT: Record<SetupDifficulty, string> = {
 };
 
 /**
+ * The money each difficulty starts with on a district and size, as the engine sets it: cash
+ * taking over a running farm and from scratch, how far the bank lends, and where it takes the
+ * farm. Whole dollars, display numbers only (m8: the setup step shows the figures).
+ */
+export function setupMoney(district: DistrictId, ha: number): SetupMoneyWire[] {
+  return DIFFICULTIES.filter((d) => d in DIFFICULTY).map((difficulty) => {
+    const running = startMoney(district, ha, difficulty, true);
+    const scratch = startMoney(district, ha, difficulty, false);
+    return {
+      difficulty,
+      cashRunning: running.cash,
+      cashScratch: scratch.cash,
+      lendLimit: running.overdraft,
+      bankLimit: running.broke,
+    };
+  });
+}
+
+/**
  * The choices the setup flow offers, with the real hectares for each
  * district. The figures come from the engine's tables here, on the server,
- * so the browser holds no tables. No dollar figures: they are shown once
- * the farm is taken.
+ * so the browser holds no tables. Money is sent as plain display numbers
+ * for each difficulty on each district and size (m8), never as a rule.
  */
 export function setupOptions(sheepOn = false): SetupOptions {
   // The difficulty table is read so the list can never name a level the engine lacks.
@@ -119,6 +147,7 @@ export function setupOptions(sheepOn = false): SetupOptions {
         id: size,
         label: size[0]!.toUpperCase() + size.slice(1),
         ha: FARM_SIZES[id][i]!,
+        money: setupMoney(id, FARM_SIZES[id][i]!),
       })),
       mixed: { arablePcts: [...ARABLE_SHARES[id].mixed], croppedPcts: CROPPED },
     })),
@@ -171,8 +200,8 @@ export function setupOptions(sheepOn = false): SetupOptions {
     nameMax: NAME_MAX,
     // The route fills this in for the player who asked (server/daily/offer.ts).
     daily: {
-      state: 'coming',
-      text: 'Daily Farm is coming. Fast Farm is ready to play now.',
+      state: 'off',
+      text: DAILY_NO_DATABASE,
       limit: 0,
       going: 0,
     },

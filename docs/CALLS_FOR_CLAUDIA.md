@@ -28,15 +28,15 @@ How to read it:
 
 Every feature switch and its real default is in the table below. The defaults come from the shared switch list in `packages/shared/src/index.ts` and the seed migrations in `supabase/migrations` (the reference data, then the Daily Farm and sheep migrations). A test checks the two agree key for key. With no keys set, the game plays as a guest on farm files whatever the switches say.
 
-Switched off: Daily Farm, sheep, the whole community (posts, groups, ticker, farm viewing), every kind of ad and AdSense, purchases, and maintenance mode. Daily Farm is off against the PRD table (which says on) because you said off by default and its live data feed has never run. Sheep are off until the open sheep gaps are ruled on. The rest are off as in the PRD, and each needs a key, an outside account or your ruling.
+Switched off: sheep, the whole community (posts, groups, ticker, farm viewing), every kind of ad and AdSense, purchases, and maintenance mode. Sheep are off until the open sheep gaps are ruled on. The rest are off as in the PRD, and each needs a key, an outside account or your ruling.
 
-Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups and leaderboards do nothing visible until the database keys exist. Push sends nothing until the push keys and a schedule exist.
+Switched on: sign-ups, Daily Farm, Fast Farm, leaderboards and push notifications. Daily Farm is on at your request of 15 November 2026 ("I want to be able to get on and try both rounds of gameplay"), as the PRD table says. Sign-ups, Daily Farm and leaderboards do nothing visible until the database keys exist: with no database, setup says Daily Farm needs the game database. Push sends nothing until the push keys and a schedule exist.
 
 | Switch | Default | What it needs before it can go on |
 | --- | --- | --- |
 | `signups_open` | On | Supabase keys, or sign-in is not offered |
 | `fast_farm` | On | Nothing |
-| `daily_farm` | Off | Database keys, `CRON_SECRET` and a 15-minute schedule, a test of the live feed (`GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL`), and your ruling A9 |
+| `daily_farm` | On (your request, 15 Nov 2026) | To run: database and account keys. For the nights to run on time: `CRON_SECRET` and a 15-minute schedule (without it each night runs when the farm is opened). For real data after 12 Nov 2026: `GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL` (without it, long-term average weather and last prices, said in the diary). `docs/RUNBOOK.md` section 5.1 |
 | `community` | Off | Database keys, your rulings A22, A15 and A17, a lawyer's read of the community rules |
 | `feed_posts` | Off | `community` on, and the photo approach in A22 |
 | `groups` | Off | `community` on |
@@ -53,14 +53,14 @@ Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups 
 | `maintenance_mode` | Off | Nothing. Turn it on from the admin switches screen |
 | `analytics` | Off | Database keys. Your ruling A21 on consent. `POSTHOG_KEY` and `POSTHOG_HOST` only if events should leave our own database. The privacy page reads it at build, so also add `analytics` to `SITE_SWITCHES_ON` and redeploy |
 
-Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built, and every entry in it is off until you set it.
+Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built. Every entry in it is off until you set it, except Daily Farm, which the site shows by default so the site and the game agree (`SITE_SWITCHES_OFF=daily_farm` takes it off).
 
 ### The rulings that matter most
 
 1. **The grass, calves and cows (A1, A2).** These change how the game plays more than anything else: winter feed, steer gains, calf weights and cow condition.
 2. **When a cow shows as in calf (A3).** 50 days against 42 changes sale values.
 3. **Sheep (A4, A5, A6).** Needed before sheep can be switched on.
-4. **Daily Farm (A9).** Needed before the real-time mode can be switched on.
+4. **Daily Farm data lag (A9).** Daily Farm is on at your request. Its game day runs 5 days behind the real date.
 5. **Legal and privacy risk (A15, A16, A17, A21, A22, A23).** No lawyer has read the legal pages. The under-14 retry, the ban record that outlives a deleted account, retention and photo moderation all carry risk.
 6. **Money (A19, A20).** Buying age, refunds and what the rescue pays.
 
@@ -86,9 +86,11 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A8. Contractor price and wages.** Built: a contractor charges materials plus $5 a metre labour, the same for either team. Wages use 2026 Pastoral Award rates (paid every 14 days) on every farm, whichever year is played. Other choice: a contractor's real quote, weekly pay, and wages of the year played. What it changes: the cost of fencing and a farm's running costs. The $5 is a stand-in because no labour-only rate was found. [m2.1 calls 4, 8, 9, 18. Change: `labourPerMetre`, `payCycleDays`]
 
-**A9. Daily Farm: on or off, and data 5 days behind.** Built: Daily Farm is off. Its game day runs on the real weather and prices of 5 days earlier, so the midnight run never waits for late data. A new farm starts on today's date as Day 1. The live data feed has never been run. Other choice: switch it on, use a different lag, or run each day on the day's own data and correct later. What it changes: whether the real-time mode exists at all. The PRD table says on and you said off by default. [m3.3 call 1, second pass calls 3 and 6, call 14. Change: the `daily_farm` switch and `DAILY_DATA_LAG_DAYS`]
+**A9. Daily Farm: data 5 days behind.** On or off is settled: you asked on 15 November 2026 for Daily Farm to be turned on, so it is on by default (the switch, migration `20261120000100_daily_farm_on` and the public pages). Still built for your ruling: its game day runs on the real weather and prices of 5 days earlier, so the midnight run never waits for late data. A new farm starts on today's date as Day 1. The live data feed has never been run. Other choice: use a different lag, or run each day on the day's own data and correct later. What it changes: how far behind the real season the farm's weather runs. [m3.3 call 1, second pass calls 3 and 6, call 14; m8. Change: `DAILY_DATA_LAG_DAYS`]
 
 **A10. The score and the leaderboards.** Built: the score shown is the game's own year score from five parts (profit, weight gain, pasture use, ground cover, deaths), with each part's points shown. The Grazier Score has no agreed weights. The headline board averages the year score over finished years. The real-year board ranks on the change in net worth per hectare over that year. Other choice: set the Grazier Score weights, show fewer points, or rank on something else. What it changes: what players chase, and a player could work the weights back from the points shown. Weights are to be set once calibration farms are run. [m1.7g calls 1, 11, 14; m4 calls 1 to 4. Change: `headline` in `server/boards/score.ts` and `YearBlocks.tsx`]
+
+**A10, the first thing to rule on after you have played: doing nothing out-scores sensible play.** The m8 playtest (144 three-year games) found that a player who does nothing scores more than one who plays sensibly in all eight district and year combinations. For example, Central West on real years: 19,566 points doing nothing against 11,374 playing sensibly, over three years. There are two reasons. Weight gain earns points (`SCORE.gainPts`, 0.5 a kg, in `packages/engine/src/money/worth.ts`) and the same kilograms are also counted in net worth, so profit counts them again. And the start herd is under carrying capacity: 1.0 to 2.8 DSE/ha on the four launch districts against 2.5 to 4.7 DSE/ha, so a herd left alone keeps growing for years. Nothing was changed: the score formula and the start herd are yours to rule on. Other choices: drop or cut the gain points, or count gain once; start the herd nearer carrying capacity; or both. What it changes: what players chase, and every leaderboard. [m8 playtest]
 
 **A11. Real years: prices and dollars.** Built: real MLA prices from 1997, lifted to today's dollars by the CPI (September quarter 2026). Each class sits on an MLA indicator (weaners 1.08 times the restocker yearling figure, bulls 0.906 of cows). Where a yard's own figure is thin the national figure times the yard's usual premium is used. Sale days with no records are Mondays at two yards. Other choice: prices of the day, different class mappings, extra fill-in yards (Emerald, Inverell, Ballarat), real sale days. What it changes: what stock sell for in each real year and whether a 1997 start can pay its way. [m1.4 Q1 to Q6, realism check CHECK 8 to 10; m1.4a Q1. Change: `REAL_PRICE_DOLLARS` and `market/realPrices.ts`]
 
@@ -118,7 +120,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A24. Notifications: defaults, quiet hours and under-16s.** Built: nothing is sent until a device is added. The morning reminder is off until turned on, email is off for every type, and email is only a fallback. Quiet hours drop reminders and hold other notices for up to 12 hours. Under-16s get no community notifications but still get challenge notices. At most 6 a day. Chrome and Edge push hosts are allowed from their own documents but have never been tested. Other choice: reminders on by default, held reminders, challenges hidden for under-16s. What it changes: how often players are contacted. Push needs one real-device test per browser. [m3.4 calls 1, 2, 5, 6, 9; m3.1 call 29. Change: `lib/notify/kinds.ts`, `DAILY_CAP`]
 
-**A25. Speed targets that are missed.** Built: `/play` scores Lighthouse 0.89 to 0.90 against a 0.95 target (three mobile runs on the final branch, largest paint about 3.4 s), so CI fails on it. Since the launch check the app pages are made for each request, so each gets its own nonce for the Content-Security-Policy; the score was 0.87 to 0.91 before that change too. App pages carry about 140 KB of framework script against the PRD's 100 KB for website pages (public pages send none). Several pages sit within 1 KB of their limit. Other choice: lighten the play page, or move the targets. What it changes: first load speed on a phone. [m1.8 calls; m3.2; m6; m5.5 call 3. Change: `PlayApp` and `SetupFlow`, `lighthouserc.json`]
+**A25. Speed targets that are missed.** Built: since m8, `/play` draws the setup screen in the server's HTML for a visitor with no cookies, so its largest paint no longer waits for the scripts and two requests. Five mobile runs back to back on this PC (busy with other work), the repo settings: before 0.82 to 0.86 (median 0.86, largest paint 3.49 s); after 0.87 to 0.98 (median 0.95, largest paint 0.92 s, the same as the first paint). What is left is total blocking time (median about 250 ms here), mostly React's own first hydration task, so a busy machine can still read under 0.95. Not yet run on CI. (On the final branch three runs had read 0.89 to 0.90.) App pages carry about 140 KB of framework script against the PRD's 100 KB for website pages (public pages send none). Several pages sit within 1 KB of their limit. Other choice: lighten the play page, or move the targets. What it changes: first load speed on a phone. [m1.8 calls; m3.2; m6; m5.5 call 3. Change: `PlayApp` and `SetupFlow`, `lighthouserc.json`]
 
 ### Part B: decided, no action needed unless you disagree
 
@@ -436,6 +438,28 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B140.** On a Daily Farm night with no hand at work, a plan that moves several times a day grazes the day across the paddocks the player really moved the mob through, split as the engine splits its own stops, or where the mob is if it was not moved. The card offers at most the plan's own moves a day. Other choice: graze the plan's own stops whether or not the mob was moved. [m7.1. Change: `PlanRun.handStops`, `stopsToday`]
 
+#### Playability fixes after the playtest (m8)
+
+**B141. The bank warns before it takes the farm.** When cash first goes below zero, and again when it passes three quarters of the way to where the bank takes the farm, one inbox fact and one Things to do fact name the cash, the limit and the head on hand that could be sold (cattle that are not calves at foot and not booked, and sheep). A skip stops at both points and says why. Each is told once. When cash comes back above the mark it falls back, so a later fall is told again. The bank's limit (where the farm is taken, `totals.bankLimit`) and how far it lends for jobs (`totals.lendLimit`) go to the browser as display numbers under names of their own, so the screens can show them beside Cash. Nothing came off the browser deny list: the engine's own field names stay out of the browser. Playtest: a Central Queensland farm was taken at $60,000 overdrawn with net worth of $196,000 to $346,000 and 275 saleable head, and +1 year ran straight into it. Other choice: warn at other points, or not stop. [m8 item 1. Change: `money/bank.ts`, `BANK_NEAR_SHARE`]
+
+**B142. More reasons a skip stops.** Besides water, troughs, crops, the year end and game over, a skip now stops for: a mob that has run out of feed (the first day of the whole-farm eaten-out countdown); the bank facts (B141); deaths from anything other than natural causes (cattle: no water, poor condition, orphaned calves; sheep: no water, starved, poor condition, flystrike; lambing, newborn and weaner losses are the flock's usual rates and do not stop it); and calving starting in a mob. Each stop says why in words. Playtest: 198 week and month skips never stopped early, and a herd lost 16 head through month skips with no stop. Other choice: fewer stops, or a setting to turn some off. [m8 item 2. Change: `stopsIn` in `day/days.ts`]
+
+**B143. +1 year ends on the farm's year end.** A year skip runs to the farm's own year end: 366 days across 29 February on a real-year farm, so the year card always shows. A year skip started part way through a year runs to that year's end, where it already stopped. [m8 item 3. Change: `daysToYearEnd`]
+
+**B144. Things to do holds facts.** New items, facts only: a cattle sale within the next 7 days and the head at sale weight not yet booked, by market class with its weights (yearling steers 280 to 450 kg, heavy steers 450 kg and over, heifers 280 kg and over); a mob whose average condition score is under 2.5, with the figure; calving started in a mob, with the calves born so far (for its first 30 days); and a mob grazing an area under the grazing floor (800 kg DM/ha), with the feed figure. Each shows once while it is true, as one item, and goes when it stops being true or the player puts it away (`dismissTodo`, a decision that takes no light). A thing put away shows again only if it stops and then starts again. None repeats daily as a new line. Playtest: 0.1 items a week for a player who plays, and the first item ever came on day 133 to 160. [m8 item 4. Change: `day/todo.ts`]
+
+**B145. Marking comes once per drop.** Marking is listed for a mob when most of its calves are 60 days or older, or 30 days after its calving started, as one item with the bull calves to mark (and any young bulls). An ignored item stays one item. Playtest: marking came one calf at a time and nagged for years. [m8 item 5. Change: `MARK_AFTER_CALVING_DAYS` in `day/todo.ts`]
+
+**B146. Mob card warnings only when the mob is losing.** The reasons show as warnings only when the mob is losing more than 0.05 kg a head a day, its average condition score is under 2.5, or it has no water. A mob that is holding or gaining gets the same facts as plain details (`MobWire.details`), and "just short of what they need" becomes a plain intake fact. Playtest: 32 to 44 warning lines a week on herds that were growing, and one line up for 858 days running. [m8 item 6. Change: `mobLines` in `server/game/mobwords.ts`]
+
+**B147. Feed under the floor says so.** Words only, no formula change. A stocked paddock under the grazing floor shows "Under 800 kg DM/ha" (`PaddockWire.feedText`) in place of "0 days". The feed reason reads "Feed is about 760 kg DM/ha. Under about 900 they eat less.", with the model's own figures (`FEED_FLOOR_KG_HA`, and `FEED_SHORT_KG_HA` worked out from the intake curve: 901 kg DM/ha). [m8 item 7]
+
+**B148. The tour asks nothing that costs.** Five steps: open a paddock, open a mob and read its card, look at the fence tool and its card (the step ends when the card shows, before the confirm), open the market, end the day. It never asks the player to join mobs or spend money. On the default farm the old "Move cattle" step could only join the weaners with the cows and bulls. [m8 item 8. Change: `lib/game/tour.ts`]
+
+**B149. The year card names a part that moved a lot.** When a part of the year score moved by a quarter or more of the larger figure, and by 500 points or more, from the year before, one fact line names the part and both figures. Where the year's own record holds a cause that moved the same way, it is named with its two figures: births for weight gain (or pasture grown), pasture grown for pasture use, deaths for deaths. Otherwise just the figures. [m8 item 9. Change: `changeLines` in `server/game/years.ts`]
+
+**B150. The setup step shows the money.** For each difficulty, on the chosen district and size: starting cash taking over a running farm and from scratch, how far the bank lends, and where it takes the farm, as display numbers (`SetupOptions.districts[].sizes[].money`). The words stay as they were. [m8 item 10]
+
 ## 2. Stand-in figures
 
 These numbers have no sourced real figure behind them. Each is one constant or setting. "Replaced by" says what would replace it.
@@ -480,6 +504,8 @@ These numbers have no sourced real figure behind them. Each is one constant or s
 | Past-day storage window | 14 days daily then weekly to 182 days | A retention decision | Your ruling |
 | Guest and farm life | Guest 30 days (database), farm file 90 days | Retention decisions | Your ruling and the lawyer |
 | Advertise spots | 20, not counted | A real count | Community page count |
+| Things to do thresholds | Condition score 2.5; a sale 7 days away; three quarters of the way to the bank's limit; marking 30 days after calving; calving shown 30 days | When each fact is listed | Your ruling after playing |
+| Year card "moved a lot" | A quarter of the larger figure and 500 points | When a change gets a line | Your ruling after playing |
 
 ## 3. Known gaps in realism
 
@@ -502,6 +528,8 @@ These are the open calibration rows and review findings. In each case the model 
 **G8. Sheep margins.** Start flock first year (no hands, no sales, no feeding) against DPIRD's $50.46 a DSE: Central West $44.28 passes, Tablelands $5.37 and Western Victoria $135.74 are open. SB-GM (a managed flock, band $37.85 to $63.08): Central West $38.69 passes, Tablelands $71.88 and Western Victoria $90.33 are open, mostly wool at 2026 prices. The model's DSE a ewe (1.6 to 2.0) is below the budget's 2.32. [CALIBRATION, m2.7 review]
 
 **G9. Mixed farm left alone.** Western Victoria with 86 cattle and 659 sheep and no action lost 579 sheep in two years and profit fell from $192,435 to $25,757. Not a benchmark. [m2.7]
+
+**G10. Things to do thresholds are stand-ins.** Condition score 2.5, 7 days to a sale and three quarters of the way to the bank's limit (and marking 30 days after calving) were picked so the list says something useful. None has a source. [m8]
 
 ## 4. Not built
 
@@ -553,7 +581,7 @@ Each item could not be verified without keys, real services or a real phone. "Wh
 
 **V13. Signed-in pages under the new policy.** The community and admin pages were only loaded as their no-keys answers, and the dashboard and its date form were never opened, because there is no database here. Do: on a preview with keys, open `/community`, a profile, `/admin` and the dashboard with a date range, and check the browser console shows no "Content Security Policy" line. [m5.5, m7 join]
 
-**V14. Lighthouse on `/play` since it is made per request.** Three local runs read 0.89 to 0.90 (A25). Not run on CI or on Vercel. Do: run Lighthouse CI on the final branch on CI. [m7 join]
+**V14. Lighthouse on `/play` since it is made per request.** Five local runs after m8 read a median 0.95 (0.87 to 0.98) on a busy PC (A25). Not run on CI or on Vercel. Do: run Lighthouse CI on the final branch on CI. [m7 join]
 
 **V15. The 8 unanswered year skips.** The first load test run had 8 of 120 year skips with no answer at all while other work ran on the same PC; two reruns had none. The cause is not known. Do: nothing yet; watch for it in Vercel logs and Sentry once live. [m5.5, LESSONS LC15]
 
@@ -575,7 +603,8 @@ Every variable is optional. With none set, the game runs with guest play and far
 | `GG_DEV_PAGES` | Builders' pages under `/dev` in production | Leave unset on the live site | `/dev` pages return 404 in production |
 | `SITE_CONTACT_EMAIL` | Enquiry address on the website, read at build time | An address you choose | No contact link; no privacy request or advertising enquiry route |
 | `SITE_OWNER_NAME` | Who "we" is on the privacy page and terms | Your business name | Pages say "the owner of The Grazing Game" |
-| `SITE_SWITCHES_ON` | Which parts of the game the public pages may talk about, read at build time | Comma list of switch keys | Pages talk only about what is live today |
+| `SITE_SWITCHES_ON` | Which parts of the game the public pages may talk about, read at build time | Comma list of switch keys | Pages talk only about what is live today, plus Daily Farm (on by default) |
+| `SITE_SWITCHES_OFF` | Turns off a part the public pages show by default (today only Daily Farm), read at build time | Comma list of switch keys | Daily Farm shows on the public pages |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project address (safe in the browser) | Supabase, Project Settings, API | No accounts or database saves |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable (anon) key, safe in the browser | Supabase, Project Settings, API Keys | No accounts or database saves |
 | `SUPABASE_SECRET_KEY` | Server-only key for deleting users, Storage and sign-in admin | Supabase, Project Settings, API Keys | No accounts, ads media, photos |

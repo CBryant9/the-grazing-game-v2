@@ -379,17 +379,17 @@ describe('functions', () => {
 });
 
 describe('the reference data matches packages/shared', () => {
-  it('feature switches: every key, at the shared launch defaults (PRD 11.7, except Daily Farm, which is off until Claudia turns it on; the PRD table says On)', async () => {
+  it('feature switches: every key, at the shared launch defaults (PRD 11.7; Daily Farm on, at Claudia’s request of 15 November 2026)', async () => {
     const got = await rows<{ key: string; enabled: boolean }>(
       db,
       `select key, enabled from public.feature_switches order by key`,
     );
     const asObject = Object.fromEntries(got.map((r) => [r.key, r.enabled]));
     expect(asObject).toEqual({ ...FEATURE_SWITCHES });
-    // One answer in every place: the seed (the reference-data migration says true, and migration
-    // 20261115000400 sets it off), packages/shared, and here.
-    expect(asObject.daily_farm).toBe(false);
-    expect(FEATURE_SWITCHES.daily_farm).toBe(false);
+    // One answer in every place: the seed (the reference-data migration says true, 20261115000400
+    // set it off, and 20261120000100 sets it on again), packages/shared, and here.
+    expect(asObject.daily_farm).toBe(true);
+    expect(FEATURE_SWITCHES.daily_farm).toBe(true);
   });
 
   it('ad slots: every slot, all off', async () => {
@@ -504,6 +504,7 @@ describe('migration files', () => {
       ['daily_cron', 'notify_cron'],
       ['system', 'analytics'],
       ['notify_cron', 'analytics'],
+      ['daily_farm', 'daily_farm_on'],
     ];
     for (const [first, then] of after) {
       expect(at(first), `${first} before ${then}`).toBeLessThan(at(then));

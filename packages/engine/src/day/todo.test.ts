@@ -51,6 +51,8 @@ describe('things to do', () => {
         area,
         count: 6,
         youngBulls: 0,
+        // The calves were aged by hand, so the farm has no calving day for this drop.
+        sinceCalving: null,
         does: 'markCalves',
         action: { type: 'markCalves', mob: b.cows },
       },
@@ -107,7 +109,8 @@ describe('things to do', () => {
       qty: 30,
       to: { cell: dry.cells[0]! },
     });
-    expect(thingsToDo(stocked)).toEqual([
+    // The steers are at sale weight with a sale in the week, which is listed too (engine 0.20.0).
+    expect(ofType(thingsToDo(stocked), 'no-water')).toEqual([
       {
         type: 'no-water',
         mob: stocked.mobs[0]!.id,
@@ -222,8 +225,18 @@ describe('things to do', () => {
     const f = cloneFarm(b.farm);
     f.layout.water.ports[0]!.level = 100;
     const list = thingsToDo(f);
-    expect(list.map((x) => x.type)).toEqual(['trough-low', 'calves-to-mark', 'fence-down']);
+    // A sale in the week is a fact with no job of its own (engine 0.20.0).
+    expect(list.map((x) => x.type)).toEqual([
+      'trough-low',
+      'sale-soon',
+      'calves-to-mark',
+      'fence-down',
+    ]);
     for (const item of list) {
+      if (item.does === null) {
+        expect(item.action).toBeNull();
+        continue;
+      }
       expect(item.does).toBe(item.action!.type);
       expect(previewAction(f, item.action!).ok, item.type).toBe(true);
     }

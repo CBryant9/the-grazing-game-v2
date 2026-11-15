@@ -1,13 +1,21 @@
 import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AD_SLOTS } from '@gg/shared';
+import { AD_SLOTS, FEATURE_SWITCHES } from '@gg/shared';
 import sitemap from '@/app/sitemap';
 import { AD_SLOT_INFO } from './adSlotInfo';
-import { DETAILS_TO_COME, SHARED_SWITCH_KEYS, SITE_PAGES, SITE_URL, linkedPages } from './site';
+import {
+  DETAILS_TO_COME,
+  SHARED_SWITCH_KEYS,
+  SITE_PAGES,
+  SITE_SWITCHES_DEFAULT_ON,
+  SITE_URL,
+  linkedPages,
+} from './site';
 
 /*
- * The public pages are built once, with the feature switches off. Each part
+ * The public pages are built once, with the feature switches off except Daily Farm
+ * (on by default, as in the game; SITE_SWITCHES_OFF turns it off). Each part
  * that depends on a switch must stay out of the page until that switch is on,
  * so the live site never promises what is not built. These tests render each
  * page to HTML the way the build does.
@@ -38,8 +46,24 @@ async function html(page: string): Promise<string> {
   return renderToStaticMarkup(createElement(mod.default));
 }
 
+describe('at the build defaults', () => {
+  it('Daily Farm shows on the landing page, as it is on in the game (FEATURE_SWITCHES)', async () => {
+    expect(SITE_SWITCHES_DEFAULT_ON).toEqual(['daily_farm']);
+    expect(FEATURE_SWITCHES.daily_farm).toBe(true);
+    expect(await html('index')).toContain('Daily Farm');
+  });
+
+  it('SITE_SWITCHES_OFF takes Daily Farm off the site, and a minus in SITE_SWITCHES_ON does nothing', async () => {
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
+    expect(await html('index')).not.toContain('Daily Farm');
+    delete process.env.SITE_SWITCHES_OFF;
+    process.env.SITE_SWITCHES_ON = 'community,-daily_farm';
+    expect(await html('index')).toContain('<h3 class="px">Daily Farm</h3>');
+  });
+});
+
 describe('with every switch off', () => {
-  // Daily Farm is on by default (SITE_DEFAULT_ON), so it is turned off here by name.
+  // Daily Farm is on by default (SITE_SWITCHES_DEFAULT_ON), so it is turned off here by name.
   beforeEach(() => {
     process.env.SITE_SWITCHES_OFF = 'daily_farm';
   });

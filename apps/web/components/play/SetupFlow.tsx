@@ -119,9 +119,10 @@ const TITLES: Record<StepId, string> = {
  * The choices and their real figures come from the server. No dollar
  * figures are shown until the farm is taken.
  */
-export function SetupFlow() {
+export function SetupFlow({ initial = null }: { initial?: SetupOptions | null }) {
   const created = useGame((s) => s.created);
-  const [options, setOptions] = useState<SetupOptions | null>(null);
+  // The choices sent with the page (a visitor with no cookies), or null to ask the server for them.
+  const [options, setOptions] = useState<SetupOptions | null>(initial);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ name: '' });
   const [index, setIndex] = useState(0);
@@ -137,7 +138,10 @@ export function SetupFlow() {
         setLoadError(e instanceof ApiError ? e.message : 'The choices could not be loaded.'),
       );
   }, []);
-  useEffect(load, [load]);
+  const sentWithPage = initial !== null;
+  useEffect(() => {
+    if (!sentWithPage) load();
+  }, [load, sentWithPage]);
   const retry = (): void => {
     setLoadError(null);
     load();

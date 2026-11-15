@@ -517,7 +517,7 @@ describe('with the switch off, or no database', () => {
     expect((await r.game.snapshot(farm.key))!.date.date).toBe(14);
   }, 240_000);
 
-  it('with no database keys, Daily Farm answers with the plain coming state and Fast Farm is untouched', async () => {
+  it('with no database keys, Daily Farm says it needs the database and Fast Farm is untouched', async () => {
     const { GameServer } = await import('../game/game');
     const { MemoryFarmStore } = await import('../game/store');
     const game = new GameServer({ store: new MemoryFarmStore(), seed: () => 3 });
@@ -525,6 +525,7 @@ describe('with the switch off, or no database', () => {
     await expect(game.create('b'.repeat(32), choices(), OWNER)).rejects.toMatchObject({
       status: 403,
       code: 'daily_off',
+      message: expect.stringContaining('Daily Farm needs the game database'),
     });
     const fast = await game.create(
       'c'.repeat(32),

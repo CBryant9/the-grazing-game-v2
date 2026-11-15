@@ -138,7 +138,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 These came from planning the phone and PC rebuild. Full detail and open questions are in [PRD.md](PRD.md).
 
-- [x] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going. *(3.3: setup asks for the mode first, as the mockup shows, and the top bar says which mode the farm is. Daily Farm is behind its switch, off until Claudia turns it on, and needs an account. The limit is now 2 and 2, below.)*
+- [x] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going. *(3.3: setup asks for the mode first, as the mockup shows, and the top bar says which mode the farm is. Daily Farm is behind its switch, and needs an account. The switch was off until Claudia asked for it on, 15 Nov 2026: see below. The limit is now 2 and 2, below.)*
 - [ ] Jobs take realistic time. The day starts at first light and "the time only moving as you did things". If you only look, it stays first light. You can only do what fits before dark, so "they can't just build all their fencing in one day". This applies to both modes.
 - [x] Daily mode: at midnight in the player's time zone the day is simulated with the cattle where they were left. *(3.3: the engine's own night, run by the rollover job or by opening the farm, whichever comes first, with the same result. The time zone is the device's, locked when the farm starts. The sub-day grazing split is the engine's own. m7.1: on a night with no hand, a plan of several moves a day grazes the day across the paddocks the player really moved the mob through, split as the engine splits its own stops, or where the mob is if it was not moved.)* Daily dry matter, intake and gain must be "as dialed in as we can get it to reality", especially at high density and with several moves a day.
 - [ ] Self-paced mode keeps +1 day, +1 week, +1 month skips, with the time controls along the top and the paddock filling the screen.
@@ -305,6 +305,21 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
   - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
 - [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
 
+## 15 Nov 2026: playability fixes from the playtest (m8)
+
+A playtest of 144 three-year games found the game hard to read and quick to run into trouble unseen. Decided (calls B141 to B150):
+
+- [x] The bank never takes the farm with no warning: when cash first goes below zero, and again at three quarters of the way to the bank's limit, an inbox fact and a Things to do fact name the cash, the limit and the head on hand that could be sold, and a skip stops at both. The bank's limit is a display number beside Cash.
+- [x] A skip stops early and says why for: no water, a trough run dry, a crop ready, the year end, game over, the first day the whole farm is eaten out, the bank facts, deaths from anything but natural causes, and calving starting.
+- [x] +1 year ends on the farm's year end, also across a leap day.
+- [x] Things to do holds facts that come once and go when they stop being true or are put away, never repeated daily: a sale within 7 days with the head at sale weight by class, a mob under CS 2.5, calving started, a stocked paddock under the feed floor, and marking once per drop with the count.
+- [x] Mob card reasons are warnings only when the mob is losing weight or in low condition. Otherwise the same facts are plain details.
+- [x] Words for feed under the floor state the fact and its effect with the real figures, never "0 days" or "not enough feed" on a herd that is growing.
+- [x] The tour never asks the player to join mobs or spend money.
+- [x] The year card names a part of the score that moved a lot, with both figures, and a cause only where it is a fact.
+- [x] The setup step can show each difficulty's starting cash and the bank's limit.
+- [ ] Doing nothing out-scores sensible play (A10): for Claudia to rule on after she has played. Nothing changed.
+
 ## 14 Nov 2026: build it all, with a list of calls at the end
 
 Her words (as typed): "ok yeah hook in- I would like them all done and would prefer a list of clals at the ends that yu explain and i could say if i wnated something diffferent - let sjust focu son getting this done, maybe you should open some chats unde ryou to get it done faster pleas"
@@ -364,3 +379,11 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [x] Web Vitals (LCP, CLS, INP) from the game and signed-in pages, with consent, shown as the 75th percentile by page against the PRD 14.10 targets.
 - [x] An `analytics` feature switch, off by default.
 - [ ] Average minutes a day, return rates, Daily Farm streaks, game overs by cause and replay check failures on the dashboard. *(Need data not kept yet; the dashboard lists them under "Built in a later milestone".)*
+
+## 15 Nov 2026: Daily Farm on
+
+Her words: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." She will set up the database and other services later on another computer, so nothing may need keys on this one.
+
+- [x] **Daily Farm is on by default.** The shared switch list, a new seed migration (`20261120000100_daily_farm_on`) and the public pages agree. The admin can still switch it off. *(Built in m8. Reverses the 3.3 call that kept it off until she turned it on.)*
+- [x] **With no database, setup says what Daily Farm needs, never "coming".** It says Daily Farm needs the game database, which keeps each farm from day to day and runs its nights, and that Fast Farm is ready to play now. *(Built in m8.)*
+- [x] **She can try Daily Farm before the database exists.** In development only (`pnpm dev`, no database), `GG_DEV_LOCAL_DAILY=1` lets a guest start a Daily Farm kept in a farm file; the nights run when the farm is next opened. *(Built in m8. `docs/RUNBOOK.md` section 5.1.)*
