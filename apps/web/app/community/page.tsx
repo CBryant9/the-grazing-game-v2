@@ -10,6 +10,8 @@ import { requireMember } from '@/server/community/page';
 export const dynamic = 'force-dynamic';
 
 const TABS: FeedTab[] = ['friends', 'everyone', 'groups'];
+/** A sponsored post after every this many posts (mockup H, and the admin's slot list). */
+const SPONSORED_EVERY = 8;
 const EMPTY: Record<FeedTab, string> = {
   friends:
     'Nothing here yet. Follow people to see what they did on their Daily Farm each day. Find them under Find people.',
@@ -43,25 +45,35 @@ export default async function Page({
     <>
       <h1 className={`px ${styles.title}`}>Community</h1>
       <SubNav here="feed" />
-      {!q.cursor && <Composer />}
-      {!q.cursor && <ShareFarm farms={farms} />}
-      <Tabs tab={tab} />
-      {page.items.length === 0 ? (
-        <Empty>{EMPTY[tab]}</Empty>
-      ) : (
-        <div className={styles.stack}>
-          {page.items.map((p, i) => (
-            <Fragment key={p.id}>
-              <PostCard post={p} />
-              {/* One sponsored post after the third, marked as an ad (PRD 10.1). */}
-              {i === 2 && <AdSlot id="feed_sponsored" screen="community" />}
-            </Fragment>
-          ))}
+      {/* PC: the feed, and a 340 px right column for the side ads (mockup H). The column is kept
+          only while ads are on, so the feed does not jump when the slot fills in. */}
+      <div className={styles.cols} data-side={switches.ads ? '' : undefined}>
+        <div className={styles.feed}>
+          {!q.cursor && <Composer />}
+          {!q.cursor && <ShareFarm farms={farms} />}
+          <Tabs tab={tab} />
+          {page.items.length === 0 ? (
+            <Empty>{EMPTY[tab]}</Empty>
+          ) : (
+            <div className={styles.stack}>
+              {page.items.map((p, i) => (
+                <Fragment key={p.id}>
+                  <PostCard post={p} />
+                  {/* A sponsored post after every eighth, marked as an ad (PRD 10.1, mockup H). */}
+                  {(i + 1) % SPONSORED_EVERY === 0 && (
+                    <AdSlot id="feed_sponsored" screen="community" />
+                  )}
+                </Fragment>
+              ))}
+            </div>
+          )}
+          {page.next && <More href={`/community?tab=${tab}&cursor=${page.next}`} />}
         </div>
-      )}
-      {page.next && <More href={`/community?tab=${tab}&cursor=${page.next}`} />}
-      {/* PC only (the slot has no phone size): the community side card. */}
-      <AdSlot id="pc_community_side" screen="community" />
+        {/* PC only (the slot has no phone size): the community side cards. */}
+        <aside className={styles.side} aria-label="Sponsors">
+          <AdSlot id="pc_community_side" screen="community" />
+        </aside>
+      </div>
     </>
   );
 }

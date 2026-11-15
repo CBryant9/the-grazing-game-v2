@@ -39,6 +39,8 @@
   --track: #2a3654;
   --knob: #8f9bb5;
   --sky: #6fb6e6;
+  /* The landing hero's fade over the farm picture, as r, g, b (used in rgba()). */
+  --hero-fade: 10, 16, 32;
 
   --font-display: var(--font-anton), 'Arial Narrow', Impact, sans-serif;
   --font-px: var(--font-silkscreen), ui-monospace, monospace;
@@ -84,6 +86,7 @@
     --track: #d6ccb8;
     --knob: #ffffff;
     --sky: #2f7fb8;
+    --hero-fade: 246, 241, 230;
   }
 }
 
@@ -120,6 +123,7 @@
   --track: #d6ccb8;
   --knob: #ffffff;
   --sky: #2f7fb8;
+  --hero-fade: 246, 241, 230;
 }
 
 *,
@@ -276,6 +280,10 @@ svg {
 .btn.lime {
   background: var(--accent);
   color: var(--accent-ink);
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.4),
+    0 3px 0 #000;
 }
 .btn.ghost {
   background: transparent;
@@ -333,6 +341,11 @@ svg {
   color: var(--accent-ink);
   border-color: var(--accent-line);
 }
+.badge.coral {
+  background: var(--btn);
+  color: #fff;
+  border-color: var(--btn-lo);
+}
 
 .card {
   background: var(--panel);
@@ -366,6 +379,7 @@ svg {
   font-weight: 400;
   font-size: clamp(2.5rem, 8vw, 4rem);
   line-height: 1;
+  letter-spacing: 0.01em;
 }
 .pagehead p {
   color: var(--muted);

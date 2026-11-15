@@ -45,24 +45,32 @@ export const DETAILS_TO_COME = 'Contact details will be added before launch.';
 export type SiteSwitchKey = FeatureSwitchKey | 'sheep' | 'farm_hands' | 'analytics';
 
 /**
- * A small "off by default" read for the website.
- *
- * The shared defaults (`FEATURE_SWITCHES`) describe launch, and a few of them
- * are on (Daily Farm, leaderboards, sign-ups) although those parts are not
- * built yet. The public pages must never promise what is not there, so every
- * switch here is OFF unless the environment turns it on:
- *
- *   SITE_SWITCHES_ON=community,leaderboards
- *
- * The admin back end (Stage 5) replaces this read with the live switches.
- * The keys are the ones in `@gg/shared` so the two line up.
+ * The switches the website treats as on unless the environment turns them off.
+ * Daily Farm is built, so the home page names it (decided for milestone 8).
  */
-export function siteSwitchOn(key: SiteSwitchKey): boolean {
-  const on = (process.env.SITE_SWITCHES_ON ?? '')
+export const SITE_DEFAULT_ON: readonly SiteSwitchKey[] = ['daily_farm'];
+
+const listFrom = (value: string | undefined): string[] =>
+  (value ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  return on.includes(key);
+
+/**
+ * The website's switch list, read when the site is built.
+ *
+ * The public pages must never promise what is not there, so every switch is
+ * OFF unless the environment turns it on, except the few in `SITE_DEFAULT_ON`,
+ * which are on unless the environment turns them off:
+ *
+ *   SITE_SWITCHES_ON=community,leaderboards
+ *   SITE_SWITCHES_OFF=daily_farm
+ *
+ * The keys are the ones in `@gg/shared` so the two line up.
+ */
+export function siteSwitchOn(key: SiteSwitchKey): boolean {
+  if (listFrom(process.env.SITE_SWITCHES_OFF).includes(key)) return false;
+  return SITE_DEFAULT_ON.includes(key) || listFrom(process.env.SITE_SWITCHES_ON).includes(key);
 }
 
 /** For tests: the shared switch keys. */

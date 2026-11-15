@@ -227,6 +227,14 @@ async function history(tx: SqlRunner, userId: string): Promise<AuthorHistory> {
   };
 }
 
+/** How many reports are open: the count on the Moderation item in the admin menu. */
+export async function openReportCount(sql: SqlRunner): Promise<number> {
+  const r = await sql.query<{ n: number }>(
+    `select count(*)::int as n from public.reports where status = 'open'`,
+  );
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 /** Open reports, oldest first, with the content, its context and the author's history. */
 export async function listQueue(sql: SqlClient, pageNo: number): Promise<Queue> {
   const page = Number.isInteger(pageNo) && pageNo >= 1 && pageNo <= 100_000 ? pageNo : 1;

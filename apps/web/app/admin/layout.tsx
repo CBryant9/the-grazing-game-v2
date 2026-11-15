@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { AdminNav } from '@/components/admin/AdminNav';
 import styles from '@/components/admin/admin.module.css';
+import { GrassIcon } from '@/components/site/GrassIcon';
+import { openReportCount } from '@/server/admin/moderation';
 import { requireAdmin } from '@/server/admin/page';
 
 // Never for search engines, never cached (the service worker leaves /admin to the network, and
@@ -25,9 +27,33 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </main>
     );
   }
+  // The count on Moderation (mockup: a coral badge). A read that fails shows no count.
+  const queue = await openReportCount(page.deps.sql).catch(() => 0);
   return (
     <div className={styles.shell}>
-      <AdminNav username={page.admin.username} />
+      <AdminNav
+        username={page.admin.username}
+        logo={
+          <span className={styles.logo}>
+            <span className={styles.mark} aria-hidden="true">
+              <GrassIcon />
+            </span>
+            ADMIN
+          </span>
+        }
+        counts={
+          queue > 0
+            ? {
+                '/admin/moderation': (
+                  <span className={`badge coral ${styles.count}`}>
+                    {queue}
+                    <span className="sr-only"> open reports</span>
+                  </span>
+                ),
+              }
+            : undefined
+        }
+      />
       <main id="main" className={styles.main} tabIndex={-1}>
         {children}
       </main>

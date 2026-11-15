@@ -368,3 +368,9 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | RF10 | Day cards said "Day 4" for the diary's Day 5, and the Share my farm card the same | The engine counts days from 0; the diary adds 1, and the cards did not | The cards add 1, as the diary does. **Rule: the day a player sees is one number, made in one way everywhere** |
 | RF11 | Day cards carried the day's cash, running costs, wages and data notes, and never the rain | A card took the diary's lines as they were, and `rain_mm` was never written | Card lines are picked by the kind of line when the day is filed (`card_lines`), and the day's rain is kept with it. **Rule: choose what goes where by the kind of thing when it is made, never by matching its words later** |
 
+### m8 Site look
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| LS1 | The admin dashboard's Show button was drawn as a plain button, not the main (coral) one | It used `className="primary"`, a plain class name, where the admin styles are a CSS module (`styles.primary`), so nothing matched | The admin button rows now style both. **Rule: in a component styled by a CSS module, a class written as a plain string matches nothing unless the module marks it `:global`** |
+

@@ -13,7 +13,12 @@ import { DETAILS_TO_COME, SHARED_SWITCH_KEYS, SITE_PAGES, SITE_URL, linkedPages 
  * page to HTML the way the build does.
  */
 
-const ENV_KEYS = ['SITE_SWITCHES_ON', 'SITE_CONTACT_EMAIL', 'SITE_OWNER_NAME'] as const;
+const ENV_KEYS = [
+  'SITE_SWITCHES_ON',
+  'SITE_SWITCHES_OFF',
+  'SITE_CONTACT_EMAIL',
+  'SITE_OWNER_NAME',
+] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const k of ENV_KEYS) {
@@ -34,6 +39,11 @@ async function html(page: string): Promise<string> {
 }
 
 describe('with every switch off', () => {
+  // Daily Farm is on by default (SITE_DEFAULT_ON), so it is turned off here by name.
+  beforeEach(() => {
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
+  });
+
   it('the landing page names only what is live', async () => {
     const h = await html('index');
     expect(h).toContain('Fast Farm');
@@ -129,6 +139,7 @@ describe('with switches on', () => {
 
   it('Daily Farm keep-going rows stay out while Daily Farm is off', async () => {
     process.env.SITE_SWITCHES_ON = 'purchases';
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
     const h = await html('pricing');
     expect(h).toContain('A$5');
     expect(h).not.toContain('Daily Farm');
@@ -150,6 +161,27 @@ describe('with switches on', () => {
     expect(p).toContain('Analytics');
     expect(p).toContain('The community');
     expect(p).toContain('If you make an account');
+  });
+});
+
+describe('the site switch defaults', () => {
+  it('Daily Farm is on with nothing set, and the home page shows its card before Fast Farm', async () => {
+    const h = await html('index');
+    expect(h).toContain('<h3 class="px">Daily Farm</h3>');
+    expect(h.indexOf('Daily Farm')).toBeLessThan(h.indexOf('Fast Farm'));
+    expect(h).not.toContain('<h3 class="px">Community</h3>');
+  });
+
+  it('the hero offers the leaderboard only while leaderboards are on', async () => {
+    expect(await html('index')).toContain('How a day works</a>');
+    process.env.SITE_SWITCHES_ON = 'leaderboards,community';
+    const h = await html('index');
+    expect(h).toContain('href="/leaderboards"');
+    expect(h).toContain('<h3 class="px">Community</h3>');
+  });
+
+  it('the home page has no announcement bar without one', async () => {
+    expect(await html('index')).not.toContain('aria-label="Announcement"');
   });
 });
 

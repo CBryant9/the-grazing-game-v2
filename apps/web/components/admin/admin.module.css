@@ -43,14 +43,15 @@
 .links a {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: var(--tap);
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid transparent;
-  color: var(--text);
+  color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 .links a:hover {
   background: var(--panel2);
@@ -64,11 +65,37 @@
   outline: 3px solid var(--accent-line);
   outline-offset: 2px;
 }
+.links a:hover,
 .links a[aria-current='page'] {
-  background: var(--sel);
-  border-color: var(--accent-line);
+  color: var(--text);
+}
+.links a[aria-current='page'] {
+  background: var(--panel2);
+  border-color: var(--line);
+}
+/* The logo and ADMIN at the top of the menu (mockup: admin nav). */
+.logo {
+  font-family: var(--font-px);
+  font-size: 1rem;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
   color: var(--accent-text);
-  font-weight: 700;
+  flex: none;
+}
+.count {
+  margin-left: auto;
 }
 .later {
   font-size: 0.6875rem;
@@ -106,9 +133,13 @@
     overflow: visible;
   }
 }
+/* Page headings in the pixel font, as the mockup (Silkscreen 20 px). */
 .h1 {
   margin: 0;
-  font-size: 1.375rem;
+  font-family: var(--font-px);
+  font-weight: 400;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
 }
 .h2 {
   margin: 0 0 6px;
@@ -134,6 +165,12 @@
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+/* PC: four tiles to a row, as the mockup. */
+@media (min-width: 900px) {
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .kpi {
   background: var(--panel);
@@ -208,29 +245,98 @@
   flex-wrap: wrap;
   align-items: center;
 }
+/* The site's chunky bevelled buttons (.btn, and .btn.coral for the main one), in every button row. */
 .btnrow button {
   min-height: var(--tap);
   padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
+  border-radius: 4px;
+  border: 2px solid #000;
   background: var(--panel2);
   color: var(--text);
-  font: inherit;
-  font-size: 0.875rem;
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  line-height: 1.2;
   cursor: pointer;
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 #000;
 }
-.btnrow button.primary {
+.btnrow button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 #000;
+}
+.btnrow button.primary,
+.btnrow button:global(.primary) {
   background: var(--btn);
-  border-color: var(--btn-lo);
   color: #fff;
+  box-shadow:
+    inset -2px -2px 0 var(--btn-lo),
+    inset 2px 2px 0 var(--btn-hi),
+    0 3px 0 #000,
+    0 0 0 2px var(--btn-hi);
 }
 .btnrow button.danger {
-  border-color: var(--bad);
   color: var(--bad);
 }
 .btnrow button.danger.primary {
   background: var(--btn);
   color: #fff;
+}
+/*
+ * The switches screen: the button that opens the confirm step looks like the mockup's switch
+ * (.tog), with its words beside it. The confirm step is unchanged.
+ */
+.tog > div > .btnrow:first-child > button {
+  position: relative;
+  padding: 0 0 0 52px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  color: var(--text);
+  transform: none;
+}
+.tog > div > .btnrow:first-child > button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin-top: -11px;
+  width: 40px;
+  height: 22px;
+  border-radius: 12px;
+  background: var(--track);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+}
+.tog > div > .btnrow:first-child > button::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  margin-top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--knob);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+}
+.tog[data-on] > div > .btnrow:first-child > button::before {
+  background: var(--accent);
+}
+.tog[data-on] > div > .btnrow:first-child > button::after {
+  left: 21px;
+  background: #111;
+}
+.tog > div > .btnrow:first-child > button:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
 }
 .btnrow button:disabled {
   opacity: 0.55;

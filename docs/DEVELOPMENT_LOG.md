@@ -2399,6 +2399,26 @@ Branch `m7.1-realism-fixes`, cut from `m7-final` (ca7ff39). Engine 0.19.0, save 
 - The review's exact Central West rescue farm (-$73,277) was not rebuilt; a farm of the same kind was used.
 - No browser check of the plan card wording; the `realism-guardian` agent was not run on this pass.
 
+### 15 Nov 2026: m8 Site look
+
+Branch `m8-look-site`, cut from `m7-final` (6a27291). The website, admin, community pages and the map's surround brought into line with `docs/mockups/index.html`. No game rule, figure or engine code changed. Lesson LS1.
+
+- **Landing page:** the title sits over the dusk farm with the mockup's fade (`--hero-fade`, both themes, in `globals.css`): from the left on PC, from the top on a phone, where the farm shows under the buttons. Hero buttons: Play free, then Leaderboard while `leaderboards` is in the site's switch list, otherwise How a day works. The three cards under the hero (Daily Farm, Fast Farm, Community) follow the switch list. **Daily Farm is now on by default** in the site's list (`SITE_DEFAULT_ON`; `SITE_SWITCHES_OFF=daily_farm` turns it off). The game's own switch default in `@gg/shared` is unchanged. The other sections stay lower down. The admin's announcement shows as a bar at the top when there is one and a database is set: the page is built with `getStaticProps` and rebuilt every 5 minutes only when `SUPABASE_DB_POOLER_URL` is set, otherwise fully static. It still sends no script file. The announcement rules moved to `lib/announcement.ts` so the page and the admin form share them (a pages-router page can not load a `server-only` module). Sections below the first screen use `content-visibility: auto`.
+- **Public header:** links are the mockup's small ghost buttons.
+- **Map surround:** bush country in both themes (VISUALS, "The surround"), in `packages/render/src/surround.ts`, drawn as a screen tile under the farm. No farm view changed, so the map fixtures did not need making again.
+- **Admin:** headings in Silkscreen 20 px, chunky buttons in every button row (coral for the main one), the switch look on the switches screen with its confirm step kept, the mockup's menu (logo and ADMIN, active item, a coral count of open reports on Moderation), KPI tiles four to a row from 900 px. The logo and the count are drawn by the server layout and handed to the menu, so no script was added.
+- **Community:** headings in Anton (40 to 64 px). The feed page has the mockup's 340 px right column on PC, holding the side ad slot, while ads are on (no new data, no new script). A sponsored post after every 8 posts (the mockup and the slot's stored default; the feed does not read the stored `every_n_posts` yet).
+- **Tokens:** `.badge.coral`, the `.btn.lime` bevel, `.pagehead h1` letter spacing.
+- **Ticker:** the mockup's green border and glow, 340 px wide, 20 px in from the corner. 1,437 bytes compressed (limit 2 KB).
+
+**Proof:** see the m8 report for the test counts, the JS sizes and Lighthouse on `/` before and after.
+
+**Not done or not checked**
+
+- Signed-in admin and community pages (no database here): only their not-set-up answers were seen.
+- The announcement bar with a real database.
+- Lighthouse on this PC was noisy while another build ran beside it; the quiet runs matched the m7 figures.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

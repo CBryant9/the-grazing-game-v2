@@ -203,8 +203,10 @@ export const RAM_HORN = 0xb9a98a;
 
 /** The parts of the map that change with the theme. */
 export interface ThemeColours {
-  /** Behind and around the farm. */
+  /** The country round the farm: bush (the mockup's `bush` tile). Also the colour behind the map before it draws. */
   surround: number;
+  /** The bush clumps laid over the surround. */
+  surroundSpeck: readonly number[];
   /** The rim round the farm. */
   farmEdge: number;
   labelBg: number;
@@ -226,7 +228,8 @@ export interface ThemeColours {
 
 export const THEMES: Record<MapTheme, ThemeColours> = {
   dark: {
-    surround: 0x10190f,
+    surround: 0x55653a,
+    surroundSpeck: [0x4a5832, 0x66753f, 0x5d6b3a],
     farmEdge: 0x05080c,
     labelBg: 0x0b1220,
     labelBgAlpha: 0.88,
@@ -241,7 +244,8 @@ export const THEMES: Record<MapTheme, ThemeColours> = {
     hover: 0xffffff,
   },
   light: {
-    surround: 0xd9d2bd,
+    surround: 0x939f72,
+    surroundSpeck: [0x87936a, 0xa2ad80, 0x8d9a6c],
     farmEdge: 0x6b5b3e,
     labelBg: 0xfffaf0,
     labelBgAlpha: 0.94,

@@ -24,7 +24,7 @@ export function PublicHeader({ current }: { current: string }) {
             <Link
               key={p.path}
               href={p.path}
-              className={styles.link}
+              className={`btn ghost sm ${styles.ghostLink}`}
               aria-current={p.path === current ? 'page' : undefined}
             >
               {p.title}
@@ -32,7 +32,7 @@ export function PublicHeader({ current }: { current: string }) {
           ))}
           <button
             type="button"
-            className="btn ghost"
+            className="btn ghost sm"
             data-theme-toggle=""
             aria-label="Switch between light and dark"
           >

@@ -62,15 +62,18 @@ export default async function Page() {
                     ? 'Never changed. This is the launch default.'
                     : 'Never changed by an admin. This is the launch setting.'}
               </p>
-              <ConfirmAction
-                label={r.enabled ? 'Turn off' : 'Turn on'}
-                endpoint="/api/admin/switches"
-                body={{ key: r.key, enabled: !r.enabled }}
-                danger={r.key === 'maintenance_mode' && !r.enabled}
-                explain={`${r.enabled ? 'Turn off' : 'Turn on'} ${info.label}? ${
-                  r.enabled ? info.whenOff : info.whenOn
-                }${info.rebuild ? ' The public website pages only change at the next build.' : ''} This is recorded in the audit log.`}
-              />
+              {/* Drawn as a switch (mockup .tog), still with its confirm step. */}
+              <div className={styles.tog} data-on={r.enabled ? '' : undefined}>
+                <ConfirmAction
+                  label={r.enabled ? 'Turn off' : 'Turn on'}
+                  endpoint="/api/admin/switches"
+                  body={{ key: r.key, enabled: !r.enabled }}
+                  danger={r.key === 'maintenance_mode' && !r.enabled}
+                  explain={`${r.enabled ? 'Turn off' : 'Turn on'} ${info.label}? ${
+                    r.enabled ? info.whenOff : info.whenOn
+                  }${info.rebuild ? ' The public website pages only change at the next build.' : ''} This is recorded in the audit log.`}
+                />
+              </div>
             </li>
           );
         })}
