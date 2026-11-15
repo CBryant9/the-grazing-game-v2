@@ -1230,3 +1230,53 @@ PRD 10.3: offered only at game over, a rescue clears the debt and puts the farm 
 - `rescueFarm(farm, { purchaseId })` applies exactly those terms to a copy: every head sold (mobs and sheep mobs emptied), sale bookings dropped (their stock is sold here), cash set, game over cleared, the eaten-out count back to 0. Paddocks, fences, water, crops, plans, hands, the clock and the day are unchanged. The farm records the rescue (`rescues`, with the purchase id, the day and the terms; save format 13), and the same purchase id again changes nothing and returns the same terms. A farm that is still playing is refused (`not-over`).
 - **The year's money** (m7.1). The sale goes in the year's cattle sales and sheep sales. The cash the rescue adds on top of the sale is its own line, "Paid to keep going" (`YearTotals.keepGoing`, save format 14). It is in net worth, but **the year's profit and score leave it out** (`scoreYear`: profit is the change in net worth less `keepGoing`), because the farm did not earn it. Before m7.1 a Central West farm rescued from a debt showed its rise in net worth to the hard starting cash ($140,000) as the year's profit, with no money line.
 - No rule of the simulation changed: a farm never rescued plays exactly as before. Tests: `money/rescue.test.ts`. The web server writes one diary line stating the facts by case: "N head of stock were sold for $X to pay the debt", or with no debt "N head of stock were sold for $X", or "1 head was sold", then "Cash is now $Y". The offer card says what the stock fetches at today's prices, by the same case rule. The diary line is not a day card line. The server marks the farm row `continued` (server/billing/rescueEngine.ts).
+
+## 14. The stock book, the feed forecast and screen facts (rebuild, m8 second pass, engine 0.21.0)
+
+Reads only, plus two saved records. No grass, cattle, sheep, crop, season, price or score formula changed.
+
+### The stock book (`stockBook`, `sim/stockbook.ts`)
+
+Every head of cattle on the farm (calves included, cattle still on the truck left out), each with:
+
+- **Bought** (`Animal.paid`): the purchase price with the $30 head fee and any cow-and-calf freight; the value on the day the farm was taken over (`buyPrice`, no fees) for the start herd; $0 for a calf bred on the farm. Which of the three it is comes from the tag: tags below `FarmState.startTags` came with the farm (`originOf`).
+- **Spent** (`Animal.cost - Animal.paid`): what has gone on the animal since: its supplement or feedlot ration, the district's health cost a day, and marking. A cow carries her own feed; her calf carries only its own.
+- **Value now**: `netSaleValue` at today's prices (its weight at its class's c/kg, the in-calf premium from PTIC, less 5% commission and $30 a head), never below 0 (net worth's rule).
+- **Profit** = value now - bought - spent. The saleyard uses the same sum when cattle are sold (`sellList`).
+
+The Sell rows show the same figures a head for a draft (`sellMoney` on the server): a cow's figures include her calf at foot, which goes with her. The stock book goes to the browser with the record (`RecordResponse.stockBook`), not in every snapshot.
+
+### The feed forecast (`feedForecast`, `sim/forecast.ts`)
+
+- A copy of the pasture and crops, run a day at a time for 365 days with the tick's own start of the day (`startOfDay`: crop stages, then `growGrass`), in an **average season** (`averageYear`: season factor 1, month factor 1). A real-year farm is forecast the same way, never on its weather to come.
+- Each day the stock on hand take what they ate today (each cattle mob's `MobDay.demand`; a mob with no day yet, its own `intakeOf` with feed in front of it; sheep, their `demand`) from the pasture squares (native and sown), shared by the feed on each, green and dead alike, never below none. Cattle in the feedlot are left out. Nothing is bought, sold, born or moved and nobody grows.
+- Out: feed on the pasture squares and on the crop squares (annual pasture, forage and grain crops) at today and about every 30.4 days (12 points), the floor (`FEED_FLOOR_KG_HA` x pasture ha), what the stock eat a day, and the first day pasture feed falls under the floor.
+- About a tenth of a second a forecast. The server keeps the last 32 by pasture, crops and stock, so a snapshot of an unchanged farm reuses it.
+
+### What a supplement adds (`SupplementCost.adds`)
+
+For each supplement, averaged over the mob's cattle (calves left out) on the same day's feed as its price: kg DM of the supplement with its ME and CP, and the change in pasture eaten against none (`intakeOf`). The lick feeds nothing itself and lifts pasture eaten on low-protein feed.
+
+### Rest days (`paddockRestDays`, `FarmState.stockedOn`)
+
+The tick records, for every square of each grazing area that holds cattle or sheep that day (a plan's day stops included), the farm day (`markStocked`). A paddock's rest days are whole days since the last such day on any of its squares: 0 the morning after stock leave. Null while stock are on its area. A farm saved before format 16 starts the record at its next night from the pasture's last hard grazing (`PastureState.lastG`, over 15 kg DM/ha taken in a day), which is often never on extensive country, so rest days show only after stock move. No rule reads the record.
+
+### Last night's rain (`lastRainMm`)
+
+The real weather table's rain for the last day that ran. Null with random seasons: they have growth factors, not rain.
+
+### The paddock comment line (server, `paddockwords.ts`)
+
+On a stocked paddock only. One sentence on what the stock pick, then one on the feed against what they eat, from the paddock summary and the mob's last day. Each tied to one condition; the thresholds are for the words only:
+
+| Line | Condition |
+|---|---|
+| "They're down to eating what they'd normally leave." | feed under `FEED_SHORT_KG_HA` (901) and green under 35% |
+| "The grass is tall and mostly dry. They're picking the green near the base." | green under 35% and 25 cm or taller |
+| "They're picking the best bits." | the diet ME the stock chose (pasture or lick only) at least 0.5 MJ/kg over the paddock's average |
+| "It's getting short: under 800 kg DM/ha." | feed under `FEED_FLOOR_KG_HA` |
+| "The grass is growing away from them." | grown on the last day at least what was eaten (kg DM/ha) |
+| "They're having a high impact: they eat about X kg DM/ha a day and about Y grows." | eaten more than twice what grew |
+| "They eat a little more than grows: about X kg DM/ha a day against Y." | eaten more than grew, up to twice |
+
+Never "overgrazed": rest is not part of any rule yet.

@@ -127,6 +127,7 @@ import { AWAY_KEPT, ROLLED_KEPT, type DailyStored } from '../daily/state';
 import { dailyRuntime } from '../daily/runtime';
 import { MIDNIGHT_TEXT, PAUSED_TEXT, UNAVAILABLE_TEXT, dailyWire } from '../daily/wire';
 import { dateText, doneWord, todoKey } from './words';
+import { stockBookWire } from './stockbook';
 import { pastYears, soFarView, yearView } from './years';
 import { DbFarmStore } from '../db/dbstore';
 import { dbHooks, type GameHooks } from '../stage4/hooks';
@@ -1918,6 +1919,7 @@ export class GameServer {
         soFar: soFarView(farm, stored.setup),
         years: pastYears(farm, stored.setup),
         ...diaryPage(stored.diary, before),
+        stockBook: stockBookWire(farm),
       };
     });
   }

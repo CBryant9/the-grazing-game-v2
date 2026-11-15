@@ -121,6 +121,13 @@ Colour tokens (CSS `:root`):
 - The market chart shows the indicator as a gold line with a fill, and today's price as a cream square.
 - Setup cards have small pixel scenes: from scratch (bare ground, windmill), established (fences, trough, grass), mixed (crop rows beside pasture).
 
+### The Feed panel and the stock book (rebuild, m8 second pass)
+
+- **Feed forecast chart** (`FeedPanel`, plain SVG, no chart library): feed on offer as a filled area in `--ok` with a 2 px line, tonnes of DM over the farm, from "Now" and then each month for a year. The ground cover floor is a dashed 2 px `--coral` line across it. Crops are bars in `--sky` stacked on the pasture at their month, so they read as spikes. The y axis has three ticks on a round top (1, 2 or 5 times a power of ten) in tonnes. A legend names all three. The chart is an image with a one-sentence summary for a screen reader, and the figures are in a table under "Forecast figures". The card under it says the facts and that it is an average-season forecast.
+- **Supplements** (same panel): one card a mob, with what it is on, its cost a day, what it adds, and a button per supplement with its cost a day. The one it is on is pressed (`--btn`). In the yards or the feedlot the reason shows instead of buttons. The job card draws under the mob's card.
+- **Stock book** (`StockBook`): chips for All and each mob, a sort picker, then a table. Up to 560 px of panel it shows Tag, Class, kg, CS and Profit (the phone list in mockup 8); from 560 px it adds Age, PTIC, Bought, Spent and Value now (mockup D). Column heads sort, with `aria-sort`. Profit is `--ok` above zero and `--bad` below, with a + or a minus sign, so it never relies on colour. 50 rows, then "Show more". How the figures are worked out sits under a disclosure.
+- **Sell money line** (`SellProfitLine`): "Bought for $1,050, $40 spent since · profit +$266/head" in 12 px, the price muted.
+
 ## Narrow screens
 
 - No horizontal scroll at phone width. Info-bar items wrap, and the feed charts shrink.

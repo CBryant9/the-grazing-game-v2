@@ -60,6 +60,7 @@ import {
 } from './derived';
 import type { TickEvent } from './events';
 import { startDay } from './clock';
+import { markStocked } from './paddockfacts';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
 import { holdPlans, runPlans, stopsToday } from './plans';
 import {
@@ -368,8 +369,14 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       weights = new Map();
       for (const a of m.animals) if (!a.dead) weights.set(a.id, a.wt);
     }
+    const place = placeFor(farm, survey, m, env.plansByHand === true);
+    // Where stock spent the day, for the paddocks' rest days (a record only: m8, engine 0.21.0).
+    if (place.kind === 'paddock' && m.where.kind === 'paddock' && m.animals.length) {
+      markStocked(farm, place.area.cells, day);
+      for (const r of place.shifts ?? []) markStocked(farm, r.cells, day);
+    }
     const res = simMob(m, {
-      place: placeFor(farm, survey, m, env.plansByHand === true),
+      place,
       land,
       day,
       byId,
@@ -425,6 +432,11 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   // 4b and 5b. The sheep's day, on the same pasture, and their deaths settled.
   // A farm that has never had sheep skips this and is unchanged.
   if (farm.sheep) {
+    for (const sm of farm.sheep.mobs) {
+      if (sm.where.kind !== 'paddock' || !sm.sheep.length) continue;
+      const areaId = survey.topology.areaOf[sm.where.anchor]!;
+      markStocked(farm, survey.topology.areas[areaId]!.cells, day);
+    }
     const sd = sheepDay(farm, survey, land, date, events);
     result.sheepDeaths = sd.deaths;
     result.lambs = sd.births;

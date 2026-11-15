@@ -142,8 +142,16 @@
  * the words quote are named, not changed (`FEED_FLOOR_KG_HA`, `FEED_SHORT_KG_HA`,
  * `MARKET_WEIGHTS`). No grass, cattle, sheep, crop, season, price or score formula changed:
  * every benchmark was re-run (docs/CALIBRATION.md, the m8 entry). Save format 15.
+ *
+ * 0.21.0 (m8, the stock book and the feed panel): reads only. `stockBook` (each animal's start
+ * value or purchase price, what has been spent on it since, what it would fetch today after
+ * selling costs, and the difference), `feedForecast` (feed on offer ahead by month in an average
+ * season, against what the stock on hand eat and the ground cover floor, with crops apart),
+ * `supplementCosts` also says what each supplement adds, `lastRainMm` and `paddockRestDays`.
+ * `createFarm` records `startTags` and the tick records `stockedOn`. No grass, cattle, sheep, crop, season, price or score formula changed: every
+ * benchmark was re-run (docs/CALIBRATION.md, the m8 stock book entry). Save format 16.
  */
-export const ENGINE_VERSION = '0.20.0';
+export const ENGINE_VERSION = '0.21.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -226,5 +234,12 @@ export const ENGINE_VERSION = '0.20.0';
  * loads unchanged; an older farm already overdrawn is told on its next night. An engine that
  * knows only format 14 refuses a format 15 save, which is right: it would show things to do the
  * player had put away.
+ *
+ * 16: the stock book (engine 0.21.0). A farm may have `startTags` (the first tag given out after
+ * setup), set on every farm made from now on, and `stockedOn` (the last day stock spent on each
+ * square's grazing area, for rest days), made at the first night. An older save loads without
+ * either: the stock book then names any animal not bred on the farm as "bought or taken over",
+ * and `stockedOn` is made at its next night from the pasture's last hard grazing. An engine that knows only
+ * format 15 refuses a format 16 save, which is right: it would drop `startTags` on its next save.
  */
-export const SAVE_FORMAT_VERSION = 15;
+export const SAVE_FORMAT_VERSION = 16;

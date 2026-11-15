@@ -557,7 +557,8 @@ describe('the record route', () => {
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(res.headers.get('set-cookie')).toMatch(/Max-Age=7776000/);
     const rec = await res.json();
-    expect(Object.keys(rec).sort()).toEqual(['diary', 'earlier', 'soFar', 'years']);
+    expect(Object.keys(rec).sort()).toEqual(['diary', 'earlier', 'soFar', 'stockBook', 'years']);
+    expect(rec.stockBook.rows.length).toBe(rec.stockBook.totals.head);
     expect(rec.years.map((y: { n: number }) => y.n)).toEqual([1]);
     expect(rec.soFar.n).toBe(2);
     expect(rec.diary).toHaveLength(30);

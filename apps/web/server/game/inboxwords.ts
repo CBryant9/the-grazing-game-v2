@@ -6,7 +6,7 @@ import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText, waitWhyWord } from './planwords';
 import { isSheepEvent, sheepMessage } from './sheepwords';
-import { bankWords, causeWord, gameOverWord } from './words';
+import { UNDER_FLOOR, bankWords, causeWord, gameOverWord } from './words';
 
 /**
  * The messages in the inbox: one or two plain sentences for each thing the
@@ -77,6 +77,35 @@ const sold = (e: Extract<FarmEvent, { type: 'cattle-sold' }>): string =>
   `${plural(e.head, 'head', 'head')} sold${e.booked ? ' from the booking' : ''}, averaging ${Math.round(e.avgKg)} kg. ${money(e.net)} paid into the bank after selling costs.`;
 
 /**
+ * The whole farm eaten out: the fact, in the paddock sheet's words for feed under the floor, and
+ * what happens if it stays that way. Never "days of feed left".
+ */
+export function outOfFeedWords(daysLeft: number): string {
+  return `The whole farm is eaten out with stock on it. Feed averages ${UNDER_FLOOR.replace('Under', 'under')}. The game ends if it stays that way for ${plural(daysLeft, 'more day')}.`;
+}
+
+/**
+ * The "bull calves to mark" notes that repeat within one drop of calves, by inbox number. The
+ * engine notes unmarked bull calves every 45 days, as the old game did; the player is told once
+ * for each drop, the rule Things to do follows (REQUIREMENTS, "marking once per drop"). A drop
+ * starts with "calving has started" in the mob; marking the mob also ends the drop's note.
+ */
+export function repeatMarkNotes(inbox: readonly { seq: number; event: FarmEvent }[]): Set<number> {
+  const told = new Set<number>();
+  const hide = new Set<number>();
+  for (const m of inbox) {
+    const e = m.event;
+    if (e.type === 'calves-marked') told.delete(e.mob);
+    if (e.type !== 'cattle') continue;
+    if (e.note.type === 'calvingStarted') told.delete(e.mob);
+    if (e.note.type !== 'toMark') continue;
+    if (told.has(e.mob)) hide.add(m.seq);
+    else told.add(e.mob);
+  }
+  return hide;
+}
+
+/**
  * The message for an event, or null when the inbox does not carry it. Every
  * workforce event has one (`labourMessage` is exhaustive over them), and says
  * its dates with `dateOf`.
@@ -94,7 +123,8 @@ export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
     case 'year-end':
       return msg('farm', `Year ${e.year.n} of the farm has ended.`);
     case 'out-of-feed':
-      return msg('cattle', `The farm has about ${plural(e.daysLeft, 'day')} of feed left.`);
+      // Feed under the floor is never put as days of feed left (the paddock sheet's own words).
+      return msg('cattle', outOfFeedWords(e.daysLeft));
     case 'game-over':
       return msg('farm', gameOverWord(e.reason));
     case 'bank':

@@ -15,8 +15,11 @@ import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
  * change 5 on its own branch, so the joined line (m6) is 6: an offline copy from either branch is
  * not shown. A saved offline farm of an older version is not shown. 7 (m8) added the bank's limits
  * beside cash, a paddock's `feedText`, a mob's `details`, and the setup's money for each difficulty.
+ * 8 (m8, stock book and feed) added the feed panel, a paddock's `comment` and
+ * `restDays`, a mob's `gainWhy`, a price row's `lastWeekCKg`, sale money on the Sell rows, and
+ * last night's rain in the totals.
  */
-export const SNAPSHOT_VERSION = 7;
+export const SNAPSHOT_VERSION = 8;
 
 export interface DateParts {
   year: number;
@@ -76,6 +79,8 @@ export interface TotalsWire {
   /** How far the bank lends for jobs, dollars (negative): the overdraft limit the job cards name. */
   lendLimit: number;
   netWorth: number;
+  /** Rain on the last day that ran (last night), mm. Null on a farm with random seasons, which has no rain figure. */
+  rainMm: number | null;
   massKgHa: number;
   greenKgHa: number;
   coverPct: number;
@@ -123,6 +128,27 @@ export interface SellGroupWire {
   id: SellGroupId;
   name: string;
   head: number;
+  /** What the head free to sell cost and would fetch today, a head. Null with none. */
+  money: SellMoneyWire | null;
+}
+
+/**
+ * What a draft of cattle cost and would fetch today, averaged a head, whole dollars (the stock
+ * book's figures, REQUIREMENTS "profit per animal"). A cow's figures include her calf at foot,
+ * which is sold with her.
+ */
+export interface SellMoneyWire {
+  head: number;
+  /** "Bought for", "Taken over at", "Bred here", "Bought or taken over at", or "Cost in at" for a mix. */
+  paidText: string;
+  /** Purchase price with fees, or value at takeover. 0 for cattle bred here. */
+  paidPerHead: number;
+  /** Spent since: feed, health and marking. */
+  spentPerHead: number;
+  /** What one would put in the bank sold today, after selling costs. */
+  valuePerHead: number;
+  /** Value less paid and spent. */
+  profitPerHead: number;
 }
 
 export type SheepFeedId = 'none' | 'lick' | 'grain' | 'hay';
@@ -202,6 +228,12 @@ export interface MobWire {
    * details, never styled as a warning. Empty when there is nothing to say.
    */
   details: string[];
+  /**
+   * One short reason line for the mob's gain, for the herd list: the engine's first reason for a
+   * class not gaining ("Milking for a calf"), or the feed's figures ("Feed at ME 10.2 MJ/kg, CP
+   * 14%"). Facts only. Null before the mob's first day.
+   */
+  gainWhy: string | null;
   /** Females on the record as PTIC (the engine's PTIC_DAYS or more in calf). Never the live count. */
   ptic: number;
   /** "31 PTIC, 2 to 4 months in calf.", or null with none PTIC. For the herd list. */
@@ -264,6 +296,14 @@ export interface PaddockWire {
   cell: number;
   /** Arable land in the paddock, ha. 0 when it has none. */
   arableHa: number;
+  /**
+   * One plain line on what the stock are doing on a stocked paddock, from the model ("They're
+   * picking the best bits. The grass is growing away from them."). Describes, never advises,
+   * praises or blames. Null on a paddock with no stock.
+   */
+  comment: string | null;
+  /** Whole days since stock last left the paddock. Null while stock are on it, or with no grazing on record. */
+  restDays: number | null;
 }
 
 export interface SaleDayWire {
@@ -284,6 +324,8 @@ export interface PriceRowWire {
   /** Change in c/kg since the first day of the chart, or null with less than two days of prices. */
   changeCKg: number | null;
   changeDays: number;
+  /** c/kg seven days ago, for the weekly change arrow. Null with less than a week of prices. */
+  lastWeekCKg: number | null;
 }
 
 /** The last month of prices the farm has lived, c/kg for each class, one point a day. Never a future price. */
@@ -313,6 +355,8 @@ export interface SellClassWire {
   label: string;
   head: number;
   cKg: number;
+  /** What the head free to sell cost and would fetch today, a head. */
+  money: SellMoneyWire | null;
 }
 
 /** A class of sheep for the Buy card. */
@@ -619,6 +663,109 @@ export interface BubbleWire {
   date: DateParts;
 }
 
+/** Where a head of cattle came from, for the stock book's first money column. */
+export type StockOriginId = 'bought' | 'start' | 'bred' | 'boughtOrStart';
+
+/** One head in the stock book. Money is whole dollars; weight whole kg. */
+export interface StockRowWire {
+  /** The tag number. */
+  id: number;
+  mob: number;
+  /** The class on the record, an id from `StockBookWire.classes`. */
+  cls: string;
+  ageDays: number;
+  kg: number;
+  cs: number;
+  /** PTIC on the record. */
+  ptic: boolean;
+  origin: StockOriginId;
+  /** Purchase price with fees, value when the farm was taken over, or 0 if bred here. */
+  paid: number;
+  /** Spent on it since: feed, health and marking. */
+  spent: number;
+  /** What it would put in the bank sold today, after selling costs. */
+  value: number;
+  /** `value` less `paid` and `spent`. */
+  profit: number;
+  /** Booked onto a sale. */
+  booked: boolean;
+}
+
+/** The stock book in Herd: every head of cattle with its money at today's prices. */
+export interface StockBookWire {
+  rows: StockRowWire[];
+  /** The class names, by id. */
+  classes: { id: string; label: string }[];
+  /** The mobs the rows are in, for the filter chips. */
+  mobs: { id: number; name: string; head: number }[];
+  /** The words for each origin: "Bought", "Taken over", "Bred here", "Bought or taken over". */
+  originText: Record<StockOriginId, string>;
+  /** Sums over every row, whole dollars. */
+  totals: { head: number; paid: number; spent: number; value: number; profit: number };
+  /** Plain facts: what each column is and how profit is worked out. */
+  notes: string[];
+}
+
+/** One point of the feed forecast: tonnes of DM over the farm, one decimal place. */
+export interface FeedPointWire {
+  /** 0 is January. */
+  month: number;
+  /** "Nov". The first point is today. */
+  label: string;
+  /** Feed on offer on the pasture. */
+  pastureT: number;
+  /** Feed on the crops (grain crops, forage crops, annual pasture), drawn as spikes. */
+  cropT: number;
+}
+
+/** A supplement a mob could be on, with its cost a day and what it adds. */
+export interface FeedOptionWire {
+  id: SuppId;
+  label: string;
+  /** Dollars a day for this mob, two places. */
+  perDay: number;
+  /** What it adds, as a fact: "2.0 kg DM a head a day at ME 8.5 MJ/kg, CP 10%." Empty for None. */
+  adds: string;
+}
+
+/** One cattle mob in the supplements table. */
+export interface FeedMobWire {
+  mob: number;
+  mobName: string;
+  area: string | null;
+  head: number;
+  supp: SuppId;
+  suppLabel: string;
+  /** Dollars a day for the supplement it is on now. */
+  perDay: number;
+  /** What the supplement it is on adds. Empty for None. */
+  adds: string;
+  options: FeedOptionWire[];
+  /** Why the supplement can not be changed (yards, feedlot), or null. */
+  reason: string | null;
+}
+
+/** The Feed panel: the average-season forecast and the supplements, as numbers and words. */
+export interface FeedWire {
+  points: FeedPointWire[];
+  /** The ground cover floor over the pasture, t DM. */
+  floorT: number;
+  floorKgHa: number;
+  pastureHa: number;
+  /** What the stock on hand eat from pasture, t DM a month (30.4 days). */
+  eatTMonth: number;
+  head: number;
+  /** The forecast in plain facts: what the stock eat, when feed falls under the floor, the crops. */
+  lines: string[];
+  /** Says it is an average-season forecast, not this year's weather. */
+  note: string;
+  /** The chart in one sentence, for a screen reader. */
+  summary: string;
+  supplements: FeedMobWire[];
+  /** Plain facts about supplements: switched on at a daily price, the cost comes off each day. */
+  suppNotes: string[];
+}
+
 export interface Snapshot {
   version: typeof SNAPSHOT_VERSION;
   /**
@@ -647,6 +794,8 @@ export interface Snapshot {
   cropping: CropsWire | null;
   mobs: MobWire[];
   paddocks: PaddockWire[];
+  /** The feed forecast and the supplements, for the Feed panel. */
+  feed: FeedWire;
   /** The build tools, with prices and help lines. */
   build: BuildWire;
   /** The farm's hands, the people looking for work and the standing with workers. */
@@ -759,6 +908,11 @@ export interface RecordResponse {
   years: YearView[];
   diary: DiaryDay[];
   earlier: number | null;
+  /**
+   * Every head of cattle with its money at today's prices, for the stock book in Herd. Sent here,
+   * on request, not in every snapshot: a herd of thousands would pass the snapshot's size limit.
+   */
+  stockBook: StockBookWire;
 }
 
 /** The job card: time, cost and light left, from the engine's own figures. */
@@ -1046,6 +1200,14 @@ export interface Shown {
 /** An act request: the job, the farm version its card was made on, and a one-use id. */
 export type ActRequest = ActionRequest & { version: string; requestId: string };
 
+/** A leg of a plan as the plan form sends it. */
+export interface PlanLegRequestWire {
+  stops: number[];
+  trigger: PlanTriggerWire;
+  /** 0 keeps going. */
+  rounds: number;
+}
+
 export type SimpleAction =
   | { type: 'markCalves'; mob: number }
   | { type: 'sellGroup'; mob: number; group: SellGroupId; qty: number }
@@ -1098,6 +1260,11 @@ export type SimpleAction =
       step: number;
       /** Set to change a plan that exists. */
       planId?: number;
+      /**
+       * Legs after the first, in order (the plan form's Leg 2 and on). The first leg is `stops`,
+       * `trigger` and `rounds` above. `step` counts across every leg's stops. Left out: one leg.
+       */
+      moreLegs?: PlanLegRequestWire[];
     }
   | { type: 'sow'; species: string; cells: number[] }
   | { type: 'hireHand'; person: string }
