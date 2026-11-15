@@ -17,7 +17,7 @@ export const ADMIN_LINKS = [
   { href: '/admin/words', label: 'Word filter', later: false },
   { href: '/admin/ads', label: 'Ads and sponsors', later: true },
   { href: '/admin/purchases', label: 'Purchases', later: true },
-  { href: '/admin/challenges', label: 'Challenges', later: true },
+  { href: '/admin/challenges', label: 'Challenges', later: false },
 ] as const;
 
 export function AdminNav({ username }: { username: string }) {

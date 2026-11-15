@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import styles from '@/components/community/community.module.css';
@@ -23,6 +24,20 @@ export default async function CommunityLayout({ children }: { children: ReactNod
     <div className={styles.page}>
       <SiteHeader />
       <main id="main" className={styles.main} tabIndex={-1}>
+        {(live.groups || live.leaderboards) && (
+          <nav className={styles.subnav} aria-label="Groups and boards">
+            {live.groups && (
+              <Link href="/community/groups" className={styles.subitem}>
+                Groups
+              </Link>
+            )}
+            {live.leaderboards && (
+              <Link href="/leaderboards" className={styles.subitem}>
+                Leaderboards
+              </Link>
+            )}
+          </nav>
+        )}
         {children}
       </main>
       {tickerOn ? <Ticker place="strip" /> : null}

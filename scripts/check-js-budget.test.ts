@@ -64,6 +64,9 @@ function pretend(
     'admin/users/[id]',
     'admin/users',
     'admin',
+    'admin/moderation',
+    'admin/words',
+    'admin/challenges',
   ]) {
     mkdirSync(join(app, rel, 'page'), { recursive: true });
     writeFileSync(
@@ -86,6 +89,8 @@ function pretend(
     'community/u/[username]',
     'community/u/[username]/[list]',
     'community/farm/[id]',
+    'community/groups',
+    'community/groups/[id]',
   ]) {
     mkdirSync(join(app, rel, 'page'), { recursive: true });
     writeFileSync(

@@ -837,7 +837,13 @@ export class GameServer {
   }
 
   /** Start the session's farm from the setup choices. A session has one farm. */
-  async create(sessionId: string, choices: SetupChoices, owner?: Owner): Promise<Snapshot> {
+  async create(
+    sessionId: string,
+    choices: SetupChoices,
+    owner?: Owner,
+    /** A challenge's fixed seed (never sent to the browser). Random otherwise. */
+    fixedSeed?: number,
+  ): Promise<Snapshot> {
     const id = await this.idFor(sessionId);
     const who: Owner | null =
       owner ?? (isSessionId(sessionId) ? { kind: 'guest', session: sessionId } : null);
@@ -854,7 +860,7 @@ export class GameServer {
         throw new GameError(409, 'You already have a farm. Start a new one from the farm screen.');
       }
       await this.makeRoom();
-      const farm = createFarm(createOptions(choices, this.seed()), envFor(choices));
+      const farm = createFarm(createOptions(choices, fixedSeed ?? this.seed()), envFor(choices));
       const stored: StoredFarm = {
         format: STORED_FORMAT,
         name: choices.name,

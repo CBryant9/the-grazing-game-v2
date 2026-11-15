@@ -592,6 +592,19 @@ const BODIES: Record<string, (p: Record<string, Person>) => unknown> = {
   settings: () => ({ key: 'announcement', value: { text: 'Hello', link: null } }),
   users: (p) => ({ userId: p.pat!.id, action: 'ban' }),
   words: () => ({ action: 'add', term: 'badword', kind: 'block' }),
+  challenges: () => ({
+    action: 'challenge',
+    kind: 'fast_challenge',
+    name: 'Walked route cup',
+    settings: {
+      district: 'cq',
+      size: 'small',
+      enterprise: 'grazing',
+      years: 'random',
+      startType: 'scratch',
+      difficulty: 'easy',
+    },
+  }),
 };
 
 describe('8. every admin route gets the gate, CSRF and rollback checks', () => {
@@ -613,7 +626,8 @@ describe('8. every admin route gets the gate, CSRF and rollback checks', () => {
                   (select count(*) from public.admin_audit_log) f,
                   (select jsonb_agg(to_jsonb(t) order by id) from public.reports t) g,
                   (select count(*) from public.word_filter) h,
-                  (select count(*) from public.notifications) i`,
+                  (select count(*) from public.notifications) i,
+                  (select count(*) from public.challenges) j`,
         )
       ).rows,
     );

@@ -247,6 +247,27 @@ export async function postsBy(
   return finishPage(tx, r.rows, me);
 }
 
+/** One group's posts, newest first (the database shows them to the group's members only). */
+export async function groupPosts(
+  tx: SqlRunner,
+  me: string,
+  group: string,
+  cursor: string | null,
+): Promise<Page<PostView>> {
+  const c = decodeCursor(cursor);
+  const r = await tx.query<PostRow>(
+    `select ${POST_SELECT}
+       from public.posts p
+       left join public.public_profiles pp on pp.user_id = p.author_id
+      where p.group_id = $5 and p.removed_at is null
+        and ($2::timestamptz is null or (p.created_at, p.id) < ($2::timestamptz, $3::uuid))
+      order by p.created_at desc, p.id desc
+      limit $4`,
+    [me, c?.ts ?? null, c?.id ?? null, PAGE_SIZE + 1, group],
+  );
+  return finishPage(tx, r.rows, me);
+}
+
 export async function getPost(tx: SqlRunner, me: string, id: string): Promise<PostView | null> {
   if (!isUuid(id)) return null;
   const r = await tx.query<PostRow>(

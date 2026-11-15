@@ -133,6 +133,8 @@ describe('every community page', () => {
       [
         '/',
         '/farm/[id]',
+        '/groups',
+        '/groups/[id]',
         '/me',
         '/people',
         '/post/[id]',
@@ -201,7 +203,8 @@ describe('every community page', () => {
     state.cookie = cookies.alice!;
     for (const path of Object.keys(pageModules)) {
       // The farm page needs a farm the member may look at: farmview.test.ts renders it.
-      if (path.includes('/farm/')) continue;
+      // The group pages need the Groups switch and a group: groups.test.ts renders them.
+      if (path.includes('/farm/') || path.includes('/groups')) continue;
       const Page = await load(path);
       const out = await Page(props());
       const html = renderToStaticMarkup(out as never);

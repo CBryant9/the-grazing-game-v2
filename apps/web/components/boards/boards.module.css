@@ -1,0 +1,113 @@
+/* Leaderboards (milestone 4.1). Server drawn, no script. 44 px targets, no row wider than the phone, both themes. */
+
+.wrap {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.filters select,
+.filters button {
+  min-height: var(--tap);
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+  max-width: 100%;
+}
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+}
+.check input {
+  width: 22px;
+  height: 22px;
+}
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 3ch minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+.mine {
+  border-color: var(--accent-line);
+}
+.pinned {
+  position: sticky;
+  bottom: 8px;
+  box-shadow: 0 4px 14px var(--shadow);
+}
+.rank {
+  font-family: var(--font-px);
+  color: var(--muted);
+}
+.who {
+  min-width: 0;
+  display: grid;
+}
+.who small {
+  color: var(--muted);
+}
+.score {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.score small {
+  display: block;
+  color: var(--muted);
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tabs a {
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+.tabs a[aria-current='page'] {
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}

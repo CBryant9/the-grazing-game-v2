@@ -7,8 +7,8 @@ import { photoToBase64, sendJson, useSend } from './send';
 
 const MAX_PHOTOS = 4;
 
-/** Write a post: words, an optional link, up to four photos. Photos wait for a check before anyone else sees them. */
-export function Composer() {
+/** Write a post: words, an optional link, up to four photos. Photos wait for a check before anyone else sees them. In a group, the post is for the group's members. */
+export function Composer({ groupId }: { groupId?: string } = {}) {
   const router = useRouter();
   const { busy, message, send, setMessage } = useSend();
   const [body, setBody] = useState('');
@@ -26,6 +26,7 @@ export function Composer() {
       body,
       link: link.trim() || undefined,
       visibility,
+      groupId,
     });
     if (!r.ok || !r.data) return;
     let waiting = 0;
@@ -107,18 +108,24 @@ export function Composer() {
           anyone else sees it.
         </p>
       )}
-      <label className={styles.label} htmlFor="post-vis">
-        Who can see it
-      </label>
-      <select
-        id="post-vis"
-        className={styles.input}
-        value={visibility}
-        onChange={(e) => setVisibility(e.target.value === 'followers' ? 'followers' : 'public')}
-      >
-        <option value="public">Everyone</option>
-        <option value="followers">Followers only</option>
-      </select>
+      {groupId ? (
+        <p className={styles.hint}>Only the group&rsquo;s members see this post.</p>
+      ) : (
+        <>
+          <label className={styles.label} htmlFor="post-vis">
+            Who can see it
+          </label>
+          <select
+            id="post-vis"
+            className={styles.input}
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value === 'followers' ? 'followers' : 'public')}
+          >
+            <option value="public">Everyone</option>
+            <option value="followers">Followers only</option>
+          </select>
+        </>
+      )}
       <div className={styles.row}>
         <button type="submit" className="btn coral" disabled={busy || body.trim() === ''}>
           {busy ? 'Posting...' : 'Post'}

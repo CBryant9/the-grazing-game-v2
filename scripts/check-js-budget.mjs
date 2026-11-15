@@ -137,6 +137,9 @@ const ADMIN_PAGES = [
   'admin/users/[id]',
   'admin/users',
   'admin',
+  'admin/moderation',
+  'admin/words',
+  'admin/challenges',
 ];
 const ADMIN_LIMIT_KB = Number(arg('--limit-admin', '150'));
 
@@ -197,6 +200,8 @@ const COMMUNITY_PAGES = [
   'community/u/[username]',
   'community/u/[username]/[list]',
   'community/farm/[id]',
+  'community/groups',
+  'community/groups/[id]',
 ];
 const COMMUNITY_LIMIT_KB = Number(arg('--limit-community', '150'));
 for (const rel of COMMUNITY_PAGES) {
@@ -223,6 +228,18 @@ for (const rel of COMMUNITY_PAGES) {
     console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');
   }
   if (!ok) failed = true;
+}
+// ---- /leaderboards (milestone 4.1): a public page rendered on the server for each request (it
+// reads the boards), built with the pages router and its runtime switched off, so it sends no
+// script file at all. There is no built HTML to read, so the check reads the page's own config
+// and that it uses no client component. The limit is 0 scripts.
+{
+  const src = readFileSync(join(ROOT, 'apps/web/pages/leaderboards.tsx'), 'utf8');
+  const off = /unstable_runtimeJS:\s*false/.test(src) && !/['"]use client['"]/.test(src);
+  console.log(
+    `${off ? 'ok  ' : 'OVER'} ${'/leaderboards'.padEnd(20)} 0.0 KB compressed in 0 scripts (runtime off, checked from the page config; the ticker's line below when its switch is on)`,
+  );
+  if (!off) failed = true;
 }
 // ---- The live ticker's own script (PRD 9.4): hand written, in `public`. Where the ticker is on
 // (the landing page when its switch is on at build, the community pages from the live switches)

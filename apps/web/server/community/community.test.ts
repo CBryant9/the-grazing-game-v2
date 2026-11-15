@@ -50,6 +50,8 @@ const NAMES = [
   'share',
   'search',
   'share-image',
+  'group',
+  'challenge',
 ] as const;
 
 let db: PGlite;
@@ -75,6 +77,8 @@ beforeAll(async () => {
   routes.share = await import('@/app/api/community/share/route');
   routes.search = await import('@/app/api/community/search/route');
   routes['share-image'] = await import('@/app/api/community/share-image/route');
+  routes.group = await import('@/app/api/community/group/route');
+  routes.challenge = await import('@/app/api/community/challenge/route');
   routes.admin = await import('@/app/api/admin/photos/route');
   routes.farm = await import('@/app/api/game/farm/route');
 }, 120_000);
@@ -145,7 +149,7 @@ beforeEach(async () => {
      delete from public.farms; delete from public.guest_sessions; delete from auth.users;
      truncate public.rate_limit_hits;
      update public.feature_switches set enabled = false where key in ('community','feed_posts','groups');
-     update public.feature_switches set enabled = true where key in ('community','feed_posts');`,
+     update public.feature_switches set enabled = true where key in ('community','feed_posts','groups');`,
   );
   resetRateLimits();
   resetSwitchCache();
@@ -240,6 +244,11 @@ const ROUTE_BODIES: Record<string, { method: 'GET' | 'POST'; body?: unknown; que
   share: { method: 'POST', body: { farmId: '00000000-0000-4000-8000-000000000001' } },
   search: { method: 'GET', query: '?q=ab' },
   'share-image': { method: 'GET', query: '?post=00000000-0000-4000-8000-000000000001' },
+  group: { method: 'POST', body: { action: 'join', code: '000000000000' } },
+  challenge: {
+    method: 'POST',
+    body: { action: 'enter', challengeId: '00000000-0000-4000-8000-000000000001' },
+  },
 };
 
 function walk(dir: string, match: RegExp): string[] {
