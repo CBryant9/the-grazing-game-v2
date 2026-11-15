@@ -188,7 +188,8 @@ export function sheepNoteWord(mobName: string, area: string | null, n: SheepNote
     case 'lowCondition':
       return `${mobName} has an average condition of CS ${t1(n.cs)}.`;
     case 'losingWeight':
-      return `${mobName} is losing weight${n.why.length ? `: ${lossList(n.why)}` : ''}. The feed is ME ${t1(n.me)} MJ/kg and CP ${n0(n.cp)}%.`;
+      // A note saved by the first sheep pass (save format 10) has no reasons: it reads as plain loss (m6).
+      return `${mobName} is losing weight${n.why?.length ? `: ${lossList(n.why)}` : ''}. The feed is ME ${t1(n.me)} MJ/kg and CP ${n0(n.cp)}%.`;
     case 'joiningStarted':
       return `Joining has started in ${mobName}: ${plural(n.ewes, 'ewe')} with ${plural(n.rams, 'ram')}${n.rams < n.ramsNeeded ? `, short of the ${n0(n.ramsNeeded)} rams the joining needs` : ''}.`;
     case 'joiningEnded':
