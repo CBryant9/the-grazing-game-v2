@@ -585,6 +585,7 @@ const BODIES: Record<string, (p: Record<string, Person>) => unknown> = {
   settings: () => ({ key: 'announcement', value: { text: 'Hello', link: null } }),
   users: (p) => ({ userId: p.pat!.id, action: 'ban' }),
   notifications: () => ({ paused: true }),
+  purchases: () => ({ action: 'product', product: 'farm_pack', active: true }),
 };
 
 describe('8. every admin route gets the gate, CSRF and rollback checks', () => {

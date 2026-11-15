@@ -73,6 +73,20 @@ const PAGES = [
     limitKb: Number(arg('--limit-account', '150')),
     mayHaveNoScripts: false,
   })),
+  // The store and the two pages Stripe sends a buyer back to (milestone 5.2). Each has its own line,
+  // with the measured size and room to spare. None of them raises an existing limit.
+  ...[
+    ['/store', 'store.html'],
+    ['/purchase/success', 'purchase/success.html'],
+    ['/purchase/cancelled', 'purchase/cancelled.html'],
+  ].map(([path, file]) => ({
+    path,
+    dir: APP,
+    file,
+    targetKb: 100,
+    limitKb: Number(arg('--limit-billing', '150')),
+    mayHaveNoScripts: false,
+  })),
 ];
 
 /** The script files a page's HTML names, once each. */

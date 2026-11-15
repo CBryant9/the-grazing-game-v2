@@ -58,7 +58,14 @@ function safeHost(url: string): string | null {
  * backslash, no query or fragment to carry anything, and no path that is not on
  * the list. Anything else becomes `/play`.
  */
-export const NEXT_ALLOWED: readonly string[] = ['/', '/play', '/account', '/about', '/pricing'];
+export const NEXT_ALLOWED: readonly string[] = [
+  '/',
+  '/play',
+  '/account',
+  '/about',
+  '/pricing',
+  '/store',
+];
 export const NEXT_DEFAULT = '/play';
 
 export function safeNext(value: unknown): string {

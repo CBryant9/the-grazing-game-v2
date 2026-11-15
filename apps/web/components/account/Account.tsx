@@ -6,6 +6,7 @@ import { authApi } from '@/lib/auth/api';
 import { useMe } from '@/lib/auth/store';
 import { goTo } from '@/lib/auth/nav';
 import { clearAllLastFarms } from '@/lib/game/offline';
+import { YourPurchases } from '@/components/billing/YourPurchases';
 import styles from './account.module.css';
 
 const METHOD: Record<string, string> = { email: 'Emailed link', google: 'Google' };
@@ -135,6 +136,8 @@ export function Account() {
           Download my data
         </a>
       </div>
+
+      <YourPurchases />
 
       <div className={styles.card}>
         <h2 className={`px ${styles.label}`}>Sign out</h2>

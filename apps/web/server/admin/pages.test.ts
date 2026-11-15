@@ -183,7 +183,7 @@ describe('every admin page', () => {
 
   it('the placeholders say plainly that they are built in a later milestone', async () => {
     state.cookie = cookies.admin!;
-    for (const name of ['moderation', 'purchases', 'challenges']) {
+    for (const name of ['moderation', 'challenges']) {
       const Page = (
         (await pageModules[`../../app/admin/${name}/page.tsx`]!()) as {
           default: () => Promise<unknown>;
@@ -192,6 +192,13 @@ describe('every admin page', () => {
       const html = renderToStaticMarkup((await Page()) as never);
       expect(html, name).toContain('Built in a later milestone');
     }
+    // Purchases is a real page since 5.2: it says whether Stripe is connected.
+    const purchases = (
+      (await pageModules['../../app/admin/purchases/page.tsx']!()) as {
+        default: () => Promise<unknown>;
+      }
+    ).default;
+    expect(renderToStaticMarkup((await purchases()) as never)).toContain('Stripe is not connected');
     const dash = (
       (await pageModules['../../app/admin/page.tsx']!()) as { default: () => Promise<unknown> }
     ).default;

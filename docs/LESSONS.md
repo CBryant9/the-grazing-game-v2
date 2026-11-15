@@ -290,3 +290,14 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | N5 | Three shared tests broke the moment a new admin page, a new `me` field and a new admin budget page existed | They list every page and every key on purpose | Updated the lists (`pages.test.ts`, `flows.test.ts`, the budget script and its test) and kept the new work in new files. **Rule: run the whole suite as soon as a shared list could be touched, not at the end** |
 | N6 | A test fixture that banned an account could not be reset with a plain delete | A running ban needs its hash record before the account can go | The reset clears bans first. **Rule: a reset that deletes accounts clears their bans and suspensions first** |
 | N7 | A home page logo strip would have turned the one static page that sends no script into a page that reads a database | The slot list says "landing", and the public pages are built ahead with the runtime off | The slot exists and is switchable, but is not placed: a public page gets an ad only as server markup with no script, and views can not be counted without a script. **Rule: do not change how a page is built to fit a feature; say what is not placed and why** |
+
+### m5.2 Purchases
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| P1 | Every test in the file failed after the first one failed | The set-up deleted accounts, and a test's banned account makes that delete refuse (`ban_hash_required`), so each next test failed in set-up | The set-up clears bans first, as the admin tests do. **Rule: a test file's reset must cope with every state a test in it can leave** |
+| P2 | A farm id from the game is 32 hex characters and the database wants a uuid | The game's routes use the id without dashes | One `farmUuid()` turns either form into a uuid, and a bad one is a plain 400 before any query can throw. **Rule: an id that came from the browser is checked for shape before it reaches a typed column** |
+| P3 | The Stripe event for a refund can arrive before the one that says the payment was made | Stripe does not order events | The refund waits as an unfinished event row, and the paid event asks Stripe for the payment's true state. **Rule: an event handler that needs another event first must park it, not drop it** |
+| P4 | A payments library was an option, and Stripe's own docs describe the signature check and the Checkout call in a few lines | A library adds weight and hides the check | `verify.ts` and `stripe.ts` follow the docs read on the day, and the fake signs with the same code, so the tests exercise the real check. **Rule: say plainly what a test double can not prove (here, Stripe itself: owed in test mode)** |
+| P5 | An upgrade test bought the upgrade for an account that already had no ads, and was refused | The test reused one account for a second case | A second account for the second case. **Rule: a test that needs a clean owner state makes a new owner** |
+

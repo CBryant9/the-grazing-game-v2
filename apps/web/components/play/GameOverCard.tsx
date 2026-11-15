@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { money, num, plural } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
+import { KeepGoing } from '@/components/billing/KeepGoing';
 import type { OverWire } from '@/lib/game/types';
 import styles from './play.module.css';
 
@@ -107,6 +108,7 @@ export function GameOverCard({ over }: { over: OverWire }) {
             The total counts the part year as if it had closed on the last day.
           </p>
         )}
+        {!asking && <KeepGoing />}
         {!asking && (
           <div className={styles.sumbtns}>
             <button type="button" className="btn ghost" onClick={() => hide(true)}>

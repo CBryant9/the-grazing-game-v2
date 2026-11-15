@@ -287,6 +287,28 @@ Code: `apps/web/server/admin/`. The pages are in `apps/web/app/admin`, the write
 
 Second pass (migration `20261115000500_admin_fixes.sql`): `app.is_admin_user` and `app.is_staff` now mean *in good standing* (role, not banned, not suspended), so a banned or suspended admin or moderator reads nothing admin-only through their own token (`account_status` beyond their own row, the audit log, private site settings, moderation actions; `packages/db/src/adminfixes.test.ts`). The last-admin trigger counts only admins in good standing and also fires on `banned_at` and `suspended_until`. `app.end_sessions(user)` (server only) deletes `auth.sessions`. `profiles_username_prefix` is a `text_pattern_ops` index on `lower(username)` for the admin search. The table access matrix is unchanged (no new table). What a banned or suspended account can and can not do today: it can not use the community, sign up again (a ban, by hash), or open admin, and its sessions end when it is banned or suspended (an access token already issued still works on the game routes until it runs out). It *can* sign in again and play its own farm, because the game routes do not check status: that is a call for Claudia.
 
+## What the server does for purchases (milestone 5.2)
+
+One migration, `20261115000700_billing_states.sql`, and no new table:
+
+- `purchases.status` also takes `disputed` (a charge a bank has disputed: the entitlement is taken away until the dispute is won).
+- `purchases.applied_at`: when a paid "keep going" rescue was applied to its farm. It is set once, by a guarded update inside a transaction that holds the purchase row, so a replayed event, a reconcile or a second try can never rescue twice.
+- `purchases_one_pending`: a partial unique index, one open checkout for each account, product and farm. A double click finds the first instead of making a second.
+- `purchases_payment_intent`: refund and dispute events name the payment, not the session.
+
+How the rows move (code in `apps/web/server/billing/`):
+
+| Step | Rows |
+|---|---|
+| The player presses Buy and confirms | One `purchases` row, `pending`, with `amount_cents` copied from `products` at that moment. The Checkout Session id is stored on it. Stripe is given the purchase id as its idempotency key |
+| Stripe's signed event says the session is paid | The event id goes into `stripe_events` once. The purchase becomes `paid` only if the amount, currency and product match THAT row. `account_entitlements` rows are written (`farm_pack`, `no_ads`, `supporter_badge`, `full_diary` as the product lists) and the Stripe customer id goes in `stripe_customers`. `public.farm_limit` already reads `farm_pack`, so the farm limit lifts with no other change |
+| A full refund, or a dispute raised | The purchase becomes `refunded` or `disputed` and its entitlement rows get `revoked_at` (they are kept, so a dispute won restores them). A part refund changes nothing |
+| An event that arrives before its purchase is known | Recorded with `processed_at` empty and `error = 'waiting_for_purchase'`, and settled when the paid event arrives |
+| An amount, currency or product that does not match | The purchase becomes `failed`, nothing is granted, and the event's `error` says which check failed. The payment id is kept so an admin can refund it |
+| Admin: switch a product, refund, check with Stripe | `admin_audit_log` rows `product_set`, `purchase_refund` (value is the amount in cents) and `purchase_reconcile`, in the same transaction as the change |
+
+`stripe_events` still holds ids only. Webhook code cuts every event down to ids and numbers before anything is stored or logged. Delete my account behaves as above: the purchase rows stay with no account (`user_id` set null), entitlements and the Stripe customer row go, and the Stripe customer id is cleared from `stripe_events`. Download my data includes `purchases` (without the Stripe ids) and `entitlements`.
+
 Still owed against a real project (added to the list above): `app.end_sessions` and `admin_sign_out_everywhere` deleting from `auth.sessions` as the function owner (a refusal gives the admin a plain message to do it in the Supabase dashboard), the `verify()` cookie reading against a real `@supabase/ssr` cookie (one cookie and chunked),
 
 ## What the server does for notifications (milestone 3.4)
