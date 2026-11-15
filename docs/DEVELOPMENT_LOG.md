@@ -2,6 +2,8 @@
 
 How The Grazing Game got to where it is, round by round: what Claudia asked for, what was built, and what was learned. Artifact version numbers refer to the published page at https://claude.ai/artifact/KpkSthPfYtYf7uPVpXVVva.
 
+**Where to look first.** The stage reports are in `docs/STAGE_REPORTS.md`. The one list of every call made for Claudia is `docs/CALLS_FOR_CLAUDIA.md`. Running the live site is `docs/RUNBOOK.md`; the launch requirements and their proof are `docs/LAUNCH_CHECK.md`. The final branch is `m7-final`.
+
 ## The original brief
 
 A simple retro pixel game simulating years on a farm and using grass well:
@@ -2338,6 +2340,41 @@ What it does not prove: a real database (no Postgres, no pooler, no network betw
 - Supabase's own backups and restore; Storage files are not in the drill.
 - The 8 unanswered year skips in the first load run.
 - The `realism-guardian` agent was not run (no change to the model, data or pictures).
+
+### 15 Nov 2026: m7 Final join
+
+Branch `m7-final`, cut from `m5.5-launch-check` (f50c821). Merged with `--no-ff`, type-checked after each: `m5.3-dashboard` (7b9e03f), then `m6-final-report` (056bb4a, only `docs/CALLS_FOR_CLAUDIA.md` and `docs/STAGE_REPORTS.md`). `docs/GRASS_QUALITY_REVIEW.md` was brought in from `m2.6-grass-quality-review` without merging that branch. Commit trailers were left as they were.
+
+**What clashed and how it was settled**
+
+- **`apps/web/proxy.ts`** (both added one). One file now: a public website page gets the fixed hash policy, stays static, and hands its page-view count to `waitUntil` (`countWebsiteView` still checks the page is public, skips bots and prefetches, and reads or sets no cookie). Every other page gets a fresh nonce. One matcher set: everything but `/api/`, `/_next/`, `/serwist/`, files with an extension and prefetches. Tested in `lib/csp.test.ts` (a public page hands on its count; an app page does not).
+- **`apps/web/server/logging.ts`** (both hooked `logFailure`). Both run: the health listener (5.3) and the Sentry report (5.5), each in its own `try`, so neither can throw into the caller. Tested in `server/errors/sentry.test.ts` (a listener that throws stops neither; a transport that throws stops nothing).
+- **`.env.example`**, the walked-route list, `docs/DEVELOPMENT_LOG.md` and `docs/LESSONS.md`: both sides kept.
+- **An escape lost in three places.** The JSON-LD lesson, its log line and the comment in `PageHead.tsx` said "the six characters <": the editing tool had unescaped what was written. Fixed with a script (LESSONS LC17). The code itself was right.
+
+**What was wired**
+
+1. Download my data includes the analytics consent choice: migration `20261118000100_export_consent.sql` (the function as before with one key, `analytics_consent`, the yes or no and when, or null). Test: `packages/db/src/rules.test.ts` ("download my data holds the analytics consent choice").
+2. Server-side events, each one line through `trackServer` (consent and the `analytics` switch still decide): `login` (the callback, a returning player, with the method), `signup` (finish; a new account has made no account choice, so the guest's consent cookie decides, and it is counted here only, never sent on), `checkout_started` (the billing checkout), `farm_ended` (Next day or a skip that ends a Fast Farm, `endedDays`). Tests: `server/analytics/serverevents.test.ts`, through the real routes.
+3. `/api/client-error` and `/api/collect` are in the walked-route list and in the no-keys test (`server/auth/accountsoff.test.ts`).
+
+**The page growth (LESSONS DA1, LC16).** Both branches saw 0.3 to 0.4 KB added to pages they did not touch. Both added a proxy. Built the same tree with `proxy.ts` moved aside: the shared chunks every app page loads were 131,335 bytes gzipped against 131,600 with it, and the page chunks about 70 bytes smaller. A token diff of the two builds found nothing but module ids one digit longer with the proxy (`836437` against `36437`): with the proxy's module graph in the build the bundler numbers from a larger range, and every reference pays a byte. Not something to trim. Final sizes are below; every page is under its limit and none was raised.
+
+**Offline and install, now that app pages are made per request.** The service worker precaches `/play` at install (the `additionalPrecacheEntries` in `app/serwist/[path]/route.ts`), and the Cache API keeps the response with its headers, so the cached copy carries the policy whose nonce matches its own scripts. Checked in headless Chrome (puppeteer-core from the Lighthouse tools, a fresh profile) against the production build: the worker registered and activated, the `/play` shell is in `serwist-precache-v2`, its header nonce and the nonce on all 16 of its scripts are the same, and with the network off a reload of `/play` drew the guest farm (name, date, head, buttons) with no policy violation. The existing offline tests pass. Nothing needed fixing. The one cached copy reuses its nonce until the next install (Part B, B136). Not checked: a real phone, airplane mode, the install prompt (V1).
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 231 files, 4,225 tests: 4,199 passed, 22 expected failures (the open calibration rows), 4 skipped, 0 failed (629 s). `pnpm test:speed` alone: cattle 4.07 ms a day with 4,890 head, sheep 1.62 ms a day with 6,865 sheep (limit 5).
+- `pnpm build` passes. `pnpm check:browser-bundle` clean (91 script files, the rendered `/play` page and page data, 118 service worker files). `pnpm check:js-budget`, no limit raised: `/` 0 KB, `/play` 208.3 of 250, `/sign-in` 144.1, `/sign-in/check-email` 144.1, `/sign-up/finish` 144.5, `/account` 147.6, `/account/notifications` 148.6, `/store` 144.6, `/purchase/success` 144.4, `/purchase/cancelled` 143.2, `/admin` 149.5, `/admin/ads` 147.8, community pages 145.6 to 149.8 (`/community/groups/[id]` 149.8) of 150, `/leaderboards` 0, `/ticker.js` 1,345 bytes.
+- Lighthouse (the repo's `lighthouserc.json` settings, mobile, three runs each, against the production build on this PC, no rule changed): `/` Performance 100, 100, 100, Accessibility, Best Practices and SEO 100, largest paint 0.67 to 0.71 s. `/play` Performance 89, 90, 90 (target 95: A25), Accessibility, Best Practices and SEO 100, largest paint about 3.45 s, layout shift 0. No console errors on either.
+- Production build with no keys, in the browser pane: `/` (no script file, theme button works), `/play` (a guest farm, a supplement job, Next day, +1 year to the year card, Scores, Diary), `/account` (the consent box ticks and unticks, `/api/consent` 200), `/admin` and `/community/people` (their no-keys answers). With the consent cookie set, the Web Vitals collector's beacon reached `/api/collect` (204). No policy violation, no 5xx, no failure line in the server log. Every server started was stopped.
+
+**Not done or not checked**
+
+- The dashboard and its date form, and signed-in community and admin pages, under the policy (no database here; V13).
+- Real Sentry and PostHog events (V16). Lighthouse on CI (V14). The 8 unanswered year skips (V15).
+- `farm_ended` for a Daily Farm that ends at the midnight run, and `profile_completed`, `pwa_installed`, `notification_opened`.
+- The `realism-guardian` agent was not run (no model, data or drawing change in this join).
 
 ## Ideas raised but not built yet
 

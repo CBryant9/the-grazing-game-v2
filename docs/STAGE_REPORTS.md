@@ -193,9 +193,10 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 
 - **5.1 Ad slots.** Every slot in PRD 10.1 with its screen, size and switch, house ads and sponsor campaigns with caps, dates and budgets, a video break with no third-party player, view and click logs counted honestly, sponsor reports as a page and CSV, uploads checked by their bytes, and an empty AdSense adapter. With every ad switch off, nothing is drawn or downloaded.
 - **5.2 Purchases.** One-off purchases through Stripe Checkout (inline prices, card only), the A$30 and A$50 packs and A$20 upgrade, farm slots and no-ads read from what the account owns, a webhook that checks signatures and records each event once, an admin page with refunds and "Check with Stripe", and the paying-to-keep-going offer card.
-- **5.3 Dashboard and analytics.** To be added.
+- **5.3 Dashboard and analytics.** The admin dashboard over a date range (players, farms, days played, money, sends, ads, website views, moderation, broken saves), CSV export of every table with an audit row, game health (route timings, failures by reason, save conflicts, rollover runs, queues), Web Vitals from a small hand-written collector, and analytics events through our own `/api/collect`, counted in our own tables and sent on to PostHog from the server only, all behind the `analytics` switch (off) and only with consent (never under 16). Public page views are counted on the server with no cookie and no id.
 - **5.4 Website.** Home, pricing, advertise, about, privacy, terms and community rules as static pages that send no script, with titles, descriptions, canonical links, share images and structured data. They say only what is live.
-- **5.5 Launch check.** To be added.
+- **5.5 Launch check.** Errors to Sentry from the server only, scrubbed to route, reason, class, release and a trimmed stack, with browser errors through `/api/client-error`. A Content-Security-Policy on every page (hashes on the static website pages, a fresh nonce on the app pages, which are now made per request). A load test (`pnpm test:load`), seven walked end-to-end flows, a restore drill (`pnpm test:restore`), farm export and import, `docs/RUNBOOK.md`, `docs/LAUNCH_CHECK.md`, and fixes for all 14 security review findings, each with a test that fails without it.
+- **The m7 join.** 5.3 and 5.5 joined on `m7-final` with one proxy (the policy and the page-view count), one failure log that feeds both game health and Sentry, the analytics consent choice in Download my data, and the `signup`, `login`, `farm_ended` and `checkout_started` events wired.
 - **The m6 join.** Stages 1 to 4 and ad slots and purchases joined on `m6-joined` (engine 0.18.0, save format 13). Wiring done: Daily Farm facts queue notifications, the Daily Farm reminder reader uses the farm's own "opened today", ads ask the purchases' no-ads answer and the new ad places were placed, the rescue is built in the engine (`rescueFarm`), day cards are made at the rollover, follows, comments and likes notify, and every API route was walked with no keys. Lessons in `docs/LESSONS.md` were renumbered by milestone.
 
 ### How it was tested
@@ -206,7 +207,10 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 - The join: the whole engine suite was run on the joined engine and on the pre-join engine. Same result on every shared test (1,980 tests before, 1,997 after), with 17 new tests and the same 4 skipped and the same expected failures. Full suite: 212 files and 4,100 tests: 4,074 passed, 22 expected failures (the open calibration rows), 4 skipped and 0 failed. Speed alone: cattle 3.41 ms and sheep 1.42 ms a day (limit 5).
 - The production build with no keys: 48 pages and 79 route files walked from a list built from the app directory, with no 5xx. Guest play end to end and, with `GG_SWITCHES_ON=sheep`, a sheep farm and a year.
 - Old saves from engine 0.13, 0.14, 0.16 (twice) and a format 12 save were loaded and played a day through both stores. This found one fault, which was fixed.
-- Script sizes after the join: `/` 0 KB, `/play` 207.2 of 250 KB, sign-in and account pages 141.4 to 146.9 of 150, `/admin` 149.1 and `/admin/ads` 147.4 of 150, community pages 145.3 to 149.4 of 150. Several pages sit within 1 KB of their limit.
+- Script sizes after the m6 join: `/` 0 KB, `/play` 207.2 of 250 KB, sign-in and account pages 141.4 to 146.9 of 150, `/admin` 149.1 and `/admin/ads` 147.4 of 150, community pages 145.3 to 149.4 of 150. After the m7 join: `/` 0 KB, `/play` 208.3, sign-in, account, store and purchase pages 143.2 to 148.6, `/admin` 149.5 and `/admin/ads` 147.8, community pages 145.6 to 149.8, no limit raised. The 0.3 to 0.4 KB every page gained is the proxy: with it, every module id the bundler writes is one digit longer (DEVELOPMENT_LOG, m7).
+- Dashboard and analytics: `server/admin/dashboard.test.ts` checks every figure against seeded rows; `server/analytics/analytics.test.ts` covers the fixed event list, consent, under 16, the switch, PostHog (mocked), Web Vitals and website views. 214 files and 4,153 tests on its branch.
+- Launch check: Sentry and client-error tests, `lib/csp.test.ts`, the load test (60 guest farms at once for two rounds: 0 errors, p95 from 157 ms to open a farm to 4,750 ms for a year skip, heap level after the first round), the seven flows in `apps/web/server/e2e/`, the restore drill (67 tables and 192 rows the same both ways) and the farm export test. 228 files and 4,164 tests on its branch.
+- The m7 join: see the final checks in `docs/DEVELOPMENT_LOG.md` ("m7 Final join"): the full suite, the speed test alone, the build, both bundle checks, Lighthouse on `/` (100 in all four, three runs) and `/play` (89 to 90 Performance, 100 in the rest), a browser walk of the production build with no policy violation, and an offline check in headless Chrome (the cached game page carries the policy whose nonce matches its scripts, and the farm opens offline).
 - No screenshots were captured for this report. The ad screens, the video break and the purchase flow could not be looked at without keys. The browser walk on a phone in both orientations and themes was not done after the join.
 
 ### PRD section 21 defaults used
@@ -217,9 +221,10 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 
 ### Not done
 
-- Milestones 5.3 and 5.5: to be added.
+- Not checked in a browser with keys: the dashboard and its date form, signed-in community and admin pages under the policy, real Sentry and PostHog events (V13, V16). Lighthouse on CI (V14). The 8 unanswered year skips in the first load run (V15).
+- Not wired: `profile_completed`, `pwa_installed`, `notification_opened`, and `farm_ended` for a Daily Farm that ends at the midnight run. Admin, community, billing and notify routes are not timed.
 - AdSense and its admin fields, `landing_sponsors` on the home page, `pc_leaderboard_banner` and `video_between_days` (A23, Part B ads, and N8).
-- The cookie and consent banner (comes with analytics in 5.3), audience totals and ad rates on Advertise, and share images in the display font (N9).
+- A consent banner (consent is a box on the account page, B129), audience totals and ad rates on Advertise, and share images in the display font (N9).
 - The real Stripe calls and the real event shapes are unproven (V5). The legal pages have no lawyer's review (A21 and V9).
 - The `realism-guardian` check and a Lighthouse run on the final branch (V10 and V11).
 
@@ -229,5 +234,6 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 - Ads: A23, and Part B, ads.
 - Website, privacy and legal: A21, and Part B, website.
 - Speed targets: A25.
-- Stage 5.3 and 5.5 calls: to be added (placeholder at the end of Part B).
+- Privacy: A17 (day cards follow the farm view) and A21 (website views counted without consent).
+- Dashboard, analytics and the launch check: Part B, B122 to B136.
 - Keys and settings for ads, purchases and the website: sections 6 and 7 of `docs/CALLS_FOR_CLAUDIA.md`.

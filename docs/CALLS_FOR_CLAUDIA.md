@@ -20,7 +20,9 @@ How to read it:
 - Accounts, sign-in, database saves, the admin area, Daily Farm, notifications, leaderboards, groups, challenges, profiles, posts, the ticker, farm viewing and moderation.
 - Ad slots, house ads and sponsor reports. One-off purchases through Stripe Checkout and paying to keep going.
 - The public website: home, pricing, advertise, about, privacy, terms, community rules.
-- Calls from milestones 5.3 and 5.5 are a placeholder at the end of Part B.
+- The admin dashboard with CSV export, game health, Web Vitals, and analytics with consent sent on to PostHog from the server only (milestone 5.3).
+- The launch check (milestone 5.5): error reporting to Sentry from the server, a Content-Security-Policy on every page, a load test, end-to-end flow tests, a restore drill, farm export and the security review fixes.
+- How to run the live site, every variable, backups and what to do when something breaks: `docs/RUNBOOK.md`. Every launch requirement with its proof or what is still needed: `docs/LAUNCH_CHECK.md`.
 
 ### What is switched off, and why
 
@@ -49,6 +51,7 @@ Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups 
 | `push_notifications` | On | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `CRON_SECRET` and a 5-minute schedule. Email also needs `RESEND_API_KEY`, `NOTIFY_FROM_ADDRESS` and `NOTIFY_TOKEN_SECRET`. Your ruling A24 |
 | `sheep` | Off | Your rulings A4, A5 and A6 (and A1 for the Tablelands winter) |
 | `maintenance_mode` | Off | Nothing. Turn it on from the admin switches screen |
+| `analytics` | Off | Database keys. Your ruling A21 on consent. `POSTHOG_KEY` and `POSTHOG_HOST` only if events should leave our own database. The privacy page reads it at build, so also add `analytics` to `SITE_SWITCHES_ON` and redeploy |
 
 Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built, and every entry in it is off until you set it.
 
@@ -99,7 +102,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A16. Bans that outlive a deleted account.** Built: a banned or suspended player who deletes their account leaves only a one-way hash of their sign-in email and the ban's end date, used to refuse a new sign-up with that email. Moderation history is deleted. A different email gets past it. Only Gmail dots and Fastmail tags are cleaned up, because no provider page was found for other aliases. Other choice: keep nothing, or keep more. What it changes: privacy risk and whether bans hold. A privacy call for you and your lawyer. [m3.1 calls 28, 33; m3.5 call 5. Change: `BAN_HASH_PEPPER` and `server/auth/email.ts`]
 
-**A17. Data download, deletion and how long data is kept.** Built: guests are removed after 30 days (database) or 90 days (files). The download leaves out the engine save and action log because they hold the hidden rules. Deleting an account hands each owned group on or leaves it ownerless. Reports others wrote about a deleted player stay. Account data retention is not decided. Profiles are Public and farm view Followers only by default. Other choice: different periods or defaults. What it changes: privacy duties under the Privacy Act. Worth a word with your lawyer. [m3.1 calls 4, 9, 15, 16, 32, 35; m3.2 call 2; m5.4 call 6. Change: `prune_housekeeping` and `profiles` column defaults]
+**A17. Data download, deletion and how long data is kept.** Built: guests are removed after 30 days (database) or 90 days (files). The download leaves out the engine save and action log because they hold the hidden rules. Deleting an account hands each owned group on or leaves it ownerless. Reports others wrote about a deleted player stay. Account data retention is not decided. Profiles are Public and farm view Followers only by default. Day cards now follow the farm view setting as well as the profile: none while the farm view is off, and public only when the profile and the farm view are both public, so a public profile on default settings posts its day cards to followers only. Other choice: different periods or defaults, or day cards that follow the profile alone. What it changes: privacy duties under the Privacy Act. Worth a word with your lawyer. [m3.1 calls 4, 9, 15, 16, 32, 35; m3.2 call 2; m5.4 call 6; m5.5 call 1. Change: `prune_housekeeping`, `profiles` column defaults and `makeDayCard` in `server/community/share.ts`]
 
 **A18. Banned and suspended accounts can still play their own farm.** Built: a ban or suspension ends sessions and blocks the community, sign-up with the hash, and admin. The game routes do not check status, so the player can sign in again and play. Other choice: refuse play to banned accounts. What it changes: what a ban does. [m3.5 call 3. Change: one check in `route()` in `server/game/http.ts`]
 
@@ -107,7 +110,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A20. Paying to keep going (the rescue).** Built: a rescue sells all stock to clear the debt and sets cash to the hard-difficulty starting cash, or what the sale leaves if more. A refund after a rescue does not undo it. The offer needs a free farm slot. Tiers are by days run: under 183 days (price open, cannot be switched on), 183 to 364, 365 to 729, 730 and over. The price under 6 months is A$15 until set. Other choice: different terms, tiers or prices. What it changes: money, and what a player gets when a farm fails. The PRD is silent on the cash. [m6 For Claudia; m5.2 calls 5, 6; PRD 21 row 30. Change: `rescueFarm` in the engine and `products.ts`]
 
-**A21. The legal pages and who is behind the game.** Built: privacy, terms and community rules are plain-English drafts with no lawyer's review, marked "Draft. Not yet reviewed." The owner name, ABN, contact address and domain are not set. The privacy page names no providers and says data may be kept outside Australia. Analytics run only with consent, which is stricter than the PRD. A few lines are worded for you to check (the SILO credit, guest farm removal). Other choice: name the providers once accounts exist, relax the consent rule. What it changes: legal exposure, and the pages stay in draft until done. [m5.4 calls 1 to 6, 10, 11. Change: `SITE_OWNER_NAME`, `SITE_CONTACT_EMAIL`, `NEXT_PUBLIC_SITE_URL`]
+**A21. The legal pages and who is behind the game.** Built: privacy, terms and community rules are plain-English drafts with no lawyer's review, marked "Draft. Not yet reviewed." The owner name, ABN, contact address and domain are not set. The privacy page names no providers and says data may be kept outside Australia. Analytics run only with consent, which is stricter than the PRD, with one exception: public website page views are counted without consent, by page and day only, with no cookie and no id, so nothing about a person is stored. The privacy page says so. A few lines are worded for you to check (the SILO credit, guest farm removal). Other choice: name the providers once accounts exist, relax the consent rule, or ask consent for website views too (the public pages send no script, so that would need one). What it changes: legal exposure, and the pages stay in draft until done. [m5.4 calls 1 to 6, 10, 11; m5.3 call 5. Change: `SITE_OWNER_NAME`, `SITE_CONTACT_EMAIL`, `NEXT_PUBLIC_SITE_URL`, `countWebsiteView` in `server/analytics/collect.ts`]
 
 **A22. Photos, the word list and moderation before the community goes on.** Built: the community is off. Photos are stripped of metadata, wait for manual approval (no image-check service is wired), and are never shown before checking. The word filter has two placeholder words. Staff see the community like any member. Other choice: choose an image-check service, add real words, let admins in while the switch is off. What it changes: moderation workload and harm risk. These must be settled before the community can be switched on. [m4.2 calls 1 to 4; m3.1 call 14; m4.2 review fix 1. Change: `IMAGE_CHECK_API_KEY`, `/admin/words`]
 
@@ -115,7 +118,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A24. Notifications: defaults, quiet hours and under-16s.** Built: nothing is sent until a device is added. The morning reminder is off until turned on, email is off for every type, and email is only a fallback. Quiet hours drop reminders and hold other notices for up to 12 hours. Under-16s get no community notifications but still get challenge notices. At most 6 a day. Chrome and Edge push hosts are allowed from their own documents but have never been tested. Other choice: reminders on by default, held reminders, challenges hidden for under-16s. What it changes: how often players are contacted. Push needs one real-device test per browser. [m3.4 calls 1, 2, 5, 6, 9; m3.1 call 29. Change: `lib/notify/kinds.ts`, `DAILY_CAP`]
 
-**A25. Speed targets that are missed.** Built: `/play` scores Lighthouse 0.89 against a 0.95 target, so CI fails on it. App pages carry about 140 KB of framework script against the PRD's 100 KB for website pages (public pages send none). Several pages sit within 1 KB of their limit. Other choice: lighten the play page, or move the targets. What it changes: first load speed on a phone. [m1.8 calls; m3.2; m6. Change: `PlayApp` and `SetupFlow`, `lighthouserc.json`]
+**A25. Speed targets that are missed.** Built: `/play` scores Lighthouse 0.89 to 0.90 against a 0.95 target (three mobile runs on the final branch, largest paint about 3.4 s), so CI fails on it. Since the launch check the app pages are made for each request, so each gets its own nonce for the Content-Security-Policy; the score was 0.87 to 0.91 before that change too. App pages carry about 140 KB of framework script against the PRD's 100 KB for website pages (public pages send none). Several pages sit within 1 KB of their limit. Other choice: lighten the play page, or move the targets. What it changes: first load speed on a phone. [m1.8 calls; m3.2; m6; m5.5 call 3. Change: `PlayApp` and `SetupFlow`, `lighthouserc.json`]
 
 ### Part B: decided, no action needed unless you disagree
 
@@ -389,9 +392,39 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B121.** Map frame rate was not measured on a phone. [m1.6a]
 
-#### Stage 5.3 and 5.5 calls: to be added
+#### Dashboard and analytics (5.3)
 
-Placeholder. Calls from milestones 5.3 (dashboard and analytics) and 5.5 (launch check) will be added here.
+**B122.** Players active today, in 7 and in 30 days come from each farm's last opened time, so they are "as of now", not a history. Minutes a day, return rates and streaks are not kept. [m5.3 call 1]
+
+**B123.** Income counts paid purchases by the day they were paid. A refunded purchase is left out of income and counted under refunds. [m5.3 call 2]
+
+**B124.** The advertiser snapshot shows shares only and leaves out groups under 5 players and "Not said". Enterprise is left out (free text). [m5.3 call 3]
+
+**B125.** Game health is always on: it holds no person's data. The `analytics` switch covers events, Web Vitals and website views. [m5.3 call 4]
+
+**B126.** The id sent to PostHog is the account id hashed with `BAN_HASH_PEPPER` under its own label. Changing the pepper starts new ids. [m5.3 call 6]
+
+**B127.** Health timings are written every 30 seconds per server, so a server that stops loses up to that much. [m5.3 call 7]
+
+**B128.** INP is the longest interaction, so it reads a little high on long sessions. The p75 shown is the top of its bucket. [m5.3 call 8. Change: `components/analytics/Vitals.tsx`]
+
+**B129.** The consent control is on the account page only, for guests too. The game page has no control of its own, to keep its script small. [m5.3 call 9]
+
+**B130.** A new account's `signup` event follows the choice the player made as a guest (the consent cookie), and is counted in our own tables only, never sent to PostHog. `farm_ended` is counted for Fast Farms when Next day or a skip ends the game; its days go to PostHog only. A Daily Farm that ends at the midnight run is not counted yet. [m7 join. Change: `app/api/auth/finish/route.ts`, `endedDays` in `server/analytics/collect.ts`]
+
+#### Launch check (5.5)
+
+**B131.** No Sentry package anywhere. The server sends errors itself, with the route, a reason code, the error's class, the release and a trimmed stack only. Browser errors come through the site's own `/api/client-error`. [m5.5 call 2. Change: `server/errors/sentry.ts`]
+
+**B132.** The Content-Security-Policy allows inline styles (React writes `style` attributes), never inline or eval scripts. [m5.5 call 4. Change: `lib/csp.ts`]
+
+**B133.** The map uses PixiJS's no-eval build, which is a little slower. The 60 fps phone check is still owed (V1). [m5.5 call 5. Change: `packages/render/src/map.ts`]
+
+**B134.** The load test keeps to the server's cap of 30 new farms a minute rather than lifting it. [m5.5 call 6. Change: `scripts/load-test.mjs`]
+
+**B135.** The restore drill is proven on PGlite. The real drill on Supabase is a written procedure for you to run once (`docs/RUNBOOK.md`, section 3). [m5.5 call 7]
+
+**B136.** Offline, the game page is the copy the service worker kept at install, with the policy and nonce it was served with, so the nonce of that one cached copy repeats until the next install. Checked: header and page agree, and the farm opens offline with no policy error. [m7 join]
 
 ## 2. Stand-in figures
 
@@ -508,6 +541,14 @@ Each item could not be verified without keys, real services or a real phone. "Wh
 
 **V11. Lighthouse.** Not run on `/play` with the latest changes, on the sign-in and account pages, or after m6. The public pages ran at 99 to 100. Do: run Lighthouse CI on the main pages (mobile) on the final branch. [m3.2, m6]
 
+**V13. Signed-in pages under the new policy.** The community and admin pages were only loaded as their no-keys answers, and the dashboard and its date form were never opened, because there is no database here. Do: on a preview with keys, open `/community`, a profile, `/admin` and the dashboard with a date range, and check the browser console shows no "Content Security Policy" line. [m5.5, m7 join]
+
+**V14. Lighthouse on `/play` since it is made per request.** Three local runs read 0.89 to 0.90 (A25). Not run on CI or on Vercel. Do: run Lighthouse CI on the final branch on CI. [m7 join]
+
+**V15. The 8 unanswered year skips.** The first load test run had 8 of 120 year skips with no answer at all while other work ran on the same PC; two reruns had none. The cause is not known. Do: nothing yet; watch for it in Vercel logs and Sentry once live. [m5.5, LESSONS LC15]
+
+**V16. Events in real Sentry and PostHog.** Both were mocked only. Do: set `SENTRY_DSN` on a preview, open `/play`, run `throw new Error("test")` in the browser console, and see it arrive. Turn on `analytics`, tick consent on `/account`, play a day and see the events in PostHog. [m5.3, m5.5]
+
 **V12. Calibration judgement.** The real-year tables, the dry and wet years, the 1997 start, and each sheep and calf open row need your eye. Do: read `docs/CALIBRATION.md` and rule on the questions above. [m1.4, m2.5, m2.7]
 
 ## 6. Keys and settings you need to provide
@@ -543,8 +584,12 @@ Every variable is optional. With none set, the game runs with guest play and far
 | `STRIPE_SECRET_KEY` | Creates checkouts and refunds | Stripe, Developers, API keys (test mode first) | Nothing is for sale |
 | `STRIPE_WEBHOOK_SECRET` | Checks Stripe's signed events | Stripe, Developers, Webhooks, signing secret (test and live differ) | Nothing is for sale |
 | `IMAGE_CHECK_API_KEY` | An outside image-check service | You choose a service; an adapter is written then | Every community photo waits in the manual queue |
+| `SENTRY_DSN` | Where server and browser errors are sent (server only; no Sentry script in the browser) | Sentry, a Node.js project, Settings, Client Keys | Errors are only in the Vercel logs |
+| `GG_RELEASE` | The release name errors are filed under | Optional: Vercel's commit is used | Nothing; the commit is used |
+| `POSTHOG_KEY` | PostHog project key, kept on the server | PostHog, Project settings | Events stay in our own database only |
+| `POSTHOG_HOST` | PostHog address for your region, https, no trailing slash | PostHog, Project settings | Events stay in our own database only |
 
-Needed later, not yet in `.env.example`: a Sentry DSN and upload token (milestone 5.5) and a PostHog project key and host (milestone 5.3). BUILD_PLAN section 8 lists them.
+No source map upload token is needed: no source maps are published, and Sentry gets trimmed stacks from the server.
 
 ## 7. Settings you set by hand
 
@@ -595,9 +640,9 @@ It should say `UPDATE 1`. There is no route or variable that makes an admin. If 
 
 ## 8. How to review and merge
 
-Open one pull request from `FINAL-BRANCH` into `main`. Merge it only when you are ready. Nothing goes to `main` without your go-ahead. Before merging, run type check, lint, tests, Lighthouse CI on the main pages (mobile) and the `realism-guardian` agent on the final branch.
+Open one pull request from `m7-final` into `main`. Merge it only when you are ready. Nothing goes to `main` without your go-ahead. Before merging, run type check, lint, tests, Lighthouse CI on the main pages (mobile) and the `realism-guardian` agent on the final branch.
 
-`FINAL-BRANCH` is expected to contain every milestone branch below. The milestone branches are listed in build order, so you can read the history one piece at a time. Branches named `worktree-agent-...` are builder work areas and can be ignored.
+`m7-final` is expected to contain every milestone branch below. The milestone branches are listed in build order, so you can read the history one piece at a time. Branches named `worktree-agent-...` are builder work areas and can be ignored.
 
 ### Planning
 
@@ -662,10 +707,11 @@ Open one pull request from `FINAL-BRANCH` into `main`. Merge it only when you ar
 - `m5.1-ad-slots`: ad slots, campaigns, house ads and reports.
 - `m5.2-purchases`: one-off purchases through Stripe Checkout and paying to keep going.
 - `claude/m5-4-website-363c83`: the public website.
-- `m5.3-dashboard`: the admin dashboard and analytics (its calls are a placeholder at the end of Part B; at this point the branch sits at the same commit as `m6-joined`).
-- `m5.5-launch-check`: end-to-end flows, restore drill and farm export (its calls are a placeholder at the end of Part B).
+- `m5.3-dashboard`: the admin dashboard, CSV export, game health, Web Vitals and analytics with consent.
+- `m5.5-launch-check`: Sentry from the server, the Content-Security-Policy, the load test, end-to-end flows, the restore drill, farm export, the runbook, the launch checklist and the 14 security review fixes.
 
 ### The join
 
 - `m6-joined`: joins Stage 1 to Stage 4 and ad slots and purchases (engine 0.18.0, save format 13), with the wiring between Daily Farm, notifications, ads, purchases and community.
 - `m6-final-report`: this report.
+- `m7-final`: everything above joined, with 5.3 and 5.5, `docs/GRASS_QUALITY_REVIEW.md`, and the small gaps closed at the join (the consent choice in Download my data, four server-side events).
