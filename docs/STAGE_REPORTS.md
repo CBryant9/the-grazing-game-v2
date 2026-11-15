@@ -263,3 +263,12 @@ Branch `m8-daily-on-and-speed`. Full detail in `docs/DEVELOPMENT_LOG.md` (m8).
 - **Tested:** Lighthouse mobile, 5 runs back to back on a busy PC: median 0.86 before (largest paint 3.49 s), 0.95 after (0.92 s). JS budget unchanged (208.4 KB). Offline viewing checked in headless Chrome with the server stopped.
 - **Not done:** total blocking time is still about 250 ms here (React's first hydration). Not run on CI.
 
+## After the stage reports: matching the mockups and playability
+
+Branch `m8-look-game`, which also holds `m7-final` (the playability fixes, engine 0.20.0) and `m8-stockbook-feed` (engine 0.21.0, save format 16, snapshot version 8). Full detail in `docs/DEVELOPMENT_LOG.md` (m8 entries).
+
+- **Built:** the game screens follow `docs/mockups/index.html` on a phone upright, a phone on its side and a PC, in both themes (Claudia, 15 Nov 2026): the floating top bar with the bell and the bank limit, the pixel icons and the tab order, the things-to-check banner with Put away, the paddock sheet with its six tiles and comment line, the build tray and job card, the full-screen day summary, More as rows, the market rows with the weekly arrow, the herd rows with the gain's reason, the paddocks list and table with Rest days, the score bars, setup's step badges and recommended start with the money on each difficulty, and the PC's website header, game header, panel tabs and sponsor rail. Mounted: the stock book behind "Mobs | Stock book" on Herd, the Sell money line on every Sell picker, the Feed panel (a row in More on a phone, a tab on a PC), rain in the top bar. The plan form now takes up to eight legs. The playability fixes and the stock book and feed work are in their own log entries.
+- **Tested:** see the log entry for the checks, test counts, speed test and Lighthouse; the screens were looked at in headless Chrome against the production build with no keys, beside the mockups.
+- **Not done:** fields the server does not send yet (Fast Farm number of total, a Groups switch, an unread count for the site bell, a year price change) leave those parts hidden. Lighthouse on `/play` reads about 0.94 on this PC against the 0.95 target (React's first hydration).
+- **Questions for Claudia:** B169 to B172.
+

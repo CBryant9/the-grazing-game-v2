@@ -8,6 +8,7 @@ import type { MobWire, SellGroupId, Snapshot, SuppId } from '@/lib/game/types';
 import { JobBox } from './JobBox';
 import { Fact, Job, WhereLine, signed } from './MobParts';
 import { SheepCard } from './SheepCard';
+import { SellProfitLine } from './SellProfitLine';
 import { Sheet } from './Sheet';
 import styles from './play.module.css';
 
@@ -54,6 +55,7 @@ function SellPicker({ mob, snapshot }: { mob: MobWire; snapshot: Snapshot }) {
               </option>
             ))}
           </select>
+          <SellProfitLine money={mob.sellGroups.find((g) => g.id === group)?.money ?? null} />
           <label htmlFor={qtyId}>How many (up to {num(lim.max)})</label>
           <input
             id={qtyId}

@@ -9,7 +9,6 @@ import { useGame } from '@/lib/game/store';
 import { CropSection } from './CropSection';
 import { Sheet } from './Sheet';
 import { Sward } from './Sward';
-import { pendingPaddock } from './ui';
 import styles from './play.module.css';
 
 export const CHIP: Record<string, string> = { green: 'g', mixed: 'm', rank: 'r', short: 's' };
@@ -71,7 +70,6 @@ export function PaddockSheet({
       : others.length === 0
         ? 'Every mob is already here.'
         : null;
-  const extra = pendingPaddock(p);
   // The feed line in words when the server sends it ("Under 800 kg DM/ha"), else the days.
   const feedLine = p.feedText ?? (p.feedDays === null ? null : `About ${num(p.feedDays)} days`);
   const stock = snapshot.market.sheep ? 'stock' : 'cattle';
@@ -114,7 +112,7 @@ export function PaddockSheet({
       )}
       <Sward paddock={vp} plantings={snapshot.view.plantings} />
       {/* The paddock's comment line: a neutral fact, shown when the server sends one. */}
-      {extra.comment && <p className={styles.sayline}>{extra.comment}</p>}
+      {p.comment && <p className={styles.sayline}>{p.comment}</p>}
       {p.water !== 'own' && (
         <p className={`${styles.waterline} ${p.water === 'none' ? styles.nowater : ''}`}>
           <b>{WATER[p.water]}.</b> {p.noWaterWhy ?? ''}

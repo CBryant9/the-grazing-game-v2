@@ -63,15 +63,14 @@ function PlanMob({ plan, m }: { plan: PlanWire; m: PlanMobWire }) {
               Pause
             </button>
           )}
-          {plan.editable && (
-            <button
-              type="button"
-              className="btn sm ghost"
-              onClick={() => startPlan({ mobId: m.mob, planId: plan.id })}
-            >
-              Change
-            </button>
-          )}
+          {/* The form holds every leg now, so any plan can be changed (m8). */}
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={() => startPlan({ mobId: m.mob, planId: plan.id })}
+          >
+            Change
+          </button>
           <button
             type="button"
             className="btn sm ghost"

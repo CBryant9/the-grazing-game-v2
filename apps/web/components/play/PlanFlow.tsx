@@ -3,9 +3,20 @@
 import { useEffect, useId, useRef } from 'react';
 import { PADDOCK_LABELS } from '@gg/shared';
 import { num } from '@/lib/game/format';
-import { draftProblem, planMobs, type RuleKind } from '@/lib/game/plans';
+import {
+  allStops,
+  draftProblem,
+  legsOf,
+  MAX_LEGS,
+  newDraft,
+  newLeg,
+  planMobs,
+  withLeg,
+  type LegDraft,
+  type RuleKind,
+} from '@/lib/game/plans';
 import { useGame } from '@/lib/game/store';
-import type { Snapshot } from '@/lib/game/types';
+import type { PlanFormWire, Snapshot } from '@/lib/game/types';
 import { JobBox } from './JobBox';
 import { CHIP } from './PaddockSheet';
 import styles from './play.module.css';
@@ -16,6 +27,7 @@ function NumberField({
   min,
   max,
   onChange,
+  disabled,
   hint,
 }: {
   label: string;
@@ -23,6 +35,7 @@ function NumberField({
   min: number;
   max: number;
   onChange: (n: number) => void;
+  disabled?: boolean;
   hint?: string;
 }) {
   const id = useId();
@@ -36,6 +49,7 @@ function NumberField({
         inputMode="numeric"
         min={min}
         max={max}
+        disabled={disabled}
         value={Number.isFinite(value) ? value : ''}
         onChange={(e) => onChange(e.target.value === '' ? NaN : Number(e.target.value))}
       />
@@ -44,24 +58,251 @@ function NumberField({
   );
 }
 
+/** The rule for a leg, as the mockup's switch (with moves a day as a third choice). */
 const RULES: { id: RuleKind; label: string }[] = [
-  { id: 'days', label: 'Every few days' },
+  { id: 'days', label: 'Move every N days' },
   { id: 'times', label: 'Times a day' },
-  { id: 'kg', label: 'When feed is down' },
+  { id: 'kg', label: 'Move at kg DM/ha' },
 ];
 
+/** One leg's card: its paddocks joined by arrows, then its rule and its rounds. */
+function LegCard({
+  snapshot,
+  form,
+  leg,
+  index,
+  count,
+  active,
+  locked,
+  onEdit,
+  onPick,
+  onRemove,
+}: {
+  snapshot: Snapshot;
+  form: PlanFormWire;
+  leg: LegDraft;
+  index: number;
+  count: number;
+  active: boolean;
+  locked: boolean;
+  onEdit: (patch: Partial<LegDraft>) => void;
+  onPick: () => void;
+  onRemove: () => void;
+}) {
+  const tap = useGame((s) => s.planTap);
+  const moveStop = useGame((s) => s.planMoveStop);
+  const timesId = useId();
+  const last = index === count - 1;
+  const stopName = (id: number): string =>
+    snapshot.paddocks.find((p) => p.id === id)?.name ?? 'Paddock';
+  return (
+    <section className={styles.legcard} aria-label={`Leg ${index + 1}`}>
+      <div className={styles.leghead}>
+        <b>Leg {index + 1}</b>
+        <span className="muted">
+          {count === 1
+            ? 'these paddocks, in order'
+            : index === 0
+              ? 'keep going in these until…'
+              : 'then go to these ones'}
+        </span>
+        {index > 0 && !locked && (
+          <button type="button" className={styles.linkbtn} onClick={onRemove}>
+            Remove leg
+          </button>
+        )}
+      </div>
+      <div className={styles.chain} aria-label={`Leg ${index + 1} paddocks`}>
+        {leg.stops.length === 0 && <span className="muted">No paddocks yet.</span>}
+        {leg.stops.map((id, i) => (
+          <span key={id} className={styles.chainitem}>
+            {i > 0 && <span aria-hidden="true">→</span>}
+            <span className={`${styles.fchip} ${i === 0 ? styles.fchipon : ''}`}>
+              {stopName(id)}
+            </span>
+          </span>
+        ))}
+        {!locked && !active && (
+          <button type="button" className={styles.fchip} onClick={onPick}>
+            + add
+          </button>
+        )}
+      </div>
+      {active && !locked && (
+        <>
+          <p className={styles.hhint}>
+            Tap paddocks on the map in order, or pick them here. They go into leg {index + 1}.
+          </p>
+          {leg.stops.length > 0 && (
+            <ol className={styles.stoplist} aria-label={`Leg ${index + 1} in order`}>
+              {leg.stops.map((id, i) => (
+                <li key={id}>
+                  <span className={styles.stopno} aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <span className={styles.stopname}>{stopName(id)}</span>
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    aria-label={`Move ${stopName(id)} earlier`}
+                    disabled={i === 0}
+                    onClick={() => moveStop(i, -1)}
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    aria-label={`Move ${stopName(id)} later`}
+                    disabled={i === leg.stops.length - 1}
+                    onClick={() => moveStop(i, 1)}
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    aria-label={`Take ${stopName(id)} out`}
+                    onClick={() => tap(id)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          <ul className={styles.pickrows} aria-label={`Paddocks to add to leg ${index + 1}`}>
+            {snapshot.paddocks.map((p) => {
+              const at = leg.stops.indexOf(p.id);
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={styles.pickrow}
+                    aria-pressed={at >= 0}
+                    onClick={() => tap(p.id)}
+                  >
+                    <span className={styles.pickname}>
+                      {at >= 0 && (
+                        <span className={styles.stopno} aria-hidden="true">
+                          {at + 1}
+                        </span>
+                      )}
+                      <b>{p.name}</b>
+                      <span className={`chip ${CHIP[p.label]}`}>
+                        {PADDOCK_LABELS[p.label].name}
+                      </span>
+                    </span>
+                    <span className={styles.pickfacts}>
+                      {num(p.ha, 1)} ha
+                      {p.water === 'none' && <span className={styles.warntag}>No water</span>}
+                      {at >= 0 && <span className="sr-only">, stop {at + 1}</span>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      <div className={styles.seg} role="group" aria-label={`Leg ${index + 1}: when it moves`}>
+        {RULES.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            aria-pressed={leg.kind === r.id}
+            disabled={locked}
+            onClick={() => onEdit({ kind: r.id })}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {leg.kind === 'days' && (
+        <NumberField
+          label="Move every (days)"
+          value={leg.every}
+          min={1}
+          max={form.everyMax}
+          disabled={locked}
+          onChange={(n) => onEdit({ every: n })}
+        />
+      )}
+      {leg.kind === 'times' && (
+        <div className={styles.picker}>
+          <label htmlFor={timesId}>Moves a day</label>
+          <select
+            id={timesId}
+            className={styles.field}
+            value={leg.times}
+            disabled={locked}
+            onChange={(e) => onEdit({ times: Number(e.target.value) })}
+          >
+            {Array.from({ length: form.timesADayMax - 1 }, (_, i) => i + 2).map((n) => (
+              <option key={n} value={n}>
+                {n} times a day
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {leg.kind === 'kg' && (
+        <>
+          <NumberField
+            label="Move when grazed down to (kg DM/ha)"
+            value={leg.kg}
+            min={form.kgMin}
+            max={form.kgMax}
+            disabled={locked}
+            onChange={(n) => onEdit({ kg: n })}
+          />
+          <NumberField
+            label="Maximum days (0 for no limit)"
+            value={leg.maxDays}
+            min={0}
+            max={form.maxDaysMax}
+            disabled={locked}
+            onChange={(n) => onEdit({ maxDays: n })}
+          />
+        </>
+      )}
+      {last && (
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={leg.keepGoing}
+            disabled={locked}
+            onChange={(e) => onEdit({ keepGoing: e.target.checked })}
+          />
+          Keep going round and round
+        </label>
+      )}
+      {!(last && leg.keepGoing) && (
+        <NumberField
+          label="Rounds"
+          value={leg.rounds}
+          min={1}
+          max={form.roundsMax}
+          disabled={locked}
+          onChange={(n) => onEdit({ rounds: n, keepGoing: false })}
+        />
+      )}
+    </section>
+  );
+}
+
 /**
- * Making or changing a grazing plan: pick the mob, the paddocks in order (tap
- * them on the map, or from the list), the rule, the rounds and the step to
- * start from. Before Confirm the card shows what the server says: the move
- * it makes now, any stop with no water, and any stop that holds another mob.
+ * Making or changing a grazing plan, as the mockup's plan form: the mob, then
+ * Leg 1 with its paddocks joined by arrows, its rule and its rounds, then
+ * "Add a leg" for more (up to eight), what happens after the last leg, the
+ * water check and Save plan. Before Confirm the card shows what the server
+ * says: the move it makes now, any stop with no water, and any stop that holds
+ * another mob.
  */
 export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
   const plan = useGame((s) => s.plan);
   const busy = useGame((s) => s.busy > 0);
   const edit = useGame((s) => s.planEdit);
-  const tap = useGame((s) => s.planTap);
-  const moveStop = useGame((s) => s.planMoveStop);
   const check = useGame((s) => s.planCheck);
   const confirm = useGame((s) => s.planConfirm);
   const back = useGame((s) => s.planBack);
@@ -83,17 +324,18 @@ export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
   const editing = phase === 'edit' || phase === 'refused';
   const onCard =
     phase === 'previewing' || phase === 'confirm' || phase === 'applying' || phase === 'done';
+  const legs = legsOf(draft);
+  const stops = allStops(draft);
+  const last = legs[legs.length - 1]!;
   const stopName = (id: number): string =>
     snapshot.paddocks.find((p) => p.id === id)?.name ?? 'Paddock';
+  const dry = [...new Set(stops)].filter(
+    (id) => snapshot.paddocks.find((p) => p.id === id)?.water === 'none',
+  );
   const title = draft.planId === null ? 'Make a plan' : 'Change the plan';
 
   const body = (
     <>
-      {phase === 'done' ? null : (
-        <p>
-          Tap paddocks on the map in the order the mob will visit them, or pick them from the list.
-        </p>
-      )}
       <div className={styles.picker}>
         <label htmlFor={mobSel}>Mob</label>
         <select
@@ -112,196 +354,99 @@ export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
         </select>
       </div>
 
-      <h3 className={`px ${styles.minihead}`}>Paddocks, in order</h3>
-      {draft.stops.length === 0 ? (
-        <p className="muted">None picked yet.</p>
-      ) : (
-        <ol className={styles.stoplist} aria-label="Paddocks in order">
-          {draft.stops.map((id, i) => (
-            <li key={id}>
-              <span className={styles.stopno} aria-hidden="true">
-                {i + 1}
-              </span>
-              <span className={styles.stopname}>{stopName(id)}</span>
-              <button
-                type="button"
-                className="btn sm ghost"
-                aria-label={`Move ${stopName(id)} earlier`}
-                disabled={onCard || i === 0}
-                onClick={() => moveStop(i, -1)}
-              >
-                Up
-              </button>
-              <button
-                type="button"
-                className="btn sm ghost"
-                aria-label={`Move ${stopName(id)} later`}
-                disabled={onCard || i === draft.stops.length - 1}
-                onClick={() => moveStop(i, 1)}
-              >
-                Down
-              </button>
-              <button
-                type="button"
-                className="btn sm ghost"
-                aria-label={`Take ${stopName(id)} out`}
-                disabled={onCard}
-                onClick={() => tap(id)}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
-      {!onCard && (
-        <ul className={styles.pickrows} aria-label="Paddocks to add">
-          {snapshot.paddocks.map((p) => {
-            const at = draft.stops.indexOf(p.id);
-            return (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className={styles.pickrow}
-                  aria-pressed={at >= 0}
-                  onClick={() => tap(p.id)}
-                >
-                  <span className={styles.pickname}>
-                    {at >= 0 && (
-                      <span className={styles.stopno} aria-hidden="true">
-                        {at + 1}
-                      </span>
-                    )}
-                    <b>{p.name}</b>
-                    <span className={`chip ${CHIP[p.label]}`}>{PADDOCK_LABELS[p.label].name}</span>
-                  </span>
-                  <span className={styles.pickfacts}>
-                    {num(p.ha, 1)} ha
-                    {p.water === 'none' && <span className={styles.warntag}>No water</span>}
-                    {at >= 0 && <span className="sr-only">, stop {at + 1}</span>}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <h3 className={`px ${styles.minihead}`}>When it moves</h3>
-      <div className={styles.seg} role="group" aria-label="Rule">
-        {RULES.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            aria-pressed={draft.kind === r.id}
-            disabled={onCard}
-            onClick={() => edit({ kind: r.id })}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-      {draft.kind === 'days' && (
-        <NumberField
-          label="Move every (days)"
-          value={draft.every}
-          min={1}
-          max={form.everyMax}
-          onChange={(n) => edit({ every: n })}
+      {legs.map((leg, i) => (
+        <LegCard
+          key={i}
+          snapshot={snapshot}
+          form={form}
+          leg={leg}
+          index={i}
+          count={legs.length}
+          active={draft.leg === i}
+          locked={onCard}
+          onEdit={(patch) => edit(withLeg(draft, i, patch))}
+          onPick={() => edit({ leg: i })}
+          onRemove={() =>
+            edit({
+              more: draft.more.filter((_, k) => k !== i - 1),
+              leg: Math.min(draft.leg, legs.length - 2),
+              step: 0,
+            })
+          }
         />
-      )}
-      {draft.kind === 'times' && (
-        <div className={styles.picker}>
-          <label htmlFor="plan-times">Moves a day</label>
-          <select
-            id="plan-times"
-            className={styles.field}
-            value={draft.times}
-            disabled={onCard}
-            onChange={(e) => edit({ times: Number(e.target.value) })}
+      ))}
+      {!onCard && legs.length < MAX_LEGS && (
+        <div>
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={() => {
+              // The leg before the new one needs a set number of rounds, or the new leg never starts.
+              const patch = withLeg(draft, legs.length - 1, { keepGoing: false });
+              edit({
+                ...patch,
+                more: [...(patch.more ?? draft.more), newLeg(form)],
+                leg: legs.length,
+              });
+            }}
           >
-            {Array.from({ length: form.timesADayMax - 1 }, (_, i) => i + 2).map((n) => (
-              <option key={n} value={n}>
-                {n} times a day
-              </option>
-            ))}
-          </select>
+            Add a leg
+          </button>
         </div>
       )}
-      {draft.kind === 'kg' && (
-        <>
-          <NumberField
-            label="Move when feed is down to (kg DM/ha)"
-            value={draft.kg}
-            min={form.kgMin}
-            max={form.kgMax}
-            onChange={(n) => edit({ kg: n })}
-          />
-          <NumberField
-            label="Or after this many days (0 for no limit)"
-            value={draft.maxDays}
-            min={0}
-            max={form.maxDaysMax}
-            onChange={(n) => edit({ maxDays: n })}
-          />
-        </>
-      )}
 
-      <h3 className={`px ${styles.minihead}`}>Rounds</h3>
-      <label className={styles.check}>
-        <input
-          type="checkbox"
-          checked={draft.keepGoing}
-          disabled={onCard}
-          onChange={(e) => edit({ keepGoing: e.target.checked })}
-        />
-        Keep going round and round
-      </label>
-      {!draft.keepGoing && (
-        <>
-          <NumberField
-            label="Rounds of the paddocks"
-            value={draft.rounds}
-            min={1}
-            max={form.roundsMax}
-            onChange={(n) => edit({ rounds: n })}
-          />
-          <div className={styles.seg} role="group" aria-label="After the last round">
-            <button
-              type="button"
-              aria-pressed={draft.after === 'repeat'}
-              disabled={onCard}
-              onClick={() => edit({ after: 'repeat' })}
-            >
-              Start again
-            </button>
-            <button
-              type="button"
-              aria-pressed={draft.after === 'stay'}
-              disabled={onCard}
-              onClick={() => edit({ after: 'stay' })}
-            >
-              Stay put
-            </button>
-          </div>
-        </>
-      )}
+      <div className={styles.afterrow}>
+        {!last.keepGoing && (
+          <>
+            <span className="muted">After the last leg</span>
+            <div className={styles.seg} role="group" aria-label="After the last leg">
+              <button
+                type="button"
+                aria-pressed={draft.after === 'repeat'}
+                disabled={onCard}
+                onClick={() => edit({ after: 'repeat' })}
+              >
+                Repeat
+              </button>
+              <button
+                type="button"
+                aria-pressed={draft.after === 'stay'}
+                disabled={onCard}
+                onClick={() => edit({ after: 'stay' })}
+              >
+                Stay
+              </button>
+            </div>
+          </>
+        )}
+        {stops.length > 0 && (
+          <span className={dry.length ? 'bad' : 'ok'}>
+            {dry.length
+              ? `✗ No water in ${dry.map(stopName).join(', ')}`
+              : '✓ Water in every paddock'}
+          </span>
+        )}
+      </div>
 
-      {draft.stops.length > 1 && (
+      {stops.length > 1 && (
         <div className={styles.picker}>
           <label htmlFor={stepSel}>Start from</label>
           <select
             id={stepSel}
             className={styles.field}
-            value={draft.step}
+            value={Math.min(draft.step, stops.length - 1)}
             disabled={onCard}
             onChange={(e) => edit({ step: Number(e.target.value) })}
           >
-            {draft.stops.map((id, i) => (
-              <option key={id} value={i}>
-                Step {i + 1}: {stopName(id)}
-              </option>
-            ))}
+            {legs.flatMap((leg, l) => {
+              const before = legs.slice(0, l).reduce((n, x) => n + x.stops.length, 0);
+              return leg.stops.map((id, i) => (
+                <option key={`${l}-${id}`} value={before + i}>
+                  {legs.length > 1 ? `Leg ${l + 1}, step ${i + 1}` : `Step ${i + 1}`}:{' '}
+                  {stopName(id)}
+                </option>
+              ));
+            })}
           </select>
         </div>
       )}
@@ -321,7 +466,7 @@ export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
       <header className={styles.sheethead}>
         <h2 className={`px ${styles.sheettitle}`}>{title}</h2>
         {phase !== 'done' && (
-          <button type="button" className="btn sm ghost" onClick={end}>
+          <button type="button" className={`btn sm ghost ${styles.planclose}`} onClick={end}>
             Cancel
           </button>
         )}
@@ -342,7 +487,14 @@ export function PlanFlow({ snapshot }: { snapshot: Snapshot }) {
               aria-describedby={problem ? 'plan-problem' : undefined}
               onClick={() => void check()}
             >
-              Check the plan
+              Save plan
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => edit({ ...newDraft(form, draft.mobId), planId: draft.planId })}
+            >
+              New plan
             </button>
             {problem && (
               <p id="plan-problem" className={styles.hhint}>

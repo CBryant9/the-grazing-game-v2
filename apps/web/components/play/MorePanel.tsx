@@ -13,6 +13,8 @@ import type { InboxKind, Snapshot } from '@/lib/game/types';
 import { AccountSection } from './AccountSection';
 import { DiaryPanel } from './DiaryPanel';
 import { EmptyState } from './EmptyState';
+import { FeedTab } from './FeedTab';
+import { PanelHead } from './PanelHead';
 import { HelpSection } from './HelpPanel';
 import { Icon, type IconName } from './Icon';
 import { ScoresPanel } from './ScoresPanel';
@@ -151,7 +153,13 @@ function Rows({ snapshot }: { snapshot: Snapshot }) {
       sub: 'Grazing plans and reports',
       open: () => setTab('plans'),
     },
-    // Feed: a row here once the Feed panel exists (it is being built on its own branch).
+    {
+      key: 'feed',
+      icon: 'grass',
+      title: 'Feed',
+      sub: 'Feed forecast, lick, hay, pellets',
+      open: extra('feed'),
+    },
     {
       key: 'scores',
       icon: 'trophy',
@@ -289,6 +297,19 @@ export function MorePanel({ snapshot }: { snapshot: Snapshot }) {
         <h2 className={`px ${styles.soontitle}`}>Diary</h2>
         <DiaryPanel />
       </section>
+    );
+  }
+  if (extra === 'feed') {
+    // On a PC Feed is its own tab, so it has no way back to More.
+    return layout === 'pc' ? (
+      <section className={styles.listpanel} aria-label="Feed">
+        <PanelHead title="Feed" />
+        <FeedTab snapshot={snapshot} />
+      </section>
+    ) : (
+      <SubPage title="Feed">
+        <FeedTab snapshot={snapshot} />
+      </SubPage>
     );
   }
   if (page === 'scores') {

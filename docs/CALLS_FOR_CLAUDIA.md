@@ -496,7 +496,17 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B167. The inbox's eaten-out line and marking note.** The eaten-out line now says "The whole farm is eaten out with stock on it. Feed averages under 800 kg DM/ha. The game ends if it stays that way for 9 more days.", never days of feed left. The engine's 45-day marking note is shown once a drop in the inbox (a drop starts with calving or ends with marking); the engine note itself is unchanged because the MVP comparison checks it, and the diary still lists it as the engine raises it. [Change: `server/game/inboxwords.ts`]
 
-**B168. Plans with more than one leg.** The engine already took up to 8 legs. The server now takes them too: `setPlan` sends the first leg as `stops`, `trigger` and `rounds` and the rest as `moreLegs`, with `step` counted across every leg. The plan form was not touched, so a plan of more than one leg still shows as not editable there. [Change: `parsePlanAction` in `server/game/plans.ts`]
+**B168. Plans with more than one leg.** The engine already took up to 8 legs. The server now takes them too: `setPlan` sends the first leg as `stops`, `trigger` and `rounds` and the rest as `moreLegs`, with `step` counted across every leg. The plan form was not touched, so a plan of more than one leg still shows as not editable there. [Change: `parsePlanAction` in `server/game/plans.ts`] *(m8 look: the plan form now holds every leg, up to 8, and Change shows on every plan. The snapshot's `editable` flag is still false for a plan of more than one leg; the screen no longer reads it.)*
+
+#### The game screens as the mockups (m8)
+
+**B169. The first tab is Build.** The phone's tabs are Build, Herd, Paddocks, Market, Plans, More, as the mockup, with Plans kept as its own tab (your earlier ruling). Build opens the build tray over the map; the map itself is always there behind the tabs, so there is no Farm tab. On a PC the first panel tab is Build too. Other choice: keep "Farm" as the name. [Change: `TABS` in `components/play/Nav.tsx`]
+
+**B170. Water sits under the paddock's name on a phone.** The mockup puts "14 ha · Water ✓" on the title row. With the close button a phone needs, that row does not fit at 390 px, so the hectares and water drop to a line just under the name. On a phone on its side they stay on the row. Other choice: drop the close button and close by tapping the map. [Change: `.padmeta` in `play.module.css`]
+
+**B171. Build and More stay as tabs on the PC panel.** The mockup's PC tabs are Herd, Plans, Paddocks, Feed, Market and Scores · Diary. Build is added first (the build tools, things to do and the paddock buttons live there) and More last (the inbox, workforce, help, farm and settings), so nothing is out of reach on a PC. Other choice: put the build tools over the map on a PC and the More items in the website header. [Change: `PC_TABS` in `components/play/Nav.tsx`]
+
+**B172. The slim bar stays on a phone on its side.** The mockup's landscape panels cover the whole screen. Here the slim top bar (date, time buttons, cash) stays above an open panel, so the day and money are always in view and Next day is one tap away. Other choice: cover it, as the mockup. [Change: `.listpanel` and `.sheet` in `play.module.css`]
 
 ## 2. Stand-in figures
 
@@ -573,7 +583,7 @@ These are the open calibration rows and review findings. In each case the model 
 
 **N1. Map.** Trees, cattle walking and grazing animation, time-lapse, frost, dust, heat haze and storm clouds, the profit layer, the selected mob and picked animals on the map, half-built fence lines and pegs, the overview inset for a phone held upright, hover, and the farmer. Sheep sprites exist as code art only. [m1.6a, m1.7c]
 
-**N2. Play screens.** The stock book, the Sell money line and the Feed panel are built as components but not mounted (the screen restyle mounts them), the paddock sheet does not yet draw `comment`, the paddocks list does not yet sort by `restDays`, the top bar does not yet show `rainMm`, the herd list does not yet show `gainWhy`, and the plan form has no Leg 2. Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, a bell with an unread count in the top bar, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
+**N2. Play screens.** Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
 
 **N3. Engine.** Temperature in the growth factor. Moving a running farm to new data. The grass changes in the grass review. Overhead costs a year for sheep. Marking cost for sheep. A managed cattle margin beside SB-GM. A calving window per district. [m1.4b, m1.4, m2.3, m2.7, m2.5]
 

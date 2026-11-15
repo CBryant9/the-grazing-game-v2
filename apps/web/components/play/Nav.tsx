@@ -17,18 +17,19 @@ export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'more', label: 'More', icon: 'dots' },
 ];
 
-type PcTab = { key: string; label: string; tab: Tab; page?: MorePage };
+type PcTab = { key: string; label: string; tab: Tab; page?: MorePage; extra?: 'feed' };
 
 /**
  * The side panel's tabs on a PC, as the mockup: Herd, Plans, Paddocks, Market, Scores · Diary.
  * Build comes first (the build tools and things to do live there) and More last (the inbox,
- * workforce, help, farm and settings). Feed is added when its panel exists.
+ * workforce, help, farm and settings). Feed sits where the mockup has it.
  */
 const PC_TABS: PcTab[] = [
   { key: 'farm', label: 'Build', tab: 'farm' },
   { key: 'herd', label: 'Herd', tab: 'herd' },
   { key: 'plans', label: 'Plans', tab: 'plans' },
   { key: 'paddocks', label: 'Paddocks', tab: 'paddocks' },
+  { key: 'feed', label: 'Feed', tab: 'more', page: 'menu', extra: 'feed' },
   { key: 'market', label: 'Market', tab: 'market' },
   { key: 'scores', label: 'Scores · Diary', tab: 'more', page: 'scores' },
   { key: 'more', label: 'More', tab: 'more', page: 'menu' },
@@ -43,15 +44,18 @@ function PcNav() {
   const setTab = useGame((s) => s.setTab);
   const openMore = useGame((s) => s.openMore);
   const setMoreExtra = useUi((s) => s.setMoreExtra);
+  const extra = useUi((s) => s.moreExtra);
   const unread = useGame((s) => s.snapshot?.inboxUnread ?? 0);
   const on = (t: PcTab): boolean =>
     t.tab !== tab
       ? false
       : t.key === 'scores'
         ? isRecord(page)
-        : t.key === 'more'
-          ? !isRecord(page)
-          : true;
+        : t.key === 'feed'
+          ? extra === 'feed' && !isRecord(page)
+          : t.key === 'more'
+            ? !isRecord(page) && extra !== 'feed'
+            : true;
   return (
     <nav className={styles.ptabs} aria-label="Game sections">
       {PC_TABS.map((t) => (
@@ -62,7 +66,7 @@ function PcNav() {
           aria-current={on(t) ? 'page' : undefined}
           onClick={() => {
             setTab(t.tab);
-            setMoreExtra(null);
+            setMoreExtra(t.extra ?? null);
             if (t.page) openMore(t.page);
           }}
         >

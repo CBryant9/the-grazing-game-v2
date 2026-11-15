@@ -11,7 +11,7 @@ import { EmptyState } from './EmptyState';
 import { PanelHead } from './PanelHead';
 import { QtyField } from './QtyField';
 import { SheepMarket } from './SheepMarket';
-import type { PendingBuyClass } from './ui';
+import { SellProfitLine } from './SellProfitLine';
 import styles from './play.module.css';
 
 type View = 'prices' | 'buy' | 'sell';
@@ -140,6 +140,7 @@ function PricesView({ market }: { market: MarketWire }) {
             <th scope="col">c/kg</th>
             <th scope="col">A head</th>
             <th scope="col">Change</th>
+            <th scope="col">Week</th>
           </tr>
         </thead>
         <tbody>
@@ -166,17 +167,24 @@ function PricesView({ market }: { market: MarketWire }) {
                   </span>
                 )}
               </td>
+              <td>{p.lastWeekCKg === null ? '-' : <WeekChange c={p.cKg - p.lastWeekCKg} />}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className={styles.hhint}>
         c/kg is live weight. A head is for a typical beast of the class, before selling costs.
-        Change is since the first day on the chart.
+        Change is since the first day on the chart. Week is the change since last week.
       </p>
       {market.credit && <p className={styles.credit}>{market.credit}</p>}
     </div>
   );
+}
+
+/** This week's change in c/kg for a class, from the price rows' last-week price. Null when not known. */
+function weekChange(market: MarketWire, id: string): number | null {
+  const row = market.prices.find((p) => p.id === id);
+  return row && row.lastWeekCKg !== null ? row.cKg - row.lastWeekCKg : null;
 }
 
 /** This week's change as the mockup: ▲6, ▼4 or "no change". Shown only when the server sends it. */
@@ -239,7 +247,7 @@ function BuyView({ market }: { market: MarketWire }) {
                   <small>{c.weightText}</small>
                 </span>
                 <b className={styles.ppr}>{c.cKg === null ? 'by the head' : `${num(c.cKg)}c/kg`}</b>
-                <WeekChange c={(c as PendingBuyClass).weekChangeCKg} />
+                <WeekChange c={weekChange(market, c.id)} />
               </button>
               {open && (
                 <div className={styles.expand}>
@@ -343,6 +351,7 @@ function SellForm({ snapshot, onBuy }: { snapshot: Snapshot; onBuy: () => void }
                   </option>
                 ))}
               </select>
+              <SellProfitLine money={classRow?.money ?? null} />
             </div>
           ) : (
             <div className={styles.picker}>
@@ -375,6 +384,7 @@ function SellForm({ snapshot, onBuy }: { snapshot: Snapshot; onBuy: () => void }
                   </option>
                 ))}
               </select>
+              <SellProfitLine money={groupRow?.money ?? null} />
             </div>
           )}
           <QtyField label="How many" value={n} max={max} onChange={setQty} />

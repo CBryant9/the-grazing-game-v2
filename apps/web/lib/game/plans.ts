@@ -1,6 +1,7 @@
 import type {
   PaddockWire,
   PlanFormWire,
+  PlanLegRequestWire,
   PlanTriggerWire,
   PlanWire,
   SimpleAction,
@@ -35,8 +36,60 @@ export interface PlanDraft {
   rounds: number;
   keepGoing: boolean;
   after: 'repeat' | 'stay';
-  /** The step to start from, counted from 0. */
+  /** The step to start from, counted from 0 across every leg's paddocks. */
   step: number;
+  /** Legs 2 and on. The fields above are leg 1. Empty for a plan of one leg. */
+  more: LegDraft[];
+  /** The leg that taps on the map add paddocks to: 0 is leg 1. */
+  leg: number;
+}
+
+/** One leg of a plan: its paddocks in order, its rule and its rounds. */
+export type LegDraft = Pick<
+  PlanDraft,
+  'stops' | 'kind' | 'every' | 'times' | 'kg' | 'maxDays' | 'rounds' | 'keepGoing'
+>;
+
+/** Legs a plan may have (the server takes up to this many). */
+export const MAX_LEGS = 8;
+
+/** Leg `i` of the draft: leg 1 is the draft's own fields. */
+export function legOf(d: PlanDraft, i: number): LegDraft {
+  if (i <= 0) {
+    const { stops, kind, every, times, kg, maxDays, rounds, keepGoing } = d;
+    return { stops, kind, every, times, kg, maxDays, rounds, keepGoing };
+  }
+  return d.more[i - 1] ?? legOf(d, 0);
+}
+
+/** Every leg, leg 1 first. */
+export function legsOf(d: PlanDraft): LegDraft[] {
+  return [legOf(d, 0), ...d.more];
+}
+
+/** The change to make to the draft for a change to leg `i`. */
+export function withLeg(d: PlanDraft, i: number, patch: Partial<LegDraft>): Partial<PlanDraft> {
+  if (i <= 0) return patch;
+  return { more: d.more.map((l, k) => (k === i - 1 ? { ...l, ...patch } : l)) };
+}
+
+/** A new leg with the server's defaults, and a set number of rounds so the plan goes on to it. */
+export function newLeg(form: PlanFormWire): LegDraft {
+  return {
+    stops: [],
+    kind: 'days',
+    every: form.defaultEvery,
+    times: 2,
+    kg: form.defaultKg,
+    maxDays: 0,
+    rounds: Math.max(1, form.defaultRounds),
+    keepGoing: false,
+  };
+}
+
+/** Every leg's paddocks in order, as one list (what `step` counts through). */
+export function allStops(d: PlanDraft): number[] {
+  return legsOf(d).flatMap((l) => l.stops);
 }
 
 /** A new form with the server's defaults. */
@@ -54,6 +107,8 @@ export function newDraft(form: PlanFormWire, mobId: number | null = null): PlanD
     keepGoing: true,
     after: 'repeat',
     step: 0,
+    more: [],
+    leg: 0,
   };
 }
 
@@ -64,27 +119,33 @@ export function draftFromPlan(
   mobId: number | null,
   paddocks: readonly PaddockWire[],
 ): PlanDraft {
-  const leg = plan.legs[0];
   const base = newDraft(form, mobId);
-  if (!leg) return base;
-  const stops = leg.stops
-    .map((s) => s.paddock ?? paddocks.find((p) => p.cell === s.cell)?.id ?? null)
-    .filter((id): id is number => id !== null);
-  const t = leg.trigger;
+  if (plan.legs.length === 0) return base;
+  const legs: LegDraft[] = plan.legs.map((leg) => {
+    const stops = leg.stops
+      .map((s) => s.paddock ?? paddocks.find((p) => p.cell === s.cell)?.id ?? null)
+      .filter((id): id is number => id !== null);
+    const t = leg.trigger;
+    return {
+      stops,
+      kind: t.mode === 'kg' ? 'kg' : t.every < 1 ? 'times' : 'days',
+      every: t.mode === 'days' && t.every >= 1 ? t.every : base.every,
+      times: t.mode === 'days' && t.every < 1 ? Math.round(1 / t.every) : base.times,
+      kg: t.mode === 'kg' ? t.kg : base.kg,
+      maxDays: t.mode === 'kg' ? t.maxDays : 0,
+      rounds: leg.rounds > 0 ? leg.rounds : base.rounds,
+      keepGoing: leg.rounds === 0,
+    };
+  });
   const mob = plan.mobs.find((m) => m.mob === mobId);
+  const total = legs.reduce((n, l) => n + l.stops.length, 0);
   return {
     ...base,
+    ...legs[0]!,
     planId: plan.id,
-    stops,
-    kind: t.mode === 'kg' ? 'kg' : t.every < 1 ? 'times' : 'days',
-    every: t.mode === 'days' && t.every >= 1 ? t.every : base.every,
-    times: t.mode === 'days' && t.every < 1 ? Math.round(1 / t.every) : base.times,
-    kg: t.mode === 'kg' ? t.kg : base.kg,
-    maxDays: t.mode === 'kg' ? t.maxDays : 0,
-    rounds: leg.rounds > 0 ? leg.rounds : base.rounds,
-    keepGoing: leg.rounds === 0,
     after: plan.after,
-    step: mob ? Math.min(mob.step, Math.max(0, stops.length - 1)) : 0,
+    more: legs.slice(1),
+    step: mob ? Math.min(mob.step, Math.max(0, total - 1)) : 0,
   };
 }
 
@@ -103,7 +164,7 @@ export function moveStop(stops: readonly number[], index: number, by: -1 | 1): n
 }
 
 /** The rule the form has, as the server takes it. */
-export function triggerOf(d: PlanDraft): PlanTriggerWire {
+export function triggerOf(d: LegDraft): PlanTriggerWire {
   if (d.kind === 'kg') return { mode: 'kg', kg: d.kg, maxDays: d.maxDays };
   if (d.kind === 'times') return { mode: 'days', every: 1 / d.times };
   return { mode: 'days', every: d.every };
@@ -112,6 +173,19 @@ export function triggerOf(d: PlanDraft): PlanTriggerWire {
 /** What is missing before the plan can be checked, or null when it is ready. */
 export function draftProblem(d: PlanDraft, form: PlanFormWire): string | null {
   if (d.mobId === null) return 'Pick the mob first.';
+  const legs = legsOf(d);
+  for (let i = 0; i < legs.length; i++) {
+    const problem = legProblem(legs[i]!, form);
+    if (problem) return legs.length > 1 ? `Leg ${i + 1}: ${problem}` : problem;
+    if (i < legs.length - 1 && legs[i]!.keepGoing) {
+      return `Leg ${i + 1} keeps going, so the next leg never starts. Give it a number of rounds.`;
+    }
+  }
+  return null;
+}
+
+/** What is missing in one leg, or null. */
+function legProblem(d: LegDraft, form: PlanFormWire): string | null {
   if (d.stops.length === 0) return 'Pick at least one paddock.';
   if (d.kind === 'times' && d.stops.length < 2) {
     return 'A plan that moves several times a day needs at least two paddocks.';
@@ -144,17 +218,34 @@ export function draftAction(
   form: PlanFormWire,
 ): SimpleAction | null {
   if (draftProblem(d, form) !== null || d.mobId === null) return null;
-  const cells = d.stops.map((id) => paddocks.find((p) => p.id === id)?.cell);
-  if (cells.some((c) => c === undefined)) return null;
+  const legs = legsOf(d);
+  const cellsOf = (stops: number[]): number[] | null => {
+    const cells = stops.map((id) => paddocks.find((p) => p.id === id)?.cell);
+    return cells.some((c) => c === undefined) ? null : (cells as number[]);
+  };
+  const first = cellsOf(d.stops);
+  if (!first) return null;
+  const moreLegs: PlanLegRequestWire[] = [];
+  for (const leg of d.more) {
+    const cells = cellsOf(leg.stops);
+    if (!cells) return null;
+    moreLegs.push({
+      stops: cells,
+      trigger: triggerOf(leg),
+      rounds: leg.keepGoing ? 0 : leg.rounds,
+    });
+  }
+  const last = legs[legs.length - 1]!;
   return {
     type: 'setPlan',
     mob: d.mobId,
-    stops: cells as number[],
+    stops: first,
     trigger: triggerOf(d),
     rounds: d.keepGoing ? 0 : d.rounds,
-    after: d.keepGoing ? 'repeat' : d.after,
-    step: Math.min(d.step, d.stops.length - 1),
+    after: last.keepGoing ? 'repeat' : d.after,
+    step: Math.min(d.step, allStops(d).length - 1),
     ...(d.planId === null ? {} : { planId: d.planId }),
+    ...(moreLegs.length > 0 ? { moreLegs } : {}),
   };
 }
 
@@ -165,10 +256,15 @@ export function mapBadges(
 ): { cell: number; text: string }[] {
   if (!d) return [];
   const out: { cell: number; text: string }[] = [];
-  d.stops.forEach((id, i) => {
-    const p = paddocks.find((x) => x.id === id);
-    if (p) out.push({ cell: p.cell, text: String(i + 1) });
-  });
+  const legs = legsOf(d);
+  legs.forEach((leg, l) =>
+    leg.stops.forEach((id, i) => {
+      const p = paddocks.find((x) => x.id === id);
+      // One leg: 1, 2, 3. More: leg and place, 1.1, 1.2, 2.1.
+      if (p)
+        out.push({ cell: p.cell, text: legs.length > 1 ? `${l + 1}.${i + 1}` : String(i + 1) });
+    }),
+  );
   return out;
 }
 

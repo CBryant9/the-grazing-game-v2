@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, type ComponentType } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 import { PADDOCK_LABELS } from '@gg/shared';
 import { num, plural } from '@/lib/game/format';
 import {
@@ -16,7 +17,6 @@ import type { MobWire, PaddockWire, Snapshot } from '@/lib/game/types';
 import { EmptyState } from './EmptyState';
 import { CHIP } from './PaddockSheet';
 import { PanelHead } from './PanelHead';
-import { pendingPaddock } from './ui';
 import styles from './play.module.css';
 
 function SortBar<K extends string>({
@@ -80,7 +80,7 @@ function padRows(snapshot: Snapshot, key: PadKey, dir: 'asc' | 'desc'): PaddockW
     return sortPaddocks(snapshot.paddocks, snapshot.mobs, key, dir);
   const byName = sortPaddocks(snapshot.paddocks, snapshot.mobs, 'name', 'asc');
   const val = (p: PaddockWire): number =>
-    key === 'water' ? WATER_ORDER[p.water] : (pendingPaddock(p).restDays ?? -1);
+    key === 'water' ? WATER_ORDER[p.water] : (p.restDays ?? -1);
   const sign = dir === 'asc' ? 1 : -1;
   return [...byName].sort((a, b) => sign * (val(a) - val(b)));
 }
@@ -97,11 +97,44 @@ function classLine(m: MobWire): string {
     .join(' · ');
 }
 
-/**
- * The Stock book panel, once it exists (being built on its own branch). While this is null the
- * Herd tab shows mobs only and no "Mobs | Stock book" switch.
- */
-const STOCK_BOOK: ComponentType<{ snapshot: Snapshot }> | null = null;
+/** The stock book loads only when it is opened, so the first load of /play stays small. */
+const StockBook = dynamic(() => import('./StockBook').then((m) => m.StockBook), {
+  loading: () => (
+    <p className="muted" role="status">
+      Loading the stock book
+    </p>
+  ),
+});
+
+/** The stock book comes with the farm record (the same fetch as Scores and the Diary). */
+function BookView() {
+  const record = useGame((s) => s.record);
+  const load = useGame((s) => s.loadRecord);
+  const has = !!record?.data;
+  useEffect(() => {
+    if (!has) void load();
+  }, [has, load]);
+  if (record?.status === 'failed' && !record.data) {
+    return (
+      <div className={styles.jobcard} role="alert">
+        <p>{record.message ?? 'The stock book could not be loaded.'}</p>
+        <div className={styles.jobbtns}>
+          <button type="button" className="btn coral" onClick={() => void load()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (!record?.data) {
+    return (
+      <p className="muted" role="status">
+        Loading the stock book
+      </p>
+    );
+  }
+  return <StockBook book={record.data.stockBook} />;
+}
 
 /** Sorting by one column: tap it again to turn the order round. */
 function useSort<K extends string>(first: K): [K, SortDir, (k: K) => void] {
@@ -137,25 +170,22 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
   const [key, dir, pick] = useSort<MobSortKey>('name');
   const [view, setView] = useState<'mobs' | 'book'>('mobs');
   const rows = sortMobs(snapshot.mobs, key, dir);
-  const Book = STOCK_BOOK;
   return (
     <section className={styles.listpanel} aria-label="Herd">
       <PanelHead
         title="Herd"
         sub={`${plural(snapshot.totals.head, 'head', 'head')} in ${plural(snapshot.mobs.length, 'mob')}`}
       />
-      {Book && (
-        <div className={styles.seg} role="group" aria-label="Herd view">
-          <button type="button" aria-pressed={view === 'mobs'} onClick={() => setView('mobs')}>
-            Mobs
-          </button>
-          <button type="button" aria-pressed={view === 'book'} onClick={() => setView('book')}>
-            Stock book
-          </button>
-        </div>
-      )}
-      {Book && view === 'book' ? (
-        <Book snapshot={snapshot} />
+      <div className={styles.seg} role="group" aria-label="Herd view">
+        <button type="button" aria-pressed={view === 'mobs'} onClick={() => setView('mobs')}>
+          Mobs
+        </button>
+        <button type="button" aria-pressed={view === 'book'} onClick={() => setView('book')}>
+          Stock book
+        </button>
+      </div>
+      {view === 'book' ? (
+        <BookView />
       ) : rows.length === 0 ? (
         <EmptyState action="Go to the Market" onAction={() => setTab('market')}>
           There are no cattle on the farm. {snapshot.market.saleLine}
@@ -165,7 +195,7 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
           <SortBar label="Sort the herd" keys={MOB_KEYS} active={key} dir={dir} onPick={pick} />
           <ul className={styles.rows}>
             {rows.map((m) => {
-              const reason = m.why[0] ?? m.details[0] ?? null;
+              const reason = m.gainWhy;
               return (
                 <li key={m.id}>
                   <button type="button" className={styles.row} onClick={() => openMob(m.id)}>
@@ -226,7 +256,7 @@ export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
   const layout = useLayout();
   const [key, dir, pick] = useSort<PadKey>('name');
   const rows = padRows(snapshot, key, dir);
-  const hasRest = snapshot.paddocks.some((p) => typeof pendingPaddock(p).restDays === 'number');
+  const hasRest = snapshot.paddocks.some((p) => p.restDays !== null);
   const keys = hasRest ? [...PADDOCK_KEYS, REST_KEY] : PADDOCK_KEYS;
   return (
     <section className={styles.listpanel} aria-label="Paddocks">
@@ -261,6 +291,11 @@ export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
                 kg DM/ha
               </th>
               <th scope="col">Water</th>
+              {hasRest && (
+                <th scope="col" className={styles.r}>
+                  Rest days
+                </th>
+              )}
               <th scope="col">Mob</th>
             </tr>
           </thead>
@@ -287,6 +322,9 @@ export function PaddockList({ snapshot }: { snapshot: Snapshot }) {
                   <td>
                     <WaterMark p={p} />
                   </td>
+                  {hasRest && (
+                    <td className={styles.r}>{p.restDays === null ? '·' : num(p.restDays)}</td>
+                  )}
                   <td>{mob ? `${mob.name} ${num(mob.head)}` : '·'}</td>
                 </tr>
               );

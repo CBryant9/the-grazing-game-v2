@@ -6,6 +6,7 @@ import {
   mapBadges,
   moveStop,
   newDraft,
+  newLeg,
   toggleStop,
   triggerOf,
 } from './plans';
@@ -147,5 +148,32 @@ describe('the plan form', () => {
       { cell: 303, text: '1' },
       { cell: 101, text: '2' },
     ]);
+  });
+
+  it('sends a second leg as moreLegs, with step counted across both legs (m8)', () => {
+    const d = {
+      ...newDraft(form, 4),
+      stops: [1, 2],
+      keepGoing: false,
+      rounds: 2,
+      more: [{ ...newLeg(form), stops: [3], kind: 'kg' as const, kg: 1200, maxDays: 7 }],
+      step: 2,
+    };
+    expect(draftAction(d, paddocks, form)).toEqual({
+      type: 'setPlan',
+      mob: 4,
+      stops: [101, 202],
+      trigger: { mode: 'days', every: 3 },
+      rounds: 2,
+      after: 'repeat',
+      step: 2,
+      moreLegs: [{ stops: [303], trigger: { mode: 'kg', kg: 1200, maxDays: 7 }, rounds: 1 }],
+    });
+    expect(mapBadges(d, paddocks).map((b) => b.text)).toEqual(['1.1', '1.2', '2.1']);
+    // A first leg that keeps going would never reach the second.
+    expect(draftProblem({ ...d, keepGoing: true }, form)).toMatch(/^Leg 1 keeps going/);
+    expect(draftProblem({ ...d, more: [{ ...newLeg(form) }] }, form)).toBe(
+      'Leg 2: Pick at least one paddock.',
+    );
   });
 });

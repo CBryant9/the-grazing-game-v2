@@ -2770,3 +2770,63 @@
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+
+/* ---- The plan form with legs (mockup F) --------------------------------------- */
+
+.legcard {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+.leghead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.leghead > .linkbtn {
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+.chainitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.fchipon {
+  background: var(--text);
+  color: var(--frame);
+  border-color: var(--text);
+}
+.afterrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+.afterrow .seg {
+  min-width: 180px;
+}
+.afterrow > :last-child:not(.seg) {
+  margin-left: auto;
+}
+.planclose {
+  margin-left: auto;
+}

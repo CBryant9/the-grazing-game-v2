@@ -9,7 +9,7 @@ import { useMe } from '@/lib/auth/store';
 import { DailyTime, ModeTag } from './DailyBits';
 import { HelpButton } from './HelpPanel';
 import { Icon } from './Icon';
-import { pendingTotals, useUi } from './ui';
+import { useUi } from './ui';
 import styles from './play.module.css';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -189,7 +189,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
   const daily = snapshot.daily ?? null;
   const day = `Day ${num(snapshot.day + 1)}`;
   const year = `Year ${num(snapshot.score.year)}`;
-  const rain = pendingTotals(snapshot).rainMm;
+  const rain = totals.rainMm;
   const times = daily ? (
     <DailyTime daily={daily} />
   ) : (

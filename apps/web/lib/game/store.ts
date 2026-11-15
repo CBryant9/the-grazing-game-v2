@@ -14,9 +14,11 @@ import { movePicks } from './lists';
 import {
   draftAction,
   draftFromPlan,
+  legOf,
   newDraft,
   moveStop,
   toggleStop,
+  withLeg,
   type PlanDraft,
 } from './plans';
 import { dragPick, newPick, type SowPick } from './sow';
@@ -969,13 +971,15 @@ export const useGame = create<GameState>()((set, get) => {
     planTap(paddockId) {
       const p = get().plan;
       if (!p || p.phase === 'applying' || p.phase === 'done') return;
-      get().planEdit({ stops: toggleStop(p.draft.stops, paddockId) });
+      const d = p.draft;
+      get().planEdit(withLeg(d, d.leg, { stops: toggleStop(legOf(d, d.leg).stops, paddockId) }));
     },
 
     planMoveStop(index, by) {
       const p = get().plan;
       if (!p || p.phase === 'applying' || p.phase === 'done') return;
-      get().planEdit({ stops: moveStop(p.draft.stops, index, by) });
+      const d = p.draft;
+      get().planEdit(withLeg(d, d.leg, { stops: moveStop(legOf(d, d.leg).stops, index, by) }));
     },
 
     async planCheck() {
