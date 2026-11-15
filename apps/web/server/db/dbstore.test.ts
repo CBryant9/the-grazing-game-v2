@@ -267,6 +267,34 @@ describe('the database store: old and broken saves', () => {
   });
 });
 
+describe('the database store: dashboard counts (m5.3)', () => {
+  it('counts each day played once, by mode, and a save conflict in game health', async () => {
+    const { pendingHealth, resetHealth } = await import('../analytics/health');
+    resetHealth(false);
+    await db.exec("delete from public.daily_counts where metric = 'days_played'");
+    await game.create(session(9), choices);
+    await game.endDay(session(9));
+    await game.endDay(session(9));
+    const played = await db.query<{ dims: string; n: number }>(
+      `select dims, sum(count)::int as n from public.daily_counts
+        where metric = 'days_played' group by dims`,
+    );
+    const diaryDays = await count('farm_days');
+    expect(played.rows).toEqual([{ dims: 'mode=fast', n: diaryDays }]);
+    expect(diaryDays).toBeGreaterThan(0);
+    // A save that expects an old version is refused, and the meeting is counted.
+    const id = (await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id;
+    const held = (await store.get(fromUuid(id))) as StoredFarm;
+    await expect(
+      store.put(fromUuid(id), held, { expect: 'not-the-version' }),
+    ).rejects.toBeInstanceOf(SaveConflictError);
+    expect(pendingHealth()).toEqual([
+      expect.objectContaining({ kind: 'save_conflict', route: 'farm-store', count: 1 }),
+    ]);
+    resetHealth(false);
+  });
+});
+
 describe('the database store: the diary cap', () => {
   it('keeps the newest 400 days, as the file does', async () => {
     await game.create(session(7), choices);

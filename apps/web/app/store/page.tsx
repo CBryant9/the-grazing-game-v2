@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Vitals } from '@/components/analytics/Vitals';
 import { AccountShell } from '@/components/account/Shell';
 import { Store } from '@/components/billing/Store';
 
@@ -13,6 +14,7 @@ export default function Page() {
   return (
     <AccountShell title="Store">
       <Store />
+      <Vitals page="store" />
     </AccountShell>
   );
 }

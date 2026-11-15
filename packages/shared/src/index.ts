@@ -90,6 +90,12 @@ export const FEATURE_SWITCHES = {
    */
   sheep: false,
   maintenance_mode: false,
+  /**
+   * Analytics collection (milestone 5.3): product events, Web Vitals and website page views.
+   * Off until Claudia turns it on. Even on, nothing is counted for a person who has not said yes,
+   * and never for an account under 16.
+   */
+  analytics: false,
 } as const;
 export type FeatureSwitchKey = keyof typeof FEATURE_SWITCHES;
 
@@ -121,6 +127,13 @@ export const SITE = {
     'A free, realistic grazing game for Australian graziers. Real seasons, real prices, real decisions about grass and stock. Play on your phone or PC.',
   locale: 'en-AU',
 } as const;
+
+/**
+ * Analytics (milestone 5.3): the cookie that keeps a browser's consent choice, `y` or `n`. The
+ * fixed event list is in `@gg/shared/analytics`, a path of its own, so pages that send no
+ * analytics never carry it.
+ */
+export const CONSENT_COOKIE = 'gg_analytics';
 
 // The farm view: the numbers the server sends the map to draw (PRD 5.16).
 export {

@@ -270,6 +270,7 @@
 }
 .field input[type='text'],
 .field input[type='search'],
+.field input[type='date'],
 .field select,
 .field textarea {
   min-height: var(--tap);

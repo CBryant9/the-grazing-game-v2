@@ -19,6 +19,7 @@ import {
 import { localDate } from '../daily/clock';
 import { cleanDaily, workOf } from '../daily/state';
 import type { SqlClient, SqlRunner } from './sql';
+import { noteHealth } from '../analytics/health';
 
 /** The game's farm id is 32 hex; the database's is a uuid. One form at the edge, converted here. */
 export function toUuid(hex: string): string {
@@ -214,15 +215,27 @@ export class DbFarmStore implements FarmStore {
     days: readonly number[],
   ): Promise<void> {
     if (days.length === 0) return;
+    let played = 0;
     for (const day of new Set(days)) {
       const entry = farm.diary.find((d) => d.day === day);
       if (!entry) continue;
-      await tx.query(
+      const r = await tx.query<{ inserted: boolean }>(
         `insert into public.farm_days (farm_id, day, game_date, lines, more)
          values ($1, $2, $3::date, array(select jsonb_array_elements_text($4::jsonb)), $5)
          on conflict (farm_id, day) do update
-           set game_date = excluded.game_date, lines = excluded.lines, more = excluded.more`,
+           set game_date = excluded.game_date, lines = excluded.lines, more = excluded.more
+         returning (xmax = 0) as inserted`,
         [id, day, dateText(entry.date), json(entry.lines), entry.more],
+      );
+      if (r.rows[0]?.inserted) played++;
+    }
+    // Days played (the admin dashboard, m5.3): a day counts once, when its diary row is first kept.
+    if (played > 0) {
+      await tx.query(
+        `insert into public.daily_counts (day, metric, dims, count)
+         select app.today_sydney(), 'days_played', 'mode=' || f.mode, $2 from public.farms f where f.id = $1
+         on conflict (day, metric, dims) do update set count = public.daily_counts.count + excluded.count`,
+        [id, played],
       );
     }
     // The diary keeps the newest days only, as the file does.
@@ -348,7 +361,11 @@ export class DbFarmStore implements FarmStore {
         // The version in the WHERE is what stops two tabs both winning: the
         // second one finds the version changed and changes nothing.
         const changed = await this.writeSave(tx, id, farm, options.expect, options.expectRev);
-        if (changed === 0) throw new SaveConflictError('The farm changed under this save.');
+        if (changed === 0) {
+          // Game health (m5.3): how often two saves meet. Counted in memory, written in a batch.
+          noteHealth('save_conflict', 'farm-store', 'version_changed');
+          throw new SaveConflictError('The farm changed under this save.');
+        }
         // A Daily Farm's clock moves in the same transaction as its save. The database refuses a
         // day that is not over in the farm's time zone, so no save can make an extra day.
         if (options.dailyThrough) {

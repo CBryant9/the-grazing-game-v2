@@ -4,6 +4,7 @@ import type { SqlClient } from '../db/sql';
 import type { GameServer } from '../game/game';
 import type { FarmStore } from '../game/store';
 import { logFailure } from '../logging';
+import { recordRollover } from '../analytics/health';
 import { addDays, localDate } from './clock';
 import { seriesFor, yardOf, type DailyData, type DailyFeed } from './data';
 
@@ -266,5 +267,9 @@ export async function runRollover(o: RolloverOptions): Promise<RolloverReport> {
   } catch (e) {
     logFailure({ route: 'daily-rollover', reason: 'count_failed' }, e);
   }
+  // Game health (m5.3): the run and how long it took.
+  await recordRollover(o.sql, o.now() - started, report.failed > 0).catch((e) =>
+    logFailure({ route: 'daily-rollover', reason: 'health_failed' }, e),
+  );
   return report;
 }

@@ -91,7 +91,17 @@ export default function PrivacyPage() {
             <h2>Analytics</h2>
             <p>
               With your consent, we use analytics to see which parts of the game are used. You can
-              say no and still play. You can change your mind at any time.
+              say no and still play. You can change your mind at any time, on your account page. It
+              is off until you say yes, and always off for accounts under 16.
+            </p>
+            <p>
+              If you say yes, we count things such as a page opened or a day played, and how fast
+              pages load for you. They are sent to our analytics service, PostHog, from our server
+              with a random id. Never your email, your name or what you type.
+            </p>
+            <p>
+              Views of these website pages are counted on our server by page and day, with no cookie
+              and nothing that says who you are.
             </p>
           </>
         ) : null}

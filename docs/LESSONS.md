@@ -323,3 +323,10 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | ST4 | A moderator could not remove an old post once its word was blocked | The word filter ran on every update, not only when the text changed | Check the text only when it changes. **Rule: a guard on content checks the columns it guards, not the whole row.** |
 | ST5 | Setting a group challenge hung the tests | The server's own connection ran inside the player's transaction (one PGlite connection: each waited for the other), the same as C1 | The owner check runs as the player first, then the server writes on its own. **Rule (C1 again): never a second connection inside a transaction.** |
 
+### m5.3 Dashboard and analytics
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| DA1 | Every app page grew by about 0.3 KB, pages that send no analytics included, and `/community/groups/[id]` reached 149.8 KB of its 150 KB limit | The fixed event list was exported from the `@gg/shared` index. Client code all over the app imports that index, and the bundler kept the new object in the shared chunk | The list moved to its own path, `@gg/shared/analytics`. The index keeps only the cookie name the beacon needs. **Rule: a big constant that only the server or one page needs goes on its own import path, never in the shared index. Compare `check:js-budget` before and after on every page, not only the pages you changed** |
+| DA2 | The CSV export test could not suspend or ban the admin it signed in as | A database trigger keeps one admin in good standing, so the only admin can not be suspended or banned (AS4) | The test makes a second admin for those checks. **Rule (AS4 again): a test that changes the only admin needs a second one first** |
+

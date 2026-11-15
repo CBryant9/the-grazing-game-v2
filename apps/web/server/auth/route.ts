@@ -7,6 +7,7 @@ import { clearCookieText, cookieText, csrfRefusal, siteOrigin } from '../securit
 import type { AuthDeps } from './accounts';
 import { authDeps } from './deps';
 import { jarFor, type AuthUser, type CookieJar, type CookieToSet } from './provider';
+import { timed } from '../analytics/health';
 
 export interface AuthContext {
   req: Request;
@@ -72,7 +73,7 @@ export function authRoute(
   options: AuthRouteOptions,
   handler: (ctx: AuthContext) => Promise<unknown>,
 ): (req: Request) => Promise<Response> {
-  return async (req) => {
+  return timed(`auth-${options.name}`, async (req) => {
     try {
       const refusal = options.write ? csrfRefusal(req) : null;
       if (refusal) return fail(403, refusal);
@@ -111,7 +112,7 @@ export function authRoute(
       logFailure({ route: `auth-${options.name}`, reason: 'account_route_failed' }, e);
       return fail(500, 'Something went wrong on the server. Try again in a moment.');
     }
-  };
+  });
 }
 
 /** The signed-in user, asked of the auth server, or a plain 401. */

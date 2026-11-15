@@ -144,6 +144,14 @@ export const SWITCH_INFO: Record<FeatureSwitchKey, SwitchInfo> = {
     whenOff: 'The game opens again for everyone.',
     rebuild: false,
   },
+  analytics: {
+    label: 'Analytics',
+    what: 'Counts which parts of the game are used, Web Vitals (page speed for real players) and website page views.',
+    whenOn:
+      'Players who said yes on the consent control are counted. Nobody else is, and never an account under 16. Website page views are counted on the server with no cookie. Events go to PostHog only when its key is set.',
+    whenOff: 'Nothing is counted or sent. The consent control still keeps each choice.',
+    rebuild: true,
+  },
 };
 
 /** The fixed wordings the admin chooses from live in the shared package, because the game shows them. */

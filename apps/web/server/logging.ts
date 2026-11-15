@@ -42,7 +42,22 @@ export function failureLine(f: Failure, e?: unknown): string {
   ].join(' ');
 }
 
+let listener: ((f: Failure) => void) | null = null;
+
+/**
+ * Be told of every failure logged, by route and reason only (game health, milestone 5.3). One
+ * listener; a later call replaces it.
+ */
+export function onFailure(fn: ((f: Failure) => void) | null): void {
+  listener = fn;
+}
+
 /** Log a failure to the server log. */
 export function logFailure(f: Failure, e?: unknown): void {
   console.error(failureLine(f, e));
+  try {
+    listener?.({ route: f.route, reason: f.reason });
+  } catch {
+    // Counting a failure must never fail the request.
+  }
 }

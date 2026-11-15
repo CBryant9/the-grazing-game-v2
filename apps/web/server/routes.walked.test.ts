@@ -40,6 +40,10 @@ describe('every route, walked with no keys', () => {
       'notify',
       'leaderboards',
       'ticker',
+      // m5.3: the analytics beacon, the consent choice, and the dashboard's CSV export (admin).
+      'collect',
+      'consent',
+      'admin/dashboard',
     ]) {
       expect(
         files.some((f) => f.startsWith(`../app/api/${family}/`)),

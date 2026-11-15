@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Vitals } from '@/components/analytics/Vitals';
 import Link from 'next/link';
 import { AccountShell } from '@/components/account/Shell';
 import styles from '@/components/account/account.module.css';
@@ -21,6 +22,7 @@ export default function Page() {
           Back to the game
         </Link>
       </div>
+      <Vitals page="purchase_cancelled" />
     </AccountShell>
   );
 }
