@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
+import { useGame } from '@/lib/game/store';
 import { currentStep, stepLabel, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
 import styles from './help.module.css';
 
@@ -16,6 +17,7 @@ export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
   const skipStep = useHelp((s) => s.tourSkipStep);
   const endTour = useHelp((s) => s.tourEnd);
   const strip = useRef<HTMLElement>(null);
+  const daily = useGame((s) => s.snapshot?.daily != null);
   // The strip's buttons go away when the tour ends or the step changes, which
   // would drop focus to the page body. Send it somewhere sensible instead:
   // the map region when the tour ends, the strip itself when a step is skipped.
@@ -45,7 +47,14 @@ export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
     );
   }
 
-  const text = TOUR_TEXT[step];
+  // A Daily Farm has no Next day: its day ends at midnight.
+  const text =
+    daily && step === 'day'
+      ? {
+          title: 'End the day',
+          body: 'The day ends at midnight. Press Done for today when you have finished. A summary of the night shows next time you open the farm.',
+        }
+      : TOUR_TEXT[step];
   return (
     <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">
       <div className={styles.stext} role="status">

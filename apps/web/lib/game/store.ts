@@ -151,6 +151,8 @@ interface GameState {
   farms: FarmListItem[];
   /** The Fast Farms the account may have at once. */
   farmLimit: number;
+  /** Daily Farms the account may have at once (milestone 3.3). */
+  dailyLimit: number;
   /** True while a save is being tried again: the screen says "Saving again". */
   saving: boolean;
   snapshot: Snapshot | null;
@@ -267,6 +269,12 @@ interface GameState {
   markInboxRead: () => Promise<void>;
   dismissSummary: () => void;
   dismissNotice: () => void;
+  /** Daily Farm: fetch the farm again, quietly (the day rolled over, or the weather came in). */
+  refresh: () => Promise<void>;
+  /** Daily Farm: the player has seen the days they missed and the worker report. */
+  dailyAck: () => Promise<void>;
+  /** Daily Farm: "Done for today", a fact on the farm card. */
+  dailyDone: () => Promise<void>;
 }
 
 const messageOf = (e: unknown): string =>
@@ -536,6 +544,7 @@ export const useGame = create<GameState>()((set, get) => {
     phase: 'loading',
     farms: [],
     farmLimit: 2,
+    dailyLimit: 0,
     saving: false,
     snapshot: null,
     busy: 0,
@@ -558,10 +567,16 @@ export const useGame = create<GameState>()((set, get) => {
     async load() {
       set({ phase: 'loading', notice: null });
       try {
-        const { snapshot, broken, pick } = await api.farm();
+        const { snapshot, broken, pick, limits } = await api.farm();
         if (broken) set({ phase: 'broken', snapshot: null, notice: { message: broken } });
-        else if (pick) set({ phase: 'pick', snapshot: null, farms: pick });
-        else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
+        else if (pick) {
+          set({
+            phase: 'pick',
+            snapshot: null,
+            farms: pick,
+            ...(limits ? { farmLimit: limits.fast, dailyLimit: limits.daily } : {}),
+          });
+        } else set(snapshot ? adopt(snapshot) : { phase: 'setup', snapshot: null });
       } catch (e) {
         set({ phase: 'failed', notice: { message: messageOf(e), retry: () => void get().load() } });
       }
@@ -587,11 +602,33 @@ export const useGame = create<GameState>()((set, get) => {
         () => void get().deleteFarm(id),
         async () => {
           const r = await api.deleteFarm(id);
-          set({ farms: r.farms, farmLimit: r.limit });
+          set({ farms: r.farms, farmLimit: r.limit, dailyLimit: r.dailyLimit });
           if (get().phase === 'ready' && get().snapshot && !r.farms.some((f) => f.current)) {
             // The farm that was open is gone: back to choosing.
             await get().load();
           }
+        },
+      );
+    },
+
+    refresh: () => reload(),
+
+    async dailyAck() {
+      await run(
+        () => void get().dailyAck(),
+        async () => {
+          const r = await api.dailyAck();
+          if (r.snapshot) set(adopt(r.snapshot));
+        },
+      );
+    },
+
+    async dailyDone() {
+      await run(
+        () => void get().dailyDone(),
+        async () => {
+          const r = await api.dailyDone();
+          if (r.snapshot) set(adopt(r.snapshot));
         },
       );
     },

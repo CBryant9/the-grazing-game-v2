@@ -17,6 +17,8 @@ export interface Failure {
   route: string;
   /** What step failed, a fixed word such as `send_link_failed`. */
   reason: string;
+  /** The farm it failed for, by its id (32 hex). An id is not personal data. Anything else is dropped. */
+  farm?: string;
 }
 
 /** The class name and plain code of an error, or `unknown`. Safe to log. */
@@ -35,6 +37,7 @@ export function failureLine(f: Failure, e?: unknown): string {
     'failed',
     `route=${f.route}`,
     `reason=${f.reason}`,
+    ...(f.farm && /^[0-9a-f]{32}$/.test(f.farm) ? [`farm=${f.farm}`] : []),
     ...(k ? [`error=${k.error}`, ...(k.code ? [`code=${k.code}`] : [])] : []),
   ].join(' ');
 }

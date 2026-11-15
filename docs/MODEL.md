@@ -251,6 +251,8 @@ Two calendars run side by side, and they are kept in step by how the real date i
 
 So the month and day the grass grows by are the real date's month and day. A new season is reported on the real 1 July, and ground cover is read on the real 1st of each month. There is one kind of day where the two differ:
 
+**A farm that starts on a day of the month (milestone 3.3).** `FarmStart` has an optional `date`, the day of the month farm day 0 falls on. Left out it is the 1st, as every farm before it started, and a farm saved without it is read the same. A Daily Farm starts on today's real date: `createFarm` takes `start: { year, month, date }`, the pasture run-up is the days before that date as for any start, and the start herd is placed on it, so the player's first day is day 0 with nothing spent. The game year still turns at a month boundary, so a farm started mid-month has a first game year a little short. Nothing else about the calendar, the weather or the market changed. Tests: `sim/startDate.test.ts`.
+
 | Case | What happens |
 |---|---|
 | In order, from the start until the newest year has been played | The real date is the farm calendar date, every day, leap days included. From 1997 that is 29 years with nothing out |
@@ -946,6 +948,7 @@ The engine gives the `mobs-joined` event, naming both mobs and the paddock, and 
 - **Editing a template** (`setPlan` with the template's `id`) puts the mob it is set on at its step, and for every other mob running the template it resets the round and the waiting state; a mob whose step is gone goes back to the start. This is the builder's choice, for Claudia.
 - `pausePlan` pauses it. A paused plan moves nothing, gives the cattle step no stops, and adds nothing to its report.
 - **`resumePlan`** (from a step, or where it was) puts the mob on that step's stop (the ordinary move, below; if another mob is in the area the two join), starts the days on the stop and the round again, clears any waiting, and keeps the report's counts. **`setPlan`** makes or changes a template, or picks one that exists (`{ template }`), and puts a mob on it at a step with its report at nothing. **`clearPlan`** takes the mob off its plan; the template stays and the event carries the report.
+- **`planMove`** (milestone 3.3, for the Daily Farm plan card) makes the plan's next move now, by hand: it is `planStep`, the tick's own move, so rounds, legs and the end of the plan are counted as the tick counts them. It takes the ordinary move time (the same as `resumePlan` when the mob has to move), and the days on the stop start from tomorrow, as after the tick's move, so the plan keeps its timetable and does not offer the same move again today. It is refused with a plain reason if the mob has no plan, the plan is paused, the mob is not on pasture, or the next area has no water. `resumePlan` is not used for this on purpose: it starts the round again (above, and the comparison with the old game in `plans.mvp.test.ts`), so a plan card built on it would never end a plan with rounds.
 - Mobs that join (`mergeShared`): the biggest keeps its own plan, or takes the other's if it has none (the old game's `mergeStrays`).
 
 ### Daylight, and what setting a plan costs

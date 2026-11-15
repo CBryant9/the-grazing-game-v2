@@ -263,6 +263,8 @@ export function buildSnapshot(
     inboxUnread,
     score: liveScore(farm),
     over: farm.over ? overWire(farm, farm.over) : null,
+    // Set by the game server for a Daily Farm, which carries the server's clock.
+    daily: null,
   };
 }
 

@@ -158,6 +158,9 @@ export const api = {
   record: (before?: number) =>
     request<RecordResponse>(`record${before === undefined ? '' : `?before=${before}`}`, 'GET'),
   inboxRead: (upTo: number) => request<FarmResponse>('inbox', 'POST', { upTo }),
+  // Daily Farm (milestone 3.3). These routes sit beside the game's, under /api/daily.
+  dailyAck: () => request<FarmResponse>('../daily/ack', 'POST', {}),
+  dailyDone: () => request<FarmResponse>('../daily/done', 'POST', {}),
   skip: (length: SkipRequestLength, anyway: boolean, version: string) =>
     request<DayResponse | StaleResponse>('skip', 'POST', { length, anyway, version }),
 };

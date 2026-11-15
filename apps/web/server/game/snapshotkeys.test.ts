@@ -11,6 +11,9 @@ import {
 import { describe, expect, it } from 'vitest';
 import type { FarmState } from '@gg/engine';
 import type { Snapshot } from '../../lib/game/types';
+import { nightOf } from '../daily/advance';
+import { farmWithPlan, planEnv, withHand } from '../daily/planfarm';
+import { dailyWire } from '../daily/wire';
 import { GameServer } from './game';
 import { buildSnapshot } from './snapshot';
 import { MemoryFarmStore } from './store';
@@ -29,6 +32,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'clock',
     'contracts',
     'cropping',
+    'daily',
     'date',
     'day',
     'farm',
@@ -77,6 +81,13 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'reason',
     'window',
   ],
+  daily: ['catchUp', 'endsAt', 'planDue', 'serverNow', 'timezone', 'waiting', 'work'],
+  'daily.catchUp': ['days', 'daysAway', 'report'],
+  'daily.catchUp.days[]': ['date', 'day', 'lines'],
+  'daily.catchUp.days[].date': ['date', 'month', 'year'],
+  'daily.catchUp.report[]': ['date', 'seq', 'text', 'who'],
+  'daily.catchUp.report[].date': ['date', 'month', 'year'],
+  'daily.planDue[]': ['from', 'mob', 'mobName', 'text', 'to'],
   date: ['date', 'month', 'year'],
   farm: ['district', 'name', 'setup'],
   'farm.setup': [
@@ -766,6 +777,37 @@ function engineFixtures(): Snapshot[] {
   ];
 }
 
+/**
+ * Daily Farm snapshots (milestone 3.3): one with a plan move due that no hand will make and a day
+ * missed, one with a hand who has moved the plan, for the worker report.
+ */
+function dailyFixtures(): Snapshot[] {
+  const env = planEnv;
+  const stored = { name: 'Daily', setup: SETUP, version: 'v1' };
+  const daily = {
+    timezone: 'Australia/Sydney',
+    startedOn: '2026-09-01',
+    openedOn: null,
+    workedOn: null,
+    doneOn: null,
+    away: [{ day: 3, date: { year: 2026, month: 8, date: 4 }, lines: ['Rain: 5 mm.'] }],
+    awayTotal: 1,
+    seenSeq: 0,
+    rolledFrom: [],
+  };
+  const now = Date.parse('2026-11-15T01:00:00Z');
+  const { farm: planned } = farmWithPlan();
+  let handed = withHand(farmWithPlan().farm);
+  for (let i = 0; i < 12; i++) handed = nightOf(handed, env).end.farm;
+  return [
+    { ...buildSnapshot(planned, stored, env), daily: dailyWire(planned, daily, now, null) },
+    {
+      ...buildSnapshot(handed, stored, env),
+      daily: dailyWire(handed, { ...daily, away: [] }, now, 'Waiting, as a fact.'),
+    },
+  ];
+}
+
 describe('what the game routes send holds only the keys on the lists', () => {
   it('snapshots and replies over several farms: nothing unlisted, and every listed key seen', async () => {
     const { snaps, replies } = await serverFixtures();
@@ -786,7 +828,11 @@ describe('what the game routes send holds only the keys on the lists', () => {
       for (const r of list) shape(r, kind, replySeen, inner);
     }
     const snapSeen: Seen = new Map();
-    for (const s of [...snaps, engine, onWay, owing, ...inner]) shape(s, '', snapSeen, []);
+    const dailies = dailyFixtures();
+    expect(dailies[0]!.daily!.planDue.length).toBeGreaterThan(0);
+    expect(dailies[1]!.daily!.catchUp!.report.length).toBeGreaterThan(0);
+    for (const s of [...snaps, engine, onWay, owing, ...dailies, ...inner])
+      shape(s, '', snapSeen, []);
     if (process.env.KEYS_DUMP) {
       const dump = (m: Seen) =>
         Object.fromEntries([...m].map(([k, v]) => [k, [...v].sort()]).sort());

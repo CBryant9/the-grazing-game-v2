@@ -12,6 +12,9 @@ vi.mock('@/lib/game/store', () => ({
 const farm = (id: string, name: string, current = false) => ({
   id,
   name,
+  mode: 'fast' as const,
+  date: null,
+  work: null,
   districtName: 'Western Victoria',
   day: 41,
   lastPlayed: Date.UTC(2026, 10, 3),
@@ -22,6 +25,7 @@ const html = (farms: ReturnType<typeof farm>[], farmLimit: number): string => {
   state.current = {
     farms,
     farmLimit,
+    dailyLimit: 0,
     busy: 0,
     openFarm: () => undefined,
     deleteFarm: () => undefined,

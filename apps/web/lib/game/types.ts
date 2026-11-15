@@ -11,10 +11,11 @@ import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
 
 /**
  * 3 added `workforce` and `contracts` (milestone 2.2). 5 added sheep (milestone 2.8): a mob's
- * `species` and `sheep`, the sheep market, the setup's stock. A saved offline farm of an older
- * version is not shown.
+ * `species` and `sheep`, the sheep market, the setup's stock. Daily Farm (m3.3) also numbered its
+ * change 5 on its own branch, so the joined line (m6) is 6: an offline copy from either branch is
+ * not shown. A saved offline farm of an older version is not shown.
  */
-export const SNAPSHOT_VERSION = 5;
+export const SNAPSHOT_VERSION = 6;
 
 export interface DateParts {
   year: number;
@@ -637,6 +638,55 @@ export interface Snapshot {
   /** The live year so far: its number and its score if it closed today. */
   score: { year: number; total: number };
   over: OverWire | null;
+  /** What only a Daily Farm has. Null for a Fast Farm. */
+  daily: DailyWire | null;
+}
+
+/** One game day the player was away for, as the diary has it. */
+export interface CatchUpDay {
+  day: number;
+  date: DateParts;
+  lines: string[];
+}
+
+/** What happened on the days the player did not open the farm, shown once before today starts. */
+export interface CatchUpWire {
+  /** The last days missed, as the diary has them (at most 60). */
+  days: CatchUpDay[];
+  /** How many days passed while the player was away, all of them. More than `days` when it was a long time. */
+  daysAway: number;
+  /** What the hands did while the player was away, one bubble each. */
+  report: BubbleWire[];
+}
+
+/** A grazing plan move that is due and that no hand is there to make (PRD 5.15). */
+export interface PlanDueWire {
+  mob: number;
+  mobName: string;
+  from: string | null;
+  to: string;
+  /** The plan card's words, as a fact: "Your grazing plan said today you would move from X to Y." */
+  text: string;
+}
+
+/**
+ * The part of a snapshot only a Daily Farm has. The clock is the server's: `endsAt` and
+ * `serverNow` are both from the server, so the countdown can not be moved by the device's clock.
+ */
+export interface DailyWire {
+  /** The farm's time zone, locked when it started. */
+  timezone: string;
+  /** Local midnight, which ends today, ms since 1970 on the server's clock. */
+  endsAt: number;
+  /** The server's clock when this was sent, ms since 1970. */
+  serverNow: number;
+  /** The day has ended and the farm is waiting for yesterday's weather and prices, so no job can start yet. */
+  waiting: string | null;
+  work: DailyWork;
+  /** Days passed while the player was away, until they have seen them. */
+  catchUp: CatchUpWire | null;
+  /** Plan moves due today that no hand will make. */
+  planDue: PlanDueWire[];
 }
 
 /** What the game over screen shows. */
@@ -826,12 +876,26 @@ export interface FarmResponse {
   broken?: string;
   /** Set when the player is signed in and has more than one farm: the picker is shown first. */
   pick?: FarmListItem[];
+  /** The farms of each mode the account may have, sent with the picker. */
+  limits?: { fast: number; daily: number };
 }
+
+/** The two ways to play (PRD section 3). Daily Farm runs in real time, Fast Farm at the player's pace. */
+export type FarmMode = 'daily' | 'fast';
+
+/** Where a Daily Farm's work for today stands. A fact, never a nudge. */
+export type DailyWork = 'not-started' | 'started' | 'done';
 
 /** One farm in the picker (milestone 3.2). The id is the one the browser sends back to open or delete it. */
 export interface FarmListItem {
   id: string;
   name: string;
+  /** Daily Farm or Fast Farm. */
+  mode: FarmMode;
+  /** The farm's date as the game reports it. */
+  date: DateParts | null;
+  /** A Daily Farm's work for today. Null for a Fast Farm. */
+  work: DailyWork | null;
   districtName: string;
   /** Farm day, from 0. The screens show day + 1. */
   day: number;
@@ -846,6 +910,9 @@ export interface FarmsResponse {
   /** Fast Farms the account may have at once, and how many are going. */
   limit: number;
   going: number;
+  /** The same for Daily Farms. */
+  dailyLimit: number;
+  dailyGoing: number;
   signedIn: boolean;
 }
 
@@ -886,6 +953,20 @@ export interface SetupOptions {
   starts: { id: SetupStart; label: string; text: string }[];
   difficulties: { id: SetupDifficulty; label: string; text: string }[];
   nameMax: number;
+  /** Whether a Daily Farm can be started, and if not, why in plain words (milestone 3.3). */
+  daily: DailyOffer;
+}
+
+/**
+ * Daily Farm at setup. `open`: it can be started. `coming`: it is switched off or has no database
+ * behind it, so setup shows the plain "coming" state. `guest`: it needs an account. `full`: the
+ * account has all the Daily Farms it can have.
+ */
+export interface DailyOffer {
+  state: 'open' | 'coming' | 'guest' | 'full';
+  text: string;
+  limit: number;
+  going: number;
 }
 
 export interface SetupChoices {
@@ -900,6 +981,10 @@ export interface SetupChoices {
   startType: SetupStart;
   difficulty: SetupDifficulty;
   name: string;
+  /** Which mode the farm plays. Left out is a Fast Farm (milestone 3.3). */
+  mode?: FarmMode;
+  /** A Daily Farm's time zone, an IANA name from the device. It is locked when the farm starts (PRD 5.2). */
+  timezone?: string;
 }
 
 /** What the browser may ask the server to do to a farm. The server checks every request. */
@@ -953,6 +1038,8 @@ export type SimpleAction =
   | { type: 'pausePlan'; mob: number }
   | { type: 'clearPlan'; mob: number }
   | { type: 'resumePlan'; mob: number; step?: number }
+  /** The plan's next move, made now by hand (the Daily Farm plan card). */
+  | { type: 'planMove'; mob: number }
   | { type: 'buyCattle'; cls: string; qty: number }
   | { type: 'sellClass'; cls: string; qty: number }
   | {

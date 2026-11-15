@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useGame } from '@/lib/game/store';
+import { dateText } from '@/lib/game/format';
 import type { FarmListItem } from '@/lib/game/types';
 import styles from './accounts.module.css';
 
@@ -15,7 +16,8 @@ const played = (ms: number): string =>
  */
 export function FarmPicker() {
   const farms = useGame((s) => s.farms);
-  const limit = useGame((s) => s.farmLimit);
+  // Fast and Daily Farms have a limit each. The picker holds both kinds.
+  const limit = useGame((s) => s.farmLimit + s.dailyLimit);
   const open = useGame((s) => s.openFarm);
   const del = useGame((s) => s.deleteFarm);
   const another = useGame((s) => s.startAnother);
@@ -31,8 +33,20 @@ export function FarmPicker() {
           <li key={f.id} className={styles.farmcard}>
             <b className={styles.farmname}>{f.name}</b>
             <p className={styles.farmsub}>
-              {f.districtName} · Day {(f.day + 1).toLocaleString('en-AU')}
+              {f.mode === 'daily' ? 'Daily Farm' : 'Fast Farm'} · {f.districtName} ·{' '}
+              {f.mode === 'daily' && f.date
+                ? dateText(f.date)
+                : `Day ${(f.day + 1).toLocaleString('en-AU')}`}
             </p>
+            {f.work && (
+              <p className={styles.farmsub}>
+                {f.work === 'done'
+                  ? "Today's work done"
+                  : f.work === 'started'
+                    ? "Today's work started"
+                    : "Today's work not started"}
+              </p>
+            )}
             <p className={styles.farmsub}>Last played {played(f.lastPlayed)}</p>
             {asking === f.id ? (
               <FarmDelete

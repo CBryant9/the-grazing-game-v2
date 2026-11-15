@@ -63,6 +63,8 @@ export interface RealYearPlanOptions {
   seed: number;
   /** The month the farm starts in, 0 for January. January if left out. */
   startMonth?: number;
+  /** The day of that month the farm's day 0 falls on. The 1st if left out. */
+  startDate?: number;
   /**
    * The year the player starts in. In order, the oldest year if left out.
    * At random, drawn from the seed if left out.
@@ -142,7 +144,11 @@ export function planRealYears(options: RealYearPlanOptions): RealYearPlan {
 
   const firstYear = order === 'random' ? shuffled(0)[0]! : (options.firstYear ?? years[0]!);
   const firstAt = years.indexOf(firstYear);
-  const start: FarmStart = { year: firstYear, month: startMonth };
+  const start: FarmStart = {
+    year: firstYear,
+    month: startMonth,
+    ...(options.startDate !== undefined ? { date: options.startDate } : {}),
+  };
 
   const yearAt = (gameYear: number): number => {
     if (!Number.isInteger(gameYear)) throw new RangeError(`${gameYear} is not a game year.`);

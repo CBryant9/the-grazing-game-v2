@@ -253,3 +253,15 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | M10 | A rate limit keyed on the `sb-*` cookie text gave a fresh count for every made-up cookie, and each try cost a call to the auth server | The key was built from something the caller writes | Visitors by address (the trusted header), admins by account id. **Rule: key a limit on what the caller can not choose** |
 | M11 | "Hide that `/admin` exists" while `robots.txt` named it and its not found carried a header an unknown address does not | Each piece was added for its own reason | `robots.txt` does not name it, the headers are the same, and `noindex` comes only after the role check passes. **Rule: when the aim is to hide something, compare the whole answer with an unknown address, not only the status** |
 
+
+## Milestone 3.3 (Daily Farm)
+
+| # | What went wrong | Why | Fix and rule |
+|---|---|---|---|
+| D1 | The first Daily Farm snapshot failed with "The weather table has no day" for today | The screens ask the engine for today's growth, and today's weather is not in anybody's tables until tomorrow | The bundle used to look at and work on a farm gets a placeholder row for today (no rain, last evapotranspiration). The night that closes the day runs on a bundle with the real row and nothing after it. **Rule: anything the engine reads for "today" must exist before the day is over** |
+| D2 | A farm caught up three days late could have run on different prices from one rolled on time | The data bundle held every day kept so far, so a late run saw rows an on-time run could not | `bundleThrough(date)`: the bundle as it stood at the end of the day being run, and a test that the two come out identical. **Rule: a simulation step may only read what existed when it would have run** |
+| D3 | A farm that failed on its second night had its first night saved, and the same run then claimed it again and finished it | `daily_finish` clears the claim, and the run claims in a loop | Fine, and kept: each night is saved on its own, and a farm with no progress keeps its claim until the run ends. The test fails the second save every time and checks the first night stays |
+| D4 | A Daily Farm opened on a server that had not loaded it had no data to look at it with | The data for a farm was set only when it was behind | The data is set at the start of every load, behind or not |
+| D5 | Two tabs opening the farm after midnight made one tab fail | Both ran the night, and the second save was refused | The refusal is not an error here: take the other tab's farm and carry on |
+| D6 | Python edits to files on Windows turned LF into CRLF and `format:check` flagged 24 files | Text-mode writes translate line endings | Use `newline=''` in scripts that edit files, and write only the files `prettier --check` names |
+| D7 | The 7-day test with the real MLA gap failed with "no national feeder-steer figure" in April | Only one price series had days kept, the others were held for 14 days and ran out | A test that runs for months keeps every series every day |

@@ -93,9 +93,22 @@
   font-family: var(--font-px);
   font-size: 0.625rem;
 }
+.carddisabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.carddisabled input {
+  cursor: default;
+}
 .cardtitle {
   font-size: 0.9375rem;
   padding-right: 64px;
+}
+.cardlink {
+  font-size: 0.8125rem;
+  color: var(--accent-text);
+  position: relative;
+  z-index: 1;
 }
 .cardtext {
   font-size: 0.8125rem;

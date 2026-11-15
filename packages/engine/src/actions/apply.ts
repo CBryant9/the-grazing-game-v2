@@ -99,6 +99,7 @@ import {
   dateOn,
   keepSources,
   keepSurvey,
+  landOf,
   nextSaleDay,
   placeAnchor,
   plantingsNow,
@@ -125,7 +126,7 @@ import {
 } from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
-import { newRun, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
+import { newRun, planStep, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
 import {
   cloneFarm,
   deepCopy,
@@ -1043,6 +1044,40 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
   return null;
 }
 
+/**
+ * The plan's next move, made now by hand (see the action). It is `planStep`, the tick's own move,
+ * so rounds, legs and the end of the plan are counted as the tick counts them. It is tonight's
+ * move taken early: the days on the stop start from tomorrow, as they would after the tick's move,
+ * so the plan keeps the same timetable and does not offer the same move again today.
+ */
+function planMove(j: Job, a: Extract<Action, { type: 'planMove' }>): Out {
+  const m = j.mob(a.mob);
+  if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
+  if (run.paused) return refuse('already-paused', `${m.name}'s plan is paused.`);
+  if (m.where.kind !== 'paddock' || !m.animals.length) {
+    return refuse('not-on-pasture', `${m.name} is not on pasture, so its plan can not move it.`);
+  }
+  const tpl = templateOf(j.farm, run);
+  if (!tpl) return refuse('no-such-plan', 'There is no such plan.');
+  const land = landOf(j.farm, j.survey, plantingsNow(j.farm, j.env));
+  const result = planStep(
+    j.farm,
+    j.survey,
+    land,
+    m,
+    tpl,
+    'days',
+    null,
+    j.events as Extract<FarmEvent, { type: 'plan-moved' | 'plan-waiting' | 'plan-finished' }>[],
+  );
+  if (result === 'blocked') {
+    return refuse('plan-waiting', `${m.name}'s plan can not move it: the next area has no water.`);
+  }
+  return null;
+}
+
 function clearPlan(j: Job, a: Extract<Action, { type: 'clearPlan' }>): Out {
   const m = j.mob(a.mob);
   if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob)) {
@@ -1658,6 +1693,8 @@ function run(j: Job, a: Action): Out {
       return pausePlan(j, a);
     case 'resumePlan':
       return resumePlan(j, a);
+    case 'planMove':
+      return planMove(j, a);
     case 'clearPlan':
       return clearPlan(j, a);
     case 'wean':

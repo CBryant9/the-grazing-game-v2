@@ -465,6 +465,9 @@ export {
   todaysDollarsFactor,
 } from './market/cpi';
 export type { CpiTable, Quarter } from './market/cpi';
+// m6: Daily Farm keeps the sheep and lamb indicators from day to day (`seriesFor`).
+export { SHEEP_INDICATOR_FILES } from './market/realSheepPrices';
+export type { SheepRealPrices } from './market/realSheepPrices';
 export {
   CATTLE_INDICATORS,
   CLASS_INDICATORS,
@@ -662,6 +665,8 @@ export type { ClockView, ThingToDo } from './day/look';
 export { LABOUR, awardHourly, casualDayRate, contractDayRate } from './data/labour';
 export type { AwardLevel, LabourFigureSource } from './data/labour';
 export { standingOf } from './labour/pool';
+// Milestone 3.3 (Daily Farm): does a hand work on a farm day? The same rule the worker report and the standing duties use.
+export { worksOn } from './labour/help';
 // The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
 export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
 export type {

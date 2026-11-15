@@ -416,7 +416,8 @@ describe('stale versions, one-use request ids and two tabs', () => {
     await expect(
       store.put(id, { ...farm, version: 'new3' }, { expect: farm.version }),
     ).rejects.toBeInstanceOf(SaveConflictError);
-    expect(await store.version(id)).toBe('new2');
+    // The version, and the revision (one write has been made).
+    expect(await store.version(id)).toBe('new2:1');
   });
 
   it('a request id is used once: a repeat gets the same answer, is logged once, and does nothing twice', async () => {
@@ -497,7 +498,7 @@ describe('saving that never loses a job silently', () => {
       await store.version(
         fromUuid((await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id),
       ),
-    ).toBe(made.farmVersion);
+    ).toBe(`${made.farmVersion}:0`);
     // The database comes back: the same request works, from the farm as it really is.
     state.fail = 0;
     const day = await g.endDay(session(31), made.farmVersion);

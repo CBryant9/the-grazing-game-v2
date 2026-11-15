@@ -109,8 +109,17 @@
  * budget's shearing, crutching and ram replacement costs; the weekly
  * losing-weight and low-condition notes. No cattle, grass or crop rule
  * changed. Logged in docs/CALIBRATION.md (the m2.7 review entry).
+ *
+ * 0.18.0 (m6, the join of Daily Farm onto the 0.17 line): two pieces Daily
+ * Farm (m3.3) built on the 0.13 engine, carried over by hand. The
+ * `planMove` action makes a plan's next move now (the tick's own
+ * `planStep`), and `createFarm` takes an optional `start.date` (the day of
+ * the month day 0 falls on; left out it is the 1st). No rule or number
+ * changed: every calibration row, comparison and digest is 0.17.0's. The
+ * stored `start.date` is optional and left out unless given, so every older
+ * save loads as it did and the save format stays 12.
  */
-export const ENGINE_VERSION = '0.17.0';
+export const ENGINE_VERSION = '0.18.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.

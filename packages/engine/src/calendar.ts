@@ -1,17 +1,22 @@
 /**
  * The farm calendar.
  *
- * A farm starts on the 1st of a month in a given year. Every later day is a
+ * A farm starts on the 1st of a month in a given year (or on a given day of the month). Every later day is a
  * whole number counted from that start (day 0). Days before the start are
  * negative; the pasture run-up uses them.
  *
  * This is calendar arithmetic only. It never reads the clock.
  */
 
-/** When a farm starts. `month` is 0 for January through 11 for December. */
+/**
+ * When a farm starts. `month` is 0 for January through 11 for December. `date` is the day of the
+ * month the farm's day 0 falls on (milestone 3.3, a Daily Farm that starts today). Left out, it
+ * is the 1st, as every farm before it started.
+ */
 export interface FarmStart {
   year: number;
   month: number;
+  date?: number;
 }
 
 /** A calendar day. `month` is 0 to 11 and `date` is the day of the month, 1 to 31. */
@@ -25,7 +30,7 @@ const DAY_MS = 86400000;
 
 /** The calendar date of a farm day. Leap years are handled. */
 export function dateAt(start: FarmStart, day: number): CalendarDate {
-  const d = new Date(Date.UTC(start.year, start.month, 1) + day * DAY_MS);
+  const d = new Date(Date.UTC(start.year, start.month, start.date ?? 1) + day * DAY_MS);
   return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate() };
 }
 

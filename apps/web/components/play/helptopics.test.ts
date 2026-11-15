@@ -30,6 +30,7 @@ describe('the help topics', () => {
   it('covers every topic the first-time experience asks for', () => {
     expect(HELP_TOPICS.map((t) => t.id)).toEqual([
       'day',
+      'daily',
       'move',
       'build',
       'water',

@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/game/api';
 import { num } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import type {
+  FarmMode,
   SetupChoices,
   SetupDifficulty,
   SetupEnterprise,
@@ -20,6 +21,7 @@ import { Icon } from './Icon';
 import styles from './setup.module.css';
 
 type StepId =
+  | 'mode'
   | 'district'
   | 'size'
   | 'enterprise'
@@ -32,6 +34,7 @@ type StepId =
   | 'summary';
 
 interface Draft {
+  mode?: FarmMode;
   district?: DistrictId;
   size?: SetupSize;
   enterprise?: SetupEnterprise;
@@ -48,6 +51,10 @@ interface Card {
   value: string;
   title: string;
   text?: string;
+  /** Shown, but not chosen: a plain reason is in `text`. */
+  disabled?: boolean;
+  /** A link under the text, for the one thing that would open it (signing in). */
+  link?: { href: string; label: string };
 }
 
 /** A group of cards, one chosen. They are real radio buttons, so arrow keys and screen readers work. */
@@ -68,16 +75,25 @@ function Cards({
     <fieldset className={styles.cards}>
       <legend className="sr-only">{legend}</legend>
       {cards.map((c) => (
-        <label key={c.value} className={`${styles.card} ${value === c.value ? styles.cardon : ''}`}>
+        <label
+          key={c.value}
+          className={`${styles.card} ${value === c.value ? styles.cardon : ''} ${c.disabled ? styles.carddisabled : ''}`}
+        >
           <input
             type="radio"
             name={name}
             value={c.value}
             checked={value === c.value}
+            disabled={c.disabled}
             onChange={() => onChange(c.value)}
           />
           <span className={`px ${styles.cardtitle}`}>{c.title}</span>
           {c.text && <span className={styles.cardtext}>{c.text}</span>}
+          {c.link && (
+            <Link href={c.link.href} className={styles.cardlink}>
+              {c.link.label}
+            </Link>
+          )}
         </label>
       ))}
     </fieldset>
@@ -85,6 +101,7 @@ function Cards({
 }
 
 const TITLES: Record<StepId, string> = {
+  mode: 'How do you want to play?',
   district: 'Where is your farm?',
   size: 'How big is it?',
   enterprise: 'What do you farm?',
@@ -133,18 +150,20 @@ export function SetupFlow() {
     draft.startType === 'running';
   const steps = useMemo<StepId[]>(
     () => [
+      'mode',
       'district',
       'size',
       'enterprise',
       ...(draft.enterprise === 'mixed' ? (['arable'] as StepId[]) : []),
-      'years',
+      // A Daily Farm plays the real date, so there is no choice of years.
+      ...(draft.mode === 'daily' ? [] : (['years'] as StepId[])),
       'start',
       ...(offersSheep ? (['stock'] as StepId[]) : []),
       'difficulty',
       'name',
       'summary',
     ],
-    [draft.enterprise, offersSheep],
+    [draft.enterprise, draft.mode, offersSheep],
   );
   const step = steps[Math.min(index, steps.length - 1)]!;
 
@@ -183,6 +202,7 @@ export function SetupFlow() {
   };
 
   const ready: Record<StepId, boolean> = {
+    mode: !!draft.mode,
     district: !!draft.district,
     size: !!draft.size,
     enterprise: !!draft.enterprise,
@@ -198,11 +218,13 @@ export function SetupFlow() {
     list.find((x) => x.id === id)?.label ?? '';
 
   const take = async (): Promise<void> => {
+    const daily = draft.mode === 'daily';
     if (
+      !draft.mode ||
       !draft.district ||
       !draft.size ||
       !draft.enterprise ||
-      !draft.years ||
+      (!daily && !draft.years) ||
       !draft.startType ||
       !draft.difficulty
     ) {
@@ -214,11 +236,14 @@ export function SetupFlow() {
       enterprise: draft.enterprise,
       arablePct: draft.enterprise === 'mixed' ? draft.arablePct : undefined,
       croppedPct: draft.enterprise === 'mixed' ? draft.croppedPct : undefined,
-      years: draft.years,
+      years: daily ? 'real-in-order' : draft.years!,
       startType: draft.startType,
       difficulty: draft.difficulty,
       name: draft.name,
       ...(offersSheep && draft.stock && draft.stock !== 'cattle' ? { stock: draft.stock } : {}),
+      mode: draft.mode,
+      // A Daily Farm's time zone is the device's, locked when the farm starts (PRD 5.2).
+      ...(daily ? { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : {}),
     };
     setTaking(true);
     setError(null);
@@ -265,6 +290,37 @@ export function SetupFlow() {
           {TITLES[step]}
         </h1>
 
+        {step === 'mode' && (
+          <>
+            <Cards
+              name="mode"
+              legend="How to play"
+              value={draft.mode}
+              onChange={(v) => set({ mode: v as FarmMode })}
+              cards={[
+                {
+                  value: 'daily',
+                  title: 'Daily Farm',
+                  text:
+                    options.daily.state === 'open'
+                      ? 'One game day for each real day. Each day starts at first light when you log in. Every job uses daylight. The farm keeps running overnight.'
+                      : options.daily.text,
+                  disabled: options.daily.state !== 'open',
+                  link:
+                    options.daily.state === 'guest'
+                      ? { href: '/sign-in', label: 'Sign in to play it' }
+                      : undefined,
+                },
+                {
+                  value: 'fast',
+                  title: 'Fast Farm',
+                  text: 'Play at your own pace. Jobs still use daylight, then tap Next day. Skip a week, month or year with plans running.',
+                },
+              ]}
+            />
+            {options.daily.state === 'open' && <p className="muted">{options.daily.text}</p>}
+          </>
+        )}
         {step === 'district' && (
           <Cards
             name="district"
@@ -411,6 +467,14 @@ export function SetupFlow() {
               <dd>{draft.name.trim()}</dd>
             </div>
             <div>
+              <dt>Mode</dt>
+              <dd>
+                {draft.mode === 'daily'
+                  ? 'Daily Farm. It starts today, in your time zone, and the day ends at midnight there.'
+                  : 'Fast Farm'}
+              </dd>
+            </div>
+            <div>
               <dt>District</dt>
               <dd>
                 {district.name}, {district.town}
@@ -430,10 +494,12 @@ export function SetupFlow() {
                   `: ${draft.arablePct}% arable, ${draft.croppedPct}% of it cropped`}
               </dd>
             </div>
-            <div>
-              <dt>Years</dt>
-              <dd>{label(options.years, draft.years)}</dd>
-            </div>
+            {draft.mode !== 'daily' && (
+              <div>
+                <dt>Years</dt>
+                <dd>{label(options.years, draft.years)}</dd>
+              </div>
+            )}
             <div>
               <dt>Start</dt>
               <dd>{label(options.starts, draft.startType)}</dd>

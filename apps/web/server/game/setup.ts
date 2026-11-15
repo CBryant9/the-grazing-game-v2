@@ -169,6 +169,13 @@ export function setupOptions(sheepOn = false): SetupOptions {
       text: DIFFICULTY_TEXT[id],
     })),
     nameMax: NAME_MAX,
+    // The route fills this in for the player who asked (server/daily/offer.ts).
+    daily: {
+      state: 'coming',
+      text: 'Daily Farm is coming. Fast Farm is ready to play now.',
+      limit: 0,
+      going: 0,
+    },
   };
 }
 
@@ -224,6 +231,17 @@ export function parseSetup(body: unknown, sheepOn = false): Parsed<SetupChoices>
     difficulty: difficulty.value,
     name,
   };
+  // The mode and a Daily Farm's time zone (milestone 3.3). The server checks the zone against its own list.
+  if (b.mode !== undefined) {
+    if (b.mode !== 'daily' && b.mode !== 'fast') return bad('Choose Daily Farm or Fast Farm.');
+    out.mode = b.mode;
+  }
+  if (b.timezone !== undefined) {
+    if (typeof b.timezone !== 'string' || b.timezone.length > 64) {
+      return bad('Your time zone was not sent properly.');
+    }
+    out.timezone = b.timezone;
+  }
   if (enterprise.value === 'mixed') {
     const allowed = ARABLE_SHARES[district.value].mixed;
     if (typeof b.arablePct !== 'number' || !allowed.includes(b.arablePct)) {
