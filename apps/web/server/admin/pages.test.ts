@@ -103,6 +103,7 @@ describe('every admin page', () => {
         '/audit',
         '/challenges',
         '/moderation',
+        '/notifications',
         '/purchases',
         '/settings',
         '/switches',

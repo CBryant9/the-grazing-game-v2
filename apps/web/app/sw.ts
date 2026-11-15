@@ -11,6 +11,7 @@
 import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from 'serwist';
 import type { PrecacheEntry, RuntimeCaching } from 'serwist';
 import { isCacheablePagePath } from '../lib/pwa/cacheablePage';
+import { installPushHandlers, type PushScope } from '../lib/pwa/push';
 
 declare const self: {
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
@@ -77,3 +78,5 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+// Show a push message and open the right page when it is tapped (lib/pwa/push.ts). Nothing is stored.
+installPushHandlers(self as unknown as PushScope);

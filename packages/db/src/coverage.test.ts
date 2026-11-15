@@ -35,6 +35,7 @@ const SERVER_ONLY = [
   'signup_refusals',
   'ban_records',
   'push_service_hosts',
+  'notification_sends',
   'signup_email_checks',
   'deletion_tokens',
 ];

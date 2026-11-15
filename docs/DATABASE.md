@@ -83,10 +83,14 @@ S = select, I = insert, U = update, D = delete. "Server" is `service_role`. The 
 | `admin_audit_log` | | | S. Nobody changes or removes a row. It outlives deleted accounts, so every column takes a fixed shape with no free text: an action name (lower case and underscores), a target kind and id (letters, digits, dashes), and details whose only keys are `switch_key`, `slot_id`, `enabled`, `count`, `value`, `role`, `until` and `ids` (a list of account or row ids), each with a fixed type. Anything else is refused. It can still name an account by its id, which is how an admin action is traced |
 | `push_service_hosts` | Server only: the web push services a subscription may point at, each with the vendor page it was read from | | |
 | `rate_limit_rules`, `rate_limit_hits` | Server only | | |
-| `notifications` | S own, mark read, D own | | |
+| `notifications` | S own, mark read (only `read_at`), D own. The server writes. `dedupe_key` (one row for each account and key) and `show_in_inbox` (false for a record that a reminder was dropped, so it is not tried again) are the server's | | |
+| `notification_sends` | Server only: one row for each notification and channel (push or email) with its state, attempts, when to try next and a fixed reason code (milestone 3.4) | | |
 | `notification_settings`, `notification_prefs` | Everything on own rows | | |
 | `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts`. Any other host is refused with an error whose message starts `push_host_not_allowed:` (hint `push_host_not_allowed`), for the screens to word ("Notifications aren't available in this browser yet"). Chrome and Edge are not listed until milestone 3.4 | | |
 | `weather_daily`, `price_daily` | Server only (engine data). Days after the baked tables end (m3.3): one weather row a district a day (rain, max and min temperature, radiation, pan evaporation and FAO-56 `et0_mm`, which the growth model reads), and price rows by indicator and yard. Weather, each price series and each yard's sale days (`yardings-prime`, `yardings-store`, the head yarded, price 0) are kept apart, as each arrives. A night never waits for any of them (the lag, and the fallbacks in "Daily Farm" below). A row already kept is never changed (`on conflict do nothing`): a farm may have run on it | | |
+
+| `push_subscriptions` | S, I, D own; the endpoint must be on a host in `push_service_hosts`. Any other host is refused with an error whose message starts `push_host_not_allowed:` (hint `push_host_not_allowed`), for the screens to word ("Notifications aren't available in this browser yet"). Chrome (`fcm.googleapis.com`) and Edge (`notify.windows.com` and its subdomains) were added in milestone 3.4, each with its vendor page | | |
+| `weather_daily`, `price_daily` | Server only (engine data) | | |
 | `daily_counts` | | | S |
 | `ad_slots` | S (id, on or off, settings) | S | S |
 | `sponsors`, `campaigns`, `ad_creatives`, `campaign_slots`, `ad_events`, `ad_daily` | | | S. The server picks the ad and logs views |
@@ -261,7 +265,7 @@ Daily Farm (milestone 3.3, below) uses the same tables: `farms.mode = 'daily'`, 
 6. Measure the rules at real volumes. The community rules call helper functions per row; leaderboard reads may want a materialised view (PRD 15) in 4.1.
 7. Supabase runs Postgres 15 or 17; the tests run on 18. Nothing newer than 15 is used (`unique nulls not distinct` is 15).
 8. Confirm the migration role may add the trigger on `storage.objects` and the trigger on `auth.users` (the migration warns if the Storage one is refused).
-9. Add the Chrome (Firebase Cloud Messaging) and Edge (Windows Push Notification Services) push hosts to `push_service_hosts`, each with the vendor page it was read from, before push goes live (3.4). Until then only Safari and Firefox subscriptions are accepted.
+9. The Chrome and Edge push hosts are in `push_service_hosts` from migration `20261115000800` (3.4), each with its vendor page. Once keys are set, check that a real Chrome (`fcm.googleapis.com`) and a real Edge (`wns2-*.notify.windows.com`) subscription is accepted: the vendor pages name the domains, not every address a browser can be given.
 
 ## What the server does for the admin screens (milestone 3.5)
 
@@ -284,3 +288,25 @@ Code: `apps/web/server/admin/`. The pages are in `apps/web/app/admin`, the write
 Second pass (migration `20261115000500_admin_fixes.sql`): `app.is_admin_user` and `app.is_staff` now mean *in good standing* (role, not banned, not suspended), so a banned or suspended admin or moderator reads nothing admin-only through their own token (`account_status` beyond their own row, the audit log, private site settings, moderation actions; `packages/db/src/adminfixes.test.ts`). The last-admin trigger counts only admins in good standing and also fires on `banned_at` and `suspended_until`. `app.end_sessions(user)` (server only) deletes `auth.sessions`. `profiles_username_prefix` is a `text_pattern_ops` index on `lower(username)` for the admin search. The table access matrix is unchanged (no new table). What a banned or suspended account can and can not do today: it can not use the community, sign up again (a ban, by hash), or open admin, and its sessions end when it is banned or suspended (an access token already issued still works on the game routes until it runs out). It *can* sign in again and play its own farm, because the game routes do not check status: that is a call for Claudia.
 
 Still owed against a real project (added to the list above): `app.end_sessions` and `admin_sign_out_everywhere` deleting from `auth.sessions` as the function owner (a refusal gives the admin a plain message to do it in the Supabase dashboard), the `verify()` cookie reading against a real `@supabase/ssr` cookie (one cookie and chunked),
+
+## What the server does for notifications (milestone 3.4)
+
+Code: `apps/web/server/notify/`. Migration `20261115000800_notify_queue.sql` (the only one). The tests: `apps/web/server/notify/*.test.ts` and `packages/db/src/notify.test.ts`.
+
+| Part | What it does |
+|---|---|
+| `queueNotification` (queue.ts) | The one way a notification is made. Writes the inbox row (`notifications`) and the sends it needs (`notification_sends`) in one transaction. The contract is in the file's comment: user, kind, title, body, link, farm, dedupe key. It answers `queued`, `duplicate` or `skipped` with a reason, and never throws for something expected |
+| Rules it applies | The wording net (no exclamation marks, guilt, streaks, countdowns, praise or money), the database's link rule, community types never for under 16 or restricted accounts or while the community switch is off, the player's push and email switches, quiet hours in the farm's time zone, the evening warning once a day and never after the farm was opened |
+| Quiet hours | A reminder or evening warning inside them is **dropped** (`dropped`, `quiet_hours`). Anything else is **held** until they end (`held`, `not_before`). The inbox row is always made, except for a dropped reminder, which is recorded with `show_in_inbox = false` so it is not tried again |
+| Email | Only a fallback: sent when the player has no working device, or when push failed for good. The email row waits (`held`, reason `push_first`, `not_before = infinity`) until push settles |
+| Sender (sender.ts) | Claims due rows in one statement (`for update skip locked`; a stale `sending` row is taken again after 5 minutes), within a time budget. One failing row never stops the rest. Retries at 1 minute, 5, 30 and 2 hours (or the service's Retry-After), at most 5 attempts. A cap of 6 notifications a day for an account. Anything stale for 12 hours is dropped. The player's switches and quiet hours are checked again at the moment of sending, and the allow-list again before each push |
+| Devices | Saved through the database's rules (`push_host_not_allowed`), up to 10 for an account. The same browser signing in as someone else moves the device. A device the push service calls gone (404, 410) is deleted. Signing out here removes this browser's device (the page does it before signing out), signing out everywhere removes all of them, and deleting the account cascades |
+| Reasons recorded | Only fixed codes, such as `quiet_hours`, `daily_cap`, `expired`, `type_off`, `account_restricted`, `push_gone`, `push_rejected`, `push_auth_rejected`, `push_too_large`, `push_host_not_allowed`, `no_device`, `no_email`, `mail_rejected`, `mail_auth_rejected`, `retries_exhausted`, `send_error`, `push_not_set_up`, `email_not_set_up`, `push_sent`, `push_first` |
+| Pause | `site_settings` key `notify_paused` (`{"paused": true}`), set from `/admin/notifications` and audited (`notify_pause_set`) in the same transaction |
+| Housekeeping | The sender route removes finished send rows older than 30 days |
+
+Routes (every file is walked by `routes.test.ts`): `/api/notify/state`, `inbox`, `prefs`, `settings`, `off`, `subscribe`, `unsubscribe` and `read` (signed in, the CSRF rule on writes, a limit for each session); `/api/notify/send` (the scheduler, `Authorization: Bearer <CRON_SECRET>`, a constant-time compare, 404 to anyone else); `/api/notify/u` (the email unsubscribe link: no sign-in, an encrypted expiring token); `/api/admin/notifications` (admin gate, audited).
+
+The unsubscribe token is AES-256-GCM with a key made from `NOTIFY_TOKEN_SECRET`. It reveals nothing, a change anywhere fails it, it expires after 60 days, and it can only turn off one type's email for one account. It changes the setting only if the player has not touched that setting since the email was made, so an old link can never undo a later choice. Opening the link (GET) changes nothing, because mail scanners open links. The button, or the one-click POST that mail providers send, does the change.
+
+Not proved by the tests, and owed against real services: Resend's own behaviour (delivery, DKIM, its limits), each real push service (Apple, Mozilla, Chrome and Edge) answering a real VAPID request, and a real phone showing the notification.

@@ -701,6 +701,13 @@ export const MATRIX: Record<string, TableSpec> = {
     },
     delete: { sql: `delete from public.push_subscriptions where user_id = '${ID.a}'`, pass: OWNER },
   },
+  notification_sends: serverOnly(
+    'notification_sends',
+    `reason = 'seed_reason'`,
+    `insert into public.notification_sends (notification_id, user_id, channel) select id, user_id, 'email' from public.notifications where user_id = '${ID.a}' limit 1`,
+    'attempts = 2',
+    `insert into public.notification_sends (notification_id, user_id, channel, reason) select id, user_id, 'push', 'seed_reason' from public.notifications where user_id = '${ID.a}' limit 1;`,
+  ),
   push_service_hosts: serverOnly(
     'push_service_hosts',
     `host = 'push.apple.com'`,
