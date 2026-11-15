@@ -1603,6 +1603,60 @@ Milestones 4.2 (profiles and following) and 4.3 (posts and the feed), built toge
 
 Calls: a like count counts every like, including one from someone the viewer has blocked (a count is not an identity). Tag characters are removed, so an emoji flag that uses them (Scotland, Wales) shows as a plain black flag. Comments a private-profile player writes on other people's posts still show (only their own posts are hidden).
 
+### 15 Nov 2026: m4 Stage 4 report
+
+Stage 4 (competition and community), milestones 4.1 to 4.5, finished on branch `m4.2-community` on top of the m4.2 work. Phase 1 fixed the security review of what m4.2 built (see "Fixes after the security review" in the m4.2 entry). Phase 2 built the rest. Every part sits behind its own switch (`leaderboards`, `community`, `groups`, `activity_ticker`, `farm_viewing`, `feed_posts`); with a switch off, or with no database keys, nothing of that part answers and the game is untouched. No community anywhere for an account under 16, both ways, from the database's own test (`app.member_raw`).
+
+**What was built**
+
+- **4.1 Scores and leaderboards.** A score provider (`server/boards/score.ts`) and a board writer (`server/boards/write.ts`) called by the game server after a year closes (`server/stage4/hooks.ts`: the end day and skip paths in `server/game/game.ts`). Boards: Score (the headline, a marked stand-in), profit per ha, weight gain per ha, ground cover, days survived, and a board for each real year that ranks on the change over that year. Filters: mode, district, farm size, start, enterprise, period (this week, month, season, all time), people I follow, a group, a challenge. The public page `/leaderboards` is drawn on the server for each request and sends no script (the filters are a plain form); your own row is pinned at the bottom. A pages-router page can not load the server's own modules, so its server side reads the board from `/api/leaderboards` at the site's configured address (`NEXT_PUBLIC_SITE_URL`, never the request's Host header), passing on the caller's cookie. Rows are written only by the server, after the action log check (PRD 14.5); read through `leaderboard_rows` as the viewer, so under-16 and private rows show the username and district only, banned or deleted accounts show as "Former player", and a block hides both ways.
+- **4.4 Groups and challenges.** `/community/groups` (your groups, public groups, join by code, start a group, the public challenges) and `/community/groups/<id>` (members, the group board, the group's challenges and their boards, the group feed with a composer, and for the owner the invite code, remove a member, hand over, change, delete, set a challenge). An ownerless group says so; its members still read and post; an admin gives it an owner on `/admin/challenges`. Challenges: a Fast Farm challenge (same farm and seed for everyone) or a Daily league, set by a group's owner or an admin; entering starts a farm on the challenge's settings and seed (the seed never leaves the server) and makes it the current farm. `/admin/challenges`: make, end, see entries and results, groups with no owner. All audited.
+- **4.5 The ticker.** Live activity lines on website pages only: the landing page (when the switch is on at build), `/leaderboards` and the community pages (from the live switches). Never on the farm screen. Facts only, written for players who switched ticker activity on (off by default), 16 or over, not private, not banned, at most 6 an hour each: "started a Fast Farm in Western Victoria", "reached Day 100 on their farm", "finished year 3 on their farm". With the switch off the public pages still send no script. With it on they send `/ticker.js` (1,345 bytes gzip, its own budget line, limit 2 KB) and it reads `/api/ticker` (at most 10 lines from the last 3 days).
+- **4.5 Look at someone's farm.** `/community/farm/<id>`: a read-only view built on the server from the owner's own farm snapshot, keeping only what PRD 9.5 lists (farm, district, day, date, season, head, average kg DM/ha, net worth, ground cover, each paddock with its label, area, pasture and mob, and the stand-in score). No buttons. Linked from profiles ("Their farm today") and day cards. Follows the farm-view setting (followers only by default), blocks and the under-16 rule.
+- **4.5 Moderation.** `/admin/moderation`: the open reports with the content, its context, how many reports the target has and the author's history; remove, keep, warn, suspend for N days, ban, each resolving every open report on that target, recorded in the moderation history, audited, and told to the author in plain words through their notifications. `/admin/words`: the word filter editor. Removed content shows as removed to its author and to nobody else. Reporting has its rate limit (5 a day for a new account, 20 for others, and the route's own per-minute limit).
+
+**How it was tested** (PGlite with the fake sign-in provider, fake Storage and image check)
+
+- `server/boards/boards.test.ts`: the score provider, period keys, the writer and its refusals (log gap, a step after the farm's day, rescued, unranked), players can not write rows or scores, a real skip writes the rows through the hook, filters, privacy and blocks, the friends filter (members only), the public page (no script, not found with the switch off or no keys). Named tests: "Your row pins at the bottom", "A real-year board ranks on the change over that year".
+- `server/community/groups.test.ts`: create, join by code, leave, owner tools, the ownerless group and the admin fix, challenges (owner only, entering on the fixed seed, one entry each, no seed in any answer, outsiders refused, its board), a Daily league refused, admin challenges audited, under 16, banned, signed out, switch off and no keys. Named test: "Two accounts in one group see the same board".
+- `server/community/farmview.test.ts` and `ticker.test.ts`: every viewer case (owner, follower, stranger with each setting, blocked both ways, under 16 both ways, banned, signed out, switch off, no keys), no engine words, form or button on the farm page, the ticker's opt-in, privacy, blocks, hide, the landing page with the switch off and on, no ticker in the game. Named test: "Two test accounts follow each other and see each other's day cards and farms".
+- `server/admin/moderation.test.ts`: every action, audit rollback, notifications, the gate for every kind of caller, CSRF, the word filter editor, the report rate limit.
+- The walked-route tests now include `group` and `challenge` (community) and `words` and `challenges` (admin: gate, CSRF, rollback on a failed audit write, noindex); the read-only preview and the moderation route have their own. Page lists in `pages.test.ts` (community and admin) and the JS budget lines include every new page.
+- `packages/db/src/stage4.test.ts`: the review migration and the word filter change at the database.
+
+**Results.** Full `pnpm test`: 164 files, 3,368 tests, all passing. `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm check:browser-bundle` and `pnpm check:js-budget` pass. JS (gzip): `/` 0.0 KB (limit 1), `/leaderboards` 0 scripts (runtime off), `/ticker.js` 1,345 bytes when the ticker is on (limit 2 KB), `/play` 198.7 KB, `/admin` 149.0 KB (heaviest `/admin/challenges`, limit 150 unchanged), community pages 144.3 to 147.1 KB (`/community/groups` 145.8, `/community/groups/[id]` 146.8, `/community/farm/[id]` 144.3; limit 150 each, never raised). Production build with no keys on port 3301: every new page and route answers 404 (the admin pages show the "needs accounts" notice), `/api/ticker` answers an empty list, no 5xx, `/` and `/play` 200, and a guest can start a farm and end a day.
+
+**Calls for Claudia**
+
+1. **The headline Score is a stand-in.** PRD 5.8's Grazier Score has no agreed weights. The headline board ranks on the game's own year score averaged over a farm's finished years, and the page says so. Swapping it is one function (`headline` in `server/boards/score.ts`) once calibration farms are run and you rule on the weights.
+2. **The other boards** use what the year view already holds: profit per ha is the average yearly change in net worth per ha; "beef per ha" is the average yearly live-weight gain per ha (kg/ha); ground cover is the average of the yearly averages; days survived is the farm's day.
+3. **A real-year board ranks on the change in net worth over that game year, per ha**, so a farm that started small and grew a lot beats one that started big and grew a little (your words in REQUIREMENTS).
+4. **A period board** (week, month, season) lists the farms that closed a year in that period, each with its figure over all its finished years. Periods are by Sydney time.
+5. **The action log check** is what the tables allow: at least one day or skip run by the server, no step after the farm's day, no gap in the numbering. No replay (PRD v1.1: every farm runs on the server).
+6. **Private profiles and under-16s on group boards:** their rows show on the main boards (username and district) but not on a group or friends board, because those filters match by account and the board does not show those accounts.
+7. **Moderators can not open `/admin`** (it is admins only). The moderator role still reads reports and the history through the database.
+8. **A like count counts every like**, including one from someone the viewer blocked.
+9. **Daily leagues can be set but not entered** until Daily Farms exist.
+10. **Visitors see the ticker on the landing page** (PRD 9.4 says Landing). Signed-in under-16s, banned players and anyone who hid the ticker see nothing.
+11. **The ticker lines** are: started a farm, reached Day 100, 365, 500, 1,000 or 2,000, finished a year. No farm names (free text). Rate 6 an hour each.
+12. **Stand-in limits:** photos 24 an hour and 80 a day (8 and 20 for a new account); `/api/ticker` 30 calls a minute per address; group and challenge routes 30 and 6 a minute per member.
+13. **Group challenges** start when set and end on the date given (or never).
+14. **The farm view** shows a farm as a list of paddocks (no map drawing), and a farm name the word filter refuses shows as "A farm".
+15. **Leaderboards are not in the header or sitemap** yet (the community pages link to it). Add when you switch it on.
+16. **Moderation "remove" on a profile** clears its bio and display name; a group can not be removed, only kept or warned.
+17. **Tag characters are stripped** from text, so flag emoji that use them (Scotland, Wales) show as a black flag.
+
+**Keys Claudia must set up:** none new. `NEXT_PUBLIC_SITE_URL` (already listed) must be the live address, because the leaderboard page reads its board from the site's own `/api/leaderboards`. The Supabase keys, pooler URL, ban pepper and site address from earlier stages are all that Stage 4 needs. The image-check service is still to be chosen (`IMAGE_CHECK_API_KEY`). To show the ticker on the landing page, add `activity_ticker` to `SITE_SWITCHES_ON` at build.
+
+**Not done**
+
+- The Grazier Score formula (needs calibration farms in the engine and your ruling). Weaning %, condition and the "above 1,500 kg DM/ha" share are not in any board.
+- Daily leagues can not be entered, and day cards are not made automatically (both wait for the Daily Farm rollover). The farm view works for Daily Farms only, so today it is reachable only for a farm marked daily.
+- A leaderboard tab inside the game, a farm's summary from a board row, badges and best ranks on profiles.
+- The Groups tab in the leaderboard page shows your groups as a filter, not as a list of every group's board.
+- Popular ordering in Everyone; reports of groups from a group page.
+- Checks against a real Supabase project, and the pages by eye on a phone and a PC in both themes.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

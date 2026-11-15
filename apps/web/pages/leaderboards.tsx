@@ -7,7 +7,8 @@ import { PublicHeader } from '@/components/site/PublicHeader';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { Ticker } from '@/components/site/Ticker';
 import siteStyles from '@/components/site/site.module.css';
-import type { BoardPageProps } from '@/server/boards/page';
+import { SITE_URL } from '@/lib/site';
+import type { BoardPageProps } from '@/lib/boards/types';
 
 // No JavaScript is sent to the browser for this page: the filters are a plain form.
 export const config: PageConfig = { unstable_runtimeJS: false };
@@ -27,17 +28,32 @@ const PERIODS: [string, string][] = [
   ['all', 'All time'],
 ];
 
-/** Server side only: reads the board for this request (the database's rules decide every row). */
+/**
+ * Server side only. A pages-router page can not load the server's own modules, so it asks the
+ * site's own board route (`/api/leaderboards`) at the site's configured address (never the
+ * request's Host header), passing on the caller's cookie so their own row is pinned.
+ */
 export const getServerSideProps: GetServerSideProps<BoardPageProps> = async ({
   req,
   res,
   query,
 }) => {
-  const { boardPage } = await import('@/server/boards/page');
-  const props = await boardPage(req.cookies, query);
-  if (!props) return { notFound: true };
-  res.setHeader('Cache-Control', 'private, no-store');
-  return { props };
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    const one = Array.isArray(v) ? v[0] : v;
+    if (typeof one === 'string') qs.set(k, one.slice(0, 64));
+  }
+  try {
+    const r = await fetch(`${SITE_URL}/api/leaderboards?${qs.toString()}`, {
+      headers: { cookie: req.headers.cookie ?? '' },
+      cache: 'no-store',
+    });
+    if (!r.ok) return { notFound: true };
+    res.setHeader('Cache-Control', 'private, no-store');
+    return { props: (await r.json()) as BoardPageProps };
+  } catch {
+    return { notFound: true };
+  }
 };
 
 function Select({

@@ -1,10 +1,10 @@
 import 'server-only';
 import { DISTRICT_IDS } from '@gg/shared';
 import type { SqlClient, SqlRunner } from '../db/sql';
-import { BOARDS, type AnyBoard } from './score';
-import { PERIODS, periodKey, type Period } from './write';
-import type { BoardRow, BoardView } from '@/lib/boards/types';
-export type { BoardRow, BoardView } from '@/lib/boards/types';
+import { BOARDS } from './score';
+import { PERIODS, periodKey } from './write';
+import type { BoardQuery, BoardRow, BoardView } from '@/lib/boards/types';
+export type { BoardQuery, BoardRow, BoardView } from '@/lib/boards/types';
 
 /**
  * Reading the boards (Stage 4, milestone 4.1; PRD 9.8). Every read goes through the
@@ -20,23 +20,6 @@ export const STARTS = ['running', 'scratch'] as const;
 export const ENTERPRISES = ['grazing', 'mixed'] as const;
 export const MODES_LIST = ['daily', 'fast'] as const;
 export const ROWS_SHOWN = 50;
-
-export interface BoardQuery {
-  board: AnyBoard;
-  period: Period;
-  mode: (typeof MODES_LIST)[number] | null;
-  district: string | null;
-  size: (typeof SIZES)[number] | null;
-  start: (typeof STARTS)[number] | null;
-  enterprise: (typeof ENTERPRISES)[number] | null;
-  realYear: number | null;
-  /** Only farms of people the viewer follows. */
-  friends: boolean;
-  /** Only farms of this group's members. */
-  group: string | null;
-  /** Only this challenge's farms. */
-  challenge: string | null;
-}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const pick = <T extends string>(v: unknown, list: readonly T[]): T | null =>

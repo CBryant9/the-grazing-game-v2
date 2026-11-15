@@ -5,7 +5,9 @@ import { readOnlyJar } from '../admin/gate';
 import { logFailure } from '../logging';
 import type { SqlRunner } from '../db/sql';
 import { BOARD_LABELS, HEADLINE_IS_STAND_IN, type AnyBoard } from './score';
-import { asVisitor, parseBoardQuery, readBoard, type BoardQuery, type BoardView } from './read';
+import { asVisitor, parseBoardQuery, readBoard } from './read';
+import type { BoardPageProps } from '@/lib/boards/types';
+export type { BoardPageProps } from '@/lib/boards/types';
 
 /**
  * The public leaderboard page's data (PRD 9.8), worked out on the server for each request. With no
@@ -13,17 +15,6 @@ import { asVisitor, parseBoardQuery, readBoard, type BoardQuery, type BoardView 
  * a visitor; a signed-in player reads as themselves (their own row is pinned; a community member
  * may also narrow to friends or one of their groups). Nothing here is sent as script.
  */
-export interface BoardPageProps {
-  query: BoardQuery;
-  view: BoardView;
-  label: { name: string; unit: string };
-  standIn: boolean;
-  signedIn: boolean;
-  /** May use the friends and group filters (a community member with the switch on). */
-  member: boolean;
-  groups: { id: string; name: string }[];
-  ticker: boolean;
-}
 
 export async function boardPage(
   cookies: Record<string, string | undefined>,

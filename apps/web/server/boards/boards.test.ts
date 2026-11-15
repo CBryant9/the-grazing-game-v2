@@ -303,14 +303,32 @@ describe('the public leaderboard page', () => {
     expect(await boardPage({}, {}, NOW)).toBeNull();
   });
 
-  it('getServerSideProps answers not found with the switch off', async () => {
-    await kit.setSwitch('leaderboards', false);
-    const { getServerSideProps } = await import('@/pages/leaderboards');
-    const out = await getServerSideProps({
-      req: { cookies: {} },
-      res: { setHeader: () => undefined },
-      query: {},
-    } as never);
-    expect(out).toEqual({ notFound: true });
+  it('getServerSideProps reads the board route at the site address, passing the cookie, and is not found with the switch off', async () => {
+    const ann = await kit.person('annie');
+    await scored(ann, 50);
+    const route = await import('@/app/api/leaderboards/route');
+    const seen: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (input: string, init?: RequestInit) => {
+      seen.push(String(input));
+      return route.GET(new Request(String(input), { headers: init?.headers as HeadersInit }));
+    }) as typeof fetch;
+    try {
+      const { getServerSideProps } = await import('@/pages/leaderboards');
+      const ctx = (cookie: string) =>
+        ({
+          req: { headers: { cookie, host: 'evil.example' } },
+          res: { setHeader: () => undefined },
+          query: { board: 'grazier' },
+        }) as never;
+      const out = (await getServerSideProps(ctx(ann.cookie))) as { props: { signedIn: boolean } };
+      expect(out.props.signedIn).toBe(true);
+      // The site's configured address, never the request's Host header.
+      expect(seen[0]).toBe('http://localhost:3000/api/leaderboards?board=grazier');
+      await kit.setSwitch('leaderboards', false);
+      expect(await getServerSideProps(ctx(''))).toEqual({ notFound: true });
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });

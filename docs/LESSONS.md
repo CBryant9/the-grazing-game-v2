@@ -248,3 +248,14 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | C5 | A day card test could not insert a Daily Farm | A Daily Farm row must carry a time zone and the last day simulated | The fixture sets both. |
 | C6 | A test expected a blocked person to be missing from a stranger's search | The person who blocked is visible to everyone but the blocked one | The test now says which of the three people sees whom. |
 | C7 | Rendering a post card in a test failed with "expected app router to be mounted" | The card holds buttons that use the router | The test mocks the router, as the page tests do. |
+
+### m4 Stage 4
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| S1 | Moderators and admins saw under-16 profiles, private details and followers-only posts on the community pages | The community's helpers let staff through, and the community pages run as the signed-in player, so a staff member's own token carried the staff view onto member pages | Staff powers live in the admin tools, which use the server's connection; the community helpers treat staff as members. **Rule: a role's powers belong to the screens built for that role, not to every screen its token reaches.** |
+| S2 | A private profile's public posts reached strangers | The post rule looked only at the post's own setting | The rule checks the author's profile too. **Rule: when a setting on a person and a setting on their content disagree, the stricter one wins, in the database.** |
+| S3 | A JPEG with two frame headers passed the size check | The parser kept the last frame header, decoders use the first | Refuse a second one. **Rule: when a format allows a repeat, refuse it unless the picture needs it, so the check and the decoder can not read different things.** |
+| S4 | A moderator could not remove an old post once its word was blocked | The word filter ran on every update, not only when the text changed | Check the text only when it changes. **Rule: a guard on content checks the columns it guards, not the whole row.** |
+| S5 | Setting a group challenge hung the tests | The server's own connection ran inside the player's transaction (one PGlite connection: each waited for the other), the same as C1 | The owner check runs as the player first, then the server writes on its own. **Rule (C1 again): never a second connection inside a transaction.** |
+
