@@ -38,7 +38,10 @@ import { placeFor, startOfDay } from './tick';
 
 /** Days the forecast runs ahead. */
 export const FORECAST_DAYS = 365;
-/** Points on the chart: today, then one about every month. */
+/**
+ * Points on the chart: today, then the first of each calendar month after it (real month
+ * lengths), so the 12 points are 12 different months in order (engine 0.22.0).
+ */
 export const FORECAST_POINTS = 12;
 
 export interface FeedForecastPoint {
@@ -58,7 +61,7 @@ export interface FeedForecast {
   pastureHa: number;
   /** Crop hectares today. */
   cropHa: number;
-  /** The ground cover floor, kg DM/ha (`FEED_FLOOR_KG_HA`). */
+  /** The grazing floor, kg DM/ha (`FEED_FLOOR_KG_HA`). */
   floorKgHa: number;
   /** What the stock on hand eat from pasture, kg DM a day. Cattle in the feedlot are left out. */
   eatKgDay: number;
@@ -143,10 +146,6 @@ export function feedForecast(farm: FarmState, env: SourceEnv = {}): FeedForecast
     return t * haSq;
   };
 
-  const step = FORECAST_DAYS / FORECAST_POINTS;
-  const at = new Set<number>();
-  for (let k = 1; k < FORECAST_POINTS; k++) at.add(Math.round(k * step));
-
   const start = farm.day;
   const dateOf = (day: number): CalendarDate => dateAt(farm.start, day);
   const points: FeedForecastPoint[] = [];
@@ -174,8 +173,10 @@ export function feedForecast(farm: FarmState, env: SourceEnv = {}): FeedForecast
     if (underFloor === null && pastureHa > 0 && left < floorKg) {
       underFloor = { day, date: dateOf(day) };
     }
-    if (at.has(k + 1)) {
-      points.push({ day, date: dateOf(day), pastureKg: kgOn(pasture), cropKg: kgOn(crop) });
+    // The first of each month after today, on the farm's own calendar.
+    if (points.length < FORECAST_POINTS) {
+      const date = dateOf(day);
+      if (date.date === 1) points.push({ day, date, pastureKg: kgOn(pasture), cropKg: kgOn(crop) });
     }
   }
 

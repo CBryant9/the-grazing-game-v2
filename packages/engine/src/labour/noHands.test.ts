@@ -5,10 +5,11 @@
  * The digests below were taken on engine 0.12.1 (save format 8, commit
  * 34fecf2), before any labour code existed. The farm is hashed with the
  * fields that only say which engine and format ran it left out, and with
- * the labour state left out (a farm with no hands has none). The two records
+ * the labour state left out (a farm with no hands has none). The records
  * no rule reads (engine 0.21.0: `startTags`, the first tag after setup, and
  * `stockedOn`, the days stock were on each square, for the stock book and
- * rest days) are left out too. Every other figure, the inbox and the action
+ * rest days; engine 0.22.0: `startNet`, the stock book's cost in for a head
+ * taken over) are left out too. Every other figure, the inbox and the action
  * log must be what they were.
  */
 
@@ -28,6 +29,7 @@ function digest(farm: FarmState): string {
   delete saved.saveFormat;
   delete saved.labour;
   delete saved.startTags;
+  delete saved.startNet;
   delete saved.stockedOn;
   const canonical = (v: unknown): string => {
     if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
@@ -113,5 +115,13 @@ describe('a farm with no hands and no contractors is unchanged', () => {
 // (docs/CALIBRATION.md, the m2.5 calf growth entry). Labour did not
 // change. The farms are the same; only the cattle figures moved. The real
 // years digest did not move with the last of these.
-const NO_HANDS_RANDOM = '154b92c7a442c890';
-const NO_HANDS_REAL = 'a9d5034a80529087';
+//
+// Taken again on engine 0.22.0 (m8 realism 2), because the inbox changed on purpose: a day's
+// births are no longer an inbox line, the weekly calving lines and "calving has finished" are,
+// and the bank fact counts the head on the farm. Each mob that has calved keeps its count
+// (`FarmMob.calving`). Nothing else moved: hashed with the inbox, `inboxSeq` and the calving
+// count left out, both farms give the same digest on 0.21.0 (m7-final) and on 0.22.0
+// ('e6c82c766149285f' random, '3cef38dcebdd3891' real; docs/CALIBRATION.md, the m8 realism 2
+// entry). Before: '154b92c7a442c890' and 'a9d5034a80529087'.
+const NO_HANDS_RANDOM = '8add17c3f8661742';
+const NO_HANDS_REAL = '849512f4fe7357eb';

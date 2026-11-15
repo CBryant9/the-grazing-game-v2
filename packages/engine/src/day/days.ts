@@ -128,7 +128,7 @@ export type SkipStop =
   /**
    * Cash went below zero (`level` 1) or past three quarters of the way to the
    * bank's limit (`level` 2). `limit` is where the bank takes the farm; `head`
-   * is the head on hand that could be sold (engine 0.20.0).
+   * is the head on the farm (`headOnFarm`, engine 0.22.0).
    */
   | { type: 'bank'; level: 1 | 2; cash: number; limit: number; head: number }
   /** The whole farm is eaten out with stock on it: the first day of the countdown to game over. */

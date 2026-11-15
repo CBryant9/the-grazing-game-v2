@@ -56,6 +56,31 @@ export const WEAN_TRIGGER_AGE = 280;
 export const JOINING_DAYS = 63;
 /** A joining report comes every this many days (3 weeks) through a joining, before the preg test. */
 export const JOINING_REPORT_DAYS = 21;
+/**
+ * A calf born more than this many days after the mob's last "calving has
+ * started" day starts a new drop (the MVP's figure, named here so Things to
+ * do and the calving lines read the same drop the note does).
+ */
+export const DROP_DAYS = 150;
+
+/**
+ * True when calving in the mob's drop has finished: no cow or heifer in the
+ * mob is due to calve before the drop's `DROP_DAYS` are up. A mob with no
+ * drop on record has nothing calving. Reading it changes nothing; it is for
+ * the words, and no rule reads it.
+ */
+export function calvingFinished(m: Pick<CattleMob, 'animals' | 'calvNote'>, day: number): boolean {
+  if (m.calvNote === null || m.calvNote === undefined) return true;
+  const left = DROP_DAYS - (day - m.calvNote);
+  if (left <= 0) return true;
+  return !m.animals.some(
+    (a) =>
+      !a.dead &&
+      (a.kind === 'cow' || a.kind === 'heifer') &&
+      a.preg >= 0 &&
+      GESTATION_DAYS - a.preg <= left,
+  );
+}
 
 /** Chance of conceiving in one cycle, by condition score. */
 export function condConc(c: number): number {
@@ -137,7 +162,7 @@ export function calve(a: Animal, m: CattleMob, inp: CalveInputs): void {
   inp.births.push(c);
   inp.totals.births++;
   inp.totals.gain += c.wt;
-  if ((m.calvNote ?? -999) < inp.day - 150) {
+  if ((m.calvNote ?? -999) < inp.day - DROP_DAYS) {
     m.calvNote = inp.day;
     inp.notes.push({ type: 'calvingStarted' });
   }

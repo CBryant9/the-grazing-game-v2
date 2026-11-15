@@ -68,7 +68,6 @@ export {
   CALVING_SHOWN_DAYS,
   LOW_CS,
   MARK_AFTER_CALVING_DAYS,
-  SALE_SOON_DAYS,
   allThingsToDo,
   pruneTodoOff,
   thingsToDo,

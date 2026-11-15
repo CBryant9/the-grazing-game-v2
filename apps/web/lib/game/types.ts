@@ -696,12 +696,19 @@ export interface StockBookWire {
   rows: StockRowWire[];
   /** The class names, by id. */
   classes: { id: string; label: string }[];
-  /** The mobs the rows are in, for the filter chips. */
-  mobs: { id: number; name: string; head: number }[];
+  /** The mobs the rows are in, for the filter chips. `head` counts calves at foot; `calves` says how many. */
+  mobs: { id: number; name: string; head: number; calves: number }[];
   /** The words for each origin: "Bought", "Taken over", "Bred here", "Bought or taken over". */
   originText: Record<StockOriginId, string>;
-  /** Sums over every row, whole dollars. */
-  totals: { head: number; paid: number; spent: number; value: number; profit: number };
+  /** Sums over every row, whole dollars. `head` counts calves at foot; `calves` says how many. */
+  totals: {
+    head: number;
+    calves: number;
+    paid: number;
+    spent: number;
+    value: number;
+    profit: number;
+  };
   /** Plain facts: what each column is and how profit is worked out. */
   notes: string[];
 }
@@ -748,7 +755,7 @@ export interface FeedMobWire {
 /** The Feed panel: the average-season forecast and the supplements, as numbers and words. */
 export interface FeedWire {
   points: FeedPointWire[];
-  /** The ground cover floor over the pasture, t DM. */
+  /** The grazing floor over the pasture, t DM. */
   floorT: number;
   floorKgHa: number;
   pastureHa: number;
@@ -759,6 +766,8 @@ export interface FeedWire {
   lines: string[];
   /** Says it is an average-season forecast, not this year's weather. */
   note: string;
+  /** How the forecast is worked out, as short lines for a disclosure under the chart. */
+  assumptions: string[];
   /** The chart in one sentence, for a screen reader. */
   summary: string;
   supplements: FeedMobWire[];

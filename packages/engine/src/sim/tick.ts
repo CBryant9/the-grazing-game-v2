@@ -26,7 +26,7 @@
  */
 
 import { dateAt, type CalendarDate } from '../calendar';
-import { weanMob, weaningDue } from '../cattle/breeding';
+import { calvingFinished, weanMob, weaningDue } from '../cattle/breeding';
 import { settleDeaths, simMob, type Death, type DeathCause, type MobPlace } from '../cattle/simMob';
 import { animalLookup, type AnimalKind } from '../cattle/types';
 import { plantingsOn, squareGrazed } from '../crops/fields';
@@ -37,7 +37,7 @@ import { knockDownTape, type Survey } from '../farm/layout';
 import { EDGE, areaAcross, areaEdges } from '../farm/topology';
 import { drainPortables, waterNeedPerHead } from '../farm/water';
 import { GRID_N } from '../grid';
-import { bankLevel, headToSell } from '../money/bank';
+import { bankLevel, headOnFarm } from '../money/bank';
 import { INTEREST, overheadsPerYear } from '../money/costs';
 import { closeYear, netWorth } from '../money/worth';
 import { growGrass } from '../pasture/grow';
@@ -93,8 +93,8 @@ export const BREAKOUT_SIZE = { headDivisor: 20, base: 0.3, max: 1.5 } as const;
 
 /** The farm counts as eaten out when the feed cattle can reach averages under this, kg DM/ha. */
 export const EATEN_OUT_KG = 40;
-/** Feed under this on a square, kg DM/ha, can't be grazed. */
-const UNGRAZEABLE_KG = 250;
+/** Feed under this on a square, kg DM/ha, can't be grazed. Exported for the words (engine 0.22.0). */
+export const UNGRAZEABLE_KG = 250;
 /** The game ends after this many days in a row eaten out with cattle on the farm. */
 export const EATEN_OUT_DAYS = 10;
 
@@ -411,6 +411,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       events.push({ type: 'births', mob: m.id, mobName: m.name, count: res.births.length });
       for (const c of res.births) result.births.push({ id: c.id, mob: m.id });
     }
+    countCalving(m, day, res.births.length, events);
     if (res.deaths.length) {
       const by = new Map<DeathCause, number>();
       for (const d of res.deaths) {
@@ -611,7 +612,13 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       farm.rng[name] = rng[name as keyof typeof rng].state();
     }
   }
-  toInbox(farm, day, events);
+  // A day's births are told in the day's own summary and day card; the inbox has the weekly
+  // calving lines instead (engine 0.22.0), so a calving does not fill it one calf at a time.
+  toInbox(
+    farm,
+    day,
+    events.filter((e) => e.type !== 'births'),
+  );
   // The new day starts at first light, with all of the day's light left.
   startDay(farm);
   return result;
@@ -632,11 +639,51 @@ function noteBank(farm: FarmState, events: TickEvent[]): void {
       level: level as 1 | 2,
       cash: farm.cash,
       limit: farm.broke,
-      head: headToSell(farm),
+      head: headOnFarm(farm),
     });
   }
   if (level !== told) {
     if (level === 0) delete farm.bankWarned;
     else farm.bankWarned = level;
+  }
+}
+
+/** A week of calving, for the weekly line: days 0 to 6 of the drop, then 7 to 13, and so on. */
+export const CALVING_WEEK_DAYS = 7;
+
+/**
+ * Keep the count for the weekly calving lines and tell them (engine 0.22.0): once a week through
+ * a drop, the calves born in the week and so far, and once when calving has finished
+ * (`calvingFinished`). Calving starting is the mob's own `calvingStarted` note. A record for the
+ * words only: no rule reads it.
+ */
+function countCalving(m: FarmMob, day: number, born: number, events: TickEvent[]): void {
+  if (m.calvNote === null || m.calvNote === undefined) return;
+  let c = m.calving;
+  if (!c || c.start !== m.calvNote) {
+    // A new drop. On a farm saved mid-drop before this was kept, the drop's calves at foot so far.
+    const since = day - m.calvNote;
+    let atFoot = 0;
+    for (const a of m.animals) if (a.kind === 'calf' && !a.dead && a.age <= since) atFoot++;
+    const before = Math.max(0, atFoot - born);
+    c = m.calving = { start: m.calvNote, born: before, week: before };
+    // A drop that had already finished before the count was kept is not told again.
+    if (since > 0 && born === 0 && calvingFinished(m, day)) {
+      c.done = true;
+      c.week = 0;
+    }
+  }
+  c.born += born;
+  c.week += born;
+  if (c.done) return;
+  if (calvingFinished(m, day)) {
+    events.push({ type: 'calving-finished', mob: m.id, mobName: m.name, total: c.born });
+    c.done = true;
+    c.week = 0;
+    return;
+  }
+  if ((day - c.start + 1) % CALVING_WEEK_DAYS === 0 && c.week > 0) {
+    events.push({ type: 'calving-week', mob: m.id, mobName: m.name, born: c.week, total: c.born });
+    c.week = 0;
   }
 }

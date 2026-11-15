@@ -53,6 +53,16 @@ export function partOfMonth(d: { month: number; date: number }): string {
 export const FORECAST_NOTE =
   'Average-season forecast: grass grows at the district’s long-term average from today. It is not a forecast of this year’s rain. The stock are the stock on hand, with nothing bought, sold, born or moved.';
 
+/** How the forecast is worked out, as short lines for the panel's "How this is worked out". */
+export const FORECAST_ASSUMPTIONS = [
+  'An average season from today, at the district’s long-term growth.',
+  'The stock on hand eat what they ate today, every day for the year.',
+  'Feed is taken across the whole farm’s pasture, not paddock by paddock.',
+  'Crops are shown apart and are not grazed.',
+  'Cattle in the feedlot are left out.',
+  'Each point is the first of a month. The first point is today.',
+];
+
 /** The forecast's facts, for the card under the chart. */
 export function forecastLines(f: FeedForecast): string[] {
   const lines: string[] = [];
@@ -66,14 +76,14 @@ export function forecastLines(f: FeedForecast): string[] {
   }
   if (f.pastureHa > 0) {
     if (f.underFloor && f.underFloor.day === f.points[0]!.day) {
-      lines.push('Feed on offer is under the ground cover floor now.');
+      lines.push('Feed on offer is under the grazing floor now.');
     } else if (f.underFloor) {
       lines.push(
-        `In an average season, feed on offer falls under the ground cover floor in ${partOfMonth(f.underFloor.date)}.`,
+        `In an average season, feed on offer falls under the grazing floor in ${partOfMonth(f.underFloor.date)}.`,
       );
     } else {
       lines.push(
-        'In an average season, feed on offer stays above the ground cover floor for the next 12 months.',
+        'In an average season, feed on offer stays above the grazing floor for the next 12 months.',
       );
     }
   }
@@ -92,7 +102,7 @@ export function forecastSummary(points: readonly FeedPointWire[], floorT: number
   if (!points.length) return 'No forecast.';
   const low = points.reduce((a, b) => (b.pastureT < a.pastureT ? b : a));
   const high = points.reduce((a, b) => (b.pastureT > a.pastureT ? b : a));
-  return `Feed on offer, tonnes of dry matter by month from ${points[0]!.label}: lowest ${tText(low.pastureT)} t in ${low.label}, highest ${tText(high.pastureT)} t in ${high.label}. The ground cover floor is ${tText(floorT)} t.`;
+  return `Feed on offer, tonnes of dry matter by month from ${points[0]!.label}: lowest ${tText(low.pastureT)} t in ${low.label}, highest ${tText(high.pastureT)} t in ${high.label}. The grazing floor is ${tText(floorT)} t.`;
 }
 
 /** What a supplement adds, as a fact. Empty for none. */
@@ -205,6 +215,7 @@ export function feedWire(farm: FarmState, env: SourceEnv, mobs: readonly MobWire
     head: f.head,
     lines: forecastLines(f),
     note: FORECAST_NOTE,
+    assumptions: FORECAST_ASSUMPTIONS,
     summary: forecastSummary(points, floorT),
     supplements,
     suppNotes: SUPP_NOTES,

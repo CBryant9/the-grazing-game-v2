@@ -111,6 +111,11 @@ export function StockBook({ book, mob = null }: { book: StockBookWire; mob?: num
     </th>
   );
   const sum = rows.reduce((t, r) => t + r.profit, 0);
+  // The head here counts calves at foot (the herd's own head total leaves them out), so say how many.
+  const calves =
+    filter === null ? book.totals.calves : (book.mobs.find((m) => m.id === filter)?.calves ?? 0);
+  const calfText =
+    calves > 0 ? `, including ${num(calves)} ${calves === 1 ? 'calf' : 'calves'} at foot` : '';
 
   return (
     <div className={styles.book}>
@@ -165,7 +170,7 @@ export function StockBook({ book, mob = null }: { book: StockBookWire; mob?: num
         </label>
       </div>
       <p className={styles.total}>
-        {num(rows.length)} head. Profit if sold today:{' '}
+        {num(rows.length)} head{calfText}. Profit if sold today:{' '}
         <b className={tone(sum)}>{profitText(sum)}</b>
       </p>
       <div className={styles.scroll}>

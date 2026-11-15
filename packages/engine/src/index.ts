@@ -148,7 +148,7 @@ export {
   stockOn,
   waterNeed,
 } from './cattle/animal';
-export { LOT_DIET, RESIDUAL, dietOf, grazeAlloc, intakeOf } from './cattle/graze';
+export { LOT_DIET, RESIDUAL, dietOf, feedAvailShare, grazeAlloc, intakeOf } from './cattle/graze';
 export type { Diet, DietResult, GrazeInputs, Intake, PlantingGraze } from './cattle/graze';
 export {
   CYCLE_DAYS,
@@ -569,7 +569,7 @@ export { PTIC_DAYS, onRecordPtic, recordClassOf, recordGroupOf } from './sim/tol
 export { portableRefund, supplementCosts } from './sim/reads';
 export type { SupplementAdds, SupplementCost } from './sim/reads';
 // The stock book, the feed forecast and small facts for the screens (m8, engine 0.21.0).
-export { originOf, stockBook } from './sim/stockbook';
+export { costIn, originOf, stockBook } from './sim/stockbook';
 export type { StockBookRow, StockOrigin } from './sim/stockbook';
 export { FORECAST_DAYS, FORECAST_POINTS, feedForecast } from './sim/forecast';
 export type { FeedForecast, FeedForecastPoint } from './sim/forecast';
@@ -596,6 +596,7 @@ export {
   BREAKOUT_SIZE,
   EATEN_OUT_DAYS,
   EATEN_OUT_KG,
+  UNGRAZEABLE_KG,
   stepDay,
 } from './sim/tick';
 export type { DayResult, TickEnv } from './sim/tick';
@@ -670,12 +671,11 @@ export {
   CALVING_SHOWN_DAYS,
   LOW_CS,
   MARK_AFTER_CALVING_DAYS,
-  SALE_SOON_DAYS,
   allThingsToDo,
   thingsToDo,
   todoKey,
 } from './day/todo';
-export { BANK_NEAR_SHARE, bankLevel, headToSell } from './money/bank';
+export { BANK_NEAR_SHARE, bankLevel, headOnFarm } from './money/bank';
 export type { BankLevel } from './money/bank';
 export type {
   BookedView,

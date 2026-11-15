@@ -27,6 +27,14 @@ import type { Animal, CattleTotals, GrazingArea, GrazingLand } from './types';
  */
 export const AVAIL_KG_HA = 650;
 
+/**
+ * The share of what they could eat that cattle can get with this much feed in front of them,
+ * 0 to 1: the diet's own `avail` (1 - e^(-mass / AVAIL_KG_HA)). For the words, so a screen says
+ * the model's own figure (engine 0.22.0).
+ */
+export const feedAvailShare = (massKgHa: number): number =>
+  1 - Math.exp(-Math.max(0, massKgHa) / AVAIL_KG_HA);
+
 export interface Diet {
   /** Digestibility of the diet (DMD), 0 to 1. */
   dmd: number;
@@ -98,7 +106,7 @@ export function dietOf(land: GrazingLand, area: GrazingArea): DietResult {
       dmd: sd / sw,
       cp: sc / sw,
       mass,
-      avail: 1 - Math.exp(-mass / AVAIL_KG_HA),
+      avail: feedAvailShare(mass),
       dist: (sdist / sw) * sideM,
     },
     weights: w,

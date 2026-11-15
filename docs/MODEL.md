@@ -824,10 +824,10 @@ The two checks before the first day can be passed with `anyway: true`, as the MV
 |---|---|---|---|
 | `no-water` | A mob on ground with no water, its head and its days dry so far | The mob's grazing area has no water point | `moveMob` (the player picks the paddock) |
 | `trough-low`, `trough-empty` | A portable trough under a quarter full, or empty, and the litres left | The trough's own low-water mark (1,500 L) | `refillPortable` |
-| `calves-to-mark` | The mob's bull calves to mark (all of them, as marking marks them all) and its young bulls, once most of the mob's calves are 60 days or older or 30 days after its calving started (`MARK_AFTER_CALVING_DAYS`, stand-in). One item for the drop | The age at which the model notes calves for marking, and the day calving started (`calvNote`) | `markCalves` |
-| `bank` | Cash below zero (level 1), or past three quarters of the way to the bank's limit (level 2, `BANK_NEAR_SHARE`, stand-in), with the limit and the head on hand that could be sold | `farm.cash`, `farm.broke` | none |
-| `sale-soon` | A cattle sale within 7 days (`SALE_SOON_DAYS`, stand-in), and the head not booked in the market classes past weaner weight (yearling and heavy steers, heifers), by class | The sale calendar and the market's own class weights (`MARKET_WEIGHTS`) | none |
-| `low-condition` | A mob whose average condition score is under 2.5 (`LOW_CS`, stand-in), with the figure | The mob's last day (`st.cs`), or its animals before its first day | none |
+| `calves-to-mark` | The mob's bull calves to mark (all of them, as marking marks them all) and its young bulls. Only this drop's calves decide when (calves born since calving started, `age <= day - calvNote`; all calves when the farm has no calving day for them). Before any marking in the drop: listed once most of the drop's bull calves are 60 days or older, or 30 days after its calving started (`MARK_AFTER_CALVING_DAYS`, stand-in). Once the player has marked in the drop (a steer calf of the drop): not again until calving in the mob has finished (`calvingFinished`), then once more if unmarked calves of the drop remain. At most two a drop (engine 0.22.0) | The age at which the model notes calves for marking, the day calving started (`calvNote`), and the cows still due before the drop's 150 days are up (`DROP_DAYS`, the gap that starts a new drop in `calve`) | `markCalves` |
+| `bank` | Cash below zero (level 1), or past three quarters of the way to the bank's limit (level 2, `BANK_NEAR_SHARE`, stand-in), with the limit and the head on the farm (`headOnFarm`: cattle not calves at foot, booked or not, and sheep; the same count as the head total) | `farm.cash`, `farm.broke` | none |
+| `sale-weight` | Head of one market class past weaner weight (yearling steers, heavy steers, heifers) on the farm and not booked, with the next cattle sale's date (null on a real-year farm read without its data). One item a class, keyed by the class (`sale-weight:feed`), there while the class has head at sale weight; put away, it stays away until the class has none, then can come again. Heifers in a mob with a joining under way, and heifers PTIC on the record, are breeding stock and not counted (engine 0.22.0; replaces `sale-soon`, which was keyed by the sale day) | The market's own class weights (`MARKET_WEIGHTS`), bookings, `Joining`, the herd record | none |
+| `low-condition` | A mob whose average condition score is under 2.5 (`LOW_CS`, stand-in), with the figure and what the mob gained or lost a head a day on its last day (`adg`, null before its first day) | The mob's last day (`st.cs`, `st.adg`), or its animals before its first day | none |
 | `calving` | Calving started in a mob, with the calves born so far, for 30 days (then marking takes over) | `calvNote` | none |
 | `feed-floor` | A mob grazing an area under the grazing floor, with the feed figure | `FEED_FLOOR_KG_HA` (800 kg DM/ha, the floor days of feed are counted above) | none |
 | `crop-ready` | A grain crop that has reached maturity, and its hectares | The crop's days to maturity | `harvest` |
@@ -835,9 +835,9 @@ The two checks before the first day can be passed with `anyway: true`, as the MV
 
 Weaning is not listed, because the model weans a drop by itself when it is due. Weaning earlier is the player's choice, offered on the mob card.
 
-Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, money, the sale, stock, crops, fences. It holds no words, so it can't nag or judge.
+Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, money, stock at sale weight, stock, crops, fences. It holds no words, so it can't nag or judge.
 
-**The bank facts** (`money/bank.ts`, engine 0.20.0). At the end of each tick, before the game over check, the tick compares where cash stands (0 at or above zero, 1 below zero, 2 at or past three quarters of the way to `farm.broke`) with how far the player has been told (`farm.bankWarned`, saved, left out at 0). When cash has gone further, one `bank` event is sent with the cash, the limit and the head on hand that could be sold, unless the bank takes the farm that day. When cash comes back, the mark falls back with it. Nothing about money changes: it only reads cash. A fall caused by a job in the day (buying cattle on the overdraft) is told at that night's tick.
+**The bank facts** (`money/bank.ts`, engine 0.20.0). At the end of each tick, before the game over check, the tick compares where cash stands (0 at or above zero, 1 below zero, 2 at or past three quarters of the way to `farm.broke`) with how far the player has been told (`farm.bankWarned`, saved, left out at 0). When cash has gone further, one `bank` event is sent with the cash, the limit and the head on the farm (`headOnFarm`, engine 0.22.0; it was the head "that could be sold", which pointed at a remedy), unless the bank takes the farm that day. When cash comes back, the mark falls back with it. Nothing about money changes: it only reads cash. A fall caused by a job in the day (buying cattle on the overdraft) is told at that night's tick.
 
 **Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then only jobs shorter than that still fit (a few segments of tape, for example), so a screen can dim the farm and light up Next day. `canStartJobs` is false only when no light is left. The farm can still be looked at after dark.
 
@@ -1239,9 +1239,9 @@ Reads only, plus two saved records. No grass, cattle, sheep, crop, season, price
 
 Every head of cattle on the farm (calves included, cattle still on the truck left out), each with:
 
-- **Bought** (`Animal.paid`): the purchase price with the $30 head fee and any cow-and-calf freight; the value on the day the farm was taken over (`buyPrice`, no fees) for the start herd; $0 for a calf bred on the farm. Which of the three it is comes from the tag: tags below `FarmState.startTags` came with the farm (`originOf`).
-- **Spent** (`Animal.cost - Animal.paid`): what has gone on the animal since: its supplement or feedlot ration, the district's health cost a day, and marking. A cow carries her own feed; her calf carries only its own.
-- **Value now**: `netSaleValue` at today's prices (its weight at its class's c/kg, the in-calf premium from PTIC, less 5% commission and $30 a head), never below 0 (net worth's rule).
+- **Bought** (`costIn`): the purchase price with the $30 head fee and any cow-and-calf freight (`Animal.paid`); for the start herd, what each head would have put in the bank sold on the takeover day, after selling costs (`FarmState.startNet`, save format 17, engine 0.22.0), the same net basis as value now, so the book starts at $0 profit; $0 for a calf bred on the farm. The herd itself keeps the old game's start value (`buyPrice`: bulls by the head, the rest by weight, no fees), which the comparison with the old game checks; a farm saved before format 17 keeps that start value in the book. Which of the three it is comes from the tag: tags below `FarmState.startTags` came with the farm (`originOf`). A bull bought later is paid for by the head and is worth less by weight, so it shows as a loss; the book says so in one line.
+- **Spent** (`Animal.cost - Animal.paid`): what has gone on the animal since: its supplement or feedlot ration, the district's health cost a day, and marking. Each head carries its own costs: a calf at foot carries its own health and supplement, and none of it is added to its mother.
+- **Value now**: `netSaleValue` at today's prices (its weight at its class's c/kg adjusted for condition score, the in-calf premium from PTIC, less `SELL_COMMISSION` (5%) and `HEAD_FEE` ($30) a head), never below 0 (net worth's rule). The book's note reads both figures from the engine.
 - **Profit** = value now - bought - spent. The saleyard uses the same sum when cattle are sold (`sellList`).
 
 The Sell rows show the same figures a head for a draft (`sellMoney` on the server): a cow's figures include her calf at foot, which goes with her. The stock book goes to the browser with the record (`RecordResponse.stockBook`), not in every snapshot.
@@ -1250,7 +1250,9 @@ The Sell rows show the same figures a head for a draft (`sellMoney` on the serve
 
 - A copy of the pasture and crops, run a day at a time for 365 days with the tick's own start of the day (`startOfDay`: crop stages, then `growGrass`), in an **average season** (`averageYear`: season factor 1, month factor 1). A real-year farm is forecast the same way, never on its weather to come.
 - Each day the stock on hand take what they ate today (each cattle mob's `MobDay.demand`; a mob with no day yet, its own `intakeOf` with feed in front of it; sheep, their `demand`) from the pasture squares (native and sown), shared by the feed on each, green and dead alike, never below none. Cattle in the feedlot are left out. Nothing is bought, sold, born or moved and nobody grows.
-- Out: feed on the pasture squares and on the crop squares (annual pasture, forage and grain crops) at today and about every 30.4 days (12 points), the floor (`FEED_FLOOR_KG_HA` x pasture ha), what the stock eat a day, and the first day pasture feed falls under the floor.
+- Out: feed on the pasture squares and on the crop squares (annual pasture, forage and grain crops) today and on the first of each of the next 11 calendar months, real month lengths (12 points, 12 different months in order; engine 0.22.0: points every 30.4 days gave "Sep Oct Nov Dec Jan Jan Mar"), the grazing floor (`FEED_FLOOR_KG_HA` x pasture ha), what the stock eat a day, and the first day pasture feed falls under the floor.
+- The panel says how it is worked out in short lines under the chart: an average season from today; the stock on hand eat today's amount all year; feed is taken across the whole farm's pasture, not paddock by paddock; crops are shown apart and not grazed; feedlot cattle are left out.
+- **One name for the 800.** `FEED_FLOOR_KG_HA` is the grazing floor everywhere: the Feed panel, the paddock sheet, Help and Things to do. It is not the ground cover figure (`coverPct`), which the model keeps separately.
 - About a tenth of a second a forecast. The server keeps the last 32 by pasture, crops and stock, so a snapshot of an unchanged farm reuses it.
 
 ### What a supplement adds (`SupplementCost.adds`)
@@ -1267,16 +1269,34 @@ The real weather table's rain for the last day that ran. Null with random season
 
 ### The paddock comment line (server, `paddockwords.ts`)
 
-On a stocked paddock only. One sentence on what the stock pick, then one on the feed against what they eat, from the paddock summary and the mob's last day. Each tied to one condition; the thresholds are for the words only:
+On a stocked paddock only. One sentence on what the stock pick, then one on the feed against what they eat, from the paddock summary and the mob's last day. Each tied to one condition; the thresholds are for the words only.
+
+What the stock ate and chose comes from the mob's last day, wherever it was. So on a mob's first day in a paddock (no stock on the paddock's grazing area last night, `FarmState.stockedOn`), only the lines about the standing feed show: getting short, and tall and mostly dry. The lines about what they eat or pick wait until they have grazed there a day (engine 0.22.0; a mob moved into an empty paddock read "They're having a high impact" the same morning).
 
 | Line | Condition |
 |---|---|
-| "They're down to eating what they'd normally leave." | feed under `FEED_SHORT_KG_HA` (901) and green under 35% |
-| "The grass is tall and mostly dry. They're picking the green near the base." | green under 35% and 25 cm or taller |
-| "They're picking the best bits." | the diet ME the stock chose (pasture or lick only) at least 0.5 MJ/kg over the paddock's average |
+| "They're down to eating what they'd normally leave." | feed under `FEED_SHORT_KG_HA` (901) and green under 35%; grazed here a day |
+| "The grass is tall and mostly dry. They're picking the green near the base." | green under 35% and 25 cm or taller, some green in the paddock, and a diet greener than the paddock's average (the diet ME above the paddock's average ME: green leaf is what lifts it); grazed here a day |
+| "The grass is tall and mostly dry." | green under 35% and 25 cm or taller, otherwise |
+| "They're picking the best bits." | the diet ME the stock chose (pasture or lick only) at least 0.5 MJ/kg over the paddock's average; grazed here a day |
 | "It's getting short: under 800 kg DM/ha." | feed under `FEED_FLOOR_KG_HA` |
 | "The grass is growing away from them." | grown on the last day at least what was eaten (kg DM/ha) |
-| "They're having a high impact: they eat about X kg DM/ha a day and about Y grows." | eaten more than twice what grew |
-| "They eat a little more than grows: about X kg DM/ha a day against Y." | eaten more than grew, up to twice |
+| "They're having a high impact: they eat about X kg DM/ha a day and about Y grows." | eaten more than twice what grew, and the feed above the grazing floor lasts under 30 days at the rate it is going down (eaten less grown; `HIGH_IMPACT_DAYS`, stand-in) |
+| "Not much is growing. They're eating standing feed: about X kg DM/ha a day and about Y grows." | eaten more than twice what grew, with the feed above the floor lasting 30 days or more |
+| "They eat more than grows: about X kg DM/ha a day and about Y grows." | eaten more than 1.25 times what grew, up to twice |
+| "They eat a little more than grows: about X kg DM/ha a day against Y." | eaten more than grew, up to 1.25 times |
+
+The lines after "growing away" need the stock to have grazed here a day.
+
+### Words that quote the model (server, engine 0.22.0)
+
+- **Feed and intake.** A mob short of feed reads "Feed is about 760 kg DM/ha. At this level they get about 69% of what they could eat." The share is the diet's own `avail` (`feedAvailShare`: 1 - e^(-mass / 650)). It replaces "Under about 900 they eat less", which suggested no effect above 900; in the model intake is already about 84% at 1,200 kg DM/ha. Used wherever the old line showed: the mob card and the losing-weight inbox note.
+- **The whole farm eaten out.** "Over the whole farm, feed above 250 kg DM/ha averages under 40 kg DM/ha. Stock can't graze the last 250 kg DM/ha.", from the tick's own `UNGRAZEABLE_KG` and `EATEN_OUT_KG`. It had quoted the 800 floor, which is not the trigger.
+- **Low condition.** A mob under CS 2.5 always gets its fact lines: the score, and what it gains, holds or loses a head a day. On the mob card and in Things to do.
+- **Head counts on Herd.** The heading counts head without calves at foot (the snapshot's head total); the stock book counts every head and says how many are calves: "268 head, including 29 calves at foot."
+
+### Calving in the inbox (`calving-week`, `calving-finished`, engine 0.22.0)
+
+A day's births are a fact for that day's summary and day card, not an inbox line: "Mob 1: 1 calf born." most days through a calving filled the inbox. The inbox has "Calving has started in Mob 1." (the `calvingStarted` note), then a weekly line on days 6, 13, 20 and so on of the drop with the week's births and the drop so far ("Mob 1: 12 calves born in the past week. 30 calves born in this drop so far."; a week with none is not told), and one line when calving has finished ("Calving has finished in Mob 1: 84 calves born in this drop."). Calving has finished when no cow or heifer in the mob is due before the drop's 150 days are up (`calvingFinished`). Calves lost at birth stay their own facts. The count is kept on the mob (`FarmMob.calving`, save format 17); a mob saved mid-drop before it existed starts from the drop's calves at foot, and a drop already finished is not told again. No rule reads it.
 
 Never "overgrazed": rest is not part of any rule yet.

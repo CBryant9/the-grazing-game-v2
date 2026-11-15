@@ -225,10 +225,10 @@ describe('things to do', () => {
     const f = cloneFarm(b.farm);
     f.layout.water.ports[0]!.level = 100;
     const list = thingsToDo(f);
-    // A sale in the week is a fact with no job of its own (engine 0.20.0).
+    // Stock at sale weight is a fact with no job of its own (engine 0.22.0).
     expect(list.map((x) => x.type)).toEqual([
       'trough-low',
-      'sale-soon',
+      'sale-weight',
       'calves-to-mark',
       'fence-down',
     ]);

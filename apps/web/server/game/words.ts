@@ -60,13 +60,23 @@ export function classWithWeight(cls: MarketClassId): string {
 const away = (days: number): string =>
   days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
 
-/** The bank fact, the same in the inbox, Things to do and a skip that stopped. */
+/**
+ * The bank fact, the same in the inbox, Things to do and a skip that stopped: the cash, the
+ * bank's limit and the head on the farm. Facts only, with no pointer to what to do about it.
+ */
 export function bankWords(level: 1 | 2, cash: number, limit: number, head: number): string {
   const first =
     level === 1
       ? `Cash is ${signedMoney(cash)}. The bank takes the farm at ${signedMoney(limit)}.`
       : `Cash is ${signedMoney(cash)}, past three quarters of the way to ${signedMoney(limit)}, where the bank takes the farm.`;
-  return `${first} On hand: ${plural(head, 'head', 'head')} that could be sold.`;
+  return `${first} ${plural(head, 'head', 'head')} on the farm.`;
+}
+
+/** What a mob is gaining or losing a day, as a fact: "Mob 1 is gaining about 0.42 kg a head a day." */
+export function gainFact(name: string, adg: number): string {
+  if (adg < -0.05) return `${name} is losing about ${Math.abs(adg).toFixed(2)} kg a head a day.`;
+  if (adg < 0) return `${name} is holding weight (${adg.toFixed(2)} kg a head a day).`;
+  return `${name} is gaining about ${adg.toFixed(2)} kg a head a day.`;
 }
 
 export function todoWire(t: ThingToDo): TodoWire {
@@ -150,12 +160,10 @@ export function todoWire(t: ThingToDo): TodoWire {
         button: null,
         urgent: t.level === 2,
       };
-    case 'sale-soon':
+    case 'sale-weight':
       return {
         ...base,
-        text: `Cattle sale on ${dateText(t.date)}, ${away(t.daysAway)}. On the farm and not booked: ${t.classes
-          .map((c) => `${c.head.toLocaleString('en-AU')} ${classWithWeight(c.cls)}`)
-          .join(', ')}.`,
+        text: saleWeightText(t),
         button: null,
         urgent: false,
       };
@@ -163,7 +171,7 @@ export function todoWire(t: ThingToDo): TodoWire {
       return {
         ...base,
         mob: t.mob,
-        text: `${t.mobName} averages condition score ${t.cs.toFixed(1)}${t.area ? ` in ${t.area}` : ''}.`,
+        text: `${t.mobName} averages condition score ${t.cs.toFixed(1)}${t.area ? ` in ${t.area}` : ''}.${t.adg === null ? '' : ` ${gainFact(t.mobName, t.adg)}`}`,
         button: null,
         urgent: false,
       };
@@ -184,6 +192,21 @@ export function todoWire(t: ThingToDo): TodoWire {
         urgent: false,
       };
   }
+}
+
+/**
+ * Stock of one class at sale weight, as a fact about the stock: the head, the class with its
+ * weights, and the next cattle sale. "30 yearling steers (280 to 450 kg) are at sale weight and
+ * not booked. The next cattle sale is on 14 Nov 2026, in 3 days."
+ */
+export function saleWeightText(t: Extract<ThingToDo, { type: 'sale-weight' }>): string {
+  const n = t.count.toLocaleString('en-AU');
+  const are = t.count === 1 ? 'is' : 'are';
+  const sale =
+    t.date && t.daysAway !== null
+      ? ` The next cattle sale is on ${dateText(t.date)}, ${away(t.daysAway)}.`
+      : '';
+  return `${n} ${classWithWeight(t.cls)} ${are} at sale weight and not booked.${sale}`;
 }
 
 const CAUSE: Record<string, string> = {

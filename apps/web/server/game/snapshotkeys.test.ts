@@ -305,6 +305,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'rainMm',
   ],
   feed: [
+    'assumptions',
     'eatTMonth',
     'floorKgHa',
     'floorT',
@@ -478,7 +479,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
   'record.years[].parts[]': ['key', 'label', 'pts'],
   'record.stockBook': ['classes', 'mobs', 'notes', 'originText', 'rows', 'totals'],
   'record.stockBook.classes[]': ['id', 'label'],
-  'record.stockBook.mobs[]': ['head', 'id', 'name'],
+  'record.stockBook.mobs[]': ['calves', 'head', 'id', 'name'],
   'record.stockBook.originText': ['bought', 'boughtOrStart', 'bred', 'start'],
   'record.stockBook.rows[]': [
     'ageDays',
@@ -495,7 +496,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'spent',
     'value',
   ],
-  'record.stockBook.totals': ['head', 'paid', 'profit', 'spent', 'value'],
+  'record.stockBook.totals': ['calves', 'head', 'paid', 'profit', 'spent', 'value'],
   'skip.summary': [
     'arrived',
     'births',

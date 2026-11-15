@@ -1,6 +1,6 @@
 import 'server-only';
-import { FEED_SHORT_KG_HA, LOW_CS, type GainForecast, type GainReason } from '@gg/engine';
-import { NO_WATER_WHY } from './words';
+import { LOW_CS, feedAvailShare, type GainForecast, type GainReason } from '@gg/engine';
+import { NO_WATER_WHY, gainFact } from './words';
 
 /**
  * The words on the mob card and the move and supplement job cards. Plain
@@ -15,8 +15,7 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 export function reasonWord(r: GainReason): string {
   switch (r.reason) {
     case 'notEnoughFeed':
-      // The fact and its effect, with the model's own figure for where intake starts to fall.
-      return `Feed is about ${Math.round(r.mass / 10) * 10} kg DM/ha. Under about ${Math.round(FEED_SHORT_KG_HA / 10) * 10} they eat less.`;
+      return feedLevelWord(r.mass);
     case 'lowMe':
       return `The feed is low in energy: ME ${r.me.toFixed(1)} MJ/kg.`;
     case 'lowProtein':
@@ -28,6 +27,16 @@ export function reasonWord(r: GainReason): string {
     case 'justShort':
       return `They eat about ${r.intake.toFixed(1)} kg DM a head a day of feed at ME ${r.me.toFixed(1)} MJ/kg, which is just short of what they need.`;
   }
+}
+
+/**
+ * The feed and what it does to intake, with its size from the engine's own intake curve
+ * (`feedAvailShare`): "Feed is about 760 kg DM/ha. At this level they get about 69% of what
+ * they could eat." Intake falls well above any one round figure, so no threshold is quoted.
+ */
+export function feedLevelWord(massKgHa: number): string {
+  const pct = Math.round(feedAvailShare(massKgHa) * 100);
+  return `Feed is about ${Math.round(massKgHa / 10) * 10} kg DM/ha. At this level they get about ${pct}% of what they could eat.`;
 }
 
 export interface WhyInputs {
@@ -72,16 +81,14 @@ export function mobLines(i: WhyInputs): MobLines {
   }
   const losing = i.adg !== null && i.adg < -LOSING_KG;
   const lowCs = i.cs !== undefined && i.cs !== null && i.cs < LOW_CS;
-  if (losing) why.push(`${i.name} is losing about ${Math.abs(i.adg!).toFixed(2)} kg a head a day.`);
+  if (losing) why.push(gainFact(i.name, i.adg!));
   if (lowCs) why.push(`${i.name} averages condition score ${i.cs!.toFixed(1)}.`);
+  // A low condition warning always carries its fact lines: the score, and the gain or loss a day.
+  if (lowCs && !losing && i.adg !== null) why.push(gainFact(i.name, i.adg));
   const warn = losing || lowCs;
   const out = warn ? why : details;
   if (!warn && i.adg !== null && i.adg < LOSING_KG && i.where === 'paddock') {
-    details.push(
-      i.adg < 0
-        ? `${i.name} is holding weight (${i.adg.toFixed(2)} kg a head a day).`
-        : `${i.name} is gaining about ${i.adg.toFixed(2)} kg a head a day.`,
-    );
+    details.push(gainFact(i.name, i.adg));
   }
   if (i.fed !== null && i.fed < 0.9) {
     out.push(`The paddock gave the mob ${Math.round(i.fed * 100)}% of the feed it wanted.`);

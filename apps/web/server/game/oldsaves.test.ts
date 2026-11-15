@@ -121,8 +121,8 @@ async function playsADay(store: FarmStore, id: string, before: number): Promise<
   const again = new GameServer({ store, seed: () => 3, saveRetryMs: [0, 0], hooks: null });
   expect((await again.snapshot(key))!.day).toBe(before + 1);
   const raw = (await store.get(id)) as StoredFarm;
-  expect(raw.saved.saveFormat).toBe(16);
-  expect(raw.saved.engineVersion).toBe('0.21.0');
+  expect(raw.saved.saveFormat).toBe(17);
+  expect(raw.saved.engineVersion).toBe('0.22.0');
 }
 
 describe('old farms through the file store', () => {

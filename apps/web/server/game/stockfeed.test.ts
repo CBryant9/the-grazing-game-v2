@@ -1,14 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { FEED_FLOOR_KG_HA, FEED_SHORT_KG_HA, createFarm, endDay, stockBook } from '@gg/engine';
+import {
+  EATEN_OUT_KG,
+  FEED_FLOOR_KG_HA,
+  FEED_SHORT_KG_HA,
+  HEAD_FEE,
+  SELL_COMMISSION,
+  UNGRAZEABLE_KG,
+  createFarm,
+  endDay,
+  stockBook,
+} from '@gg/engine';
 import type { SetupChoices, SimpleAction, Snapshot } from '../../lib/game/types';
 import { addsText, forecastLines, partOfMonth } from './feed';
 import { GameServer } from './game';
 import { outOfFeedWords, repeatMarkNotes } from './inboxwords';
 import { gainWhy, shortReason } from './mobwords';
-import { HIGH_IMPACT, commentLine, feedLine, pickLine, type CommentInputs } from './paddockwords';
+import {
+  A_LITTLE_MORE,
+  HIGH_IMPACT,
+  HIGH_IMPACT_DAYS,
+  commentLine,
+  daysAboveFloor,
+  feedLine,
+  pickLine,
+  type CommentInputs,
+} from './paddockwords';
 import { parsePlanAction } from './plans';
 import { buildSnapshot } from './snapshot';
-import { stockBookWire } from './stockbook';
+import { STOCK_BOOK_NOTES, stockBookWire } from './stockbook';
 import { MemoryFarmStore } from './store';
 
 /*
@@ -63,6 +82,29 @@ describe('the stock book on the wire', () => {
     for (const n of b.notes) expect(n).not.toMatch(BANNED);
   }, 120_000);
 
+  it('starts at $0 profit on a running farm, says what its head counts, and reads its selling costs from the engine (engine 0.22.0)', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices());
+    const b = (await game.record(A)).stockBook;
+    // Day 0: every head was taken over at what it would put in the bank that day.
+    expect(b.totals.profit).toBe(0);
+    // The head counts calves at foot; the herd's head total does not. Each says which.
+    const calves = s0.mobs.filter((m) => m.species === 'cattle').reduce((t, m) => t + m.calves, 0);
+    expect(b.totals.calves).toBe(calves);
+    expect(b.totals.head).toBe(s0.totals.head + calves);
+    expect(b.mobs.reduce((t, m) => t + m.calves, 0)).toBe(calves);
+    // The selling costs in the note are the engine's own figures.
+    const value = STOCK_BOOK_NOTES.find((n) => n.startsWith('Value now'))!;
+    expect(value).toContain(`${Math.round(SELL_COMMISSION * 100)}% commission`);
+    expect(value).toContain(`$${HEAD_FEE} a head`);
+    expect(value).toMatch(/in-calf premium/);
+    expect(value).toMatch(/condition score/);
+    expect(STOCK_BOOK_NOTES).toContain(
+      'Bulls are bought for breeding and sell by weight, so a bull shows as a loss if sold.',
+    );
+    expect(STOCK_BOOK_NOTES.join(' ')).not.toMatch(/not her calf/);
+  }, 120_000);
+
   it('matches the engine’s own stock book', () => {
     const farm = createFarm({
       seed: 4,
@@ -115,6 +157,21 @@ describe('the Feed panel on the wire', () => {
     expect(f.note).toMatch(/not a forecast of this year’s rain/);
     expect(f.lines[0]).toMatch(/^At [\d,]+ head the stock eat about [\d.,]+ t DM a month\.$/);
     for (const l of [...f.lines, f.note, f.summary, ...f.suppNotes]) expect(l).not.toMatch(BANNED);
+    // 12 different months in order, in the chart, the table and the screen-reader sentence.
+    const labels = f.points.map((p) => p.label);
+    expect(new Set(labels).size).toBe(12);
+    for (let i = 1; i < f.points.length; i++) {
+      expect(f.points[i]!.month).toBe((f.points[i - 1]!.month + 1) % 12);
+    }
+    expect(f.summary).toContain(`from ${labels[0]}`);
+    // How it is worked out, in the panel's own words; the 800 has one name.
+    expect(f.assumptions.join(' ')).toMatch(/average season from today/i);
+    expect(f.assumptions.join(' ')).toMatch(/eat what they ate today, every day/);
+    expect(f.assumptions.join(' ')).toMatch(/whole farm\u2019s pasture, not paddock by paddock/);
+    expect(f.assumptions.join(' ')).toMatch(/Crops are shown apart and are not grazed/);
+    expect(f.assumptions.join(' ')).toMatch(/feedlot are left out/);
+    for (const l of [...f.lines, f.summary, ...f.assumptions])
+      expect(l).not.toMatch(/ground cover/i);
   }, 120_000);
 
   it('lists each cattle mob with its supplement, its cost a day and what each one adds', async () => {
@@ -151,14 +208,14 @@ describe('the Feed panel on the wire', () => {
     const lines = forecastLines(base);
     expect(lines[0]).toBe('At 400 head the stock eat about 152 t DM a month.');
     expect(lines[1]).toBe(
-      'In an average season, feed on offer falls under the ground cover floor in early October.',
+      'In an average season, feed on offer falls under the grazing floor in early October.',
     );
     expect(lines[2]).toBe('Crops add the most feed in December: about 120 t DM.');
     expect(forecastLines({ ...base, underFloor: null })[1]).toMatch(
-      /stays above the ground cover floor/,
+      /stays above the grazing floor/,
     );
     expect(forecastLines({ ...base, underFloor: { day: 0, date: date(10, 1) } })[1]).toBe(
-      'Feed on offer is under the ground cover floor now.',
+      'Feed on offer is under the grazing floor now.',
     );
     expect(partOfMonth({ month: 2, date: 15 })).toBe('mid March');
     expect(partOfMonth({ month: 5, date: 28 })).toBe('late June');
@@ -204,17 +261,55 @@ describe('the paddock comment line', () => {
     );
   });
 
-  it('eaten over twice what grows: a high impact, with the figures', () => {
+  it('a high impact needs both: over twice what grows, and the feed above the floor gone in under 30 days', () => {
     expect(HIGH_IMPACT).toBe(2);
-    expect(feedLine(at({ growKgHa: 4, eatKgHa: 12 }))).toBe(
+    expect(HIGH_IMPACT_DAYS).toBe(30);
+    // 1,000 kg DM/ha: 200 above the floor, going down 8 a day, gone in 25 days.
+    expect(feedLine(at({ massKgHa: 1000, growKgHa: 4, eatKgHa: 12 }))).toBe(
       "They're having a high impact: they eat about 12 kg DM/ha a day and about 4 grows.",
     );
+    expect(daysAboveFloor(at({ massKgHa: 1000, growKgHa: 4, eatKgHa: 12 }))).toBeCloseTo(25, 9);
   });
 
-  it('eaten a little over what grows: the figures', () => {
+  it('light stocking on dormant grass with plenty standing: not a high impact, the fact (engine 0.22.0)', () => {
+    // The review's case: about 1,300 kg DM/ha standing, little growing, light stocking.
+    expect(feedLine(at({ massKgHa: 1300, growKgHa: 0.4, eatKgHa: 1.6 }))).toBe(
+      "Not much is growing. They're eating standing feed: about 1.6 kg DM/ha a day and about 0.4 grows.",
+    );
+    // 2,000 kg DM/ha going down 8 a day lasts 150 days above the floor.
+    expect(feedLine(at({ growKgHa: 4, eatKgHa: 12 }))).toMatch(/^Not much is growing\./);
+  });
+
+  it('eaten a little over what grows, up to 1.25 times: the figures', () => {
+    expect(A_LITTLE_MORE).toBe(1.25);
     expect(feedLine(at({ growKgHa: 8, eatKgHa: 10 }))).toBe(
       'They eat a little more than grows: about 10 kg DM/ha a day against 8.',
     );
+  });
+
+  it('eaten 1.25 to 2 times what grows: more than grows, with the figures (engine 0.22.0)', () => {
+    expect(feedLine(at({ growKgHa: 8, eatKgHa: 12 }))).toBe(
+      'They eat more than grows: about 12 kg DM/ha a day and about 8 grows.',
+    );
+    expect(feedLine(at({ growKgHa: 8, eatKgHa: 16 }))).toBe(
+      'They eat more than grows: about 16 kg DM/ha a day and about 8 grows.',
+    );
+  });
+
+  it("a mob's first day in a paddock: only the lines about the standing feed (engine 0.22.0)", () => {
+    const first = (over: Partial<CommentInputs>) => commentLine(at({ ...over, grazedHere: false }));
+    // What they eat or pick waits a day: their last day was somewhere else.
+    expect(first({ massKgHa: 1300, growKgHa: 1, eatKgHa: 30 })).toBeNull();
+    expect(first({ dietMe: 10.5, paddockMe: 9.5 })).toBeNull();
+    expect(first({ massKgHa: FEED_FLOOR_KG_HA - 50, green: 0.2, heightCm: 4 })).toBe(
+      "It's getting short: under 800 kg DM/ha.",
+    );
+    // Tall and dry is the standing feed; picking the green near the base waits.
+    expect(first({ green: 0.2, heightCm: 30, dietMe: 9.9 })).toBe(
+      'The grass is tall and mostly dry.',
+    );
+    // After a day there, the same paddock says what they eat.
+    expect(commentLine(at({ massKgHa: 1000, growKgHa: 1, eatKgHa: 30 }))).toMatch(/high impact/);
   });
 
   it('under the floor: getting short, in the paddock sheet’s words', () => {
@@ -233,9 +328,17 @@ describe('the paddock comment line', () => {
     expect(pickLine(at({ dietMe: null }))).toBeNull();
   });
 
-  it('tall and mostly dry: picking the green near the base', () => {
+  it('tall and mostly dry: picking the green near the base only with some green and a greener diet', () => {
     expect(pickLine(at({ green: 0.2, heightCm: 30 }))).toBe(
       "The grass is tall and mostly dry. They're picking the green near the base.",
+    );
+    // No green at all, or a diet no better than the paddock's average: just the grass.
+    expect(pickLine(at({ green: 0, heightCm: 30 }))).toBe('The grass is tall and mostly dry.');
+    expect(pickLine(at({ green: 0.2, heightCm: 30, dietMe: 9.5, paddockMe: 9.5 }))).toBe(
+      'The grass is tall and mostly dry.',
+    );
+    expect(pickLine(at({ green: 0.2, heightCm: 30, dietMe: null }))).toBe(
+      'The grass is tall and mostly dry.',
     );
   });
 
@@ -342,7 +445,11 @@ describe('the inbox leftovers', () => {
   it('the whole farm eaten out is never put as days of feed left', () => {
     const t = outOfFeedWords(9);
     expect(t).not.toMatch(/days? of feed/);
-    expect(t).toContain('under 800 kg DM/ha');
+    // The model's own condition, with its own figures: feed above 250 averaging under 40.
+    expect(t).toContain(
+      `feed above ${UNGRAZEABLE_KG} kg DM/ha averages under ${EATEN_OUT_KG} kg DM/ha`,
+    );
+    expect(t).not.toContain('800');
     expect(t).toContain('9 more days');
   });
 
