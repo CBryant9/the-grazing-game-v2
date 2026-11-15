@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { Vitals } from '@/components/analytics/Vitals';
 import { PlayApp } from '@/components/play/PlayApp';
 import { PlayBoundary } from '@/components/shell/PlayBoundary';
 import { PlayOffline } from '@/components/shell/PlayOffline';
 import { PwaRegister } from '@/components/shell/PwaRegister';
+import { firstSetup } from '@/server/game/firstScreen';
 
 export const metadata: Metadata = {
   title: 'Play',
@@ -16,13 +18,18 @@ export const metadata: Metadata = {
 // what comes back. The map (and PixiJS with it) loads after the page is up.
 // Around it: a boundary so a crash shows two buttons, the offline view, and
 // the install and service worker setup.
-export default function PlayPage() {
+//
+// A visitor with none of the game's cookies can have no farm, so the setup
+// screen is drawn in the HTML with its choices (server/game/firstScreen.ts):
+// the first paint does not wait for the scripts and two requests.
+export default async function PlayPage() {
+  const setup = await firstSetup((await cookies()).getAll());
   return (
     <PlayBoundary>
       <PwaRegister />
       <Vitals page="play" />
       <PlayOffline>
-        <PlayApp />
+        <PlayApp setup={setup} />
       </PlayOffline>
     </PlayBoundary>
   );

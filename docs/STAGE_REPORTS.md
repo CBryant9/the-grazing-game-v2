@@ -257,3 +257,9 @@ Branch `m8-daily-on-and-speed`. Full detail in `docs/DEVELOPMENT_LOG.md` (m8).
 - **Tested:** the Daily end-to-end test with the switch at its new default (start, midnight rollover, next morning); new tests for the no-database line and the development setting.
 - **Not done:** the live weather and price feed has still never run against SILO and MLA (A9, V-list).
 
+### /play speed
+
+- **Built:** a visitor with no cookies gets the setup screen in the server's HTML, so the largest paint no longer waits for the scripts, the farm request and the setup request.
+- **Tested:** Lighthouse mobile, 5 runs back to back on a busy PC: median 0.86 before (largest paint 3.49 s), 0.95 after (0.92 s). JS budget unchanged (208.4 KB). Offline viewing checked in headless Chrome with the server stopped.
+- **Not done:** total blocking time is still about 250 ms here (React's first hydration). Not run on CI.
+

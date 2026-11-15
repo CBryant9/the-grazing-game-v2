@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import { useMe } from '@/lib/auth/store';
 import { onSavingAgain } from '@/lib/game/api';
 import { wireTour } from '@/lib/game/helpstore';
 import { useGame } from '@/lib/game/store';
+import type { SetupOptions } from '@/lib/game/types';
 import { FarmPicker } from './FarmPicker';
 import { PastDay } from './PastDay';
 import { PlayScreen } from './PlayScreen';
@@ -17,9 +18,18 @@ import accounts from './accounts.module.css';
  * /play. A visitor with no farm sees the setup flow. A visitor with a farm
  * sees the play screen. The farm itself lives on the server: this asks for
  * its snapshot and draws what comes back.
+ *
+ * `setup`: the server knew there could be no farm (no cookies) and sent the
+ * setup choices with the page, so setup is drawn at once, in the HTML. The
+ * farm is still asked for, as before; until the first answer, setup stays on
+ * the screen in place of "Loading your farm", and then the answer rules.
  */
-export function PlayApp() {
-  const phase = useGame((s) => s.phase);
+export function PlayApp({ setup = null }: { setup?: SetupOptions | null }) {
+  const storePhase = useGame((s) => s.phase);
+  // Has the first farm request been answered? After that the store's phase is shown as it is.
+  const [answered, setAnswered] = useState(false);
+  if (!answered && storePhase !== 'loading') setAnswered(true);
+  const phase = setup && !answered && storePhase === 'loading' ? 'setup' : storePhase;
   const snapshot = useGame((s) => s.snapshot);
   const notice = useGame((s) => s.notice);
   const load = useGame((s) => s.load);
@@ -53,8 +63,12 @@ export function PlayApp() {
 
   return (
     <div className={styles.plain}>
+      {/* Each Suspense boundary is hydrated as its own piece of work, so the first hydration
+          is not one long task (TBT). Nothing in them suspends, so nothing else changes. */}
       <div className={styles.plainhdr}>
-        <SiteHeader />
+        <Suspense fallback={null}>
+          <SiteHeader />
+        </Suspense>
       </div>
       <main id="main" className={styles.plainmain} tabIndex={-1}>
         {phase === 'loading' && (
@@ -72,7 +86,11 @@ export function PlayApp() {
         )}
         {phase === 'broken' && <BrokenFarm message={notice?.message} />}
         {phase === 'pick' && <FarmPicker />}
-        {phase === 'setup' && <SetupFlow />}
+        {phase === 'setup' && (
+          <Suspense fallback={null}>
+            <SetupFlow initial={setup} />
+          </Suspense>
+        )}
         {phase === 'setup' && <BackToFarms />}
       </main>
     </div>
