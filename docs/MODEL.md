@@ -1197,3 +1197,12 @@ These rules replace the ones above where they differ.
 ### Not built yet
 
 Real-year sheep prices (the six national sheep indicators are pulled by `pnpm data:mla` but not wired into the real-data bundle), booking sheep onto a later sale, the sheep sale days of Dubbo and Hamilton (the cattle calendar stands in), the marking job and its cost, sheep on the map, out-of-season joining (S25: about 10% fewer in lamb), and feed on offer at lambing as a cause of lamb deaths.
+
+## 13. Paying to keep going: the rescue (rebuild, m6 join, engine 0.18.0)
+
+PRD 10.3: offered only at game over, a rescue clears the debt and puts the farm back to modest funds. `money/rescue.ts`:
+
+- `rescueTerms(farm)` (a read) gives what a rescue would do today: the head of cattle and sheep it sells, what they fetch (cattle at their net sale value, sheep at theirs with the wool on their backs: the figures net worth uses), the debt (cash below 0), the hard-difficulty starting cash for the farm (`startMoney(district, farmHa, 'hard', withHerd: false)`: the stock has just been sold) and the cash after.
+- **Cash after** is the hard-difficulty starting cash, or what the sale leaves after the debt if that is more. The "or more" is a stand-in where PRD 10.3 is silent: a rescue never takes away cash its own sale raised. Listed for Claudia.
+- `rescueFarm(farm, { purchaseId })` applies exactly those terms to a copy: every head sold (mobs and sheep mobs emptied), sale bookings dropped (their stock is sold here), cash set, game over cleared, the eaten-out count back to 0. Stock bought and on the way still arrives. Paddocks, fences, water, crops, plans, hands, the clock, the day and the year's totals are unchanged. The farm records the rescue (`rescues`, with the purchase id, the day and the terms; save format 13), and the same purchase id again changes nothing and returns the same terms. A farm that is still playing is refused (`not-over`).
+- No rule of the simulation changed: a farm never rescued plays exactly as on 0.17.0. Tests: `money/rescue.test.ts`. The web server writes one diary line stating the facts and marks the farm row `continued` (server/billing/rescueEngine.ts).
