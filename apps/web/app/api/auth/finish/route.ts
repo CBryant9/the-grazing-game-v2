@@ -1,4 +1,5 @@
 import { logFailure } from '@/server/logging';
+import { trackServer } from '@/server/analytics/collect';
 import { USERNAME, convertGuest, finishSignUp, parseDob } from '@/server/auth/accounts';
 import { authRoute, requireUser } from '@/server/auth/route';
 import { SESSION_COOKIE, readJson, sessionFrom } from '@/server/game/http';
@@ -46,6 +47,9 @@ export const POST = authRoute(
         : undefined;
     const out = await finishSignUp(deps, user, { username, displayName, dob });
     if (out.result !== 'signed_up') return refuse(out.result);
+    // Analytics (m7 join): a new account has made no account choice yet, so the choice the player
+    // made as a guest (the consent cookie) decides. Counted here only, never sent on; never fails.
+    await trackServer(ctx.req, null, 'signup');
 
     // The guest's farm moves in. If the account has no room, nothing moves and the player is told.
     const guest = sessionFrom(ctx.req);

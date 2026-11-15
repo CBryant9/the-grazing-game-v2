@@ -31,6 +31,9 @@ beforeAll(async () => {
   routes.delete = await import('@/app/api/account/delete/route');
   routes.farm = await import('@/app/api/game/farm/route');
   routes.farms = await import('@/app/api/game/farms/route');
+  // m7 join: the browser error route and the analytics beacon answer with no keys too.
+  routes.clientError = await import('@/app/api/client-error/route');
+  routes.collect = await import('@/app/api/collect/route');
 });
 afterAll(() => {
   setAuthDeps(undefined);
@@ -113,6 +116,20 @@ const checkAll = async (): Promise<void> => {
   expect(await (await call('farms', 'GET', '/api/game/farms')).json()).toMatchObject({
     signedIn: false,
   });
+  // A browser error is taken (and sent nowhere with no DSN); a beacon is taken and counted nowhere.
+  const err = await call('clientError', 'POST', '/api/client-error', {
+    kind: 'error',
+    name: 'TypeError',
+    message: 'x',
+    stack: '',
+    route: '/play',
+  });
+  expect(err.status).toBe(204);
+  const beacon = await call('collect', 'POST', '/api/collect', {
+    id: '3f2b8c1e-7a4d-4e2b-9c1a-5d6e7f8a9b0c',
+    ev: [{ e: 'page_view', p: { page: 'play' } }],
+  });
+  expect(beacon.status).toBe(204);
 };
 
 describe('accounts not set up, in production', () => {

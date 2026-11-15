@@ -2,6 +2,7 @@ import 'server-only';
 import { GameError } from '../game/game';
 import { readJson } from '../game/http';
 import { requireUser } from '../auth/route';
+import { trackServer } from '../analytics/collect';
 import { STANDING_WORDS, buyerStanding, startCheckout } from './checkout';
 import { myPurchases, purchaseStatus, receiptFor } from './mine';
 import { accountOwns, dollars, forSale, givesWords, listProducts, type Owned } from './products';
@@ -97,6 +98,8 @@ export async function checkoutHandler(
     farmId: b.farm === undefined ? undefined : (farmUuid(b.farm) ?? 'x'),
     origin: ctx.origin,
   });
+  // Analytics (m7 join): counted only with consent and the switch on; never fails the request.
+  await trackServer(ctx.req, user.id, 'checkout_started');
   return { url: out.url, reused: out.reused };
 }
 

@@ -1,4 +1,5 @@
 import { logFailure } from '@/server/logging';
+import { trackServer } from '@/server/analytics/collect';
 import { accountOf } from '@/server/auth/accounts';
 import { NOT_SET_UP, authRoute, redirect } from '@/server/auth/route';
 import { GameError } from '@/server/game/game';
@@ -32,5 +33,9 @@ export const GET = authRoute({ name: 'callback', max: 30 }, async (ctx) => {
   if (!account.profile) {
     return redirect(ctx, `/sign-up/finish?next=${encodeURIComponent(next)}`);
   }
+  // Analytics (m7 join): a returning player signed in. Consent and the switch decide; never fails.
+  await trackServer(ctx.req, user.id, 'login', {
+    method: user.method === 'google' ? 'google' : 'email',
+  });
   return redirect(ctx, next);
 });

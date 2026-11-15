@@ -128,6 +128,17 @@ export async function trackServer(
   }
 }
 
+/**
+ * The farm's day when a Next day or a skip has just ended the game, else null (farm_ended, m7
+ * join). A farm already over is refused before it runs, so a game ends on one answer only.
+ */
+export function endedDays(out: unknown): number | null {
+  const o = out as { ok?: unknown; snapshot?: { over?: unknown; day?: unknown } } | null;
+  return o?.ok === true && o.snapshot?.over && typeof o.snapshot.day === 'number'
+    ? o.snapshot.day
+    : null;
+}
+
 const BOT = /bot|crawl|spider|slurp|lighthouse|headless|preview|monitor|curl|wget|python|java\//i;
 
 /**

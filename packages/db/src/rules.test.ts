@@ -126,6 +126,31 @@ describe('private fields', () => {
     expect(JSON.stringify(d)).not.toContain('cs_test_');
     expect(passed(await as(db, 'anon', `select public.export_my_data()`))).toBe(false);
   });
+
+  it('download my data holds the analytics consent choice (m7 join)', async () => {
+    const before = rowsOf(await as(db, 'a', `select public.export_my_data() as d`))[0]!.d as Record<
+      string,
+      unknown
+    >;
+    expect(before).toHaveProperty('analytics_consent', null);
+    await db.query(
+      `insert into public.analytics_consent (user_id, granted) values ($1, true)
+       on conflict (user_id) do update set granted = true`,
+      [ID.a],
+    );
+    try {
+      const after = rowsOf(await as(db, 'a', `select public.export_my_data() as d`))[0]!
+        .d as Record<string, { granted: boolean; decided_at: string } | null>;
+      expect(after.analytics_consent?.granted).toBe(true);
+      expect(typeof after.analytics_consent?.decided_at).toBe('string');
+      // Another player's choice is never in it.
+      const other = rowsOf(await as(db, 'b', `select public.export_my_data() as d`))[0]!
+        .d as Record<string, unknown>;
+      expect(other.analytics_consent).toBeNull();
+    } finally {
+      await db.query(`delete from public.analytics_consent where user_id = $1`, [ID.a]);
+    }
+  });
 });
 
 describe('the engine save', () => {
