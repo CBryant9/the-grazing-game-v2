@@ -194,6 +194,22 @@ export function sheepWorth(
   return v;
 }
 
+/**
+ * What selling every sheep on a farm today would pay, dollars: each record at the sale action's
+ * own figure (`sheepNetSaleValue`, as `sellSheep` pays it), lambs at foot included. A sale pays
+ * nothing for the wool on the back, so it is not counted (net worth counts it: `sheepWorth`).
+ */
+export function flockSaleValue(
+  mobs: readonly { sheep: readonly Sheep[] }[],
+  prices: SheepIndicators = SHEEP_INDICATORS_C_KG,
+): number {
+  let v = 0;
+  for (const m of mobs) {
+    for (const s of m.sheep) if (!s.dead && s.n > 0) v += sheepNetSaleValue(s, prices) * s.n;
+  }
+  return v;
+}
+
 /** What `cleanKg` of fleece wool at `micron` fetches, before selling costs, dollars (call C20). */
 export const woolValue = (cleanKg: number, micron: number): number =>
   (cleanKg * woolPriceCKg(micron)) / 100;

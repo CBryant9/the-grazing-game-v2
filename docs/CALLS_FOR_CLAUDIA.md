@@ -108,7 +108,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A19. Buying age, card payments and refunds.** Built: buying needs 18 or over (the PRD only says to check under 18s with a lawyer). Checkout takes cards only. A full refund removes what was bought. A dispute removes it until won. A part refund changes nothing. Packs are one each, with the upgrade for the second. Other choice: a lower age with parental consent, other payment types, different refund rules. What it changes: money and legal risk. Recommended: 18 until a lawyer advises. [m5.2 calls 1, 3, 4, 7, 8; m3.1 call 18. Change: `MIN_PURCHASE_AGE` in `products.ts`]
 
-**A20. Paying to keep going (the rescue).** Built: a rescue sells all stock to clear the debt and sets cash to the hard-difficulty starting cash, or what the sale leaves if more. A refund after a rescue does not undo it. The offer needs a free farm slot. Tiers are by days run: under 183 days (price open, cannot be switched on), 183 to 364, 365 to 729, 730 and over. The price under 6 months is A$15 until set. Other choice: different terms, tiers or prices. What it changes: money, and what a player gets when a farm fails. The PRD is silent on the cash. [m6 For Claudia; m5.2 calls 5, 6; PRD 21 row 30. Change: `rescueFarm` in the engine and `products.ts`]
+**A20. Paying to keep going (the rescue).** Built: a rescue sells all stock at what a normal sale would pay that day (sheep with nothing for the wool on their backs, B137), on any day, to clear the debt, and sets cash to the hard-difficulty starting cash, or what the sale leaves if more. Stock on the way is not sold or counted: it still arrives. The cash added on top of the sale is the year's "Paid to keep going" line and is not in the year's profit or score (B138). The diary line and the offer card say what the stock fetched, with "to pay the debt" only when there was a debt. A refund after a rescue does not undo it. The offer needs a free farm slot. Tiers are by days run: under 183 days (price open, cannot be switched on), 183 to 364, 365 to 729, 730 and over. The price under 6 months is A$15 until set. Other choice: different terms, tiers or prices. What it changes: money, and what a player gets when a farm fails. The PRD is silent on the cash. [m6 For Claudia; m5.2 calls 5, 6; PRD 21 row 30. Change: `rescueFarm` in the engine and `products.ts`]
 
 **A21. The legal pages and who is behind the game.** Built: privacy, terms and community rules are plain-English drafts with no lawyer's review, marked "Draft. Not yet reviewed." The owner name, ABN, contact address and domain are not set. The privacy page names no providers and says data may be kept outside Australia. Analytics run only with consent, which is stricter than the PRD, with one exception: public website page views are counted without consent, by page and day only, with no cookie and no id, so nothing about a person is stored. The privacy page says so. A few lines are worded for you to check (the SILO credit, guest farm removal). Other choice: name the providers once accounts exist, relax the consent rule, or ask consent for website views too (the public pages send no script, so that would need one). What it changes: legal exposure, and the pages stay in draft until done. [m5.4 calls 1 to 6, 10, 11; m5.3 call 5. Change: `SITE_OWNER_NAME`, `SITE_CONTACT_EMAIL`, `NEXT_PUBLIC_SITE_URL`, `countWebsiteView` in `server/analytics/collect.ts`]
 
@@ -258,7 +258,7 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 #### Daily Farm
 
-**B63.** With no hand working, a plan is held for the night and the plan card offers the move. "Yes" takes the ordinary move time. [m3.3 call 5; second pass item 2]
+**B63.** With no hand working, a plan is held for the night and the plan card offers the move. "Yes" takes the ordinary move time. Since m7.1 the plan stays live on that night (not paused), its report counts the night, and sheep plans follow the same rule (B140). [m3.3 call 5; second pass item 2; m7.1]
 
 **B64.** A missed day is a night after a date the player never opened the farm on. [m3.3 call 6]
 
@@ -426,6 +426,16 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B136.** Offline, the game page is the copy the service worker kept at install, with the policy and nonce it was served with, so the nonce of that one cached copy repeats until the next install. Checked: header and page agree, and the farm opens offline with no policy error. [m7 join]
 
+#### Realism fixes after the final review (m7.1)
+
+**B137.** In a rescue, sheep are valued exactly as a normal sale that day would pay: the sale action's own figure, with nothing for the wool on their backs. Cattle were already valued that way. Other choice: count the wool on the back, as net worth does. [m7.1. Change: `flockSaleValue` in `sheep/market.ts`, used by `money/rescue.ts`]
+
+**B138.** The cash a rescue adds on top of its stock sale is its own line in the year's money, "Paid to keep going", and the year's profit and score leave it out. The stock sale goes in the year's sales. Other choice: count the rescue as profit, as before. [m7.1. Change: `YearTotals.keepGoing`, `scoreYear`]
+
+**B139.** A day card carries short job and farm facts only (PRD 9.3): moves, sales and purchases, births, deaths, weaning, marking, fencing and water work, and the day's rain. It leaves out the day's cash and running cost lines, wages and super, data notes and the "paid to keep going" line. The lines are picked by kind when the day is filed, not by their words. [m7.1. Change: `cardEvent` in `server/game/diary.ts`, and `farm_days.card_lines`]
+
+**B140.** On a Daily Farm night with no hand at work, a plan that moves several times a day grazes the day across the paddocks the player really moved the mob through, split as the engine splits its own stops, or where the mob is if it was not moved. The card offers at most the plan's own moves a day. Other choice: graze the plan's own stops whether or not the mob was moved. [m7.1. Change: `PlanRun.handStops`, `stopsToday`]
+
 ## 2. Stand-in figures
 
 These numbers have no sourced real figure behind them. Each is one constant or setting. "Replaced by" says what would replace it.
@@ -537,7 +547,7 @@ Each item could not be verified without keys, real services or a real phone. "Wh
 
 **V9. Lawyer and links.** The privacy complaints link, the legal drafts and the provider wording. Do: ask a lawyer to read them. [m5.4]
 
-**V10. `realism-guardian`.** Not run on several milestones (1.2c, 1.4b, 1.4, 1.5a, 1.6a, m6 join, others). Do: run it on the final branch before merging.
+**V10. `realism-guardian`.** Not run on several milestones (1.2c, 1.4b, 1.4, 1.5a, 1.6a, m6 join, others). The realism check was run on the engine changes of the final joins (m6 and m7), and its findings are fixed in m7.1 (Daily Farm plans with no hand, the rescue, day cards). Do: run it again on any later model change before merging.
 
 **V11. Lighthouse.** Not run on `/play` with the latest changes, on the sign-in and account pages, or after m6. The public pages ran at 99 to 100. Do: run Lighthouse CI on the main pages (mobile) on the final branch. [m3.2, m6]
 

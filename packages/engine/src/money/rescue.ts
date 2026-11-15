@@ -5,14 +5,19 @@
  * "Stock are sold to clear the debt first. Cash is then set to the hard-difficulty starting cash
  * for that farm." The smallest rule that does that, and nothing else:
  *
- *  1. Every head of stock on the farm is sold at what it would fetch today: the cattle at their net
- *     sale value and the sheep at theirs with the wool on their backs (the same figures net worth
- *     uses). Stock already bought and on the way still arrives; anything booked for a sale day is
- *     sold here instead, so its booking goes.
+ *  1. Every head of stock on the farm is sold at what a normal sale would pay today: the cattle at
+ *     their net sale value (never below 0 for a beast, as net worth counts them) and the sheep at
+ *     the sale action's own figure, which pays nothing for the wool on their backs (m7.1). It sells
+ *     on any day, sale day or not (a recorded call). Stock already bought and on the way is not
+ *     sold and not counted: it still arrives. Anything booked for a sale day is sold here instead,
+ *     so its booking goes.
  *  2. The sale pays the debt. Cash is then the hard-difficulty starting cash for this farm (its
  *     district and size, a farm with no herd: the stock has just been sold), or what the sale left
  *     after the debt if that is more. The "or more" is a stand-in where PRD 10.3 is silent: a
- *     rescue never takes away cash the sale itself raised (listed for Claudia).
+ *     rescue never takes away cash the sale itself raised (listed for Claudia). The sale goes in
+ *     the year's cattle and sheep sales. The cash added on top of the sale is its own line in the
+ *     year's money, "Paid to keep going" (`YearTotals.keepGoing`), and the year's profit and score
+ *     leave it out (m7.1).
  *  3. The farm opens again on the day it ended: game over is cleared and the eaten-out count goes
  *     back to 0. Paddocks, fences, water, crops, plans, hands and the clock are as they were.
  *  4. The rescue is recorded on the farm (`rescues`, save format 13), keyed on the purchase id: a
@@ -24,7 +29,7 @@
 
 import { startMoney } from './costs';
 import { netSaleValue } from '../market/prices';
-import { sheepIndicatorsOf, sheepWorth } from '../sheep/market';
+import { flockSaleValue, sheepIndicatorsOf } from '../sheep/market';
 import { pricesOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
 
@@ -41,6 +46,11 @@ export interface RescueTerms {
   hardStartCash: number;
   /** Cash after the rescue, dollars. */
   cashAfter: number;
+  /**
+   * The cash the rescue added on top of the stock sale, dollars (0 when the sale left more than
+   * the hard starting cash). Left out on a rescue recorded before engine 0.19.0.
+   */
+  paidIn?: number;
 }
 
 /** A rescue the farm has had (save format 13). */
@@ -57,32 +67,37 @@ export type RescueResult =
   | { ok: true; farm: FarmState; terms: RescueTerms; already: boolean }
   | { ok: false; reason: RescueRefusal; message: string };
 
+/** What the stock sale pays, cattle and sheep apart, dollars. */
+function saleOf(farm: FarmState): { cattleValue: number; sheepValue: number } {
+  const prices = pricesOf(farm);
+  let cattleValue = 0;
+  for (const m of farm.mobs)
+    for (const a of m.animals) cattleValue += Math.max(0, netSaleValue(a, prices));
+  const sheepValue = farm.sheep ? flockSaleValue(farm.sheep.mobs, sheepIndicatorsOf(farm)) : 0;
+  return { cattleValue, sheepValue };
+}
+
 /** What a rescue would do to this farm today. Reads only. */
 export function rescueTerms(farm: FarmState): RescueTerms {
-  const prices = pricesOf(farm);
   let cattleSold = 0;
-  let cattleValue = 0;
-  for (const m of farm.mobs) {
-    for (const a of m.animals) {
-      cattleSold++;
-      cattleValue += Math.max(0, netSaleValue(a, prices));
-    }
-  }
+  for (const m of farm.mobs) cattleSold += m.animals.length;
   let sheepSold = 0;
   for (const m of farm.sheep?.mobs ?? []) {
     for (const s of m.sheep) if (!s.dead && s.n > 0) sheepSold += s.n;
   }
-  const sheepValue = farm.sheep ? sheepWorth(farm.sheep.mobs, sheepIndicatorsOf(farm)) : 0;
+  const { cattleValue, sheepValue } = saleOf(farm);
   const stockValue = Math.round(cattleValue + sheepValue);
   const cash = Math.round(farm.cash);
   const hardStartCash = startMoney(farm.district, farm.layout.scale.farmHa, 'hard', false).cash;
+  const cashAfter = Math.max(hardStartCash, cash + stockValue);
   return {
     cattleSold,
     sheepSold,
     stockValue,
     debt: Math.max(0, -cash),
     hardStartCash,
-    cashAfter: Math.max(hardStartCash, cash + stockValue),
+    cashAfter,
+    paidIn: cashAfter - (cash + stockValue),
   };
 }
 
@@ -100,8 +115,13 @@ export function rescueFarm(farm: FarmState, o: { purchaseId: string }): RescueRe
     return { ok: false, reason: 'not-over', message: 'The game is not over on this farm.' };
   }
   const terms = rescueTerms(farm);
+  const sale = saleOf(farm);
   const next = cloneFarm(farm);
   const day = next.over!.day;
+  // The sale is the year's sales; the cash added on top is its own line, out of the year's profit.
+  next.year.sales += sale.cattleValue;
+  if (sale.sheepValue !== 0) next.year.sheepSales = (next.year.sheepSales ?? 0) + sale.sheepValue;
+  if (terms.paidIn) next.year.keepGoing = (next.year.keepGoing ?? 0) + terms.paidIn;
   next.mobs = [];
   if (next.sheep) next.sheep.mobs = [];
   next.saleBookings = [];

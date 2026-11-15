@@ -25,7 +25,7 @@ import { coverPct } from '../pasture/summary';
 import { lightLeft } from '../sim/clock';
 import { areaIdOf, dateOn, realSourcesOf, surveyOf } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
-import type { FarmState, GameOverReason, YearTotals } from '../sim/state';
+import type { FarmState, GameOverReason, PlanWaitReason, YearTotals } from '../sim/state';
 import { mobSummaries, type MobSummary } from '../sim/summary';
 import { stepDay, type DayResult, type TickEnv } from '../sim/tick';
 import { dawn } from './dawn';
@@ -114,12 +114,14 @@ export type SkipStop =
    * A grazing plan could not move a mob because the next area has no water.
    * The old game stopped its clock for this, once for each stop the plan was
    * waiting for. `step` counts the stops from the first stop of the first leg.
+   * `why` is the plan's own reason, so the words say it (only no water stops a skip today).
    */
   | {
       type: 'plan-waiting';
       mob: number;
       mobName: string;
       area: string;
+      why: PlanWaitReason;
       step: number;
     };
 
@@ -390,6 +392,7 @@ export function stopsIn(day: DayResult): SkipStop[] {
         mob: e.mob,
         mobName: e.mobName,
         area: e.area,
+        why: e.why,
         step: e.step,
       });
     } else if (e.type === 'year-end') stops.push({ type: 'year-end', year: e.year.n });

@@ -941,7 +941,8 @@ describe('the feed', () => {
       )
     ).rows[0]!.id;
     await db.query(
-      `insert into public.farm_days (farm_id, day, game_date, lines, more, rain_mm) values ($1, 4, '2026-03-04', array['Built 10 km of electric fence', 'Moved 2 mobs'], 1, 12.5)`,
+      // The diary has the cash and running cost lines too; the card carries the job facts only (m7.1).
+      `insert into public.farm_days (farm_id, day, game_date, lines, more, card_lines, rain_mm) values ($1, 4, '2026-03-04', array['Built 10 km of electric fence', 'Moved 2 mobs', 'Cash went from $1,000 to $900.', 'Running costs: $100.'], 1, array['Built 10 km of electric fence', 'Moved 2 mobs'], 12.5)`,
       [farm],
     );
     await db.query(
@@ -964,7 +965,6 @@ describe('the feed', () => {
       '4 Mar 2026',
       'Built 10 km of electric fence',
       'Moved 2 mobs',
-      'and 1 more',
       '12.5 mm',
     ]);
     const friends = await asUser(deps.sql, a.id, (tx) => feedPage(tx, a.id, 'friends', null));
@@ -972,13 +972,14 @@ describe('the feed', () => {
     await follow(a, b);
     const after = await asUser(deps.sql, a.id, (tx) => feedPage(tx, a.id, 'friends', null));
     expect(after.items.map((p) => p.kind)).toEqual(['day_card']);
-    expect(after.items[0]!.card?.title).toBe('Day 4');
+    // Engine day 4 is the diary's Day 5.
+    expect(after.items[0]!.card?.title).toBe('Day 5');
     // A private profile makes no day card. A Fast Farm makes none.
     await db.query(`update public.profiles set privacy_profile = 'private' where user_id = $1`, [
       b.id,
     ]);
     await db.query(
-      `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, 6, '2026-03-06', array['x'])`,
+      `insert into public.farm_days (farm_id, day, game_date, lines, card_lines) values ($1, 6, '2026-03-06', array['x'], array['x'])`,
       [farm],
     );
     expect(await makeDayCard(deps.sql, farm, 6)).toBeNull();
@@ -995,7 +996,7 @@ describe('the feed', () => {
     ).rows[0]!.id;
     for (const day of [1, 2, 3]) {
       await db.query(
-        `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, $2, '2026-03-0${day}', array['Moved 1 mob'])`,
+        `insert into public.farm_days (farm_id, day, game_date, lines, card_lines) values ($1, $2, '2026-03-0${day}', array['Moved 1 mob'], array['Moved 1 mob'])`,
         [farm, day],
       );
     }

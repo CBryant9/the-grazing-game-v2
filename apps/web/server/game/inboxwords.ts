@@ -4,7 +4,7 @@ import type { InboxKind } from '../../lib/game/types';
 import { isLabourEvent, labourMessage, type DateOf } from './labourwords';
 import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
-import { movedText } from './planwords';
+import { movedText, waitWhyWord } from './planwords';
 import { isSheepEvent, sheepMessage } from './sheepwords';
 import { causeWord, gameOverWord } from './words';
 
@@ -171,7 +171,7 @@ export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
     case 'plan-waiting':
       return msg(
         'plan',
-        `${e.mobName}'s grazing plan can not move it into ${e.area}, because that area has no water.`,
+        `${e.mobName}'s grazing plan can not move it into ${e.area}, because ${waitWhyWord(e.why)}.`,
       );
     case 'plan-staying':
       return msg(

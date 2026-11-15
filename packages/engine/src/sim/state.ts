@@ -109,6 +109,13 @@ export interface PlanRun {
   headDays: number;
   /** Live weight gained by the mob's animals while on the plan, kg. */
   gainKg: number;
+  /**
+   * For a plan that moves the mob more than once a day: a square in each area the mob stood in
+   * today before each move made by hand through `planMove`, in order (save format 14). On a night
+   * when plan moves are left to the player, the day's grazing is shared across these and the area
+   * the mob is in. Cleared at the night. Left out when there are none.
+   */
+  handStops?: number[];
 }
 
 /** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
@@ -189,6 +196,12 @@ export interface YearTotals {
   running: number;
   /** Interest: negative when paid on an overdraft, positive when earned. */
   interest: number;
+  /**
+   * Cash a paid rescue added on top of its stock sale this year, dollars ("Paid to keep going",
+   * save format 14). Not earned by the farm, so the year's profit and score leave it out. Left out
+   * until a farm is first rescued.
+   */
+  keepGoing?: number;
   /** Net worth when the year started. */
   worth0: number;
   /** Ground cover % on the 1st of each month. */
@@ -197,7 +210,7 @@ export interface YearTotals {
 
 /** The points a year scored, and the figures behind them. */
 export interface YearScore {
-  /** Change in net worth over the year, dollars. */
+  /** Change in net worth over the year, less any cash a paid rescue put in, dollars. */
   profit: number;
   /** Share of the feed grown that was eaten, %. */
   util: number;

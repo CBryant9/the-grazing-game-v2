@@ -83,7 +83,7 @@ function mobWire(farm: FarmState, p: PlanView, reasons: Map<number, 'asked' | 'm
       roundText: roundText(m.roundInLeg, leg?.rounds ?? 0),
       paused: m.paused,
       pausedText: m.paused ? pausedText(reasons.get(m.mob) ?? null, movedByHand) : null,
-      waitingText: m.waiting ? waitingText(m.waiting.area) : null,
+      waitingText: m.waiting ? waitingText(m.waiting.area, m.waiting.why) : null,
       nextText: nextText(m.next, farm.day),
       report: reportLines(m),
     };

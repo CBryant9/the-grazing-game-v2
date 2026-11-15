@@ -84,6 +84,7 @@ import { suppPerDay } from './mobs';
 import { GROUP_NAME, lostWaterNote, moveNotes } from './mobwords';
 import { parsePlanAction, planLines } from './plans';
 import { diaryPage, fileLines, periodFilings, type Filing } from './diary';
+import { rescueSaleWords } from './rescuewords';
 import { buildSnapshot, buildSummary, dateParts } from './snapshot';
 import {
   BrokenFarmError,
@@ -1817,6 +1818,8 @@ export class GameServer {
                   day: result.farm.day,
                   date: dateParts(dateOn(result.farm, result.farm.day)),
                   lines: [message],
+                  // A job's result is a job fact: a day card may carry it (PRD 9.3).
+                  card: [message],
                 },
               ]
             : [],
@@ -2074,12 +2077,7 @@ export class GameServer {
 /** The one diary line a rescue writes: the facts, in plain words. */
 export function rescueLine(t: RescueTerms): string {
   const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
-  const sold = t.cattleSold + t.sheepSold;
-  const stock =
-    sold > 0
-      ? `${sold.toLocaleString('en-AU')} head of stock were sold for ${money(t.stockValue)} to pay the debt`
-      : 'There was no stock to sell';
-  return `You paid to keep going. ${stock}, and cash was set to ${money(t.cashAfter)}. The farm is open again.`;
+  return `You paid to keep going. ${rescueSaleWords(t.cattleSold + t.sheepSold, t.stockValue, t.debt > 0, 'were')} Cash is now ${money(t.cashAfter)}. The farm is open again.`;
 }
 
 let shared: GameServer | undefined;

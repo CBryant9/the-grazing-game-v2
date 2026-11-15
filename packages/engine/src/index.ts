@@ -560,7 +560,18 @@ export { PTIC_DAYS, onRecordPtic, recordClassOf, recordGroupOf } from './sim/tol
 // Reads the web server needs, so it never copies a rule (14 Nov 2026).
 export { portableRefund, supplementCosts } from './sim/reads';
 export type { SupplementCost } from './sim/reads';
-export { perDay, plansView, positionOf, stepOf, stepsIn, stopsToday } from './sim/plans';
+export {
+  perDay,
+  planDueTonight,
+  plansView,
+  positionOf,
+  stepOf,
+  stepsIn,
+  stopsToday,
+} from './sim/plans';
+// Daily Farm with no hand (m7.1): the sheep plan moves due tonight, for the plan card.
+export { sheepPlansDue } from './sheep/moves';
+export type { SheepPlanDue } from './sheep/moves';
 export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
 export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
 export type { PlanFigure, PlanFigureSource } from './data/plans';

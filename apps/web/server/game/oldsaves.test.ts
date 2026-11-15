@@ -13,11 +13,12 @@ import { GameServer, farmKey } from './game';
 import { FileFarmStore, type FarmStore, type StoredFarm } from './store';
 
 /*
- * Old data after the m6 join (engine 0.18.0, save format 13, stored format 3). A stored farm from
+ * Old data after m7.1 (engine 0.19.0, save format 14, stored format 3). A stored farm from
  * the web line before the engine join (engine 0.13.0, save format 9), and one from each later
  * engine format, loads and plays a day, through the file store and the database store. The engine
  * saves are the real ones the old code made (packages/engine/test-support/fixtures); the format 12
  * one is today's save stamped 12, the same shape a 0.17.0 engine wrote (format 13 only added
+ * optional fields), and the format 13 one is today's save stamped 13 (format 14 only added
  * optional fields). The web's stored format has been 3 since the diary (m1.7g); a stored format 2
  * farm (before the diary) is walked too.
  */
@@ -44,6 +45,8 @@ const format12 = (): SavedFarm => ({
   engineVersion: '0.17.0',
 });
 
+const format13 = (): SavedFarm => ({ ...format12(), saveFormat: 13, engineVersion: '0.18.0' });
+
 const CASES: { label: string; saved: () => SavedFarm; storedFormat: number }[] = [
   {
     label: 'engine 0.13.0, save format 9 (the web line before the join)',
@@ -66,6 +69,7 @@ const CASES: { label: string; saved: () => SavedFarm; storedFormat: number }[] =
     storedFormat: 3,
   },
   { label: 'engine 0.17.0 shape, save format 12', saved: format12, storedFormat: 3 },
+  { label: 'engine 0.18.0 shape, save format 13', saved: format13, storedFormat: 3 },
   {
     label: 'stored format 2 (no diary), save format 9',
     saved: () => fixture('save-format-9.json'),
@@ -117,8 +121,8 @@ async function playsADay(store: FarmStore, id: string, before: number): Promise<
   const again = new GameServer({ store, seed: () => 3, saveRetryMs: [0, 0], hooks: null });
   expect((await again.snapshot(key))!.day).toBe(before + 1);
   const raw = (await store.get(id)) as StoredFarm;
-  expect(raw.saved.saveFormat).toBe(13);
-  expect(raw.saved.engineVersion).toBe('0.18.0');
+  expect(raw.saved.saveFormat).toBe(14);
+  expect(raw.saved.engineVersion).toBe('0.19.0');
 }
 
 describe('old farms through the file store', () => {

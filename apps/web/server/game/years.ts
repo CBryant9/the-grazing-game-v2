@@ -67,6 +67,12 @@ export function growthLine(
 /** Plain sentences from the year's figures. */
 export function yearFacts(y: Closed): string[] {
   const out = [`Net worth went from ${dollars(y.worth0)} to ${dollars(y.worth1)}.`];
+  // A rescue's cash is in net worth but not in the year's profit: said as a fact.
+  if (y.keepGoing) {
+    out.push(
+      `Paid to keep going: ${dollars(y.keepGoing)}. It is in net worth but not in the year's profit.`,
+    );
+  }
   // A year with sheep in it says so: its gain and births count sheep and lambs too.
   const sheep = y.sheepDeaths !== undefined || !!y.wool || !!y.sheepSales || !!y.sheepBuys;
   const stock = sheep ? 'Cattle and sheep' : 'Cattle';
@@ -110,6 +116,8 @@ export function yearMoney(y: YearTotals): { label: string; dollars: number }[] {
     { label: 'Infrastructure', dollars: -y.infra },
     { label: 'Running costs', dollars: -y.running },
     { label: 'Interest', dollars: y.interest },
+    // Cash a paid rescue put in on top of its stock sale (m7.1). Not in the year's profit.
+    { label: 'Paid to keep going', dollars: y.keepGoing ?? 0 },
   ];
   return rows.map((r) => ({ ...r, dollars: round(r.dollars) })).filter((r) => r.dollars !== 0);
 }

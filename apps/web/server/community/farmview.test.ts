@@ -294,7 +294,7 @@ describe('the links to a farm', () => {
     const bobFarm = await dailyFarm(bob, 'Bobby Plains');
     for (const f of [annFarm, bobFarm]) {
       await kit.db.query(
-        `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, 1, current_date, $2)`,
+        `insert into public.farm_days (farm_id, day, game_date, lines, card_lines) values ($1, 1, current_date, $2, $2)`,
         [f, ['Moved 1 mob', 'Built 2 km of electric fence']],
       );
       expect(await makeDayCard(kit.deps.sql, f, 1)).not.toBeNull();
@@ -319,7 +319,7 @@ describe('the links to a farm', () => {
     await follow(fan, owner);
     const id = await dailyFarm(owner);
     await kit.db.query(
-      `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, 1, current_date, $2)`,
+      `insert into public.farm_days (farm_id, day, game_date, lines, card_lines) values ($1, 1, current_date, $2, $2)`,
       [id, ['Moved 1 mob']],
     );
     expect(await makeDayCard(kit.deps.sql, id, 1)).toBeNull();

@@ -237,3 +237,12 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 - Privacy: A17 (day cards follow the farm view) and A21 (website views counted without consent).
 - Dashboard, analytics and the launch check: Part B, B122 to B136.
 - Keys and settings for ads, purchases and the website: sections 6 and 7 of `docs/CALLS_FOR_CLAUDIA.md`.
+
+## After the stages: m7.1 realism fixes
+
+A fix pass after a read-only realism review of the final branch (engine 0.19.0, save format 14). Full detail in `docs/DEVELOPMENT_LOG.md` (m7.1).
+
+- **Built:** Daily Farm nights with no hand keep plans live and count the night in the plan report (the engine's `plansByHand`); sheep plans are held and moved from the card; plans of several moves a day graze where the mob was moved; "grazed down to" plans wait a day and can end; waiting plans give the real reason; bad start dates are refused. The rescue values sheep as a sale pays and keeps its cash out of the year's profit, as a "Paid to keep going" line, with words by case. Day cards and Share my farm show the diary's day number; day cards carry job and farm facts and the rain only.
+- **Tested:** a test for each fix; `pnpm test` 4,227 passed, 22 expected failures, 4 skipped; no benchmark moved; speed, build, browser bundle and page budgets pass with no limit raised.
+- **Not done:** see the log entry (the supplement price read on a hand-moved several-moves-a-day plan; a browser check of the plan card).
+- **Questions for Claudia:** B137 to B140, and A20 as updated.

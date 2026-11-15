@@ -1,5 +1,5 @@
 import 'server-only';
-import type { PlanMobView, PlanNext, PlanRule, PlanReport } from '@gg/engine';
+import type { PlanMobView, PlanNext, PlanRule, PlanReport, PlanWaitReason } from '@gg/engine';
 
 /**
  * The words for grazing plans: the rule, the rounds, where a mob is on its
@@ -55,9 +55,24 @@ export function pausedText(because: 'asked' | 'manual-move' | null, movedByHand:
   return 'Paused. The plan does nothing until it is resumed.';
 }
 
+/**
+ * Why a plan can not move a mob into an area, from the plan's own reason (m7.1: "no water" only
+ * when that is the reason). Cattle plans wait for sheep, sheep plans for cattle.
+ */
+export function waitWhyWord(why: PlanWaitReason): string {
+  switch (why) {
+    case 'sheep-there':
+      return 'sheep are grazing there';
+    case 'cattle-there':
+      return 'cattle are grazing there';
+    case 'no-water':
+      return 'that area has no water';
+  }
+}
+
 /** Why a plan can not move a mob now. */
-export const waitingText = (area: string): string =>
-  `The plan can not move the mob into ${area}, because that area has no water. It tries again each day.`;
+export const waitingText = (area: string, why: PlanWaitReason = 'no-water'): string =>
+  `The plan can not move the mob into ${area}, because ${waitWhyWord(why)}. It tries again each day.`;
 
 /** What the plan will do next, as a fact. Counts of days are from the plan's own rule. */
 export function nextText(next: PlanNext, farmDay: number): string {
@@ -65,7 +80,9 @@ export function nextText(next: PlanNext, farmDay: number): string {
     case 'paused':
       return 'Nothing, while it is paused.';
     case 'waiting':
-      return `Move into ${next.area} once it has water.`;
+      return next.why === 'no-water'
+        ? `Move into ${next.area} once it has water.`
+        : `Move into ${next.area} once the ${next.why === 'sheep-there' ? 'sheep' : 'cattle'} there have left.`;
     case 'finish':
       return 'The next move ends the plan. The mob stays where it is.';
     case 'move': {

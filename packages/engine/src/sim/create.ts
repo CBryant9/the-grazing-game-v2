@@ -277,6 +277,15 @@ function startRealYears(o: CreateFarmOptions, order: YearOrder, env: SourceEnv):
  * its start, and its market opens on the real prices of its first day.
  */
 export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState {
+  if (o.start.date !== undefined) {
+    // A day of that month: 1 to 28, 29, 30 or 31. With no year given, 29 February is allowed.
+    // Months count from 0 (January).
+    const last = new Date(Date.UTC(o.start.year ?? 2000, o.start.month + 1, 0)).getUTCDate();
+    const d = o.start.date;
+    if (!Number.isInteger(d) || d < 1 || d > last) {
+      throw new RangeError(`The start date must be a day of that month, 1 to ${last}.`);
+    }
+  }
   const farmHa = typeof o.size === 'number' ? o.size : FARM_SIZES[o.district][SIZE_INDEX[o.size]];
   const running = o.startType === 'running';
   const real = o.years?.kind === 'real' ? startRealYears(o, o.years.order, env) : null;

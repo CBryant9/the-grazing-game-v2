@@ -76,13 +76,26 @@ export function stepOf(tpl: PlanTemplate, leg: number, idx: number): number {
  * square in each grazing area, in order, from the stop it is on. Null for a
  * mob that stays put all day: no plan, a paused plan, or a plan that moves
  * once a day or less. The cattle step keeps the stops that have water.
+ *
+ * `byHand` is a night when plan moves are left to the player (a Daily Farm
+ * with no hand at work): the stops are the areas the mob really stood in
+ * today, the ones it left by `planMove` and the one it is in now, so the
+ * day's grazing is shared across where it was. With no hand move today it
+ * grazes where it is (null).
  */
-export function stopsToday(farm: FarmState, mob: FarmMob): readonly number[] | null {
+export function stopsToday(
+  farm: FarmState,
+  mob: FarmMob,
+  byHand = false,
+): readonly number[] | null {
   const run = mob.plan;
   if (!run || run.paused || mob.where.kind !== 'paddock') return null;
   const tpl = templateOf(farm, run);
   const leg = tpl?.legs[run.leg];
   if (!leg) return null;
+  if (byHand) {
+    return run.handStops?.length ? [...run.handStops, mob.where.anchor] : null;
+  }
   const k = perDay(leg.rule);
   if (k <= 1) return null;
   const out: number[] = [];
@@ -141,6 +154,115 @@ function areaMass(farm: FarmState, cells: readonly number[]): number {
 
 export type StepResult = 'moved' | 'blocked' | 'finished';
 
+/** Where a plan goes on its next move, as `planStep` works it out. Nothing is changed. */
+type NextStop =
+  | { finish: true }
+  | {
+      finish: false;
+      leg: number;
+      ni: number;
+      round: number;
+      roundDone: boolean;
+      legStarted: number | null;
+      restarted: boolean;
+      target: number;
+    };
+
+function nextStopOf(tpl: PlanTemplate, run: PlanRun): NextStop {
+  const old = tpl.legs[run.leg]!;
+  let ni = run.idx + 1;
+  let round = run.round;
+  let leg = run.leg;
+  let roundDone = false;
+  let legStarted: number | null = null;
+  let restarted = false;
+  if (ni >= old.stops.length) {
+    ni = 0;
+    roundDone = true;
+    round++;
+    if (old.rounds > 0 && round >= old.rounds) {
+      round = 0;
+      leg++;
+      if (leg >= tpl.legs.length) {
+        if (tpl.after === 'repeat') {
+          leg = 0;
+          restarted = true;
+        } else return { finish: true };
+      } else legStarted = leg;
+    }
+  }
+  const target = tpl.legs[leg]!.stops[ni]!;
+  return { finish: false, leg, ni, round, roundDone, legStarted, restarted, target };
+}
+
+/** Why cattle can not go into an area now, or null: no water, or sheep grazing it. */
+export function cattleBlockedBy(
+  farm: FarmState,
+  survey: Survey,
+  areaId: number,
+): PlanWaitReason | null {
+  // Cattle never go in with sheep. A farm with no sheep never waits for this.
+  if (farm.sheep && sheepAreas(farm, survey).has(areaId)) return 'sheep-there';
+  return grazingArea(survey, areaId).hasWater ? null : 'no-water';
+}
+
+/**
+ * Whether the plan's rule says the mob moves (or the plan ends) tonight, by the tick's own rule
+ * (`runPlans`): a plan of several moves a day moves every night, less the moves made by hand
+ * today; a days rule after N days on the stop; a "grazed down to" rule once the area is at its
+ * figure or at its day limit, never on the day the mob came in. A paused plan, or a mob off
+ * pasture, is never due.
+ */
+export function planDueTonight(farm: FarmState, survey: Survey, m: FarmMob): boolean {
+  const run = m.plan;
+  if (!run || run.paused || m.where.kind !== 'paddock' || !m.animals.length) return false;
+  const tpl = templateOf(farm, run);
+  const rule = tpl?.legs[run.leg]?.rule;
+  if (!rule) return false;
+  const k = perDay(rule);
+  if (k > 1) return (run.handStops?.length ?? 0) < k;
+  const stay = farm.day + 1 - run.moved;
+  if (rule.mode === 'days') return stay >= rule.every;
+  if (stay < 1) return false;
+  const mass = areaMass(farm, survey.topology.areas[areaIdOf(survey, m)]!.cells);
+  return mass <= rule.kg || (rule.maxDays > 0 && stay >= rule.maxDays);
+}
+
+/**
+ * Step 8 of the tick on a night when plan moves are left to the player (a Daily Farm with no
+ * hand at work): no mob is moved, and every plan stays live. A plan whose move is due and whose
+ * next area is blocked waits, told once for each stop as `planStep` tells it; a plan whose next
+ * area is free again stops waiting. The plan's report has already counted the day's grazing.
+ */
+export function holdPlans(farm: FarmState, survey: Survey, events: TickEvent[]): void {
+  for (const m of farm.mobs) {
+    const run = m.plan;
+    if (!planDueTonight(farm, survey, m)) continue;
+    const tpl = templateOf(farm, run!)!;
+    const next = nextStopOf(tpl, run!);
+    if (next.finish) continue;
+    const areaId = survey.topology.areaOf[next.target]!;
+    const why = cattleBlockedBy(farm, survey, areaId);
+    if (!why) {
+      run!.waiting = null;
+      continue;
+    }
+    if (run!.waiting?.target !== next.target) {
+      run!.waiting = { target: next.target, why };
+      events.push({
+        type: 'plan-waiting',
+        mob: m.id,
+        mobName: m.name,
+        template: tpl.id,
+        why,
+        area: survey.topology.areas[areaId]!.name,
+        cell: next.target,
+        step: stepOf(tpl, next.leg, next.ni),
+      });
+    }
+  }
+}
+
 /**
  * One move of a plan: the old game's `planStep`. Works out where the plan
  * goes next. It finishes the plan if its rounds are done, waits if the next
@@ -161,48 +283,26 @@ export function planStep(
   events: TickEvent[],
 ): StepResult {
   const run = m.plan!;
-  const old = tpl.legs[run.leg]!;
-  let ni = run.idx + 1;
-  let round = run.round;
-  let leg = run.leg;
-  let roundDone = false;
-  let legStarted: number | null = null;
-  let restarted = false;
-  if (ni >= old.stops.length) {
-    ni = 0;
-    roundDone = true;
-    round++;
-    if (old.rounds > 0 && round >= old.rounds) {
-      round = 0;
-      leg++;
-      if (leg >= tpl.legs.length) {
-        if (tpl.after === 'repeat') {
-          leg = 0;
-          restarted = true;
-        } else {
-          // The plan is done. The last round counts, and the mob stays where it is.
-          run.rounds++;
-          events.push({
-            type: 'plan-finished',
-            mob: m.id,
-            mobName: m.name,
-            area: survey.topology.areas[areaIdOf(survey, m)]!.name,
-            report: reportOf(farm, run),
-          });
-          delete m.plan;
-          return 'finished';
-        }
-      } else legStarted = leg;
-    }
+  const next = nextStopOf(tpl, run);
+  if (next.finish) {
+    // The plan is done. The last round counts, and the mob stays where it is.
+    run.rounds++;
+    events.push({
+      type: 'plan-finished',
+      mob: m.id,
+      mobName: m.name,
+      area: survey.topology.areas[areaIdOf(survey, m)]!.name,
+      report: reportOf(farm, run),
+    });
+    delete m.plan;
+    return 'finished';
   }
-  const target = tpl.legs[leg]!.stops[ni]!;
+  const { leg, ni, round, roundDone, legStarted, restarted, target } = next;
   const areaId = survey.topology.areaOf[target]!;
   const area = grazingArea(survey, areaId);
   const step = stepOf(tpl, leg, ni);
-  // Cattle never go in with sheep. A farm with no sheep never waits for this.
-  const sheepThere = farm.sheep ? sheepAreas(farm, survey).has(areaId) : false;
-  if (!area.hasWater || sheepThere) {
-    const why = sheepThere ? 'sheep-there' : 'no-water';
+  const why = cattleBlockedBy(farm, survey, areaId);
+  if (why) {
     // Said once for each stop, as the old game said it once for each stop.
     if (run.waiting?.target !== target) {
       run.waiting = { target, why };
@@ -396,6 +496,12 @@ export interface PlanMobView {
   /** Set when the plan can not move the mob: the area it wants and why not. */
   waiting: { why: PlanWaitReason; area: string; cell: number } | null;
   next: PlanNext;
+  /** The plan's rule says the mob moves (or the plan ends) tonight: `planDueTonight`. */
+  due: boolean;
+  /** Why the next area can not take the mob now, read today, or null (also when the plan ends). */
+  blocked: PlanWaitReason | null;
+  /** Moves made by hand today through `planMove`, on a plan that moves more than once a day. */
+  movesToday: number;
   /** Feed the mob ate in the paddock while on the plan, kg DM, and head-days. */
   eatenKg: number;
   headDays: number;
@@ -508,6 +614,9 @@ export function plansView(farm: FarmState): PlanView[] {
         paused: run.paused,
         waiting,
         next,
+        due: planDueTonight(farm, survey, m),
+        blocked: finishes ? null : cattleBlockedBy(farm, survey, topo.areaOf[cell]!),
+        movesToday: run.handStops?.length ?? 0,
         eatenKg: run.eatenKg,
         headDays: run.headDays,
         gainKg: run.gainKg,

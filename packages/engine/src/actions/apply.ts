@@ -123,10 +123,20 @@ import {
   pauseSheepPlan,
   resumeSheepPlan,
   setSheepPlan,
+  sheepPlanMove,
 } from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
-import { newRun, planStep, positionOf, reportOf, stepOf, stepsIn, templateOf } from '../sim/plans';
+import {
+  newRun,
+  perDay,
+  planStep,
+  positionOf,
+  reportOf,
+  stepOf,
+  stepsIn,
+  templateOf,
+} from '../sim/plans';
 import {
   cloneFarm,
   deepCopy,
@@ -1049,9 +1059,16 @@ function resumePlan(j: Job, a: Extract<Action, { type: 'resumePlan' }>): Out {
  * so rounds, legs and the end of the plan are counted as the tick counts them. It is tonight's
  * move taken early: the days on the stop start from tomorrow, as they would after the tick's move,
  * so the plan keeps the same timetable and does not offer the same move again today.
+ *
+ * A plan that moves the mob several times a day makes at most that many hand moves in a day. Each
+ * one records the area the mob left (`handStops`), so the night grazes the day across the areas
+ * the mob was really in. A sheep mob's plan moves by the sheep tick's own move.
  */
 function planMove(j: Job, a: Extract<Action, { type: 'planMove' }>): Out {
   const m = j.mob(a.mob);
+  if (!m && j.farm.sheep?.mobs.some((x) => x.id === a.mob)) {
+    return sheepPlanMove(j.farm, j.events, a.mob);
+  }
   if (!m) return refuse('no-such-mob', 'That mob is not on the farm.');
   const run = m.plan;
   if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
@@ -1061,6 +1078,15 @@ function planMove(j: Job, a: Extract<Action, { type: 'planMove' }>): Out {
   }
   const tpl = templateOf(j.farm, run);
   if (!tpl) return refuse('no-such-plan', 'There is no such plan.');
+  const k = perDay(tpl.legs[run.leg]!.rule);
+  const today = run.handStops ?? [];
+  if (k > 1 && today.length >= k) {
+    return refuse(
+      'plan-waiting',
+      `${m.name}'s plan has made its ${k} moves for today. The next move is due tomorrow.`,
+    );
+  }
+  const left = m.where.anchor;
   const land = landOf(j.farm, j.survey, plantingsNow(j.farm, j.env));
   const result = planStep(
     j.farm,
@@ -1073,8 +1099,14 @@ function planMove(j: Job, a: Extract<Action, { type: 'planMove' }>): Out {
     j.events as Extract<FarmEvent, { type: 'plan-moved' | 'plan-waiting' | 'plan-finished' }>[],
   );
   if (result === 'blocked') {
-    return refuse('plan-waiting', `${m.name}'s plan can not move it: the next area has no water.`);
+    return refuse(
+      'plan-waiting',
+      run.waiting?.why === 'sheep-there'
+        ? `${m.name}'s plan can not move it: sheep are grazing in the next area. Cattle and sheep run in separate paddocks.`
+        : `${m.name}'s plan can not move it: the next area has no water.`,
+    );
   }
+  if (result === 'moved' && k > 1 && m.plan) m.plan.handStops = [...today, left];
   return null;
 }
 

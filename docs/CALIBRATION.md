@@ -4,7 +4,7 @@ The game is only worth playing if a grazier would believe it. These benchmarks a
 
 ## Benchmarks
 
-| What | Target | Why this figure | State (engine 0.17.0) |
+| What | Target | Why this figure | State (engine 0.19.0) |
 |---|---|---|---|
 | Steer gain, Central Qld, set-stocked, no lick | 20–60 kg/head/yr | Spear grass country without supplement: weight lost through the dry wipes out most of the wet-season gain | Pass |
 | Steer gain, Central Qld, with lick | 75–130 kg/head/yr | Urea/protein lick lifts dry-season intake (CP < 7%) | Pass, with a known gap held: the average year may run up to 2 kg over the top (`averageYearOver`) |
@@ -1504,6 +1504,16 @@ Band $37.85 to $63.08 (±25% of $50.46): the same DPIRD budget moved from $27.81
 Unmanaged figures swing on stock values and overheads year to year and are not margins; on Claudia's list.
 
 **Speed** (each alone): see the DEVELOPMENT_LOG entry.
+
+### 15 Nov 2026, m7.1 realism fixes: engine 0.19.0, save format 14
+
+What changed (no grass, cattle, sheep, crop, season or price formula): a night can leave grazing plan moves to the player (`plansByHand`, Daily Farm with no hand at work), with the plan live and its report counting the night, and a plan of several moves a day grazing the day across the areas the mob was moved through by hand; `planMove` works for sheep and gives the real reason a move is blocked; `createFarm` refuses a start date that is not a day of the month; a rescue values sheep as a normal sale pays and keeps the cash it adds out of the year's profit and score (`YearTotals.keepGoing`). Engine 0.18.0 had no calibration entry of its own: it changed no rule or number (version.ts).
+
+**The benchmarks were re-run and none moved.** Every engine test that existed on `m7-final` (ca7ff39, engine 0.18.0) was run on both tips and compared by name: the same passes, the same 22 expected failures (the open calibration rows, with the same figures in their names) and the same 4 skips. No band, skip, `it.fails` or tolerance changed. The calibration suites take none of the new paths: they drive no Daily Farm night, no `planMove` and no rescue. The no-hands digests pass untouched.
+
+Existing engine tests edited, none a calibration test: the version test (`day/saves.test.ts`, 0.19.0 and format 14, renamed with the numbers), one assertion in `sim/plans.test.ts` that now expects the skip stop's new `why` field (`no-water`), the first rescue test and the rescue save test (`money/rescue.test.ts`: the sheep valued as a sale, the year's sales and `keepGoing`, format 14), and the list of reads in `day/clock.test.ts`, which gained the two new reads (`planDueTonight`, `sheepPlansDue`). By name: 2,000 engine tests give the same result as on `m7-final`, 1 was renamed (the version test) and 13 are new.
+
+**Speed** (alone): cattle 3.56 ms a day with 4,890 head and 407 calves; sheep 2.59 ms a day with 6,865 sheep (limit 5 ms each).
 
 ### Earlier checks (build sessions, older model versions)
 

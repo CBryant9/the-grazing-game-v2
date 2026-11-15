@@ -24,6 +24,7 @@ export function gameRescueEngine(game: GameServer, sql: () => SqlRunner | null):
         hardStartCash: t.hardStartCash,
         head: t.cattleSold + t.sheepSold,
         stockValue: t.stockValue,
+        debt: t.debt,
       };
     },
     async apply({ purchaseId, farm }) {

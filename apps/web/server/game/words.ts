@@ -3,6 +3,7 @@ import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engi
 import type { TodoWire } from '../../lib/game/types';
 import { layoutWord } from './buildwords';
 import { labourMessage, type DateOf } from './labourwords';
+import { waitWhyWord } from './planwords';
 import { isSheepEvent, sheepMessage } from './sheepwords';
 
 /** Why water matters, as a fact. Said in the things to do and on the paddock sheet: written once, here. */
@@ -66,7 +67,7 @@ export function todoWire(t: ThingToDo): TodoWire {
       return {
         ...base,
         mob: t.mob,
-        text: `${t.mobName}'s grazing plan can not move it into ${t.area}, because that area has no water. The plan tries again each day.`,
+        text: `${t.mobName}'s grazing plan can not move it into ${t.area}, because ${waitWhyWord(t.why)}. The plan tries again each day.`,
         button: button('Pause plan'),
         urgent: false,
       };
@@ -143,7 +144,7 @@ export function stopWord(s: SkipStop): string {
     case 'game-over':
       return gameOverWord(s.reason);
     case 'plan-waiting':
-      return `${s.mobName}'s grazing plan could not move it into ${s.area}, because that area has no water.`;
+      return `${s.mobName}'s grazing plan could not move it into ${s.area}, because ${waitWhyWord(s.why)}.`;
   }
 }
 

@@ -43,7 +43,8 @@ export function farmCard(snap: Snapshot, mode: ModeId): Card {
     { label: 'Ground cover', value: `${num(t.coverPct)}%` },
     { label: 'Net worth', value: `$${num(t.netWorth)}` },
   ];
-  return { v: 1, kind: 'farm', title: `${snap.farm.name}, Day ${snap.day}`, facts };
+  // The day as the diary numbers it: the engine counts from 0, the player sees Day 1 first.
+  return { v: 1, kind: 'farm', title: `${snap.farm.name}, Day ${snap.day + 1}`, facts };
 }
 
 export async function shareFarm(
@@ -100,7 +101,7 @@ export async function shareFarm(
 }
 
 /**
- * One day card for one Daily Farm day (PRD 9.3): the day's diary lines as facts, made by the server
+ * One day card for one Daily Farm day (PRD 9.3): the day's job and farm facts, made by the server
  * at the farm's rollover (m6 join: the night calls the Stage 4 hooks, which call this). Fast Farms make none. A card
  * is made only for an owner who is a community member (16 or over, in good standing) with a profile
  * that is not private and a farm view that is not off, once per farm and day, and only when the diary
@@ -129,18 +130,21 @@ export async function makeDayCard(
   if (!farm || farm.privacy === 'private' || farm.farm_view === 'off') return null;
   const visibility =
     farm.privacy === 'public' && farm.farm_view === 'public' ? 'public' : 'followers';
+  // The card carries the day's job and farm facts only (PRD 9.3): the lines picked by kind when the
+  // day was filed (`card_lines`), never its cash, running cost, wage or data lines.
   const d = await sql.query<{
     game_date: string;
-    lines: string[];
-    more: number;
+    card_lines: string[] | null;
     rain_mm: string | null;
   }>(
-    `select to_char(game_date, 'YYYY-MM-DD') as game_date, lines, more, rain_mm
+    `select to_char(game_date, 'YYYY-MM-DD') as game_date, card_lines, rain_mm
        from public.farm_days where farm_id = $1 and day = $2`,
     [farmId, day],
   );
   const row = d.rows[0];
-  if (!row || row.lines.length === 0) return null;
+  const lines = row?.card_lines ?? [];
+  const rain = row?.rain_mm == null ? 0 : Number(row.rain_mm);
+  if (!row || (lines.length === 0 && !(rain > 0))) return null;
   const exists = await sql.query(
     `select 1 from public.posts where farm_id = $1 and farm_day = $2 and kind = 'day_card'`,
     [farmId, day],
@@ -148,12 +152,11 @@ export async function makeDayCard(
   if (exists.rowCount > 0) return null;
   const [y, m, dd] = row.game_date.split('-').map(Number);
   const facts: Card['facts'] = [{ label: 'Date', value: `${dd} ${MONTHS[(m ?? 1) - 1]} ${y}` }];
-  for (const line of row.lines.slice(0, 8)) facts.push({ label: null, value: line.slice(0, 200) });
-  if (row.more > 0) facts.push({ label: null, value: `and ${row.more} more` });
-  if (row.rain_mm !== null && Number(row.rain_mm) > 0) {
-    facts.push({ label: 'Rain', value: `${num(Number(row.rain_mm), 1)} mm` });
-  }
-  const card: Card = { v: 1, kind: 'day', title: `Day ${day}`, facts };
+  for (const line of lines.slice(0, 8)) facts.push({ label: null, value: line.slice(0, 200) });
+  if (lines.length > 8) facts.push({ label: null, value: `and ${lines.length - 8} more` });
+  if (rain > 0) facts.push({ label: 'Rain', value: `${num(rain, 1)} mm` });
+  // The day as the diary numbers it: the engine counts from 0, the player sees Day 1 first.
+  const card: Card = { v: 1, kind: 'day', title: `Day ${day + 1}`, facts };
   const r = await sql.query<{ id: string }>(
     `insert into public.posts (author_id, kind, body, farm_id, farm_day, card, visibility)
      values ($1, 'day_card', null, $2, $3, $4::jsonb, $5) returning id`,

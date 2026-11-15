@@ -127,13 +127,22 @@ export class DbFarmStore implements FarmStore {
         d: string;
         lines: string[];
         more: number;
+        card_lines: string[] | null;
+        rain_mm: string | null;
       }>(
-        `select day, to_char(game_date, 'YYYY-MM-DD') as d, lines, more
+        `select day, to_char(game_date, 'YYYY-MM-DD') as d, lines, more, card_lines, rain_mm
            from public.farm_days where farm_id = $1 order by day desc limit ${DIARY_DAYS}`,
         [id],
       );
       const diary: StoredDiaryDay[] = days.rows
-        .map((d) => ({ day: d.day, date: dateParts(d.d), lines: d.lines, more: d.more }))
+        .map((d): StoredDiaryDay => ({
+          day: d.day,
+          date: dateParts(d.d),
+          lines: d.lines,
+          more: d.more,
+          ...(d.card_lines?.length ? { card: d.card_lines } : {}),
+          ...(d.rain_mm !== null ? { rainMm: Number(d.rain_mm) } : {}),
+        }))
         .reverse();
       return {
         format: row.stored_format,
@@ -220,12 +229,23 @@ export class DbFarmStore implements FarmStore {
       const entry = farm.diary.find((d) => d.day === day);
       if (!entry) continue;
       const r = await tx.query<{ inserted: boolean }>(
-        `insert into public.farm_days (farm_id, day, game_date, lines, more)
-         values ($1, $2, $3::date, array(select jsonb_array_elements_text($4::jsonb)), $5)
+        // The day card's lines (by kind, m7.1) and the day's rain go in with the diary lines.
+        `insert into public.farm_days (farm_id, day, game_date, lines, more, card_lines, rain_mm)
+         values ($1, $2, $3::date, array(select jsonb_array_elements_text($4::jsonb)), $5,
+                 array(select jsonb_array_elements_text($6::jsonb)), $7)
          on conflict (farm_id, day) do update
-           set game_date = excluded.game_date, lines = excluded.lines, more = excluded.more
+           set game_date = excluded.game_date, lines = excluded.lines, more = excluded.more,
+               card_lines = excluded.card_lines, rain_mm = excluded.rain_mm
          returning (xmax = 0) as inserted`,
-        [id, day, dateText(entry.date), json(entry.lines), entry.more],
+        [
+          id,
+          day,
+          dateText(entry.date),
+          json(entry.lines),
+          entry.more,
+          json(entry.card ?? []),
+          entry.rainMm === undefined ? null : Math.round(entry.rainMm * 10) / 10,
+        ],
       );
       if (r.rows[0]?.inserted) played++;
     }

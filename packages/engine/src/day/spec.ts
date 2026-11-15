@@ -287,6 +287,16 @@ export function specFor(before: FarmState, action: Action, trial: ActionDone): J
           part('head', (sheepMoved.head / 100) * T.moveMobMinPer100Head.value),
         ]);
       }
+      // A sheep plan's move made by hand (`planMove` on a sheep mob): the sheep move's time.
+      const sheepPlanMoved = trial.events.find((e) => e.type === 'sheep-plan-moved');
+      if (!lost.length && sheepPlanMoved?.type === 'sheep-plan-moved') {
+        const was = (before.sheep?.mobs ?? []).find((x) => x.id === sheepPlanMoved.mob);
+        const head = was ? was.sheep.reduce((n, s) => n + (s.dead ? 0 : s.n), 0) : 0;
+        return whole([
+          part('settle', T.moveMobSettleMin.value),
+          part('head', (head / 100) * T.moveMobMinPer100Head.value),
+        ]);
+      }
       if (!lost.length) return { kind: 'free' };
       const head = lost.reduce((n, l) => n + l.head, 0);
       return whole([

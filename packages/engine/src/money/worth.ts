@@ -183,14 +183,23 @@ export const SCORE = {
 export function scoreYear(
   y: Pick<
     YearTotals,
-    'worth0' | 'grown' | 'eaten' | 'gain' | 'deaths' | 'sheepDeaths' | 'sheepDeathAe' | 'covers'
+    | 'worth0'
+    | 'grown'
+    | 'eaten'
+    | 'gain'
+    | 'deaths'
+    | 'sheepDeaths'
+    | 'sheepDeathAe'
+    | 'covers'
+    | 'keepGoing'
   > & {
     worth1: number;
   },
   coverNow: number,
 ): YearScore {
   const S = SCORE;
-  const profit = y.worth1 - y.worth0;
+  // The change in net worth, less any cash a paid rescue put in (m7.1): the farm did not earn it.
+  const profit = y.worth1 - y.worth0 - (y.keepGoing ?? 0);
   const util = y.grown > 0 ? (y.eaten / y.grown) * 100 : 0;
   const cover = y.covers.length ? y.covers.reduce((a, b) => a + b, 0) / y.covers.length : coverNow;
   const utilPts =

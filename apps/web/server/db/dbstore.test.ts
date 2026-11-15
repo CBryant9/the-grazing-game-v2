@@ -316,6 +316,31 @@ describe('the database store: the diary cap', () => {
   });
 });
 
+describe('the database store: a day kept with its card lines and its rain (m7.1)', () => {
+  it('writes the day card lines and the real rain with the diary, and reads them back', async () => {
+    await game.create(session(8), { ...choices, startType: 'running', years: 'real-in-order' });
+    await game.endDay(session(8));
+    const id = (await db.query<{ id: string }>('select id from public.farms')).rows[0]!.id;
+    const rows = await db.query<{
+      day: number;
+      lines: string[];
+      card_lines: string[] | null;
+      rain_mm: string | null;
+    }>('select day, lines, card_lines, rain_mm from public.farm_days where farm_id = $1', [id]);
+    expect(rows.rows.length).toBeGreaterThan(0);
+    const row = rows.rows[0]!;
+    // A real-year day has its real rain kept (0 mm is a fact too), and its card lines.
+    expect(row.rain_mm).not.toBeNull();
+    expect(Number(row.rain_mm)).toBeGreaterThanOrEqual(0);
+    expect(row.card_lines).not.toBeNull();
+    // The day's cash line is in the diary, never in the card.
+    expect(row.card_lines!.some((l) => l.startsWith('Cash went from'))).toBe(false);
+    const held = (await store.get(fromUuid(id))) as StoredFarm;
+    const kept = held.diary.find((d) => d.day === row.day)!;
+    expect(kept.rainMm).toBe(Number(row.rain_mm));
+  });
+});
+
 describe('the database store: accounts, limits and slots', () => {
   it('an account has two Fast Farm slots; a third is refused with a plain message', async () => {
     const a = await game.create(farmKey(hex(1)), { ...choices, name: 'One' }, user(USER));

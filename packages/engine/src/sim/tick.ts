@@ -14,7 +14,8 @@
  *   6. portable troughs drain, hungry or thirsty mobs may push through tape,
  *      and mobs that share an area join
  *   7. running costs and interest
- *   8. grazing plans move mobs (plans.ts)
+ *   8. grazing plans move mobs (plans.ts), or on a night the moves are
+ *      left to the player (`plansByHand`), wait for them
  *   9. the market moves and the day ends
  *  10. the year closes every 365 days
  *  11. game-over checks
@@ -59,7 +60,7 @@ import {
 import type { TickEvent } from './events';
 import { startDay } from './clock';
 import { autoWeanDest, mergeShared, newMob } from './mobs';
-import { runPlans, stopsToday } from './plans';
+import { holdPlans, runPlans, stopsToday } from './plans';
 import {
   mergeSheepShared,
   sheepAreas,
@@ -68,7 +69,7 @@ import {
   sheepWaterLitres,
 } from '../sheep/farm';
 import type { SheepDeathCause } from '../sheep/notes';
-import { runSheepPlans } from '../sheep/moves';
+import { holdSheepPlans, runSheepPlans } from '../sheep/moves';
 import {
   PLAY_STREAMS,
   PRICE_HISTORY_DAYS,
@@ -99,6 +100,14 @@ export const EATEN_OUT_DAYS = 10;
 export interface TickEnv extends SourceEnv {
   /** Random streams, in place of the farm's saved ones. A stream given here is not saved back. */
   rng?: Partial<Record<PlayStream, Rng>>;
+  /**
+   * A night when grazing plan moves are left to the player (a Daily Farm with no hand at work,
+   * PRD 5.15). Every plan stays live and counts the night in its report, but the tick moves no
+   * mob: a plan whose move is due waits for the player's `planMove`. A plan that moves several
+   * times a day grazes the day across the areas the mob was really moved through by hand
+   * (`stopsToday`), or where it is if it was not moved. Left out, the plans move as always.
+   */
+  plansByHand?: boolean;
 }
 
 export interface DayResult {
@@ -118,6 +127,8 @@ export interface DayResult {
   sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause; count: number }[];
   /** Lambs born today, by record and mob. Left out on a farm with no sheep. */
   lambs?: { id: number; mob: number; count: number }[];
+  /** The day's real rain, mm, from the weather table. Left out on a farm with random seasons. */
+  rainMm?: number;
 }
 
 /**
@@ -188,8 +199,11 @@ function sheepBreakouts(farm: FarmState, survey: Survey, day: number, events: Ti
   if (moved) mergeSheepShared(farm, survey, events);
 }
 
-/** Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its area and the day's stops. */
-export function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace {
+/**
+ * Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its
+ * area and the day's stops. `byHand`: plan moves are left to the player tonight (`TickEnv`).
+ */
+export function placeFor(farm: FarmState, survey: Survey, m: FarmMob, byHand = false): MobPlace {
   if (m.where.kind === 'lot') return { kind: 'lot' };
   if (m.where.kind === 'yards') {
     // A stand-in until yard work is built (milestone 1.5): the yards have
@@ -204,7 +218,7 @@ export function placeFor(farm: FarmState, survey: Survey, m: FarmMob): MobPlace 
     };
   }
   const areaOf = survey.topology.areaOf;
-  const stops = stopsToday(farm, m);
+  const stops = stopsToday(farm, m, byHand);
   return {
     kind: 'paddock',
     area: grazingArea(survey, areaOf[m.where.anchor]!),
@@ -287,6 +301,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     births: [],
   };
   if (farm.over) return result;
+  if (real) result.rainMm = real.seasons.rainOn(day);
   // Real-year sheep prices for today (sheep may have come since the last day).
   refreshSheepPrices(farm, env);
   result.ran = true;
@@ -353,7 +368,7 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
       for (const a of m.animals) if (!a.dead) weights.set(a.id, a.wt);
     }
     const res = simMob(m, {
-      place: placeFor(farm, survey, m),
+      place: placeFor(farm, survey, m, env.plansByHand === true),
       land,
       day,
       byId,
@@ -403,6 +418,8 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
 
   // 5. Deaths are settled.
   settleDeaths(farm.mobs, deaths, byId, farm.year);
+  // The areas a mob was moved through by hand today have been grazed: the record clears at the night.
+  for (const m of farm.mobs) if (m.plan?.handStops) delete m.plan.handStops;
 
   // 4b and 5b. The sheep's day, on the same pasture, and their deaths settled.
   // A farm that has never had sheep skips this and is unchanged.
@@ -505,9 +522,15 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   farm.year.interest += interest;
 
   // 8. Grazing plans move mobs here. Each move takes the move time off today's light.
-  runPlans(farm, survey, landOf(farm, survey, plantings), events);
-  // 8b. Sheep plans, on a farm with sheep.
-  if (farm.sheep) runSheepPlans(farm, survey, landOf(farm, survey, plantings), events);
+  // On a night when the moves are left to the player, nothing moves and the plans stay live.
+  if (env.plansByHand) {
+    holdPlans(farm, survey, events);
+    if (farm.sheep) holdSheepPlans(farm, survey, events);
+  } else {
+    runPlans(farm, survey, landOf(farm, survey, plantings), events);
+    // 8b. Sheep plans, on a farm with sheep.
+    if (farm.sheep) runSheepPlans(farm, survey, landOf(farm, survey, plantings), events);
+  }
 
   // 9. The market moves and the day ends.
   farm.day++;

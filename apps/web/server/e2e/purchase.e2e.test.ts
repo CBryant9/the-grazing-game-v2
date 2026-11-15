@@ -265,8 +265,12 @@ describe('launch flow 5: paying to keep going', () => {
     ).offer!;
     expect(offer.productId).toBe('keep_going_fast');
     const card = offer.does.join(' ');
-    expect(card).toContain(
-      `Your stock (${(ended.totals.head + ended.totals.calves).toLocaleString('en-AU')} head) is sold first to pay the debt.`,
+    // What the stock fetches today, and "to pay the debt" because there is one (m7.1).
+    const head = (ended.totals.head + ended.totals.calves).toLocaleString('en-AU');
+    expect(card).toMatch(
+      new RegExp(
+        `${head} head of stock will be sold at today's prices for \\$[\\d,]+ to pay the debt\\.`,
+      ),
     );
     expect(card).toMatch(/opens again on the day it ended/);
 

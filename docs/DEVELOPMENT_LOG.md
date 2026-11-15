@@ -2376,6 +2376,29 @@ Branch `m7-final`, cut from `m5.5-launch-check` (f50c821). Merged with `--no-ff`
 - `farm_ended` for a Daily Farm that ends at the midnight run, and `profile_completed`, `pwa_installed`, `notification_opened`.
 - The `realism-guardian` agent was not run (no model, data or drawing change in this join).
 
+### 15 Nov 2026: m7.1 Realism fixes
+
+Branch `m7.1-realism-fixes`, cut from `m7-final` (ca7ff39). Engine 0.19.0, save format 14. A read-only review of the final branch found realism faults in three places; each is fixed with a test that fails without it. Lessons RF1 to RF11. Calls B137 to B140, A20 and V10 updated.
+
+**Daily Farm plans with no hand.** The night is the engine's own (`TickEnv.plansByHand`), not the player's "paused" state: plans stay live, no mob moves, and the plan's report counts the night. The review's case (Central West, one mob, a daily plan, 6 nights moved from the card): before, 6 moves, 0 kg DM, 0 head-days, 0 kg; now 6 moves, 5,523 kg DM, 924 head-days, -457 kg (the engine's own tick on the same farm: 6 moves, 5,528 kg DM, 924 head-days, -454 kg; the difference is that a hand-moved mob grazes its new paddock that day). A part-time hand's nights and the held nights both count. Plans of several moves a day graze across the paddocks the mob was moved through (`handStops`) and the card offers at most the plan's own moves a day. Sheep plans are held, offered and moved by `planMove`. "Grazed down to" plans wait a day after a hand move and can end on the card. A waiting plan gives its real reason everywhere. `createFarm` refuses a bad start date. Tests: `packages/engine/src/sim/heldNight.test.ts`, `apps/web/server/daily/nights.test.ts`, `apps/web/server/game/realism.test.ts`.
+
+**The rescue.** Sheep valued as a normal sale pays (no wool on the back). The sale goes in the year's sales; the cash added on top is its own money line, "Paid to keep going", left out of the year's profit and score. A Central West farm (medium, seed 3, taken by the bank): net worth $42,360 to $140,000, $97,640 paid in; the year's profit stays at -$328,322 (before the fix it rose by the $97,640, with no money line). Words by case on the diary line and the offer card. Tests: `money/rescue.test.ts`, `realism.test.ts`, the billing and purchase flow tests.
+
+**Day cards.** "Day N" is the diary's day on the day card, the Share my farm card and its farm picker. A day card carries job and farm facts only, picked by the kind of line when the day is filed (`farm_days.card_lines`, migration `20261119000100_day_card_lines.sql`), and `rain_mm` is written when the day is kept. Tests: `community.test.ts`, `farmview.test.ts`, `dbstore.test.ts`, `realism.test.ts`.
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 233 files, 4,253 tests: 4,227 passed, 22 expected failures, 4 skipped, 0 failed. Engine tests against `m7-final` by name: 2,000 the same result, 1 renamed (the version test), 13 new; the same 22 expected failures and 4 skips. No benchmark moved (CALIBRATION, the m7.1 entry).
+- `pnpm test:speed` alone: cattle 3.56 ms a day (4,890 head, 407 calves), sheep 2.59 ms a day (6,865 sheep).
+- `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised and no page larger than at m7 (`/play` 208.3 KB, `/sign-in` 144.1 KB, `/community/groups/[id]` 149.8 KB): every change is on the server.
+
+**Not done or not checked**
+
+- The supplement price read (`supplementCosts`) prices a plan of several moves a day on the plan's own stops, not on the paddocks the player moved the mob through on a night with no hand. A small difference in a price shown, on Daily Farm only.
+- The sheep tick still counts a round when a plan wraps to a stop it then can not enter (kept so no sheep figure moves).
+- The review's exact Central West rescue farm (-$73,277) was not rebuilt; a farm of the same kind was used.
+- No browser check of the plan card wording; the `realism-guardian` agent was not run on this pass.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

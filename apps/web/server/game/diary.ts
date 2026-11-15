@@ -24,6 +24,13 @@ export interface StoredDiaryDay {
   date: DateParts;
   lines: string[];
   more: number;
+  /**
+   * The lines a day card may carry (PRD 9.3, m7.1): short job and farm facts, picked by the kind
+   * of line when it was filed, never by its words. Left out when there are none.
+   */
+  card?: string[];
+  /** The day's real rain, mm, when the farm plays real years. Left out otherwise. */
+  rainMm?: number;
 }
 
 /** Lines to add to a day. */
@@ -31,7 +38,28 @@ export interface Filing {
   day: number;
   date: DateParts;
   lines: string[];
+  /** Which of `lines` a day card may carry. Left out: none of them. */
+  card?: string[];
+  /** The day's real rain, mm. */
+  rainMm?: number;
 }
+
+/**
+ * Whether a day's event may go on a day card (PRD 9.3): moves, sales and purchases, births,
+ * deaths, weaning, marking, fencing and water work, and the rest of the farm's own facts. Wages
+ * and super are money lines, not job facts, so they stay in the diary only. The day's cash and
+ * running cost lines (`summaryLines`), data notes and the rescue line are never filed as card
+ * lines at all.
+ */
+export function cardEvent(e: FarmEvent): boolean {
+  return !CARD_LEAVES_OUT.has(e.type);
+}
+
+const CARD_LEAVES_OUT: ReadonlySet<FarmEvent['type']> = new Set<FarmEvent['type']>([
+  'wages-paid',
+  'wages-owed-paid',
+  'wages-missed',
+]);
 
 /**
  * The diary with the lines filed under their days, as a new list. A day
@@ -57,6 +85,10 @@ export function fileLines(
       if (entry.lines.length < DIARY_LINES) entry.lines.push(line);
       else entry.more++;
     }
+    if (f.card?.length) {
+      entry.card = [...(entry.card ?? []), ...f.card].slice(0, DIARY_LINES);
+    }
+    if (f.rainMm !== undefined) entry.rainMm = f.rainMm;
   }
   if (out.length > DIARY_DAYS) out.splice(0, out.length - DIARY_DAYS);
   return out;
@@ -117,6 +149,8 @@ export function summaryLines(s: SummaryWire): string[] {
 export interface RunDay {
   day: number;
   events: readonly FarmEvent[];
+  /** The day's real rain, mm (the engine's `DayResult.rainMm`). */
+  rainMm?: number;
 }
 
 /**
@@ -134,11 +168,13 @@ export function periodFilings(
   days: readonly RunDay[],
 ): Filing[] {
   const byDay = new Map<number, string[]>();
-  const add = (day: number, lines: string[]): void => {
+  const cards = new Map<number, string[]>();
+  const add = (day: number, lines: string[], card = false): void => {
     if (lines.length === 0) return;
     const there = byDay.get(day);
     if (there) there.push(...lines);
-    else byDay.set(day, lines);
+    else byDay.set(day, lines.slice());
+    if (card) cards.set(day, [...(cards.get(day) ?? []), ...lines]);
   };
   const dateOf: DateOf = (day) => {
     const d = dateOn(farm, day);
@@ -147,9 +183,10 @@ export function periodFilings(
   for (const d of days) {
     for (const e of d.events) {
       const words = inboxMessage(e, dateOf);
-      if (words) add(d.day, [words.text]);
+      if (words) add(d.day, [words.text], cardEvent(e));
     }
   }
+  const rain = new Map(days.filter((d) => d.rainMm !== undefined).map((d) => [d.day, d.rainMm!]));
   for (const m of farm.inbox) {
     if (m.seq < seq0) continue;
     // First light brings cattle in, sells booked stock and does the workforce's pay day, leavings and fencing.
@@ -160,13 +197,21 @@ export function periodFilings(
       (isLabourEvent(m.event) && DAWN_LABOUR.has(m.event.type));
     if (!dawn) continue;
     const words = inboxMessage(m.event, dateOf);
-    if (words) add(m.day, [words.text]);
+    if (words) add(m.day, [words.text], cardEvent(m.event));
   }
   if (summary.daysRun > 0) add(Math.max(0, farm.day - 1), summaryLines(summary));
   return [...byDay]
     .sort((a, b) => a[0] - b[0])
     .map(([day, lines]) => {
       const d = dateOn(farm, day);
-      return { day, date: { year: d.year, month: d.month, date: d.date }, lines };
+      const card = cards.get(day);
+      const rainMm = rain.get(day);
+      return {
+        day,
+        date: { year: d.year, month: d.month, date: d.date },
+        lines,
+        ...(card?.length ? { card } : {}),
+        ...(rainMm !== undefined ? { rainMm } : {}),
+      };
     });
 }

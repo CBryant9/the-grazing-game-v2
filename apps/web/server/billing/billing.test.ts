@@ -1119,8 +1119,12 @@ describe('paying to keep going', () => {
     ).offer;
     expect(offer.productId).toBe('keep_going_fast');
     const card = offer.does.join(' ');
-    expect(card).toContain(
-      `Your stock (${(before.totals.head + before.totals.calves).toLocaleString('en-AU')} head) is sold first to pay the debt.`,
+    // What the stock fetches today, and "to pay the debt" because there is one (m7.1).
+    const head = (before.totals.head + before.totals.calves).toLocaleString('en-AU');
+    expect(card).toMatch(
+      new RegExp(
+        `${head} head of stock will be sold at today's prices for \\$[\\d,]+ to pay the debt\\.`,
+      ),
     );
     expect(card).toMatch(/starting cash for this farm/);
     expect(card).toMatch(/opens again on the day it ended/);
@@ -1145,7 +1149,7 @@ describe('paying to keep going', () => {
     const lines = (await game.record(f.key)).diary.flatMap((d) => d.lines);
     const said = lines.filter((l) => l.startsWith('You paid to keep going.'));
     expect(said).toHaveLength(1);
-    expect(said[0]).toContain(`cash was set to $${offer.cashAfter.toLocaleString('en-AU')}`);
+    expect(said[0]).toContain(`Cash is now $${offer.cashAfter.toLocaleString('en-AU')}`);
     // It plays on.
     expect((await game.endDay(f.key)).snapshot.day).toBe(before.day + 1);
 

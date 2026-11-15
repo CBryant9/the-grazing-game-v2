@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { endDay, skipDays } from '../day/days';
 import { netSaleValue } from '../market/prices';
 import { farmHash, loadFarm, saveFarm } from '../save/save';
-import { sheepIndicatorsOf, sheepWorth } from '../sheep/market';
+import { sheepIndicatorsOf, sheepNetSaleValue, sheepWorth } from '../sheep/market';
 import { createFarm, type CreateFarmOptions } from '../sim/create';
 import { pricesOf } from '../sim/derived';
 import { cloneFarm, type FarmState } from '../sim/state';
 import { SAVE_FORMAT_VERSION } from '../version';
 import { startMoney } from './costs';
+import { closeYear, liveYear, netWorth } from './worth';
 import { rescueFarm, rescueTerms } from './rescue';
 
 /*
@@ -51,12 +52,17 @@ describe('a rescue', () => {
     expect(stock.cattle).toBeGreaterThan(0);
     expect(stock.sheep).toBeGreaterThan(0);
     const terms = rescueTerms(over);
-    // What the stock fetched: the figures net worth uses.
+    // What the stock fetched: what a normal sale pays today (m7.1). The cattle at net sale value,
+    // the sheep at the sale action's own figure, with nothing for the wool on their backs.
     const prices = pricesOf(over);
-    let value = 0;
+    let cattle = 0;
     for (const m of over.mobs)
-      for (const a of m.animals) value += Math.max(0, netSaleValue(a, prices));
-    value += sheepWorth(over.sheep!.mobs, sheepIndicatorsOf(over));
+      for (const a of m.animals) cattle += Math.max(0, netSaleValue(a, prices));
+    let sheep = 0;
+    for (const m of over.sheep!.mobs)
+      for (const s of m.sheep)
+        if (!s.dead && s.n > 0) sheep += sheepNetSaleValue(s, sheepIndicatorsOf(over)) * s.n;
+    const value = cattle + sheep;
     expect(terms).toMatchObject({
       cattleSold: stock.cattle,
       sheepSold: stock.sheep,
@@ -85,7 +91,13 @@ describe('a rescue', () => {
     expect(r.farm.layout).toEqual(over.layout);
     expect(r.farm.pasture).toEqual(over.pasture);
     expect(r.farm.plans).toEqual(over.plans);
-    expect(r.farm.year).toEqual(over.year);
+    // The year: the sale is in its sales, and the cash paid in on top is its own line (m7.1).
+    expect(r.farm.year).toEqual({
+      ...over.year,
+      sales: over.year.sales + cattle,
+      sheepSales: (over.year.sheepSales ?? 0) + sheep,
+      keepGoing: terms.paidIn,
+    });
     expect(r.farm.clock).toEqual(over.clock);
     // And it plays on.
     const next = endDay(r.farm);
@@ -168,7 +180,7 @@ describe('a rescue', () => {
     if (!r.ok) throw new Error(r.message);
     const saved = saveFarm(r.farm);
     expect(saved.saveFormat).toBe(SAVE_FORMAT_VERSION);
-    expect(SAVE_FORMAT_VERSION).toBe(13);
+    expect(SAVE_FORMAT_VERSION).toBe(14);
     const loaded = loadFarm(JSON.parse(JSON.stringify(saved)));
     expect(loaded.rescues).toEqual(r.farm.rescues);
     expect(farmHash(loaded)).toBe(farmHash(r.farm));
@@ -178,5 +190,44 @@ describe('a rescue', () => {
     // A format 12 save (no rescues) loads with none.
     const old = { ...saveFarm(createFarm(base)), saveFormat: 12 };
     expect(loadFarm(old).rescues).toBeUndefined();
+  });
+
+  it('values the sheep as a normal sale today would pay, with nothing for the wool on their backs (m7.1)', () => {
+    const over = brokeFarm();
+    const ind = sheepIndicatorsOf(over);
+    let sale = 0;
+    for (const m of over.sheep!.mobs)
+      for (const s of m.sheep) if (!s.dead && s.n > 0) sale += sheepNetSaleValue(s, ind) * s.n;
+    const cattleOnly = rescueTerms({ ...cloneFarm(over), sheep: undefined }).stockValue;
+    const terms = rescueTerms(over);
+    expect(terms.stockValue - cattleOnly).toBeCloseTo(sale, -1);
+    // Net worth counts the wool on the back; a sale does not pay it, so the rescue does not.
+    const worth = sheepWorth(over.sheep!.mobs, ind);
+    expect(worth).toBeGreaterThan(sale + 1);
+    expect(terms.stockValue).toBeLessThan(Math.round(cattleOnly + worth));
+  });
+
+  it('keeps the cash paid in out of the year profit and score, as its own money line (m7.1)', () => {
+    // The review's case: a Central West farm the bank took, rescued from a debt.
+    const farm = cloneFarm(createFarm({ ...base, district: 'cw', stock: undefined }));
+    farm.cash = farm.broke + 1;
+    const over = skipDays(farm, 'week').farm;
+    expect(over.over?.reason).toBe('bank');
+    const before = liveYear(over);
+    const r = rescueFarm(over, { purchaseId: 'p-cw' });
+    if (!r.ok) throw new Error(r.message);
+    const after = liveYear(r.farm);
+    const jump = netWorth(r.farm) - netWorth(over);
+    expect(r.terms.debt).toBeGreaterThan(0);
+    expect(r.terms.paidIn).toBeGreaterThan(0);
+    expect(r.farm.year.keepGoing).toBe(r.terms.paidIn);
+    // Net worth jumps by the cash paid in (the cattle sold at what net worth counted them at).
+    expect(Math.abs(jump - r.terms.paidIn!)).toBeLessThan(2);
+    // The year's profit does not: only the rounding of the sale moves it.
+    expect(Math.abs(after.score.profit - before.score.profit)).toBeLessThan(2);
+    expect(Math.abs(after.score.profitPts - before.score.profitPts)).toBeLessThan(0.1);
+    // And when the year closes, its profit leaves the cash paid in out.
+    const closed = closeYear(cloneFarm(r.farm));
+    expect(closed.score.profit).toBeCloseTo(closed.worth1 - closed.worth0 - r.terms.paidIn!, 6);
   });
 });

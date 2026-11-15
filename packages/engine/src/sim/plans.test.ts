@@ -498,6 +498,7 @@ describe('when a plan can not move a mob', () => {
         mob,
         mobName: mobOf(planned, mob).name,
         area: expect.any(String),
+        why: 'no-water',
         step: 1,
       },
     ]);

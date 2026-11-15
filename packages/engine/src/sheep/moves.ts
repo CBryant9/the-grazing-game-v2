@@ -19,8 +19,8 @@ import type { GrazingLand } from '../cattle/types';
 import type { Survey } from '../farm/layout';
 import { areaIdOf, grazingArea, placeAnchor, surveyOf } from '../sim/derived';
 import type { FarmEvent, TickEvent } from '../sim/events';
-import { newRun, perDay, positionOf, stepOf, templateOf } from '../sim/plans';
-import type { FarmState, PlanTemplate } from '../sim/state';
+import { newRun, positionOf, stepOf, templateOf } from '../sim/plans';
+import type { FarmState, PlanRun, PlanTemplate, PlanWaitReason } from '../sim/state';
 import { sheepClassOf } from './energy';
 import { createSheepMob, mergeSheepShared, sheepMobsOf } from './farm';
 import { headOf, lambsByDam, splitOff } from './simFlock';
@@ -324,73 +324,215 @@ export function runSheepPlans(
 ): void {
   void land;
   for (const m of sheepMobsOf(farm)) {
-    const run = m.plan;
-    if (!run || run.paused || m.where.kind !== 'paddock' || !m.sheep.length) continue;
-    const tpl = templateOf(farm, run);
-    const leg = tpl?.legs[run.leg];
-    if (!tpl || !leg) continue;
-    const days = farm.day + 1 - run.moved;
-    const area = survey.topology.areas[areaIdOf(survey, m)]!;
-    const rule = leg.rule;
-    const due =
-      rule.mode === 'days'
-        ? days >= Math.max(1, rule.every) || perDay(rule) > 1
-        : days >= 1 &&
-          (areaMass(farm, area.cells) <= rule.kg || (rule.maxDays > 0 && days >= rule.maxDays));
-    if (!due) continue;
-    let ni = run.idx + 1;
-    let li = run.leg;
-    if (ni >= leg.stops.length) {
-      ni = 0;
-      run.rounds++;
-      if (leg.rounds > 0 && run.rounds >= leg.rounds) {
-        li++;
-        if (li >= tpl.legs.length) {
-          if (tpl.after === 'repeat') li = 0;
-          else {
-            delete m.plan;
-            events.push({ type: 'sheep-plan-finished', mob: m.id, mobName: m.name });
-            continue;
-          }
-        }
+    if (!sheepDueTonight(farm, survey, m)) continue;
+    sheepPlanStep(farm, survey, m, templateOf(farm, m.plan!)!, events);
+  }
+  mergeSheepShared(farm, survey, events);
+}
+
+/** Where a sheep plan goes on its next move, or that it ends. Nothing is changed. */
+function sheepNextOf(
+  tpl: PlanTemplate,
+  run: PlanRun,
+): { finish: true } | { finish: false; li: number; ni: number; wraps: boolean; target: number } {
+  const leg = tpl.legs[run.leg]!;
+  let ni = run.idx + 1;
+  let li = run.leg;
+  let wraps = false;
+  if (ni >= leg.stops.length) {
+    ni = 0;
+    wraps = true;
+    // The rounds as the sheep tick has always counted them: a round counts as the plan wraps.
+    if (leg.rounds > 0 && run.rounds + 1 >= leg.rounds) {
+      li++;
+      if (li >= tpl.legs.length) {
+        if (tpl.after === 'repeat') li = 0;
+        else return { finish: true };
       }
     }
-    const target = tpl.legs[li]!.stops[ni]!;
-    const to = survey.topology.areaOf[target]!;
-    const cattle = farm.mobs.some(
-      (x) =>
-        x.where.kind === 'paddock' &&
-        x.animals.length &&
-        survey.topology.areaOf[x.where.anchor] === to,
-    );
-    const water = grazingArea(survey, to).hasWater;
-    if (cattle || !water) {
-      if (run.waiting?.target !== target) {
-        run.waiting = { target, why: cattle ? 'cattle-there' : 'no-water' };
-        events.push({
-          type: 'sheep-plan-waiting',
-          mob: m.id,
-          mobName: m.name,
-          why: run.waiting.why,
-          area: survey.topology.areas[to]!.name,
-        });
-      }
+  }
+  return { finish: false, li, ni, wraps, target: tpl.legs[li]!.stops[ni]! };
+}
+
+/** Why sheep can not go into an area now, or null: cattle grazing it, or no water. */
+function sheepBlockedBy(farm: FarmState, survey: Survey, to: number): PlanWaitReason | null {
+  const cattle = farm.mobs.some(
+    (x) =>
+      x.where.kind === 'paddock' &&
+      x.animals.length &&
+      survey.topology.areaOf[x.where.anchor] === to,
+  );
+  if (cattle) return 'cattle-there';
+  return grazingArea(survey, to).hasWater ? null : 'no-water';
+}
+
+/**
+ * Whether a sheep plan's rule says the mob moves (or the plan ends) tonight, by the sheep tick's
+ * rule: after N days on the stop (at least 1; a rule of several moves a day moves once a day for
+ * sheep), or once grazed down to the figure or at the day limit, never on the day it came in.
+ */
+function sheepDueTonight(farm: FarmState, survey: Survey, m: SheepMob): boolean {
+  const run = m.plan;
+  if (!run || run.paused || m.where.kind !== 'paddock' || !m.sheep.length) return false;
+  const leg = templateOf(farm, run)?.legs[run.leg];
+  if (!leg) return false;
+  const days = farm.day + 1 - run.moved;
+  const rule = leg.rule;
+  if (rule.mode === 'days') return days >= Math.max(1, rule.every);
+  const area = survey.topology.areas[areaIdOf(survey, m)]!;
+  return (
+    days >= 1 &&
+    (areaMass(farm, area.cells) <= rule.kg || (rule.maxDays > 0 && days >= rule.maxDays))
+  );
+}
+
+/**
+ * One move of a sheep plan, as the tick makes it: the plan ends if its rounds are done, waits if
+ * the next area has cattle or no water (told once a stop), and otherwise moves the mob. Sheep put
+ * with a sheep mob join it when the caller runs `mergeSheepShared`.
+ */
+function sheepPlanStep(
+  farm: FarmState,
+  survey: Survey,
+  m: SheepMob,
+  tpl: PlanTemplate,
+  events: TickEvent[],
+): 'moved' | 'blocked' | 'finished' {
+  const run = m.plan!;
+  const next = sheepNextOf(tpl, run);
+  if (next.finish || next.wraps) run.rounds++;
+  if (next.finish) {
+    delete m.plan;
+    events.push({ type: 'sheep-plan-finished', mob: m.id, mobName: m.name });
+    return 'finished';
+  }
+  const { li, ni, target } = next;
+  const to = survey.topology.areaOf[target]!;
+  const why = sheepBlockedBy(farm, survey, to);
+  if (why) {
+    if (run.waiting?.target !== target) {
+      run.waiting = { target, why };
+      events.push({
+        type: 'sheep-plan-waiting',
+        mob: m.id,
+        mobName: m.name,
+        why,
+        area: survey.topology.areas[to]!.name,
+      });
+    }
+    return 'blocked';
+  }
+  const from = survey.topology.areas[areaIdOf(survey, m)]!.name;
+  m.where = { kind: 'paddock', anchor: target };
+  run.leg = li;
+  run.idx = ni;
+  run.waiting = null;
+  run.moved = farm.day + 1;
+  run.moves++;
+  events.push({
+    type: 'sheep-plan-moved',
+    mob: m.id,
+    mobName: m.name,
+    from,
+    to: survey.topology.areas[to]!.name,
+  });
+  return 'moved';
+}
+
+/**
+ * Step 8b on a night when plan moves are left to the player (`TickEnv.plansByHand`): no sheep
+ * mob is moved and every plan stays live. A plan whose move is due and whose next area is
+ * blocked waits, told once a stop; one whose next area is free again stops waiting.
+ */
+export function holdSheepPlans(farm: FarmState, survey: Survey, events: TickEvent[]): void {
+  for (const m of sheepMobsOf(farm)) {
+    if (!sheepDueTonight(farm, survey, m)) continue;
+    const run = m.plan!;
+    const next = sheepNextOf(templateOf(farm, run)!, run);
+    if (next.finish) continue;
+    const to = survey.topology.areaOf[next.target]!;
+    const why = sheepBlockedBy(farm, survey, to);
+    if (!why) run.waiting = null;
+    else if (run.waiting?.target !== next.target) {
+      run.waiting = { target: next.target, why };
+      events.push({
+        type: 'sheep-plan-waiting',
+        mob: m.id,
+        mobName: m.name,
+        why,
+        area: survey.topology.areas[to]!.name,
+      });
+    }
+  }
+}
+
+/** A sheep plan move due tonight, for the plan card on a night with no hand. */
+export interface SheepPlanDue {
+  mob: number;
+  mobName: string;
+  /** Where the mob is. */
+  from: string | null;
+  /** Where the plan moves it, or null when the move ends the plan and the mob stays. */
+  to: string | null;
+  /** Why the next area can not take the mob now, or null. */
+  blocked: PlanWaitReason | null;
+}
+
+/** The sheep plan moves due tonight, by the sheep tick's own rule. Reads only. */
+export function sheepPlansDue(farm: FarmState): SheepPlanDue[] {
+  if (!farm.sheep) return [];
+  const survey = surveyOf(farm);
+  const out: SheepPlanDue[] = [];
+  for (const m of sheepMobsOf(farm)) {
+    if (!sheepDueTonight(farm, survey, m)) continue;
+    const next = sheepNextOf(templateOf(farm, m.plan!)!, m.plan!);
+    const here = areaIdOf(survey, m);
+    const from = here < 0 ? null : survey.topology.areas[here]!.name;
+    if (next.finish) {
+      out.push({ mob: m.id, mobName: m.name, from, to: null, blocked: null });
       continue;
     }
-    const from = area.name;
-    m.where = { kind: 'paddock', anchor: target };
-    run.leg = li;
-    run.idx = ni;
-    run.waiting = null;
-    run.moved = farm.day + 1;
-    run.moves++;
-    events.push({
-      type: 'sheep-plan-moved',
+    const to = survey.topology.areaOf[next.target]!;
+    out.push({
       mob: m.id,
       mobName: m.name,
       from,
       to: survey.topology.areas[to]!.name,
+      blocked: sheepBlockedBy(farm, survey, to),
     });
   }
-  mergeSheepShared(farm, survey, events);
+  return out;
+}
+
+/**
+ * A sheep plan's next move, made now by hand (the `planMove` action for a sheep mob, on a Daily
+ * Farm with no hand at work). It is the sheep tick's own move, so rounds and the end of the plan
+ * are counted as the tick counts them, and it is tonight's move taken early: the days on the
+ * stop start from tomorrow. Sheep never go where cattle graze.
+ */
+export function sheepPlanMove(farm: FarmState, events: FarmEvent[], mob: number): Out {
+  const m = sheepMob(farm, mob);
+  if (!m) return refuse('no-such-mob', 'That sheep mob is not on the farm.');
+  const run = m.plan;
+  if (!run) return refuse('no-plan', `${m.name} has no grazing plan.`);
+  if (run.paused) return refuse('already-paused', `${m.name}'s plan is paused.`);
+  if (m.where.kind !== 'paddock' || !m.sheep.length) {
+    return refuse('not-on-pasture', `${m.name} is not on pasture, so its plan can not move it.`);
+  }
+  const tpl = templateOf(farm, run);
+  if (!tpl) return refuse('no-such-plan', 'There is no such plan.');
+  const s = surveyOf(farm);
+  const next = sheepNextOf(tpl, run);
+  const why = next.finish ? null : sheepBlockedBy(farm, s, s.topology.areaOf[next.target]!);
+  if (why) {
+    return refuse(
+      'plan-waiting',
+      why === 'cattle-there'
+        ? `${m.name}'s plan can not move it: cattle are grazing in the next area. Cattle and sheep run in separate paddocks.`
+        : `${m.name}'s plan can not move it: the next area has no water.`,
+    );
+  }
+  sheepPlanStep(farm, s, m, tpl, events as TickEvent[]);
+  mergeSheepShared(farm, s, events as TickEvent[]);
+  return null;
 }

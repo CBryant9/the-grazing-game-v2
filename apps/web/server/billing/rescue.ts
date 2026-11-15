@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SqlRunner } from '../db/sql';
+import { rescueSaleWords } from '../game/rescuewords';
 import { dollars, getProduct, type ProductRow } from './products';
 
 /**
@@ -36,6 +37,8 @@ export interface RescuePreview {
   head?: number;
   /** What that stock fetches, whole dollars. */
   stockValue?: number;
+  /** The debt the sale pays first, whole dollars (0 when cash was not below 0). */
+  debt?: number;
 }
 
 export interface RescueEngine {
@@ -165,12 +168,15 @@ export async function offerFor(
   if (!(await roomFor(sql, farm))) return null;
   const preview = await eng.preview(farm);
   const hard = preview.hardStartCash ?? preview.cashAfter;
+  // What the stock fetches today, by the same case rule as the diary line: "to pay the debt" only
+  // when there is a debt, "1 head" for one.
+  const debt = preview.debt === undefined ? true : preview.debt > 0;
   const sold =
-    preview.head === undefined
-      ? 'Your stock is sold first to pay the debt.'
-      : preview.head > 0
-        ? `Your stock (${preview.head.toLocaleString('en-AU')} head) is sold first to pay the debt.`
-        : 'There is no stock to sell.';
+    preview.head === undefined || preview.stockValue === undefined
+      ? debt
+        ? 'Your stock is sold first to pay the debt.'
+        : 'Your stock is sold first.'
+      : rescueSaleWords(preview.head, preview.stockValue, debt, 'will be');
   return {
     product,
     offer: {
@@ -185,7 +191,7 @@ export async function offerFor(
         preview.cashAfter > hard
           ? `The sale leaves more than the hard-difficulty starting cash for this farm (${dollars(
               hard * 100,
-            )}) after the debt, so your cash is then ${dollars(preview.cashAfter * 100)}.`
+            )})${debt ? ' after the debt' : ''}, so your cash is then ${dollars(preview.cashAfter * 100)}.`
           : `Your cash is then set to the hard-difficulty starting cash for this farm, ${dollars(
               preview.cashAfter * 100,
             )}.`,

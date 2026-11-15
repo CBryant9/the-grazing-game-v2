@@ -120,8 +120,19 @@
  * sells its stock to clear the debt, its cash is set to the hard-difficulty
  * starting cash (or what the sale left, if more), and it opens again; once
  * for each purchase id (`money/rescue.ts`, MODEL section 13). Save format 13.
+ *
+ * 0.19.0 (m7.1, realism fixes after the final review): a night can leave grazing plan moves to
+ * the player (`TickEnv.plansByHand`, a Daily Farm with no hand at work). Plans stay live and
+ * their reports count the night; no mob moves; a plan of several moves a day grazes the day
+ * across the areas the mob was moved through by hand (`PlanRun.handStops`). `planMove` works for
+ * sheep, gives the real reason a move is blocked and makes at most a plan's own moves a day.
+ * `createFarm` refuses a `start.date` that is not a day of the month. A rescue values sheep as a
+ * normal sale pays (no wool on the back), records the sale in the year's sales and the cash it
+ * added on top as `YearTotals.keepGoing`, which the year's profit and score leave out. No grass,
+ * cattle, sheep, crop, season or price formula changed: every calibration row, comparison and
+ * digest is 0.18.0's (docs/CALIBRATION.md, the m7.1 entry). Save format 14.
  */
-export const ENGINE_VERSION = '0.18.0';
+export const ENGINE_VERSION = '0.19.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -192,5 +203,11 @@ export const ENGINE_VERSION = '0.18.0';
  * 1st. An older save has neither and loads unchanged. An engine that knows
  * only format 12 refuses a format 13 save, which is right: it would put a
  * Daily Farm on the wrong dates and could apply a rescue twice.
+ *
+ * 14: m7.1 (engine 0.19.0). A plan run may have `handStops` (the areas a mob was moved through
+ * by hand today, cleared at the night), a year may have `keepGoing` (cash a rescue added on top
+ * of its stock sale), and a rescue's terms may have `paidIn`. All are left out until used, so a
+ * format 9 to 13 save loads unchanged. An engine that knows only format 13 refuses a format 14
+ * save, which is right: it would count a rescue's cash as the year's profit.
  */
-export const SAVE_FORMAT_VERSION = 13;
+export const SAVE_FORMAT_VERSION = 14;

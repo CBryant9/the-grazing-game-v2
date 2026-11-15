@@ -732,7 +732,10 @@ export async function blockedBy(
   return r.rows.map((x) => ({ id: x.user_id, username: x.username }));
 }
 
-/** My farms, for the Share my farm picker (the player's own rows only). */
+/**
+ * My farms, for the Share my farm picker (the player's own rows only). `day` is the day number
+ * the player sees (the diary's: the engine counts from 0, the player from Day 1).
+ */
 export async function myFarms(
   tx: SqlRunner,
 ): Promise<{ id: string; name: string; mode: string; day: number }[]> {
@@ -740,5 +743,5 @@ export async function myFarms(
     `select id, name, mode, current_day from public.farms
       where owner_id = app.uid() and status = 'active' order by started_at desc limit 20`,
   );
-  return r.rows.map((f) => ({ id: f.id, name: f.name, mode: f.mode, day: f.current_day }));
+  return r.rows.map((f) => ({ id: f.id, name: f.name, mode: f.mode, day: f.current_day + 1 }));
 }

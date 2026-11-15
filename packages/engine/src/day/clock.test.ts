@@ -237,6 +237,9 @@ describe('looking is free', () => {
       // Grazing plans: the plans, and the stops a mob's plan gives it today.
       plansView: (f) => engine.plansView(f),
       stopsToday: (f) => engine.stopsToday(f, f.mobs[0]!),
+      // Daily Farm with no hand (m7.1): whether a plan is due tonight, and the sheep plan moves due.
+      planDueTonight: (f) => engine.planDueTonight(f, engine.surveyOf(f), f.mobs[0]!),
+      sheepPlansDue: (f) => engine.sheepPlansDue(f),
       // The numbers the map is drawn from. Looking at the map is free.
       farmView: (f, env) => engine.farmView(f, env),
       // The workforce (milestones 2.1 and 2.2).
