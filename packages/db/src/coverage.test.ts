@@ -441,4 +441,43 @@ describe('migration files', () => {
     const stamps = named.map((f) => f.slice(0, 14));
     expect(new Set(stamps).size).toBe(stamps.length);
   });
+
+  it('each stamp is a real UTC date and time (Supabase reads it as the version)', () => {
+    for (const f of migrationFiles()) {
+      const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})_/.exec(f)!;
+      const [y, mo, d, h, mi, s] = m.slice(1).map(Number) as [number, ...number[]];
+      const t = new Date(Date.UTC(y, mo! - 1, d, h, mi, s));
+      expect(t.getUTCFullYear() * 1e4 + (t.getUTCMonth() + 1) * 100 + t.getUTCDate(), f).toBe(
+        y * 1e4 + mo! * 100 + d!,
+      );
+      expect([t.getUTCHours(), t.getUTCMinutes(), t.getUTCSeconds()], f).toEqual([h, mi, s]);
+    }
+  });
+
+  // m6 join: the branches were numbered apart. Each migration that builds on another comes after it.
+  it('each migration comes after the ones it builds on', () => {
+    const at = (name: string): number => {
+      const i = migrationFiles().findIndex((f) => f.slice(15) === `${name}.sql`);
+      expect(i, name).toBeGreaterThanOrEqual(0);
+      return i;
+    };
+    const after: [string, string][] = [
+      ['game', 'farm_store'],
+      ['admin_tools', 'admin_fixes'],
+      ['game', 'daily_farm'],
+      ['system', 'daily_farm'],
+      ['daily_farm', 'farm_rev'],
+      ['daily_farm', 'daily_cron'],
+      ['cron', 'daily_cron'],
+      ['system', 'sheep_switch'],
+      ['money', 'billing_states'],
+      ['billing_states', 'billing_refund_flag'],
+      ['system', 'notify_queue'],
+      ['money', 'ads_events'],
+      ['system', 'ads_events'],
+    ];
+    for (const [first, then] of after) {
+      expect(at(first), `${first} before ${then}`).toBeLessThan(at(then));
+    }
+  });
 });
