@@ -2562,6 +2562,10 @@ Branch `m8-look-game`, after merging `m7-final` (the playability fixes, engine 0
 
 **Still hidden for want of a field:** the weekly arrow on the Buy rows (a buy class has no last-week price; its price is worked out from the market classes on the server, so the screen does not guess it), Fast Farm "2 of 3" in the PC farm box, a Groups switch, an unread count on the site bell, a year's price change on the price table.
 
+### 15 Nov 2026: m8 the PC header at mid widths
+
+At about 1024 px the PC game header squeezed the date block into a few characters and wrapped it one word a line (about 200 px tall), and the panel tabs wrapped to two rows. Fixed in `play.module.css` (rules in VISUALS "The PC header at every PC width"): a 150 px minimum and an ellipsis for the date block, parts dropped in a set order at 1365, 1279 and 1180 px, a second row only below 1024 px, tabs on one row, the panel capped at 42% of the window. Also fixed: "PTIC" in the Herd rows (a word-boundary character had gone in as a backspace). New `components/play/pcheader.test.ts` guards the rules. Checked on the production build with a guest farm at 768 x 1024 (phone layout), 1024 x 768, 1180 x 820, 1280 x 720, 1366 x 768, 1440 x 900 and 1920 x 1080: the header is one row of 63 px at every PC size, no sideways scroll, the map at least 594 px wide.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

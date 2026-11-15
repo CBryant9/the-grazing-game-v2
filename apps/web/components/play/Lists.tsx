@@ -93,7 +93,7 @@ function classLine(m: MobWire): string {
       : plural(m.head, 'head', 'head');
   }
   return m.classes
-    .map((c) => `${num(c.head)} ${c.label.toLowerCase().replace(/ptic/g, 'PTIC')}`)
+    .map((c) => `${num(c.head)} ${c.label.toLowerCase().replace(/\bptic\b/g, 'PTIC')}`)
     .join(' · ');
 }
 

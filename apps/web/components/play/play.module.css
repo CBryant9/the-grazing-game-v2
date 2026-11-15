@@ -2235,16 +2235,20 @@
 /* The side panel's tabs on a PC, as the mockup */
 .ptabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 10px 12px;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 10px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--line);
   flex: none;
 }
 .ptab {
   position: relative;
+  flex: none;
+  white-space: nowrap;
   min-height: 34px;
-  padding: 7px 9px;
+  padding: 7px 7px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: none;
@@ -2829,4 +2833,95 @@
 }
 .planclose {
   margin-left: auto;
+}
+
+/* ---- The PC game header at every PC width (900 px up) ------------------------ */
+
+/* The date block never wraps word by word: it keeps a minimum width and its lines end in an ellipsis. */
+.screen[data-layout='pc'] .topname {
+  flex: 1 1 150px;
+  min-width: 150px;
+}
+.screen[data-layout='pc'] .topdate,
+.screen[data-layout='pc'] .sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen[data-layout='pc'] .farmboxtext .fname {
+  max-width: 150px;
+}
+.screen[data-layout='pc'] .top > * {
+  flex-shrink: 0;
+}
+.screen[data-layout='pc'] .top > .topname {
+  flex-shrink: 1;
+}
+/* The skip chips' short labels are drawn only where the bar is narrow. */
+.tbshort,
+.tbhide {
+  display: none;
+}
+/*
+ * Where the header is tight, parts go in this order: the facts line, then the daylight labels,
+ * then a shorter daylight bar with short skip chips, and last a second row for the time controls.
+ */
+@media (max-width: 1365px) {
+  .screen[data-layout='pc'] .sub {
+    display: none;
+  }
+}
+@media (max-width: 1279px) {
+  .screen[data-layout='pc'] .dlnote {
+    display: none;
+  }
+  .screen[data-layout='pc'] .topdl {
+    width: 170px;
+  }
+  .screen[data-layout='pc'] .top {
+    gap: 10px;
+  }
+  .ptab {
+    font-size: 0.625rem;
+    padding: 7px 6px;
+  }
+}
+@media (max-width: 1180px) {
+  .screen[data-layout='pc'] .topdl {
+    width: 110px;
+  }
+  /* The tabs stay on one row: "Scores · Diary" is "Scores" here, with smaller padding. */
+  .ptablong {
+    display: none;
+  }
+  .ptabs {
+    gap: 0;
+    padding: 10px 6px;
+  }
+  .ptab {
+    padding: 7px 5px;
+  }
+  .screen[data-layout='pc'] .tblong {
+    display: none;
+  }
+  .screen[data-layout='pc'] .tbshort {
+    display: inline;
+  }
+}
+@media (max-width: 1023px) {
+  .screen[data-layout='pc'] .top {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .screen[data-layout='pc'] .toptimes {
+    order: 9;
+    flex-basis: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+/* The panel never takes the map below a usable size: at most 42% of the window. */
+.screen[data-layout='pc'] .side {
+  max-width: 42vw;
 }

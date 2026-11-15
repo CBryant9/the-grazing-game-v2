@@ -96,28 +96,43 @@ export function TimeButtons({ short = false }: { short?: boolean }) {
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label={short ? '+1 week' : undefined}
+        aria-label="+1 week"
         onClick={() => void skip('week')}
       >
-        {short ? '+1w' : '+1 week'}
+        <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
+          +1 week
+        </span>
+        <span className={short ? undefined : styles.tbshort} aria-hidden="true">
+          +1w
+        </span>
       </button>
       <button
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label={short ? '+1 month' : undefined}
+        aria-label="+1 month"
         onClick={() => void skip('month')}
       >
-        {short ? '+1m' : '+1 month'}
+        <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
+          +1 month
+        </span>
+        <span className={short ? undefined : styles.tbshort} aria-hidden="true">
+          +1m
+        </span>
       </button>
       <button
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label={short ? '+1 year' : undefined}
+        aria-label="+1 year"
         onClick={() => void skip('year')}
       >
-        {short ? '+1y' : '+1 year'}
+        <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
+          +1 year
+        </span>
+        <span className={short ? undefined : styles.tbshort} aria-hidden="true">
+          +1y
+        </span>
       </button>
     </div>
   );

@@ -64,13 +64,20 @@ function PcNav() {
           type="button"
           className={`${styles.ptab} ${on(t) ? styles.ptabon : ''}`}
           aria-current={on(t) ? 'page' : undefined}
+          aria-label={t.key === 'scores' ? 'Scores and Diary' : undefined}
           onClick={() => {
             setTab(t.tab);
             setMoreExtra(t.extra ?? null);
             if (t.page) openMore(t.page);
           }}
         >
-          {t.label}
+          {t.key === 'scores' ? (
+            <>
+              Scores<span className={styles.ptablong}> · Diary</span>
+            </>
+          ) : (
+            t.label
+          )}
           {t.key === 'more' && unread > 0 && (
             <>
               <span className={styles.ptabbadge} aria-hidden="true">
