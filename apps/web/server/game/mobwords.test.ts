@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GainForecast, GainReason } from '@gg/engine';
-import { breedingLines, mobWhy, moveNotes, pticWords, reasonWord } from './mobwords';
+import { breedingLines, mobLines, mobWhy, moveNotes, pticWords, reasonWord } from './mobwords';
 import { doneWord } from './words';
 
 const BANNED = /\bshould\b|\bmust\b|overgraz|\bbad\b|\bgood\b|—|–/i;
@@ -8,7 +8,7 @@ const BANNED = /\bshould\b|\bmust\b|overgraz|\bbad\b|\bgood\b|—|–/i;
 const REASONS: [GainReason, RegExp][] = [
   [
     { reason: 'notEnoughFeed', mass: 423 },
-    /^There is not enough feed where they graze: about 420 kg DM\/ha\.$/,
+    /^Feed is about 420 kg DM\/ha\. Under about 900 they eat less\.$/,
   ],
   [{ reason: 'lowMe', me: 7.34 }, /^The feed is low in energy: ME 7\.3 MJ\/kg\.$/],
   [{ reason: 'lowProtein' }, /^The feed is under 7% CP, so they eat less\.$/],
@@ -69,16 +69,17 @@ describe('why a mob is losing weight or short', () => {
     expect(why).toEqual([
       'Steers A is losing about 0.31 kg a head a day.',
       'The paddock gave the mob 62% of the feed it wanted.',
-      'There is not enough feed where they graze: about 500 kg DM/ha.',
+      'Feed is about 500 kg DM/ha. Under about 900 they eat less.',
       'The feed is low in energy: ME 7.1 MJ/kg.',
       'Cows with calves put about 60 MJ a day into milk, on top of about 40 MJ for themselves.',
     ]);
     for (const w of why) expect(w).not.toMatch(BANNED);
   });
 
-  it('says a mob that is only just not gaining is not gaining', () => {
-    expect(mobWhy({ ...base, adg: 0.02 })[0]).toBe(
-      'Steers A is not gaining weight (0.02 kg a head a day).',
+  it('gives no warning for a mob that is only just gaining (m8): the figure is a detail', () => {
+    expect(mobWhy({ ...base, adg: 0.02 })).toEqual([]);
+    expect(mobLines({ ...base, adg: 0.02 }).details[0]).toBe(
+      'Steers A is gaining about 0.02 kg a head a day.',
     );
   });
 

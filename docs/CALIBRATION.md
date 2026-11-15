@@ -1515,6 +1515,14 @@ Existing engine tests edited, none a calibration test: the version test (`day/sa
 
 **Speed** (alone): cattle 3.56 ms a day with 4,890 head and 407 calves; sheep 2.59 ms a day with 6,865 sheep (limit 5 ms each).
 
+### 15 Nov 2026, m8 playability fixes: engine 0.20.0, save format 15
+
+What changed (no grass, cattle, sheep, crop, season, price or score formula, no data table figure, no band): the bank facts (`money/bank.ts`, a `bank` tick event and `farm.bankWarned`); more skip stops (bank, first eaten-out day, deaths other than natural, calving started); a year skip runs to the farm's year end (366 days across a leap day); Things to do facts and putting one away (`day/todo.ts`, `dismissTodo`, `farm.todoOff`). Three literals were named, not changed: the intake curve's 650 kg DM/ha (`AVAIL_KG_HA`) and 0.75 (`NOT_ENOUGH_FEED_AVAIL`), the 800 kg DM/ha floor (`FEED_FLOOR_KG_HA`), and the market class weights 280 and 450 kg (`MARKET_WEIGHTS`). `FEED_SHORT_KG_HA` (901) is worked out from the first two for the words only.
+
+**The benchmarks were re-run and none moved.** The full suite on this tip gives the same 22 expected failures (the open calibration rows) and the same 4 skips as `m7-final` (6a27291). No band, skip, `it.fails` or tolerance changed. The no-hands digests pass untouched: the bank event and the two new saved fields are left out until used, and those farms never go below zero. The calibration suites drive `stepDay`, the instant path or skips with `anyway` that run on past early stops, so the new stops change none of their figures.
+
+Existing engine tests edited, none a calibration test, each for a decided change: the version test (`day/saves.test.ts`, 0.20.0 and format 15) and the rescue save test (format 15); two skip tests in `day/days.test.ts` (deaths from no water and the first eaten-out day now stop a skip); the rescue "eaten out" test runs its skip on past the new stop; `day/todo.test.ts` (the marking item carries `sinceCalving`, a sale within the week is listed, facts have `does: null`); the list of reads in `day/clock.test.ts` (four new reads); the action list in `day/jobs.test.ts` (51 kinds, with `dismissTodo`). New: `day/playability.test.ts` (13 tests).
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

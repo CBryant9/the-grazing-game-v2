@@ -20,6 +20,13 @@ import { cellQuality, meFromDmd } from '../pasture/quality';
 import type { Animal, CattleTotals, GrazingArea, GrazingLand } from './types';
 
 /** The feed a mob picks across its grazing area. */
+/**
+ * How the feed on offer limits what cattle can eat: the share they can get
+ * is 1 - e^(-mass / AVAIL_KG_HA), with mass in kg DM/ha (the MVP's figure,
+ * named here so the screens can quote where it bites; engine 0.20.0).
+ */
+export const AVAIL_KG_HA = 650;
+
 export interface Diet {
   /** Digestibility of the diet (DMD), 0 to 1. */
   dmd: number;
@@ -91,7 +98,7 @@ export function dietOf(land: GrazingLand, area: GrazingArea): DietResult {
       dmd: sd / sw,
       cp: sc / sw,
       mass,
-      avail: 1 - Math.exp(-mass / 650),
+      avail: 1 - Math.exp(-mass / AVAIL_KG_HA),
       dist: (sdist / sw) * sideM,
     },
     weights: w,

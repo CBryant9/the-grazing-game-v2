@@ -151,7 +151,9 @@ describe('a rescue', () => {
     farm.cash = 400_000;
     farm.pasture.G.fill(0);
     farm.pasture.D.fill(0);
-    const run = skipDays(farm, 'month');
+    // The first eaten-out day stops a skip (m8), so it is run on to the end.
+    let run = skipDays(farm, 'month');
+    for (let i = 0; i < 3 && !run.farm.over; i++) run = skipDays(run.farm, 'month');
     expect(run.farm.over?.reason).toBe('feed');
     const terms = rescueTerms(run.farm);
     expect(terms.debt).toBe(0);
@@ -180,7 +182,7 @@ describe('a rescue', () => {
     if (!r.ok) throw new Error(r.message);
     const saved = saveFarm(r.farm);
     expect(saved.saveFormat).toBe(SAVE_FORMAT_VERSION);
-    expect(SAVE_FORMAT_VERSION).toBe(14);
+    expect(SAVE_FORMAT_VERSION).toBe(15);
     const loaded = loadFarm(JSON.parse(JSON.stringify(saved)));
     expect(loaded.rescues).toEqual(r.farm.rescues);
     expect(farmHash(loaded)).toBe(farmHash(r.farm));

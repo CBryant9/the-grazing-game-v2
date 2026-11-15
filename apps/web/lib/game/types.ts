@@ -13,9 +13,10 @@ import type { DistrictId, FarmView, PaddockLabelId } from '@gg/shared';
  * 3 added `workforce` and `contracts` (milestone 2.2). 5 added sheep (milestone 2.8): a mob's
  * `species` and `sheep`, the sheep market, the setup's stock. Daily Farm (m3.3) also numbered its
  * change 5 on its own branch, so the joined line (m6) is 6: an offline copy from either branch is
- * not shown. A saved offline farm of an older version is not shown.
+ * not shown. A saved offline farm of an older version is not shown. 7 (m8) added the bank's limits
+ * beside cash, a paddock's `feedText`, a mob's `details`, and the setup's money for each difficulty.
  */
-export const SNAPSHOT_VERSION = 6;
+export const SNAPSHOT_VERSION = 7;
 
 export interface DateParts {
   year: number;
@@ -67,6 +68,13 @@ export interface TotalsWire {
   ae: number;
   dse: number;
   cash: number;
+  /**
+   * Where the bank takes the farm, dollars (negative): shown beside Cash. A display number, the
+   * same figure the bank facts in the inbox and Things to do name.
+   */
+  bankLimit: number;
+  /** How far the bank lends for jobs, dollars (negative): the overdraft limit the job cards name. */
+  lendLimit: number;
   netWorth: number;
   massKgHa: number;
   greenKgHa: number;
@@ -183,8 +191,17 @@ export interface MobWire {
   intakeKg: number | null;
   intakePct: number | null;
   classes: MobClassWire[];
-  /** Plain sentences on why the mob is losing weight or short of feed or water. Empty when there is nothing to say. */
+  /**
+   * Warnings: plain sentences on why the mob is losing weight (worse than 0.05 kg a head a day),
+   * is in low condition, or has no water. Empty when there is nothing to warn of.
+   */
   why: string[];
+  /**
+   * The same facts as plain details, not warnings, for a mob that is holding or gaining: the feed
+   * where it grazes, the share of its feed it got, energy and protein. Drawn in the card's
+   * details, never styled as a warning. Empty when there is nothing to say.
+   */
+  details: string[];
   /** Females on the record as PTIC (the engine's PTIC_DAYS or more in calf). Never the live count. */
   ptic: number;
   /** "31 PTIC, 2 to 4 months in calf.", or null with none PTIC. For the herd list. */
@@ -232,6 +249,11 @@ export interface PaddockWire {
   dsePerHa: number;
   /** Days of feed with stock on it, or null with no stock. */
   feedDays: number | null;
+  /**
+   * The feed line in words, drawn in place of the days: "About 12 days", or "Under 800 kg DM/ha"
+   * where the paddock is under the grazing floor (so never "0 days"). Null with no stock.
+   */
+  feedText: string | null;
   /** Feed grown on the last day, kg DM/ha a day. */
   growKgHaDay: number;
   /** Why no water matters, as a fact, for a paddock with none. Null with water. */
@@ -933,6 +955,15 @@ export interface PastDaysResponse {
 
 // ---- Setup
 
+/** One difficulty's money on a district and size, for the setup step. Whole dollars. */
+export interface SetupMoneyWire {
+  difficulty: SetupDifficulty;
+  cashRunning: number;
+  cashScratch: number;
+  lendLimit: number;
+  bankLimit: number;
+}
+
 export interface SetupOptions {
   /** Cattle, sheep or a mix. Empty when the sheep switch is off: every farm then starts with cattle. */
   stocks: { id: SetupStock; label: string; text: string }[];
@@ -941,7 +972,17 @@ export interface SetupOptions {
     name: string;
     town: string;
     state: string;
-    sizes: { id: SetupSize; label: string; ha: number }[];
+    sizes: {
+      id: SetupSize;
+      label: string;
+      ha: number;
+      /**
+       * The money each difficulty starts with on this district and size, whole dollars: cash
+       * taking over a running farm and starting from scratch, how far the bank lends for jobs
+       * (negative), and where the bank takes the farm (negative). Display numbers.
+       */
+      money: SetupMoneyWire[];
+    }[];
     mixed: { arablePcts: number[]; croppedPcts: number[] };
     /** True where sheep may be chosen: the switch is on and the district runs sheep. */
     sheep: boolean;
@@ -1037,6 +1078,8 @@ export type SimpleAction =
   | { type: 'removePortable'; port: number }
   | { type: 'pausePlan'; mob: number }
   | { type: 'clearPlan'; mob: number }
+  /** Put a thing to do away by its key. It stays away while it stays true. Takes none of the day. */
+  | { type: 'dismissTodo'; key: string }
   | { type: 'resumePlan'; mob: number; step?: number }
   /** The plan's next move, made now by hand (the Daily Farm plan card). */
   | { type: 'planMove'; mob: number }

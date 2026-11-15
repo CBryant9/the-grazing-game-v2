@@ -456,6 +456,20 @@ export interface FarmState {
   noFeedDays: number;
   /** Set when the game is over. Nothing more can be done on the farm. */
   over: { reason: GameOverReason; day: number } | null;
+  /**
+   * The furthest the bank facts have gone (save format 15): 1 once the
+   * player has been told cash went below zero, 2 once told it passed three
+   * quarters of the way to the bank's limit (`money/bank.ts`). It falls back
+   * when cash recovers, so a later fall is told again. Left out at 0.
+   */
+  bankWarned?: 1 | 2;
+  /**
+   * Things to do the player has put away (save format 15), by key. A key
+   * stays only while its thing is still true: the list is cut back to what
+   * is true at the end of each day, so a thing that stops and starts again
+   * shows again. Left out when empty.
+   */
+  todoOff?: string[];
   /** Every action taken on the farm, in order. */
   actionLog: LoggedAction[];
 

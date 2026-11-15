@@ -27,7 +27,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Jobs use light. Before you confirm a job, its card says how long it takes and how much light is left after it. A job that fits in the light left is done. A job that does not fit is not done.',
       'Some jobs, like sowing, take none of the day.',
       'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
-      'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. A skip stops early and says why if something needs you, such as a mob with no water.',
+      'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. +1 year runs to the end of the farm year.',
+      'A skip stops early and says why if something needs you: a mob with no water, a trough run dry, a crop ready, stock dying of anything but natural causes, calving starting, the whole farm eaten out, or cash going below zero and then three quarters of the way to where the bank takes the farm.',
     ],
   },
   {
@@ -86,7 +87,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     title: 'Husbandry',
     lines: [
       'Stock work is done where the mob is. The cattle never have to come to the yards for it.',
-      'Things to do says what needs doing, such as calves to mark or a mob with no water. It is a banner over the map on a phone. Where there is a job, its button sits right there. Open mob goes to the mob card.',
+      'Things to do lists facts that need you, such as calves to mark, a mob with no water, cash below zero, a sale in the next week with cattle at sale weight, a mob under CS 2.5, calving under way, or a paddock with stock under the grazing floor. Each shows once, while it is true. It is a banner over the map on a phone. Where there is a job, its button sits right there. Open mob goes to the mob card.',
+      'Marking shows once for a drop, with the count, when most of the calves are old enough or a month after calving started.',
       'The mob card has the jobs as buttons: Mark calves, Wean, Sell, Move and the supplement. A button that is off says why.',
       'There is no preg testing. A cow goes on the record as PTIC by herself, once she is far enough along. The mob card shows how many head are known in calf.',
     ],

@@ -441,6 +441,11 @@ export function parseAction(body: unknown, farm?: FarmState): Action | null {
     case 'planMove':
     case 'clearPlan':
       return mob === null ? null : ({ type: a.type, mob } as Action);
+    case 'dismissTodo':
+      // Put a thing to do away. The engine checks the key is on the list now.
+      return typeof a.key === 'string' && a.key.length > 0 && a.key.length <= 60
+        ? { type: 'dismissTodo', key: a.key }
+        : null;
     case 'moveMob': {
       const cell = int(a.cell, 0, GRID_N - 1);
       return mob === null || cell === null ? null : { type: 'moveMob', mob, to: { cell } };

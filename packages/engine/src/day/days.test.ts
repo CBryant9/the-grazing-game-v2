@@ -196,11 +196,15 @@ describe('what stops a skip', () => {
     expect(week.stops).toEqual([{ type: 'no-water', when: 'during', mob, mobName: 'Mob 1', area }]);
     expect(endDay(farm).stops).toEqual(week.stops);
     expect(stopsIn(week.days[0]!)).toEqual(week.stops);
-    // Run anyway again and it goes on to day 4, when everything dies.
+    // Run anyway again and it goes on to day 4, when everything dies. Deaths from no water
+    // stop a skip (engine 0.20.0), so it stops there and says so.
     const on = skipDays(week.farm, 'week', {}, { anyway: true });
-    expect(on.daysRun).toBe(7);
+    expect(on.daysRun).toBe(3);
     expect(on.summary.deathsByCause).toEqual({ noWater: 30 });
     expect(on.summary.head).toEqual({ before: 30, after: 0 });
+    expect(on.stops).toEqual([
+      { type: 'deaths', species: 'cattle', mob, mobName: 'Mob 1', cause: 'noWater', count: 30 },
+    ]);
   });
 
   it('a portable trough with under 3 days of water: the skip does not start', () => {
@@ -301,8 +305,12 @@ describe('what stops a skip', () => {
     f = cloneFarm(f);
     f.pasture.G.fill(0);
     f.pasture.D.fill(0);
-    const run = skipDays(f, 'month');
-    expect(run.daysRun).toBe(10);
+    // The first day of the countdown stops a skip (engine 0.20.0), with the days left.
+    const first = skipDays(f, 'month');
+    expect(first.daysRun).toBe(1);
+    expect(first.stops).toEqual([{ type: 'out-of-feed', daysLeft: 9 }]);
+    const run = skipDays(first.farm, 'month');
+    expect(run.daysRun).toBe(9);
     expect(run.stops).toEqual([{ type: 'game-over', reason: 'feed' }]);
   });
 

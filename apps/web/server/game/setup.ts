@@ -8,12 +8,14 @@ import {
   dateOn,
   sheepDistrict,
   sheepMobsRead,
+  startMoney,
 } from '@gg/engine';
 import { DISTRICTS, DISTRICT_IDS, type DistrictId } from '@gg/shared';
 import type {
   SetupChoices,
   SetupDifficulty,
   SetupEnterprise,
+  SetupMoneyWire,
   SetupOptions,
   SetupSize,
   SetupStart,
@@ -72,10 +74,29 @@ const DIFFICULTY_TEXT: Record<SetupDifficulty, string> = {
 };
 
 /**
+ * The money each difficulty starts with on a district and size, as the engine sets it: cash
+ * taking over a running farm and from scratch, how far the bank lends, and where it takes the
+ * farm. Whole dollars, display numbers only (m8: the setup step shows the figures).
+ */
+export function setupMoney(district: DistrictId, ha: number): SetupMoneyWire[] {
+  return DIFFICULTIES.filter((d) => d in DIFFICULTY).map((difficulty) => {
+    const running = startMoney(district, ha, difficulty, true);
+    const scratch = startMoney(district, ha, difficulty, false);
+    return {
+      difficulty,
+      cashRunning: running.cash,
+      cashScratch: scratch.cash,
+      lendLimit: running.overdraft,
+      bankLimit: running.broke,
+    };
+  });
+}
+
+/**
  * The choices the setup flow offers, with the real hectares for each
  * district. The figures come from the engine's tables here, on the server,
- * so the browser holds no tables. No dollar figures: they are shown once
- * the farm is taken.
+ * so the browser holds no tables. Money is sent as plain display numbers
+ * for each difficulty on each district and size (m8), never as a rule.
  */
 export function setupOptions(sheepOn = false): SetupOptions {
   // The difficulty table is read so the list can never name a level the engine lacks.
@@ -119,6 +140,7 @@ export function setupOptions(sheepOn = false): SetupOptions {
         id: size,
         label: size[0]!.toUpperCase() + size.slice(1),
         ha: FARM_SIZES[id][i]!,
+        money: setupMoney(id, FARM_SIZES[id][i]!),
       })),
       mixed: { arablePcts: [...ARABLE_SHARES[id].mixed], croppedPcts: CROPPED },
     })),

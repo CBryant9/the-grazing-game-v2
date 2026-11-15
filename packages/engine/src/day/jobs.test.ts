@@ -516,6 +516,13 @@ describe('the job card and the job agree, for every kind of action', () => {
       resumePlan: [{ farm: paused, action: { type: 'resumePlan', mob: b.steers, step: 1 } }],
       planMove: [{ farm: planned, action: { type: 'planMove', mob: b.steers } }],
       clearPlan: [{ farm: planned, action: { type: 'clearPlan', mob: b.steers } }],
+      // Putting a thing to do away takes none of the day: here, the fence that is down.
+      dismissTodo: [
+        {
+          farm: b.farm,
+          action: { type: 'dismissTodo', key: `fence-down:${b.downed.line}${b.downed.index}` },
+        },
+      ],
       setSupplement: [
         { farm: b.farm, action: { type: 'setSupplement', mob: b.steers, supp: 'hay' } },
         { farm: b.farm, action: { type: 'setSupplement', mob: b.steers, supp: 'none' } },
@@ -613,8 +620,8 @@ describe('the job card and the job agree, for every kind of action', () => {
       ],
       clearSheepPlan: [{ farm: sheepOnPlan, action: { type: 'clearSheepPlan', mob: flock } }],
     };
-    // 50 kinds of action: everything a player can do.
-    expect(Object.keys(cases).length).toBe(50);
+    // 51 kinds of action: everything a player can do (m8 added putting a thing to do away).
+    expect(Object.keys(cases).length).toBe(51);
 
     const outcomes = new Set<string>();
     let refusals = 0;

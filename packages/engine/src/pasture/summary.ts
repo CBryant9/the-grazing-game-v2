@@ -16,6 +16,12 @@ import { cellQuality } from './quality';
 import { LAND, type PastureState } from './state';
 
 /**
+ * The grazing floor, kg DM/ha: days of feed are counted above it, and a
+ * paddock under it is labelled Short. Named so the screens can quote it.
+ */
+export const FEED_FLOOR_KG_HA = 800;
+
+/**
  * The cattle figures a paddock summary needs. The cattle model is milestone
  * 1.2. It works these out for the grazing area and hands in the paddock's
  * share (paddock ha divided by the area's ha).
@@ -82,7 +88,7 @@ export interface PaddockSummary {
   rate: number;
   /** Long-term carrying capacity for this soil, AE/ha, at the district's safe utilisation. */
   cc: number;
-  /** Days of feed above 800 kg DM/ha at 9 kg per AE a day. Infinity with no stock. */
+  /** Days of feed above FEED_FLOOR_KG_HA at 9 kg per AE a day. Infinity with no stock. */
   feedDays: number;
   /** The neutral paddock label: Short, Green, Dry & rank or Mixed. */
   label: PaddockLabelId;
@@ -140,12 +146,12 @@ export function paddockSummary(state: PastureState, inputs: PaddockSummaryInputs
   const eat = inputs.stock?.eat ?? 0;
 
   const cc = (R.annual * f * 0.65 * R.util) / 3285;
-  const feedKg = Math.max(0, mass - 800) * ha;
+  const feedKg = Math.max(0, mass - FEED_FLOOR_KG_HA) * ha;
   let grow = 0;
   for (const i of cells) grow += grown[i]! * inputs.haPerSquare;
 
   const label: PaddockLabelId =
-    mass < 800
+    mass < FEED_FLOOR_KG_HA
       ? 'short'
       : green > 0.5
         ? 'green'

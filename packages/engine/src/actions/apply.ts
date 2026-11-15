@@ -127,6 +127,7 @@ import {
 } from '../sheep/moves';
 import { recordClassOf, recordGroupOf } from '../sim/told';
 import { cancelContractFence, hireHand, letHandGo, orderContractFence } from '../labour/actions';
+import { allThingsToDo, todoKey } from '../day/todo';
 import {
   newRun,
   perDay,
@@ -1130,6 +1131,22 @@ function clearPlan(j: Job, a: Extract<Action, { type: 'clearPlan' }>): Out {
   return null;
 }
 
+/**
+ * Put a thing to do away. The list of things put away keeps only those still
+ * true, so it never grows past the list itself.
+ */
+function dismissTodo(j: Job, a: Extract<Action, { type: 'dismissTodo' }>): Out {
+  if (typeof a.key !== 'string' || !a.key || a.key.length > 60) {
+    return refuse('bad-request', 'That thing to do was not sent properly.');
+  }
+  const live = new Set(allThingsToDo(j.farm, j.env).map(todoKey));
+  if (!live.has(a.key)) return refuse('not-on-list', 'That is not on the list any more.');
+  const kept = (j.farm.todoOff ?? []).filter((k) => live.has(k) && k !== a.key);
+  j.farm.todoOff = [...kept, a.key];
+  j.events.push({ type: 'todo-dismissed', key: a.key });
+  return null;
+}
+
 function wean(j: Job, a: Extract<Action, { type: 'wean' }>): Out {
   const { farm } = j;
   const m = j.mob(a.mob);
@@ -1729,6 +1746,8 @@ function run(j: Job, a: Action): Out {
       return planMove(j, a);
     case 'clearPlan':
       return clearPlan(j, a);
+    case 'dismissTodo':
+      return dismissTodo(j, a);
     case 'wean':
       return wean(j, a);
     case 'markCalves':

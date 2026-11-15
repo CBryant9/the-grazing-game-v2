@@ -1,5 +1,5 @@
 import 'server-only';
-import type { GainForecast, GainReason } from '@gg/engine';
+import { FEED_SHORT_KG_HA, LOW_CS, type GainForecast, type GainReason } from '@gg/engine';
 import { NO_WATER_WHY } from './words';
 
 /**
@@ -15,7 +15,8 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 export function reasonWord(r: GainReason): string {
   switch (r.reason) {
     case 'notEnoughFeed':
-      return `There is not enough feed where they graze: about ${Math.round(r.mass / 10) * 10} kg DM/ha.`;
+      // The fact and its effect, with the model's own figure for where intake starts to fall.
+      return `Feed is about ${Math.round(r.mass / 10) * 10} kg DM/ha. Under about ${Math.round(FEED_SHORT_KG_HA / 10) * 10} they eat less.`;
     case 'lowMe':
       return `The feed is low in energy: ME ${r.me.toFixed(1)} MJ/kg.`;
     case 'lowProtein':
@@ -41,24 +42,46 @@ export interface WhyInputs {
   fed: number | null;
   /** The engine's reasons for each class that is not gaining. */
   forecasts: readonly GainForecast[];
+  /** The mob's average condition score, or null with no adults. Left out: not checked. */
+  cs?: number | null;
+}
+
+/** A mob losing more than this, kg a head a day, gets its reasons as warnings. */
+export const LOSING_KG = 0.05;
+
+/** The mob card's lines: warnings, and the same kind of facts as plain details. */
+export interface MobLines {
+  why: string[];
+  details: string[];
 }
 
 /**
- * Why a mob is losing weight, or short of feed or water, in plain sentences
- * built from the engine's own reasons. It states facts. It never says what
- * to do.
+ * The mob card's lines, built from the engine's own reasons. Warnings only
+ * when the mob is actually losing weight (worse than 0.05 kg a head a day),
+ * its condition score is low, or it has no water. A mob that is holding or
+ * gaining gets the same facts as plain details instead, with no "just
+ * short" line. Facts only. It never says what to do.
  */
-export function mobWhy(i: WhyInputs): string[] {
-  const out: string[] = [];
+export function mobLines(i: WhyInputs): MobLines {
+  const why: string[] = [];
+  const details: string[] = [];
   if (i.where === 'paddock' && (!i.hasWater || i.dryDays > 0)) {
-    out.push(
+    why.push(
       `${i.name} has no water${i.area ? ` in ${i.area}` : ''}.${i.dryDays > 0 ? ` ${plural(i.dryDays, 'day')} without so far.` : ''}`,
     );
   }
-  if (i.adg !== null && i.adg < -0.05) {
-    out.push(`${i.name} is losing about ${Math.abs(i.adg).toFixed(2)} kg a head a day.`);
-  } else if (i.adg !== null && i.adg < 0.05 && i.where === 'paddock') {
-    out.push(`${i.name} is not gaining weight (${i.adg.toFixed(2)} kg a head a day).`);
+  const losing = i.adg !== null && i.adg < -LOSING_KG;
+  const lowCs = i.cs !== undefined && i.cs !== null && i.cs < LOW_CS;
+  if (losing) why.push(`${i.name} is losing about ${Math.abs(i.adg!).toFixed(2)} kg a head a day.`);
+  if (lowCs) why.push(`${i.name} averages condition score ${i.cs!.toFixed(1)}.`);
+  const warn = losing || lowCs;
+  const out = warn ? why : details;
+  if (!warn && i.adg !== null && i.adg < LOSING_KG && i.where === 'paddock') {
+    details.push(
+      i.adg < 0
+        ? `${i.name} is holding weight (${i.adg.toFixed(2)} kg a head a day).`
+        : `${i.name} is gaining about ${i.adg.toFixed(2)} kg a head a day.`,
+    );
   }
   if (i.fed !== null && i.fed < 0.9) {
     out.push(`The paddock gave the mob ${Math.round(i.fed * 100)}% of the feed it wanted.`);
@@ -66,14 +89,25 @@ export function mobWhy(i: WhyInputs): string[] {
   const seen = new Set<string>();
   for (const f of i.forecasts) {
     for (const r of f.why) {
-      const text = reasonWord(r);
+      // "Just short of what they need" is not true of a mob that is holding or gaining.
+      const text = !warn && r.reason === 'justShort' ? intakeWord(r) : reasonWord(r);
       if (!seen.has(text)) {
         seen.add(text);
         out.push(text);
       }
     }
   }
-  return out;
+  return { why, details };
+}
+
+/** What a class eats, as a plain fact. */
+function intakeWord(r: Extract<GainReason, { reason: 'justShort' }>): string {
+  return `They eat about ${r.intake.toFixed(1)} kg DM a head a day of feed at ME ${r.me.toFixed(1)} MJ/kg.`;
+}
+
+/** The warnings alone: why a mob is losing weight, in low condition, or has no water. */
+export function mobWhy(i: WhyInputs): string[] {
+  return mobLines(i).why;
 }
 
 /**

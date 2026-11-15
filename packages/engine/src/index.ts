@@ -38,7 +38,7 @@ export { cellQuality, meFromDmd } from './pasture/quality';
 export type { SquareQuality } from './pasture/quality';
 export { PHASE_LABELS, phaseOf } from './pasture/phase';
 export type { PhaseId } from './pasture/phase';
-export { areaSummary, coverPct, paddockSummary } from './pasture/summary';
+export { FEED_FLOOR_KG_HA, areaSummary, coverPct, paddockSummary } from './pasture/summary';
 export type {
   AreaSummary,
   PaddockStock,
@@ -109,6 +109,7 @@ export {
   GROUPS,
   HEALTH_COST_PER_HEAD_YEAR,
   MARKET_CLASSES,
+  MARKET_WEIGHTS,
   MARKING,
   SALE_CLASSES,
 } from './data/cattle';
@@ -177,7 +178,14 @@ export {
   weaningDue,
 } from './cattle/breeding';
 export type { CalveInputs, MarkResult } from './cattle/breeding';
-export { gainOn, gainWhy, milkMJ, predictGains } from './cattle/gains';
+export {
+  FEED_SHORT_KG_HA,
+  NOT_ENOUGH_FEED_AVAIL,
+  gainOn,
+  gainWhy,
+  milkMJ,
+  predictGains,
+} from './cattle/gains';
 export type { CattleNote, GainForecast, GainReason } from './cattle/notes';
 export { dayDiet, settleDeaths, simMob } from './cattle/simMob';
 export type {
@@ -639,7 +647,7 @@ export type { ClockSpan, FarmClock } from './sim/state';
 export type { WorkEvent } from './sim/events';
 export type { JobCard, JobPiece, JobPreview, JobWorkPart } from './actions/types';
 export { NOT_TODAY, applyAction, previewAction } from './day/act';
-export { TROUGH_LOW_DAYS, endDay, skipDays, stopsIn, waterCheck } from './day/days';
+export { TROUGH_LOW_DAYS, daysToYearEnd, endDay, skipDays, stopsIn, waterCheck } from './day/days';
 export type {
   Change,
   DayEnd,
@@ -649,14 +657,20 @@ export type {
   SkipResult,
   SkipStop,
 } from './day/days';
+export { SHORTEST_JOB_MIN, clockView, husbandryNow, jobsToday, marketView } from './day/look';
+// Things to do (engine 0.20.0: facts for the bank, a sale coming up, a mob's
+// condition, calving and feed under the floor; marking once per drop; put away by `dismissTodo`).
 export {
-  SHORTEST_JOB_MIN,
-  clockView,
-  husbandryNow,
-  jobsToday,
-  marketView,
+  CALVING_SHOWN_DAYS,
+  LOW_CS,
+  MARK_AFTER_CALVING_DAYS,
+  SALE_SOON_DAYS,
+  allThingsToDo,
   thingsToDo,
-} from './day/look';
+  todoKey,
+} from './day/todo';
+export { BANK_NEAR_SHARE, bankLevel, headToSell } from './money/bank';
+export type { BankLevel } from './money/bank';
 export type {
   BookedView,
   HusbandryJob,
@@ -665,7 +679,8 @@ export type {
   OnTheWayView,
   SaleDayView,
 } from './day/look';
-export type { ClockView, ThingToDo } from './day/look';
+export type { ClockView } from './day/look';
+export type { ThingToDo } from './day/todo';
 
 // Milestones 2.1 and 2.2: farm hands and contractor fencing (docs/MODEL.md,
 // section 11). Hiring, letting go and ordering or cancelling contract

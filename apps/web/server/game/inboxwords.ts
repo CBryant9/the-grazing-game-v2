@@ -6,7 +6,7 @@ import { longDate, saleClassLabel } from './marketwords';
 import { reasonWord } from './mobwords';
 import { movedText, waitWhyWord } from './planwords';
 import { isSheepEvent, sheepMessage } from './sheepwords';
-import { causeWord, gameOverWord } from './words';
+import { bankWords, causeWord, gameOverWord } from './words';
 
 /**
  * The messages in the inbox: one or two plain sentences for each thing the
@@ -97,6 +97,8 @@ export function inboxMessage(e: FarmEvent, dateOf: DateOf): Message | null {
       return msg('cattle', `The farm has about ${plural(e.daysLeft, 'day')} of feed left.`);
     case 'game-over':
       return msg('farm', gameOverWord(e.reason));
+    case 'bank':
+      return msg('farm', bankWords(e.level, e.cash, e.limit, e.head));
     case 'cattle': {
       const text = noteWord(e.mobName, e.area, e.note);
       return text ? msg('cattle', text) : null;
