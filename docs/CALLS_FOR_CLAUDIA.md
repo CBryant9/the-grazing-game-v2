@@ -20,501 +20,378 @@ How to read it:
 - Accounts, sign-in, database saves, the admin area, Daily Farm, notifications, leaderboards, groups, challenges, profiles, posts, the ticker, farm viewing and moderation.
 - Ad slots, house ads and sponsor reports. One-off purchases through Stripe Checkout and paying to keep going.
 - The public website: home, pricing, advertise, about, privacy, terms, community rules.
-- Milestones 5.3 (dashboard and analytics) and 5.5 (launch check) are still being built. They are not covered here.
+- Calls from milestones 5.3 and 5.5 are a placeholder at the end of Part B.
 
 ### What is switched off, and why
 
-Everything that needs a key, an outside account or your ruling is built and held behind a feature switch or a missing key. With no keys the game plays as a guest on farm files.
+Every feature switch and its real default is in the table below. The defaults come from the shared switch list in `packages/shared/src/index.ts` and the seed migrations in `supabase/migrations` (the reference data, then the Daily Farm and sheep migrations). A test checks the two agree key for key. With no keys set, the game plays as a guest on farm files whatever the switches say.
 
-- **Daily Farm:** off. The PRD table 11.7 says on. It is off because you said off by default and because its live data feed has never been run (items in Daily Farm).
-- **Sheep:** off. Sheep are held back until you rule on the open sheep winter and money gaps (items in Sheep).
-- **Community and its parts, ads, every ad slot, purchases, maintenance mode:** off, as in PRD 11.7.
-- **AdSense:** nothing is wired. It needs your own AdSense account and a consent banner.
-- **Sign-ups, Fast Farm, leaderboards and push notifications:** on, as in PRD 11.7. Push sends nothing until the push keys exist.
-- **Website sections** about features that are off are hidden. They read `SITE_SWITCHES_ON` when the site is built.
+Switched off: Daily Farm, sheep, the whole community (posts, groups, ticker, farm viewing), every kind of ad and AdSense, purchases, and maintenance mode. Daily Farm is off against the PRD table (which says on) because you said off by default and its live data feed has never run. Sheep are off until the open sheep gaps are ruled on. The rest are off as in the PRD, and each needs a key, an outside account or your ruling.
+
+Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups and leaderboards do nothing visible until the database keys exist. Push sends nothing until the push keys and a schedule exist.
+
+| Switch | Default | What it needs before it can go on |
+| --- | --- | --- |
+| `signups_open` | On | Supabase keys, or sign-in is not offered |
+| `fast_farm` | On | Nothing |
+| `daily_farm` | Off | Database keys, `CRON_SECRET` and a 15-minute schedule, a test of the live feed (`GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL`), and your ruling A9 |
+| `community` | Off | Database keys, your rulings A22, A15 and A17, a lawyer's read of the community rules |
+| `feed_posts` | Off | `community` on, and the photo approach in A22 |
+| `groups` | Off | `community` on |
+| `activity_ticker` | Off | `community` on. The landing page also needs `activity_ticker` in `SITE_SWITCHES_ON` at build |
+| `farm_viewing` | Off | `community` on. It shows Daily Farms only, so it needs `daily_farm` on to show anyone |
+| `leaderboards` | On | Database keys (rows are written by the server) and `NEXT_PUBLIC_SITE_URL` for the public page. Your ruling A10 for the score |
+| `ads` | Off | Database keys, an admin, a slot switched on and a house campaign. Your ruling A23 |
+| `video_ads` | Off | `ads` on, plus a slot that shows video |
+| `banner_ads` | Off | `ads` on, plus a banner slot |
+| `adsense` | Off | Nothing is wired. It needs your own AdSense account, a consent banner and new code |
+| `purchases` | Off | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, accounts on, a product switched on, and your rulings A19 and A20 |
+| `push_notifications` | On | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `CRON_SECRET` and a 5-minute schedule. Email also needs `RESEND_API_KEY`, `NOTIFY_FROM_ADDRESS` and `NOTIFY_TOKEN_SECRET`. Your ruling A24 |
+| `sheep` | Off | Your rulings A4, A5 and A6 (and A1 for the Tablelands winter) |
+| `maintenance_mode` | Off | Nothing. Turn it on from the admin switches screen |
+
+Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built, and every entry in it is off until you set it.
 
 ### The rulings that matter most
 
-1. **Calves, cows and the grass.** Calves grow slower than published figures. Cows now milk off their backs and fewer get back in calf. The Tablelands winter feed is too poor for ewes and dry cows. The grass review recommends three sourced changes and asks six questions. These change how the game plays more than anything else (Cattle and grass items on grass, calves and steer bands).
-2. **When a cow shows as in calf.** The game uses 50 days, the day the price pays the premium. Agriculture Victoria says about 42 days. Moving to 42 changes sale values (first item in Cattle and grass).
-3. **Sheep.** Whether to switch sheep on, and how to settle the Tablelands winter, ewe deaths, wool price and the margin gaps (Sheep).
-4. **Daily Farm.** Whether to switch it on, with real data running 5 days behind the real date, and how missed days work (Daily Farm).
-5. **Legal and privacy risk.** A lawyer has not read the privacy page, terms or community rules. Buying age is set at 18. A refused under-14 can retry with a new email. A ban record survives a deleted account. Analytics run only with consent. Admins cannot read dates of birth (Website, Accounts and privacy, Purchases).
-6. **Money.** The rescue (paying to keep going) sets cash to the hard-difficulty starting cash. Refunds after a rescue do not undo it. Keep-going prices under 6 months are not set (Purchases).
+1. **The grass, calves and cows (A1, A2).** These change how the game plays more than anything else: winter feed, steer gains, calf weights and cow condition.
+2. **When a cow shows as in calf (A3).** 50 days against 42 changes sale values.
+3. **Sheep (A4, A5, A6).** Needed before sheep can be switched on.
+4. **Daily Farm (A9).** Needed before the real-time mode can be switched on.
+5. **Legal and privacy risk (A15, A16, A17, A21, A22, A23).** No lawyer has read the legal pages. The under-14 retry, the ban record that outlives a deleted account, retention and photo moderation all carry risk.
+6. **Money (A19, A20).** Buying age, refunds and what the rescue pays.
 
 ## 1. Needs your ruling
 
-### Cattle and grass
+### Part A: the calls that need you
 
-**1. When a cow shows as PTIC.** The record and the price both use 50 days in calf. Agriculture Victoria gives reliable palpation from about 6 weeks (42 days). Moving both to 42 changes sale values against the MVP. Change: `PTIC_DAYS` and the premium's `fromDays`. [m1.7f second pass Q1]
+These are the calls that change how the game plays in a way you would notice, that carry legal, privacy or money risk, or that must be settled before a switched-off feature can be turned on. Each one settles a group of related calls. The smaller calls inside each group are listed in Part B.
 
-**2. Booked cows are paid the PTIC premium on sale day.** A cow booked in "Cows" who reaches 50 days in calf by the sale day is paid the premium. The price is set on the sale day by the record, not at booking. [m1.7f third pass, coordinator call 3]
+**A1. The grass, the steer bands and carrying capacity.** Built: the grass model as calibrated from the MVP. A review against published figures found the Tablelands winter feed very poor (35 to 55 kg DM/ha of green, a dry cow eating about 1.0 to 1.1% of live weight and well short of energy). Stock eat less of poor feed than measured cows (1.0 to 1.2% against 1.4 to 1.5%). Dead feed is 50% digestible against 47% in the grazing advice tool PROGRAZE. Carrying capacity is 3.5 DSE/ha on Tablelands native pasture against 5 published, and 5.5 to 7.7 on sown pasture against 12 to 23. None of the steer gain bands (Tablelands 90 to 105 kg, Central West 115 to 130 kg) has an outside source. Other choice: leave the grass as it is, or make only some of the changes. The review asks six things: keep or replace the steer bands; whether Tablelands native pasture means red grass with winter-active natives; whether to accept 1.4 to 1.5% intake on poor feed everywhere; whether to accept the published carrying capacities; whether Central West peak digestibility goes back toward 0.70; and whether to look at the milk rule next. What it changes: winter condition, steer gains and calf growth in every district, and whether sheep can run on native pasture. Recommended: three changes made one at a time with the benchmarks rerun after each (more intake on poor feed, dead feed at 47% with slower summer breakdown, and winter-active natives on the Tablelands), then carrying capacity as a separate decision. [grass review rulings 1 to 6; sheep C18; m1.3. Change: intake, dead feed and growth curves in `packages/engine/src/data` and the steer bands in `calibration/steers.test.ts`]
 
-**3. Late pregnancy shows.** Cows more than 190 days in calf add 10% to AE and give a "late pregnancy" reason on the mob card. A grazier can usually see it by then. [m1.7f second pass Q2]
+**A2. Calves, cows and calving time.** Built: calves weigh 142 to 163 kg at 200 days in the average year and gain 0.53 to 0.63 kg a day, under the published 0.7 to 1.1 (Central Queensland passes its band). Cows now keep milking on poor feed, lose condition, and fewer get back in calf (about 55 calves per 100 cows by year 3 in Central Queensland and on the Tablelands, against 72 to 77 weaned in northern breeder herds). Every herd calves from late November to March on a 1 September start. Other choice: change the milk rule, the calf cost of gain, or give each district its own calving window. What it changes: calf weights, cow condition, conception and what a new player sees on 1 September. A May start leaves 79 to 82% of Tablelands cows thin in spring. The milk and calf figures are stand-ins with no published source. [m2.5 calls 1 to 6; grass review ruling 6. Change: `MILK` and `YOUNG_GAIN_COST` in `packages/engine/src/data/cattle.ts`, and `startHerd`]
 
-**4. Joining counts follow the record.** The "ready to join" counts follow what is on the record. A note can stay silent when every female is in calf but under 50 days. This is a small give-away that was accepted. [m1.7f third pass]
+**A3. When a cow shows as in calf, and what the premium pays.** Built: a cow goes on the record as in calf by herself at 50 days, the day the sale price pays the in-calf premium. Cows more than 190 days in calf add 10% to feed need. A cow booked for sale who reaches 50 days by sale day is paid the premium. Other choice: use 42 days, from Agriculture Victoria's figure for reliable palpation. What it changes: sale values against the MVP and when the record shows pregnancy. Moving to 42 changes both. [m1.7f second pass Q1 and Q2; third pass coordinator call 3. Change: `PTIC_DAYS` and the premium's `fromDays`]
 
-**5. Herds calve November to March in every district.** The start herd has PTIC cows 100 to 210 days in calf on whatever day the farm starts, so a 1 September start calves from late November. Central Queensland usually calves in the wet. Western Victoria calves in autumn, spring or both. No source was read for the Tablelands or Central West. A May start calves August to November and gives much thinner Tablelands cows. Change: a calving window per district in `startHerd` and the `ptic` and `cowCalf` sale classes, then rerun the herd benchmarks. [m2.5 call 5]
+**A4. Sheep: the Tablelands winter, ewe deaths and carrying capacity.** Built: sheep, off by default. Unfed Tablelands ewes reach lambing at condition score 1.4 and 31.7% die, with 48.8% of lambs marked (Central West 71.1%). First-cross ewes die 4.95, 5.36 and 5.35% a year against 2 to 4%, and Merino ewe deaths run over in some blocks. Carrying capacity benchmarks are skipped. Other choice: change the grass winter (see A1), add a sheep supplement, or hold the benchmark on sown pasture. What it changes: whether a sheep farm can survive a Tablelands winter, and so whether sheep can be switched on. Recommended: the review's grass package lifts Tablelands ewes to condition score about 1.95 and cuts deaths from 15 to 18% to about 8%. [m2.3 calls 1, 2, 14, 18, 28 to 30, 33; m2.7 review calls 2 and 5. Change: the grass model, `data/sheep.ts` and the sheep switch]
 
-**6. Cows milk off their backs.** On poor feed a cow keeps milking, gets thin and fewer get back in calf. Over three years with no action, calves per 100 cows fall to about 55 in Central Queensland and on the Tablelands. A player can lick, hay, wean early or sell. The mob card says "milking" but does not say her condition is falling because of it. A "cows getting thin" line in Things to do was not built. [m2.5 call 1]
+**A5. Sheep money: wool price, margins and the ewe count.** Built: wool sells at a dated September 2026 stand-in price on every farm (no AWEX series). A managed flock's margin matches DPIRD's $50.46 a DSE in the Central West ($38.69) and is over the band in the Tablelands ($71.88) and Western Victoria ($90.33). The unmanaged start flock earns $5.37 (Tablelands) and $135.74 (Western Victoria) a DSE. The model counts 1.6 to 2.0 DSE a ewe against the budget's 2.32. Ewe wool is 17.8 micron (the coarsest that keeps two benchmarks true). Wool selling costs are stand-ins. Other choice: set a wool price series, move a micron benchmark, or widen the plus or minus 25% margin band. What it changes: how profitable sheep look and what "per DSE" screens say. [m2.3 calls 24, 35, 40, 43; m2.7 review calls 4 to 6, 9, 10; PRD 21 row 27. Change: `data/sheepMarket.ts`, `data/sheep.ts`]
 
-**7. Milk falls with condition (stand-in).** Full milk at CS 2.25, none at CS 1.5. No published figure was found. 2.5 and 1.6, 3.0 and 1.8, and 2.25 and 1.5 all keep every herd benchmark in band. With no fall at all, Tablelands herd deaths are 4.4% against a band of 1.5 to 3.6%. Change: `MILK` in `packages/engine/src/data/cattle.ts`. [m2.5 call 2]
+**A6. Sheep figures to confirm before sheep go on.** Built: Merinos are unmulesed (17% of ewes struck a year, same fly season everywhere). Netting fence is $10 a metre (permanent is $7). Joining is 5 January (Central West), 7 April (Tablelands) and 1 April (Western Victoria). No-water death stays at day 4 as for cattle. Sheep count 8.4 DSE per AE, which moves the cattle DSE figures on screen by 5%. Two lamb survival tables in the source disagree and need a check against the printed page. Other choice: a different fly rate, fence price, joining dates, or DSE of 8. What it changes: sheep deaths, fencing cost, lambing times and every DSE shown. [m2.3 calls 3 to 7, 10, 19, 22 (C3, C21, C26, C27, C30, C32). Change: `FLYSTRIKE`, `JOIN_START`, `SURVIVAL_PER_CS`, `DSE_PER_AE`]
 
-**8. Calf cost of gain.** Stock under 100 kg pay 0.52 MJ per kg of live weight to the 0.75 for each kg gained, moving to the MVP figure by 200 kg. It comes from Holstein calves in Japan on milk and concentrate. The CSIRO 2007 nutrient requirements book would settle it. Change: `YOUNG_GAIN_COST`. [m2.5 call 3]
+**A7. A hand's share of fencing.** Built: with a hand on, a day of permanent fence is 800 m (the hand's share is about 300 m). Other choice: the hand's share is 500 m and the two of you build 1,000 m. What it changes: how much fence a farm with a hand builds in a day. You said both things on 13 November, so the record conflicts. [m2.1 call 1. Change: `handDayShare` in `packages/engine/src/data/labour.ts`]
 
-**9. Calf rows stay open.** Weight at 100 days passes everywhere. Daily gain and weight at 200 days are open in the southern districts, and daily gain in Central Queensland. The grass looks like the binding limit, and the milk rule holds the rest. The next step proposed is a look at the milk rule. See "Known gaps in realism". [m2.5 call 4, grass review question 6]
+**A8. Contractor price and wages.** Built: a contractor charges materials plus $5 a metre labour, the same for either team. Wages use 2026 Pastoral Award rates (paid every 14 days) on every farm, whichever year is played. Other choice: a contractor's real quote, weekly pay, and wages of the year played. What it changes: the cost of fencing and a farm's running costs. The $5 is a stand-in because no labour-only rate was found. [m2.1 calls 4, 8, 9, 18. Change: `labourPerMetre`, `payCycleDays`]
 
-**10. Herd figures that moved with the calf fix.** Herd gain a head rose 5 to 15 kg. Central West's worst single herd lost 3.85% (was 3.37). Tablelands preg tests run 7.17 points over the expected rate (band up to 9). All stay in band. [m2.5 call 6]
+**A9. Daily Farm: on or off, and data 5 days behind.** Built: Daily Farm is off. Its game day runs on the real weather and prices of 5 days earlier, so the midnight run never waits for late data. A new farm starts on today's date as Day 1. The live data feed has never been run. Other choice: switch it on, use a different lag, or run each day on the day's own data and correct later. What it changes: whether the real-time mode exists at all. The PRD table says on and you said off by default. [m3.3 call 1, second pass calls 3 and 6, call 14. Change: the `daily_farm` switch and `DAILY_DATA_LAG_DAYS`]
 
-**11. Grass review, question 1: the steer bands.** None of the steer bands has an outside source. The recommended package puts Tablelands steers at 126 kg and Central West at 143 kg, over bands of 90 to 105 and 115 to 130. Keep the bands and tune something else, or replace them with sourced figures. Change: the band constants in `calibration/steers.test.ts`. Recommended: the review found no sourced steer gains by district, so it asks for your ruling and gives no pick. [grass review, ruling 1]
+**A10. The score and the leaderboards.** Built: the score shown is the game's own year score from five parts (profit, weight gain, pasture use, ground cover, deaths), with each part's points shown. The Grazier Score has no agreed weights. The headline board averages the year score over finished years. The real-year board ranks on the change in net worth per hectare over that year. Other choice: set the Grazier Score weights, show fewer points, or rank on something else. What it changes: what players chase, and a player could work the weights back from the points shown. Weights are to be set once calibration farms are run. [m1.7g calls 1, 11, 14; m4 calls 1 to 4. Change: `headline` in `server/boards/score.ts` and `YearBlocks.tsx`]
 
-**12. Grass review, question 2: Tablelands native pasture.** Should "native" there mean red grass with winter-active natives (microlaena, wallaby grass) as the district list says, or pure red grass with winter green only on sown paddocks? Recommended: give the native pasture its winter-active natives (winter growth from PROGRAZE's microlaena curve and half the frost loss). [grass review, ruling 2]
+**A11. Real years: prices and dollars.** Built: real MLA prices from 1997, lifted to today's dollars by the CPI (September quarter 2026). Each class sits on an MLA indicator (weaners 1.08 times the restocker yearling figure, bulls 0.906 of cows). Where a yard's own figure is thin the national figure times the yard's usual premium is used. Sale days with no records are Mondays at two yards. Other choice: prices of the day, different class mappings, extra fill-in yards (Emerald, Inverell, Ballarat), real sale days. What it changes: what stock sell for in each real year and whether a 1997 start can pay its way. [m1.4 Q1 to Q6, realism check CHECK 8 to 10; m1.4a Q1. Change: `REAL_PRICE_DOLLARS` and `market/realPrices.ts`]
 
-**13. Grass review, question 3: intake on poor feed.** Accept the measured Central Queensland intake (1.4 to 1.5% of live weight at 49 to 51% digestibility) as the target for every district? The game gives 1.0 to 1.2%. Recommended: raise intake at 50% digestibility from about 1.1% to about 1.4% of live weight for a dry cow. [grass review, ruling 3]
+**A12. Real years: weather and seasons.** Built: one 100 mm soil for every district. Out-of-season rain lifts growth to at most 1.9 times the curve. A farm that starts after a dry time starts on pasture lifted to at least 85% of average. The season label (six words from the MVP, "Drought" under 60% of average) reads the last 12 months. Years change on the farm's anniversary and, after the newest, go back to 1997. Other choice: a soil for each district, a higher ceiling for native pasture, the real pasture left by the year before, labels that lean on recent months. What it changes: how dry and wet years play out, which you should check against the years you remember. [m1.4b Q1 to Q7; m1.4 Q7 to Q10. Change: the growth factor in `season/weatherGrowth.ts`]
 
-**14. Grass review, question 4: carrying capacity.** Accept published 5 DSE/ha for unimproved Tablelands native and 12 to 17.5 for sown as targets, and raise the safe-use share to fit? The game gives 3.5 on Tablelands native and 5.5 to 7.7 on sown. Recommended: a separate decision after the three grass changes. Raise the share of growth eaten, give sown pasture its own share and growth in the paddock figure, and add the published figures as benchmarks. [grass review, ruling 4; sheep C18]
+**A13. Buying and selling on sale days.** Built: buying only on a sale day (next one named), with stock arriving in the yards next morning. On a day with no sale, stock is booked onto the next one and sold that day at that day's price, and can be cancelled. Stock in the yards has water and grazing but no hay. Other choice: buy any day, sell only on the sale day, or hay after one day. What it changes: how often a player can trade, and how cattle left in the yards fare. [m1.5b Q1 to Q4. Change: the sale rules in `day/` and `market/saleCalendar.ts`]
 
-**15. Grass review, question 5: Central West peak digestibility.** It was tuned from 0.70 to 0.68 to fit the steer band. With the package in, should it go back toward 0.70? [grass review, ruling 5; m1.3]
+**A14. Grazing plans.** Built: a plan that reaches a paddock holding another mob joins the two. Plan moves take none of the day's light. Setting a plan costs the ordinary move time if the mob has to move. A move by hand pauses the plan. Other choice: keep mobs apart so a plan waits, make plan moves use daylight (the PRD proposed this), or end a plan on any hand move. What it changes: whether rotations work with few paddocks, and how much a plan costs the player's day. [m1.5c Q1 to Q6. Change: `sim/plans.ts`]
 
-**16. Grass review, question 6: calves and the milk rule.** The grass is not what holds calves back. Look at the milk rule next as separate work? [grass review, ruling 6]
+**A15. Age checks and the under-14 refusal.** Built: accounts need 14 or over, worked out from the date of birth on the Sydney date. A refused under-14 can still play as a guest. The refusal holds for that sign-in only, so a different email gets a fresh try and the database cannot tell it is the same person. Under 16 means no community. Other choice: stronger checks than a date of birth. What it changes: the legal risk. Date of birth alone may not count as "reasonable steps" under the PRD's legal note, so it is a question for your lawyer. [m3.1 calls 5, 27, 31; m3.2 calls 7, 18. Change: `complete_sign_up` and `app.today_sydney`]
 
-**17. Grass review: dead feed quality.** The game's dead feed is 50% digestible all year (51% in Western Victoria). PROGRAZE assumes 47% (45% tropical). Recommended: set dead feed to 47% (45% in Central Queensland) and slow the summer breakdown of standing dead feed to about half gone by autumn. [grass review, recommendation 2]
+**A16. Bans that outlive a deleted account.** Built: a banned or suspended player who deletes their account leaves only a one-way hash of their sign-in email and the ban's end date, used to refuse a new sign-up with that email. Moderation history is deleted. A different email gets past it. Only Gmail dots and Fastmail tags are cleaned up, because no provider page was found for other aliases. Other choice: keep nothing, or keep more. What it changes: privacy risk and whether bans hold. A privacy call for you and your lawyer. [m3.1 calls 28, 33; m3.5 call 5. Change: `BAN_HASH_PEPPER` and `server/auth/email.ts`]
 
-**18. How a benchmark is judged.** The build plan fails any average-or-better year outside its band. The model cannot meet that as written. The tests hold bands on the average of twelve blocks, accept Central Queensland with lick up to 2 kg over the top, hold the oats figures to one fortnight and count herd deaths over all herds together. These are marked "proposed" in the tests and in `docs/CALIBRATION.md`. Change: the judging rule in `docs/CALIBRATION.md` and the calibration tests. [m1.3, CALIBRATION "How a benchmark is judged"]
+**A17. Data download, deletion and how long data is kept.** Built: guests are removed after 30 days (database) or 90 days (files). The download leaves out the engine save and action log because they hold the hidden rules. Deleting an account hands each owned group on or leaves it ownerless. Reports others wrote about a deleted player stay. Account data retention is not decided. Profiles are Public and farm view Followers only by default. Other choice: different periods or defaults. What it changes: privacy duties under the Privacy Act. Worth a word with your lawyer. [m3.1 calls 4, 9, 15, 16, 32, 35; m3.2 call 2; m5.4 call 6. Change: `prune_housekeeping` and `profiles` column defaults]
 
-**19. Other calibration questions.** `docs/CALIBRATION.md` lists ten more questions from milestone 1.3 and further "CHECK" items from real years (CHECK 8 to 10). They are not repeated here. [m1.3, m1.4 realism check]
+**A18. Banned and suspended accounts can still play their own farm.** Built: a ban or suspension ends sessions and blocks the community, sign-up with the hash, and admin. The game routes do not check status, so the player can sign in again and play. Other choice: refuse play to banned accounts. What it changes: what a ban does. [m3.5 call 3. Change: one check in `route()` in `server/game/http.ts`]
 
-**20. Real data pulled: yards and grid points.** The brief named Emerald, Inverell and Ballarat as fill-in yards. Are they right? Armidale's own history is long, so Inverell may not be needed. Are the four SILO grid points where each district's weather should come from? They came from the brief and were not checked on a map. Should the rest of the MLA pull (6 to 9 more hours) run in full or only for what is needed? [m1.4a Q1 to Q3]
+**A19. Buying age, card payments and refunds.** Built: buying needs 18 or over (the PRD only says to check under 18s with a lawyer). Checkout takes cards only. A full refund removes what was bought. A dispute removes it until won. A part refund changes nothing. Packs are one each, with the upgrade for the second. Other choice: a lower age with parental consent, other payment types, different refund rules. What it changes: money and legal risk. Recommended: 18 until a lawyer advises. [m5.2 calls 1, 3, 4, 7, 8; m3.1 call 18. Change: `MIN_PURCHASE_AGE` in `products.ts`]
 
-**21. Soil water.** One soil of 100 mm for all four districts, chosen against AussieGRASS. The comparison leans to a smaller soil for Western Victoria and a larger one for Central Queensland. Should each district have its own, and what water-holding figures would you trust? [m1.4b Q1]
+**A20. Paying to keep going (the rescue).** Built: a rescue sells all stock to clear the debt and sets cash to the hard-difficulty starting cash, or what the sale leaves if more. A refund after a rescue does not undo it. The offer needs a free farm slot. Tiers are by days run: under 183 days (price open, cannot be switched on), 183 to 364, 365 to 729, 730 and over. The price under 6 months is A$15 until set. Other choice: different terms, tiers or prices. What it changes: money, and what a player gets when a farm fails. The PRD is silent on the cash. [m6 For Claudia; m5.2 calls 5, 6; PRD 21 row 30. Change: `rescueFarm` in the engine and `products.ts`]
 
-**22. Growth ceiling.** Rain out of season lifts growth to at most 1.9 times the curve for the time of year, so a wet Central Queensland winter and spring (1998, 2022) grows little. About a third of Central Queensland days sit at the ceiling. Raising it for native pasture only is possible. [m1.4b Q2]
+**A21. The legal pages and who is behind the game.** Built: privacy, terms and community rules are plain-English drafts with no lawyer's review, marked "Draft. Not yet reviewed." The owner name, ABN, contact address and domain are not set. The privacy page names no providers and says data may be kept outside Australia. Analytics run only with consent, which is stricter than the PRD. A few lines are worded for you to check (the SILO credit, guest farm removal). Other choice: name the providers once accounts exist, relax the consent rule. What it changes: legal exposure, and the pages stay in draft until done. [m5.4 calls 1 to 6, 10, 11. Change: `SITE_OWNER_NAME`, `SITE_CONTACT_EMAIL`, `NEXT_PUBLIC_SITE_URL`]
 
-**23. Starting after a dry time.** Should a farm starting 1 January 2003 start on the pasture the 2002 season left, or on the lifted run-up (at least 85% of average) as built? [m1.4b Q3]
+**A22. Photos, the word list and moderation before the community goes on.** Built: the community is off. Photos are stripped of metadata, wait for manual approval (no image-check service is wired), and are never shown before checking. The word filter has two placeholder words. Staff see the community like any member. Other choice: choose an image-check service, add real words, let admins in while the switch is off. What it changes: moderation workload and harm risk. These must be settled before the community can be switched on. [m4.2 calls 1 to 4; m3.1 call 14; m4.2 review fix 1. Change: `IMAGE_CHECK_API_KEY`, `/admin/words`]
 
-**24. Years at random and in order.** Is the farm's anniversary the right place to change year? Should the first year be picked or a surprise? After the newest year, go back to 1997 (built) or stop? [m1.4b Q4 and Q5]
+**A23. Ads: no-ads owners, under-16s and AdSense.** Built: all ads are off. Someone who owns no-ads sees no sponsor cards either. Under-16s and guests see only campaigns for everyone, never aimed. AdSense has no code, no account and no consent banner behind it. Other choice: let no-ads owners see sponsor cards (the PRD proposed this), ban ads for under-16s, wire AdSense. What it changes: money and the legal handling of children's data. Needed before ads can go on. [m5.1 calls 1, 2, 15. Change: `adSlotsFor` and `viewerFor` in `server/ads/serve.ts`, `adsense.ts`]
 
-**25. Season labels.** Six labels from the MVP, set by the last 12 months' growth (under 60% of average is "Drought"). Are the edges right, and is "Drought" a fair word? Should the label lean on the last few months? [m1.4b Q6, m1.4 Q10]
+**A24. Notifications: defaults, quiet hours and under-16s.** Built: nothing is sent until a device is added. The morning reminder is off until turned on, email is off for every type, and email is only a fallback. Quiet hours drop reminders and hold other notices for up to 12 hours. Under-16s get no community notifications but still get challenge notices. At most 6 a day. Chrome and Edge push hosts are allowed from their own documents but have never been tested. Other choice: reminders on by default, held reminders, challenges hidden for under-16s. What it changes: how often players are contacted. Push needs one real-device test per browser. [m3.4 calls 1, 2, 5, 6, 9; m3.1 call 29. Change: `lib/notify/kinds.ts`, `DAILY_CAP`]
 
-**26. District variation.** Western Victoria varies least (year factors 0.71 to 1.25). Western Victoria never drops under its steer band, even from April 2006. Central West with nothing done loses 5 to 54% of set-stocked weaners in its four worst years. Do these look right? Check the dry and wet year tables in `docs/CALIBRATION.md`, Central West from April 2002, 2006, 2018 and 2019 first. [m1.4b Q7 and Q8, m1.4 Q7 to Q9]
+**A25. Speed targets that are missed.** Built: `/play` scores Lighthouse 0.89 against a 0.95 target, so CI fails on it. App pages carry about 140 KB of framework script against the PRD's 100 KB for website pages (public pages send none). Several pages sit within 1 KB of their limit. Other choice: lighten the play page, or move the targets. What it changes: first load speed on a phone. [m1.8 calls; m3.2; m6. Change: `PlayApp` and `SetupFlow`, `lighthouserc.json`]
 
-**27. Real prices: class mapping.** Each class is on an MLA indicator. Weaners are 1.08 times the restocker yearling figure, heifers of 280 kg and over use the feeder heifer figure, and bulls are 0.906 of the cow price. Change: the mapping in `market/realPrices.ts` and `DATA.md` "Real prices: indicators to classes". [m1.4 Q1]
+### Part B: decided, no action needed unless you disagree
 
-**28. Yard price or national price.** A yard's own weekly figure jumps about. Built: the yard's figure where it has enough rows, else the national figure times the yard's usual premium. The other choice is the yard's figure as it is. [m1.4 Q2]
+Each line says what was built. The bracket gives the log reference and where to change it. Items that are part of a Part A group are not repeated here.
 
-**29. Thin yard histories.** Western Victoria young cattle play on national prices because Mortlake's rows are too thin (is Ballarat wanted?). Central Queensland before October 2014 and Western Victoria before 2018 play on national prices times the yard's later premium (are Emerald and Ballarat wanted?). [m1.4 Q3 and Q4]
+#### Cattle and grass
 
-**30. Today's dollars.** Past prices are lifted by the CPI so a 1997 sale reads about 200 c/kg, not 90. "Today" is fixed at the September quarter 2026. The other choice is the prices of the day with costs left at today's level. Change: `REAL_PRICE_DOLLARS`. Whether to use a different quarter and whether a farm starting in 1997 can pay its way are also open. [m1.4 Q5, realism check CHECK 8 to 10]
+**B1.** Herd figures moved with the calf fix: gain a head up 5 to 15 kg, Central West worst herd lost 3.85%, Tablelands preg tests 7.17 points over expected (band up to 9). [m2.5 call 6]
 
-**31. Sale days where there are no records.** Mondays at Gracemere from 1997 to 1999 and 2004 to 2014, and at Mortlake before 2018. No sale from 16 December to 7 January. Do you know the days those yards really sold? [m1.4 Q6]
+**B2.** Benchmarks are judged on the average of twelve blocks, with Central Queensland lick up to 2 kg over, oats held to a fortnight and deaths counted over all herds. Marked proposed. [m1.3. Change: judging rule in `docs/CALIBRATION.md` and tests]
 
-**32. A 366-day year.** A real leap year costs one more day of overheads. Leave it? [m1.4 Q11]
+**B3.** Ten more calibration questions and real-year CHECK items sit in `docs/CALIBRATION.md`. [m1.3, m1.4]
 
-**33. Moving a running farm to new data.** A new data pull stops every running real-year farm. How data versions should work once Daily Farm fetches data every day is open. How the 1 July "new season" message should read on a real-year farm is also open. [m1.4 realism check]
+**B4.** Real data: the four SILO grid points were not checked on a map, and the rest of the MLA pull (6 to 9 hours) has not run. [m1.4a Q2, Q3]
 
-**34. Working day: what "500 m a working day" means.** A working day is that day's light, so a full day of permanent fence is 500 m in June and in December, and other jobs come off it. The other choice is a pace by the hour. Change: `data/jobTimes.ts`. [m1.5a Q1]
+**B5.** A 366-day real year costs one more day of overheads. [m1.4 Q11]
 
-**35. Fence building rules.** A line is built one map-square side at a time, so on a big farm a day can be one 340 m segment. A job longer than the day's light is done at first light and takes the whole day. The bank must cover the whole line as drawn, though only today's part is built. Should permanent fence scale with the farm? Electric fence is 1 km an hour (built) while the mockup shows 150 m an hour. [m1.5a Q2 to Q5, second review (b)]
+**B6.** A new data pull stops every running real-year farm, and the 1 July "new season" message on a real-year farm is not settled. [m1.4 realism check]
 
-**36. Times for taking things out and for gates.** Taking out takes as long as putting in (a gate 1 h, a trough or hub 3 h, moving a fixed trough 3 h). Opening or shutting a gate and buying take none of the day. [m1.5a Q6, Q7, Q11]
+**B7.** "500 m a working day" means that day's light, so a full day on fence is 500 m in June and December. [m1.5a Q1. Change: `data/jobTimes.ts`]
 
-**37. Husbandry times.** Marking is 2 min per calf (every calf at foot counted), weaning 30 min plus 0.5 min a head (every head), selling 60 min plus 1 min per 10 head (calves at foot counted). No mustering time. A switch to a supplement takes none of the day. [m1.5a Q8 to Q10, second review (a)]
+**B8.** Fence lines are built one square side at a time, a job longer than the light is done at first light and takes the whole day, the bank must cover the whole line, electric fence is 1 km an hour (the mockup shows 150 m an hour), and fence does not scale with farm size. [m1.5a Q2 to Q5]
 
-**38. Skips and evening.** A skip started part-way through a year stops at the year's end. A month is 30 days. The farm is lit as evening when less than 15 minutes of light is left. The red part of a line and the "uses the rest of the day" flag are built as one thing. [m1.5a Q12 to Q14]
+**B9.** Taking things out takes as long as putting in. Gates and buying take none of the day. [m1.5a Q6, Q7, Q11]
 
-**39. Things to do.** It lists five kinds of fact. Should it also list a crop to lock up or grain shedding, no bull with the cows, a sowing window open or low condition? These were left off as closer to advice than a job. [m1.5a Q15, second review (c)]
+**B10.** Marking 2 min a calf, weaning 30 min plus 0.5 min a head, selling 60 min plus 1 min per 10 head, no mustering time, a supplement switch takes none of the day. [m1.5a Q8 to Q10]
 
-**40. Sale days and delivery.** Built: buying only on a sale day, with the next one named. Stock arrive in the yards at first light the next day. Cattle in the yards have water and the yards' own grazing but no hay. Weekdays for farms not on real years are Central Queensland Wednesday, Tablelands Thursday, Central West Thursday and Western Victoria Monday. The other choices are buying any day, no yard feed rule and different weekdays. [m1.5b Q1, Q3, Q4]
+**B11.** A skip stops at the year's end, a month is 30 days, and the farm goes dark when under 15 minutes of light remain. [m1.5a Q12 to Q14]
 
-**41. Booking a sale.** On a day with no sale, stock is booked onto the next one and sold at first light that day at that day's price. It can be cancelled. The other choice is selling only on the sale day. [m1.5b Q2]
+**B12.** Things to do lists five kinds of fact only. Crop lock-up, grain shedding, no bull and low condition were left off. [m1.5a Q15]
 
-**42. Grazing plans: joining and daylight.** A plan that reaches a paddock with another mob joins the two (the bigger keeps its name). The other way keeps them apart, so a plan waits. Plan moves take none of the day's light (as in the old game). PRD 5.15 proposed they use daylight. [m1.5c Q1 and Q2]
+**B13.** Plans are limited to 8 legs, 30 stops, 20 plans, 0.25 to 60 days and 300 to 5,000 kg DM/ha. A low figure is refused, not clamped. [m1.5c Q7. Change: `DATA.md` limits]
 
-**43. Plans: setting, editing and hand moves.** Setting or resuming a plan costs the ordinary move time if the mob has to be moved. Editing a plan resets the round and waiting state of the other mobs on it. A move by hand pauses a plan (the old game ended it). A move to the feedlot ends it. [m1.5c Q3 to Q6]
+**B14.** The map draws a big mob as a sample, a mob stands round the square it was put on, grass is drawn about twice a cow's height, cattle colours are set by district, a pale rim keeps cattle readable, and no trees are drawn. [m1.6a Q1 to Q7]
 
-**44. Plan limits.** Up to 8 legs, 30 stops in a leg, 20 plans, 0.25 to 60 days, 300 to 5,000 kg DM/ha. The old game had none and clamped low figures up. Here a low figure is refused with the reason. Change: `DATA.md`. [m1.5c Q7]
+**B15.** Red on the map picture means only "does not fit today". A knocked-down fence is amber, no water purple, a team fence hot pink. The site's panels keep red. The profit marker must not be red when built. [m1.7f call 6 and second pass Q4, Q5]
 
-**45. Map: big mobs and where mobs stand.** A big mob in a big paddock is drawn as a sample (a marker with the true count and up to three cattle a square on four squares in ten). A mob stands round the square it was put on, usually the trough. Should it follow where the model says it grazed lately, or should every beast be drawn? [m1.6a Q1 and Q2]
+**B16.** Every farm starts on 1 September. The player cannot pick a start month. [m1.7a Q1]
 
-**46. Map: how it looks.** Grass at 90 cm is drawn about twice a cow's height so height reads. Cattle colours are by district and class. A pale rim keeps a black cow readable on dark ground. Labels use the full paddock name and a dot. Trees are not drawn because the model has no shade. Do you want trees back as decoration? [m1.6a Q3 to Q7]
+**B17.** The Mark calves job marks every bull calf and young bull, though the banner counts those 60 days or older. [m1.7a Q2]
 
-**47. Colours: red means one thing.** Red on the map picture is only for the part of a line that does not fit today. A knocked-down fence is amber, no water is purple, a hub tool no-water key is purple, a team fence is hot pink. The site's panels keep red (the main button, the Short chip, the chart). The profit marker, not yet built, must not be red on the map. The "Short" label is the same colour as danger. [m1.7f call 6, second pass Q4 and Q5, m1.7f coordinator calls 1 and 2, m1.6a note]
+**B18.** The phone paddock sheet covers 58% of the map. [m1.7a Q4]
 
-**48. Play screen: setup and start.** Setup has no start month, so every farm starts 1 September (random seasons start in 2026, real years from 1997). Should the player pick? [m1.7a Q1]
+**B19.** The mob card "why" note shows for any mob gaining under 0.05 kg a day. The sell picker offers Steers, Heifers and Cows. Exact figures are shown (no water kills on day 4). [m1.7b Q1 to Q3]
 
-**49. Marking calves.** The banner counts bull calves of 60 days or more but the job marks every bull calf and young bull in the mob. Should the job mark only the ones old enough? [m1.7a Q2, m1.7b Q4]
+**B20.** The fence tool starts on permanent. No tool zooms by itself. Removing a fence gives nothing back. The gate sentence says mobs will join. [m1.7c Q1 to Q4]
 
-**50. Phone panels and dusk.** On a phone held upright the paddock sheet covers the bottom 58% of the map. The map goes dark as soon as less light is left than the shortest job needs. [m1.7a Q3 and Q4]
+**B21.** $ a head uses the middle of each class's weight range. Births fill the inbox in calving season. The sow card does not mark squares that cannot take a crop. [m1.7d Q1 to Q4]
 
-**51. Mob card words.** The "why" note shows for any mob under +0.05 kg/head/day, not only a mob losing weight. The sell picker offers Steers, Heifers and Cows (calves go with their mothers). The cards show exact figures (cattle with no water die on the fourth day, the milking MJ a day, "week N of 9"). Are exact figures right, or should they be vaguer (project rule 14)? [m1.7b Q1 to Q3]
+**B22.** Taken-down fence is kept as materials and reused at half price (your ruling). Materials count nothing in net worth. Fence built over by another kind is lost. Taking out a square hub leaves its gates. Moving a hub costs $300. [m1.7x Q1 to Q4]
 
-**52. Build tools.** The fence tool starts on permanent. No tool zooms the map by itself, so pipe on a phone needs a pinch first. The gate sentence says mobs in them will join if both hold stock. Removing a fence gives nothing back. [m1.7c Q1 to Q4, m1.7f items 8 and 9]
+**B23.** A farm file not used for 90 days is removed. [m1.7f Q4. Change: `FARM_STALE_DAYS`]
 
-**53. Market, plans and crops screens.** $ a head uses the middle of each class's sale weight range. Births fill the inbox in calving season (one line a day). The plan card says "Moves into Paddock 2 after 2 more days here", which is the plan's own rule and not a forecast. The sow cards name squares that cannot take a crop but the map does not mark them red. [m1.7d Q1 to Q4]
+**B24.** The guided first day strip sits above the map. A step done early counts. Help opens in the bottom sheet on a phone. An existing farm a day old gets no tour until replayed. [m1.7e calls; m1.8 calls]
 
-**54. Fence materials and hubs.** Taken-down fence is kept as materials, and reused fence is half price (your ruling). Materials on hand count for nothing in net worth. Fence built over by another kind is lost. Taking out a hub on a square leaves the gates. Moving a hub costs $300. [m1.7x Q1 to Q4, m1.7f second pass Q3]
+**B25.** The service worker starts 8 seconds after `/play` loads and keeps only `/` and `/play`. The offline last-farm copy is per player once accounts are on. [m1.8 calls; m3.2 item 7]
 
-**55. Unused farms removed after 90 days.** A farm file not used for 90 days is removed (the session cookie also lasts 90 days). Change: `FARM_STALE_DAYS`. [m1.7f Q4 and second pass Q6]
+**B26.** The stored farm is 191 KB at the start and 339 KB after 1.5 years against "a few tens of KB" in the plan. [m1.8 calls]
 
-**56. Help and the guided first day.** The tour strip sits above the map. A step done early counts. The move step is dropped on a farm with no cattle now. Help is a bottom sheet on a phone so the map stays visible. An existing farm a day or more old gets no tour until replayed. [m1.7e calls, m1.8 calls]
+#### Sheep
 
-**57. Install and offline.** The service worker starts 8 seconds after `/play` loads. It keeps only `/` and `/play`. The offline last-farm copy was per browser, and is per player once accounts are on. Change: `PwaRegister` delay in `apps/web`. [m1.8 calls, m3.2 build item 7]
+**B27.** Dressing percentage is sourced (lambs 45 to 50%, mutton table dated 2001). Fat score is condition score rounded (stand-in). [m2.3 call 8 (C31)]
 
-**58. Stored farm size.** The stored farm is 191 KB at the start and 339 KB after about 1.5 years. The build plan said "a few tens of KB". [m1.8 calls]
+**B28.** Worms are left out, so Western Victoria weaners lose 1.65% against 2 to 6%. [m2.3 call 9 (C22)]
 
-### Sheep
+**B29.** Dead feed in a sheep's reach counts in full, as for cattle. [m2.3 call 11]
 
-All sheep screens are behind the `sheep` switch, off by default. Never offered in Central Queensland.
+**B30.** The life cycle runs by itself: rams work 5 weeks, scanning on day 80, ram lambs become wethers at marking, lambs wean at 14 weeks. [m2.3 call 12]
 
-**59. The Tablelands winter.** Unfed ewes on native pasture lamb at CS 1.4 and 31.7% die (eight seeds), whatever the stocking rate. Marking is 48.8% there and 71.1% in the Central West. The grass model was not changed. Three fixes are open: the grass winter (see the grass review), a sheep supplement, or running the benchmark on sown pasture. [m2.3 calls 1 and 18, C18]
+**B31.** Cattle and sheep never break into each other's paddocks. Sheep get through permanent, electric and tape fences, and only netting, gates and the boundary hold them. [m2.3 calls 15, 20, 21]
 
-**60. Carrying capacity.** The rule gives 3.55 DSE/ha on Tablelands native and 5.5 to 7.7 on sown pasture against 5 and 12 to 23 sourced. The rule's 26% of growth eaten is far under what improved pasture really carries (45 to 80%). SB-59 to SB-62 are skipped for this. [m2.3 call 2, C18]
+**B32.** Sheep deaths score by size (a lamb about 0.03 of a beast, a ewe 0.2). Cattle count one each. A dead newborn calf costs 60 points, a ewe about 11.6, a lamb 1.9. [m2.3 calls 13, 25, 32; m2.7 review call 1]
 
-**61. One DSE figure: 8.4 per AE.** Every DSE shown is AE times 8.4. The cattle screens' DSE figures moved by 5%. To go back, set `DSE_PER_AE` to 8. [m2.3 call 3 (C3), second pass call 19]
+**B33.** Shearing is 80 days after lambing and crutching 60 days before. Shearing is $9.81 a head all in and crutching $1.92. [m2.3 call 23; review items 13, 14]
 
-**62. Merinos are unmulesed.** 17% of Merino ewes are struck a year with one shearing and one crutch. For mulesed Merinos lower `FLYSTRIKE.daily.merino`. Strikes apply to every weaned sheep, though only ewes were measured. The fly season is the same in every district because no district page was read. A ewe struck twice counts twice. [m2.3 call 4 (C21), calls 31 and 42]
+**B34.** Wool sells by itself at shearing and has its own money line. [m2.3 call 24]
 
-**63. Netting fence: $10 a metre.** A stand-in for the sheep-proof fence price. SB-65 holds netting $10 against permanent $7. Change: the fence price constant in the engine. [m2.3 call 5 (C26), call 27]
+**B35.** Sheep feeding fills the energy gap. Grain is charged at the pellet price and hay at the hay price. Tablelands winter feeding costs about $19.76 a ewe. [m2.3 calls 26, 34]
 
-**64. Joining dates.** Central West 5 January (June lambing), Tablelands 7 April (September lambing), Western Victoria 1 April. The NSW calendar's generic March joining was not used. Each mob keeps its own date. Change: `JOIN_START`. [m2.3 call 6 (C27), second pass call 22]
+**B36.** Wool on backs counts in net worth net of levy and shearing cost. Lambs at foot are priced on their own. Sheep on their way count at what was paid. [m2.3 calls 36, 37]
 
-**65. No water days for sheep.** No source gives how long a sheep lives without water, so the cattle rule stands (dead on day 4). The transport standard's 48 hours is kept as `WATER_WELFARE_HOURS` for screens. [m2.3 call 7 (C30)]
+**B37.** Past the overdraft a day's sheep costs come off cash, the bank limit ends the game, and buying sheep is refused. [m2.3 call 38]
 
-**66. Dressing percentage and fat score.** Sourced now (lambs 45 to 50%, mutton by fat score, table dated 2001). Fat score is taken as CS rounded (stand-in). [m2.3 call 8 (C31)]
+**B38.** Several plan moves a day move sheep once a day. [m2.3 call 41]
 
-**67. Worms left out.** Western Victoria weaners grown to target lose 1.65% a year, under SB-47's 2 to 6% (the survey figure takes in worm deaths). Held as a known gap of 0.4 points. [m2.3 call 9 (C22)]
+**B39.** Thirsty sheep get out by the cattle rule. [m2.7 review call 8]
 
-**68. Two lamb survival tables disagree.** S19's table gives 48% more lambs at CS 3.0 to 3.5 than 2.0 to 2.5, the text says 15 to 20%. The slopes sit between them. Please check the printed page. Change: `SURVIVAL_PER_CS`. [m2.3 call 10 (C32)]
+**B40.** The calf fix does not apply to lambs. Sheep keep their own cost of gain and milk. [m2.7 call 1]
 
-**69. Dead feed in the sheep's reach counts in full.** As for cattle. A quarter (the first build) starved sheep on dry winter feed. [m2.3 call 11]
+**B41.** Weaners on a mixed farm go where the other species is not. [m2.7 call 4]
 
-**70. No chores for the sheep life cycle.** Rams work only in the 5 joining weeks. Scanning is counted on day 80. Ram lambs become wethers at the marking count. Lambs wean at 14 weeks into an empty watered paddock. All automatic. [m2.3 call 12]
+**B42.** A mixed Western Victoria farm left alone lost 579 sheep in two years. Not a benchmark. [m2.7 call 3]
 
-**71. Breakouts across species.** Cattle never push into a paddock with sheep and sheep never into one with cattle. They take another fence or stay. The other choice was letting them box up together. Sheep get through permanent, electric and tape fences when hungry or thirsty. Only netting, gates and the boundary hold them. A cattle fence says "A cattle fence does not hold sheep." on a sheep farm. Whether gates should hold sheep is the builder's call. [m2.3 calls 15, 20, 21, m2.7 review note 12]
+**B43.** Sheep screens: a farm that has sheep keeps showing them if the switch goes off, part moves are one class at a time, sheep sell on sale days only, only the shearing day can be moved on screen, summary head rows stay cattle, paddock days of feed counts cattle only, gain shows in grams. [m2.8 calls 1 to 9]
 
-**72. Sheep in the year score.** Sheep deaths score by size, (live weight divided by 450) to the 0.75 AE a death, so a lamb is about 0.03 of a beast and a ewe 0.2. Cattle still count one each. A dead newborn calf costs 60 points, a ewe about 11.6 and a newborn lamb 1.9. Weighing cattle deaths by size would change every cattle score. [m2.3 calls 13, 25, 32, m2.7 review call 1]
+**B44.** No overhead costs a year, marking cost, freight beyond $3 a head, or pasture cost for sheep. Animal health is $3.57 a head. [m2.3 call 17; review call 7]
 
-**73. Ewe deaths.** Adult and wether deaths are 0.91% a year (derived). First-cross ewes die 4.95, 5.36 and 5.35% against 2 to 4%. Merino adult deaths miss in some blocks. Old ewes die at the same rate as young ones and are cast for age only if the player sells them. See "Known gaps in realism". [m2.3 calls 14, 28 to 30, 33, review calls 2 and 5]
+#### Farm hands and contractors
 
-**74. Shearing, crutching and shed costs.** Crutch 60 days before lambing, shear 80 days after (NSW calendar). Shearing is $9.81 a head all in, crutching $1.92 a head, from the DPIRD budget as read in search summaries. Shed hands, classer and presser are not separately charged. [m2.3 call 23, review items 13 and 14]
+**B45.** Hands help on every kind of job by skill. A hand helps a team whenever the farm has one, with no switch. [m2.1 call 2; m2.2 call 2. Change: `skillFor` in `labour/help.ts`]
 
-**75. Wool income and price.** Wool income is its own line. Wool sells by itself at shearing. The wool price is a dated September 2026 stand-in on every farm because there is no real-year wool series (an AWEX agreement is not in place). It is why Tablelands and Western Victoria sit over the margin band. [m2.3 call 24, review call 6, PRD 21 row 27]
+**B46.** There is no overwork limit. Hands leave only when let go, when a contract ends or when unpaid. [m2.1 call 3]
 
-**76. Wool selling costs.** Shed staff $1.50 a head (not charged since 0.17.0), levy 1.5%, $40 a bale selling, $16 cartage, $14 pack, 180 kg bales, oddments 22% of the clip at 0.9 of the fleece price. The pages refused automatic reading. [m2.3 call 40]
+**B47.** Contractors start the next working day and work Monday to Friday. The bank must cover the whole run when ordered. "Done on" is at the team's pace. [m2.1 calls 5 to 7. Change: `contractorDays`]
 
-**77. Sheep feeding.** Feeding fills the energy gap up to Agriculture Victoria's full ration. Grain is charged at the game's pellet price and hay at its hay price. The Tablelands winter costs about $19.76 a ewe a year in feed at $330 a tonne. [m2.3 calls 26 and 34]
+**B48.** Wages owed are kept and never forgiven, and are paid in full once the bank covers them. [m2.1 call 15]
 
-**78. Ewe micron 17.8.** The coarsest that keeps SB-51's 1-micron gap, since the districts grow medium wool. C15 says the districts grow 19 to 21 micron, but SB-52 holds wethers at 18 to 20. Ewes at 19 need one of those rows to move. Which row moves is your call. [m2.3 call 35, review call 4]
+**B49.** Injury is 1.5 times likelier on a fencing day and the farm pays one week of wages as its share. [m2.1 call 11]
 
-**79. Sheep in net worth.** Wool on backs counts in net worth net of the levy and the cost to shear. Lambs at foot are priced on their own (MLA lamb indicators) because MLA has no ewe-and-lamb unit. Sheep on their way count at what was paid. [m2.3 calls 36 and 37, review item 3]
+**B50.** Standing starts at 80, loses 20 per missed wage and gains 5 per full pay day. The pool adds 1 to 3 people a week and offers at most 6 hands. The PRD says no limit on hands. Standing shows as a level. [m2.1 call 12; m2.2 call 4; PRD 21 row 23]
 
-**80. Overdraft and sheep costs.** Past the overdraft a day's sheep costs come off cash as cattle supplements do, and the bank's limit ends the game. Buying sheep is refused. [m2.3 call 38]
+**B51.** A skip does not stop for workforce events. A hand hired today starts tomorrow. [m2.1 calls 13, 14; m2.2 call 9. Change: `stopsIn` in `day/days.ts`]
 
-**81. Start flock.** Ewes 1.5 to 5.5 years, cast for age at 6 (stand-in). This year's wether lambs are counted as sold before the start. Start-flock first-year profit per DSE is a known gap (see Known gaps). [m2.3 calls 39 and 43]
+**B52.** Dogs only enlarge a hand's share of stock jobs. [m2.1 call 16]
 
-**82. Sheep plan moves.** Several plan moves a day move sheep once a day. [m2.3 call 41]
+**B53.** The lick-run duty and the "feeding and machinery" skill are not built. [m2.1 call 17]
 
-**83. Thirsty sheep.** Sheep get out by the cattle rule (the cattle odds, then a 21-day wait). One that breaks into another dry paddock can still die before its next try. [m2.7 review call 8]
+**B54.** Plan moves are credited to the hand who worked that day. [m2.1 call 19]
 
-**84. DSE a ewe.** The model's DSE from energy is 1.6 to 2.0 a ewe joined. The DPIRD budget rates 2.32. A screen showing "per DSE" on the model's figure reads 20 to 45% higher than budgets. [m2.7 review call 5]
+**B55.** The workforce screens are built in the existing style. The worker report is a modal capped at 24 bubbles. There is no "started" message. [m2.2 calls 1, 5 to 8]
 
-**85. The margin band (SB-GM).** The band is plus or minus 25% of DPIRD's $50.46 a DSE. It is the builder's choice. A tighter band would test the price date. Whether cattle against sheep should become a managed benchmark is open (unmanaged year 2: Western Victoria cattle minus $96 and sheep plus $101 a DSE, Central West minus $97 and plus $59). [m2.7 review calls 9 and 10]
+**B56.** A team is offered on permanent fence only, in hot pink with cross ticks. The contract's spend shows in the cash change only. [m2.2 calls 10 to 12]
 
-**86. Sheep and cattle rules stay apart.** The calf fix does not apply to lambs. Sheep have their own cost of gain and milk, fitted to the sheep benchmarks. If a lamb growth row ever opens, look at the sheep rules. [m2.7 call 1]
+#### Scores and leaderboards
 
-**87. Weaners on a mixed farm.** Weaners go where the other species is not, because of the one-mob-a-paddock rule. A mixed farm's weaning destinations depend on where the cattle are. [m2.7 call 4]
+**B57.** The game over card counts the year under way as a last year. [m1.7g calls 10, 13]
 
-**88. A neglected mixed farm.** On the probe farm (Western Victoria, 86 cattle and 659 sheep, left alone) 579 sheep died in two years, mostly lambs, and profit fell from $192,435 to $25,757. Year 1 counts its lamb crop as new worth. This is what neglect looks like, not a benchmark. [m2.7 call 3]
+**B58.** The diary keeps 400 days, counts from Day 1, titles real-year years "Year 3 · 1997", and leaves births and deaths to the inbox. [m1.7g calls 4, 6 to 9, 12. Change: `DIARY_DAYS`]
 
-**89. Sheep screens: switch and display rules.** A farm that already has sheep keeps showing them if the switch goes off. The farm view version stays 4. Sheep part moves are one class at a time. Sheep sell on a sale day only. Only the shearing day can be moved on screen. The summary's Head, Calves and Live weight rows stay the cattle's. Paddock "days of feed" counts cattle only. The start flock text is general. Gain shows in g a head a day for sheep. [m2.8 calls 1 to 9]
+**B59.** Period boards list farms that closed a year in the period, by Sydney time. [m4 call 4]
 
-**90. Sheep calls with no other home.** Sheep have no overhead costs by the year, marking has no cost, freight beyond the $3 head fee and pasture are not charged, animal health is $3.57 a head. [m2.3 call 17, review call 7]
+**B60.** The action log check is: at least one server-run day or skip, no step after the farm's day, no gap in numbering. [m4 call 5]
 
-### Farm hands and contractors
+**B61.** Private and under-16 rows show username and district only, banned or deleted accounts show as "Former player", blocks hide both ways, and group and friends boards leave private rows out. [m4 call 6; m3.1 calls 11, 12]
 
-**91. A hand's share: about 500 m or 800 m a day.** On 13 Nov you said both "about 800 m a day instead of 500 m" with a hand on, and a worker's share of "about 500 m". A 500 m share means player plus hand build 1,000 m. 800 m a day means the hand's share is about 300 m. Built: 800 m (share about 300 m). Change: `handDayShare` in `packages/engine/src/data/labour.ts` (0.6 now, 1 for a 500 m share). [m2.1 call 1]
+**B62.** Leaderboards are not in the header or sitemap, and the boards page cannot carry a banner ad. [m4 call 15; m6]
 
-**92. Hands help on every kind of job.** By the skill the job needs, not only fence. To limit to fence, `skillFor` in `labour/help.ts` returns null for other jobs. Hands help a team whenever the farm has a hand, with no switch, because a checkbox is one more thing to decide. [m2.1 call 2, m2.2 call 2]
+#### Daily Farm
 
-**93. No overwork limit.** Hands leave only when let go, when a contract ends or when not paid. [m2.1 call 3]
+**B63.** With no hand working, a plan is held for the night and the plan card offers the move. "Yes" takes the ordinary move time. [m3.3 call 5; second pass item 2]
 
-**94. Contractor labour is $5 a metre (stand-in).** Either team costs the same. Price guides list installed rural fence at about $8 to $25 a metre with materials at $7. Please give a contractor's quote. Change: `labourPerMetre`. [m2.1 call 4, m2.2 call 3]
+**B64.** A missed day is a night after a date the player never opened the farm on. [m3.3 call 6]
 
-**95. Contractor days.** They start the next working day and work Monday to Friday (`contractorDays`). The bank must cover the whole run when ordered. "Done on" is at the team's pace without hands. A contractor's run is the one job that carries on day to day. [m2.1 calls 5 to 7]
+**B65.** "Done for today" is only a fact. [m3.3 call 7]
 
-**96. Pay.** Pay day every 14 days. Casual hands are paid the casual day rate for days worked, contract hands the weekly rate over 5 days, salaried hands the weekly rate. Weekend penalties, overtime, leave and allowances are not modelled. Notice on letting go is not modelled. Wages are 2026 Pastoral Award rates (1 July 2026 guide) on every farm, which match prices only under `REAL_PRICE_DOLLARS = 'today'`. [m2.1 calls 8 to 10, 18]
+**B66.** Sale days past the baked tables follow real yard rows, then the usual weekly sale. SILO's provisional days are used as served. [m3.3 calls 8, 9]
 
-**97. Wages owed.** Wages the farm cannot pay are kept as wages owed, never forgiven. The hand still leaves and the standing still drops. The debt is paid in full at the first first light the bank covers all of it. [m2.1 call 15]
+**B67.** The time zone comes from the device once and is locked. Eight zones are supported and no screen changes it. [m3.3 call 10; m3.1 call 20. Change: `SUPPORTED_ZONES`]
 
-**98. Injury.** 1.5 times likelier on a fencing day. The farm pays one week of the hand's wages as its share of a claim. Safe Work Australia's rate for agriculture is sourced. No workers compensation premium is charged. [m2.1 call 11]
+**B68.** 2 Daily Farms per account, counted apart from 2 Fast Farms. The plan setup screen does not yet warn that you have no staff. The data version is `daily-lag5`. [m3.3 calls 11, 13, 15]
 
-**99. Standing and the pool.** Standing starts at 80, loses 20 per missed wage, gains 5 per full pay day. At 0 the list keeps 40% of its people and asks 20% above the award. The pool adds 1 to 3 people a week, listed 14 to 42 days, at most 6 hands. All stand-ins. Standing shows to players as a level (Top, High, Middling, Low, Very low). [m2.1 call 12, m2.2 call 4]
+**B69.** The evening warning has words and a queue rule but no job sends it. [m6; m3.4 call 8]
 
-**100. Skips and hiring days.** A skip does not stop for anything about the workforce. A hand hired today starts tomorrow. Change: add events to `stopsIn` in `day/days.ts`. [m2.1 calls 13 and 14, m2.2 call 9]
+#### Accounts and privacy
 
-**101. Dogs.** A hand with dogs takes a 2.5 divided by 1.5 bigger share of stock jobs. With walking and mustering cut, they make nothing else quicker. Keep dogs as a stat, or drop them? [m2.1 call 16]
+**B70.** Guests are server sessions, not anonymous sign-ins. A guest whose account has no room is refused. [m3.1 calls 2, 3]
 
-**102. Lick-run duty not built.** There is no lick-run job to hand over. A supplement is a daily price in Fast Farm. The duty and the "feeding and machinery" skill can come with Daily Farm feeders. [m2.1 call 17]
+**B71.** Admins see "under 16" as Yes or No and cannot read a date of birth. [m3.1 call 7]
 
-**103. Plan moves in the worker report.** Credited to the hand who worked that day. A move on a day no hand worked is not in the report. [m2.1 call 19]
+**B72.** Admins can use the community in the database with switches off, but not on the site. [m3.1 call 6; m4.2 call 1]
 
-**104. Workforce screens.** The mockup has no workforce screens, so they were built in the existing style. The worker report is a modal at the start of the day summary, capped at 24 bubbles, with repeats merged. The owed-wages line only offers "See workforce". There is no "started" message. Every working day of a run is an inbox line. Pay "about $X each pay day, with super" is the full week cost over 14 days. [m2.2 calls 1, 5 to 8]
+**B73.** Moderators read reports, history and all posts in the database and cannot open `/admin`. [m3.1 call 8; m4 call 7]
 
-**105. Teams and colours.** A team is offered on permanent fence only. The team's line is hot pink `#ff5cc8` with a cross-tick pattern, since the map has no key. The contract's spend shows in the cash change only, not the money list. [m2.2 calls 10 to 12]
+**B74.** Rate limits per account are stand-ins: posts 20 an hour, comments 60, likes 300, follows 100 a day, reports 20 a day, groups 5 a day, jobs 1,200 an hour. [m3.1 call 13. Change: `rate_limit_rules` rows]
 
-### Scores and leaderboards
+**B75.** The audit log takes ids and action names only. Tables not made from PRD 15: `farm_jobs`, `farm_messages`, `subscriptions`, `plan_features`. Avatars are in private buckets and show initials until checked. [m3.1 calls 17, 22, 23, 30]
 
-**106. Year score and the Grazier Score.** The headline is the engine's year score from five parts (Profit, Weight gain, Pasture use, Ground cover, Deaths). The PRD's Grazier Score has no agreed weights, so it is not shown. Change: `headline` in `server/boards/score.ts`, and the labels in `YearBlocks.tsx` and `MorePanel.tsx`. [m1.7g call 1, m4 call 1]
+**B76.** Sign-up checks its switch, the username check says only free or not available, sign-in lands only on a short list of pages, sign-in links are limited per server instance, and an unfinished sign-up plays as a guest. [m3.1 call 24; m3.2 calls 6, 8 to 10]
 
-**107. Parts show points.** The year score shows each part's points beside its facts as the mockup does, so a player could work the weights back. Part scores are rounded one by one, so the five can differ from the total by a point. Kept for now. [m1.7g calls 11 and 14]
+**B77.** Saves use a pooled database connection. Past days keep every day for 14 days then weekly to 182 days. A refused job keeps its version. [m3.2 calls 1, 3 to 5, 16. Change: `PAST_DAILY_DAYS`, `PAST_MAX_DAYS`]
 
-**108. Game over card.** It counts the year under way as a last year, so the total adds every score earned. The part year's score is as if it closed that day. [m1.7g call 10, call 13]
+**B78.** `GG_SITE_URL` and `GG_TRUSTED_IP_HEADER` are required for accounts in production. [m3.2 calls 12, 17]
 
-**109. Diary rules.** The diary keeps the last 400 days (`DIARY_DAYS`). Day numbers count from Day 1 (the farm's own day starts at 0). A real-year farm titles a year "Year 3 · 1997". Births and deaths are left out of the day summary because the inbox says them. A job's own inbox messages are not filed, the result line is. Money rows on a year are signed. [m1.7g calls 4 and 6 to 9, 12]
+**B79.** Apple sign-in is not built. [m3.2 call 15]
 
-**110. Leaderboard headline.** The headline board ranks the year score averaged over a farm's finished years. The page says it is a stand-in. [m4 call 1]
+**B80.** Game routes accept a token until it expires after "sign out everywhere". Set the Supabase token lifetime to 900 seconds. [m3.2 second pass call 19]
 
-**111. Other boards.** Profit per ha is the average yearly change in net worth per ha. "Beef per ha" is the average yearly live-weight gain per ha. Ground cover is the average of yearly averages. Days survived is the farm's day. [m4 call 2]
+**B81.** Three views run with their owner's rights (the Supabase linter flags this). [m3.1 call 25]
 
-**112. Real-year board.** It ranks on the change in net worth over that game year, per hectare, so a farm that started small and grew a lot beats one that started big and grew a little. [m4 call 3]
+#### Community and moderation
 
-**113. Period boards.** A week, month or season board lists farms that closed a year in that period, each with its figure over all its finished years. Periods are by Sydney time. [m4 call 4]
+**B82.** A post needs words. Everyone is newest first and popular is not built. Search is by username start. [m4.2 calls 5, 6, 11]
 
-**114. Action log check.** What the tables allow: at least one day or skip run by the server, no step after the farm's day, no gap in the numbering. No replay. [m4 call 5]
+**B83.** A private profile's posts are its author's alone. Share my farm from a private profile is refused. [m4.2 call 8; review fix 2]
 
-**115. Private and under-16 rows.** They show on the main boards (username and district only) but not on a group or friends board. A banned or deleted account shows as "Former player". A block hides both ways, including on boards. [m4 call 6, m3.1 calls 11 and 12]
+**B84.** Share my farm shows farm, district, date, season, head, pasture, ground cover and net worth. Day cards are made at the rollover. [m4.2 calls 7, 9; m6]
 
-**116. Boards not linked.** Leaderboards are not in the header or sitemap yet. The community pages link to it. The boards page cannot show the leaderboard banner ad because it sends no script. [m4 call 15, m6]
+**B85.** The Community link is in the More tab. [m4.2 call 13]
 
-### Daily Farm
+**B86.** Hidden characters are removed and tag-character emoji flags show as a black flag. [m4.2 review fix 6]
 
-Daily Farm is off by default (the switch `daily_farm`).
+**B87.** A like count counts every like, including from a blocked player. [m4.2; m4 call 8]
 
-**117. Off by default.** The brief says off. PRD 11.7 says on. Flip it in admin or with `update public.feature_switches set enabled = true where key = 'daily_farm'`. [m3.3 call 1 and second pass]
+**B88.** Photo and ticker limits: photos 24 an hour and 80 a day, ticker 30 calls a minute, group routes 30 and 6 a minute. Stand-ins. [m4.2 review fix 4; m4 call 12]
 
-**118. Data runs 5 days behind.** Game day D runs on the real weather and prices of D minus 5. This lets the night run at midnight on settled data and a late feed never holds a farm. Missing rows use long-term average rain and the last price carried forward, with a diary line. The Help page says so. Change: `DAILY_DATA_LAG_DAYS`. The lag of 5 rests on the repo's own pull, not a SILO figure. [m3.3 second pass call 3]
+**B89.** Ownerless groups can read and post until an admin assigns an owner. Challenges start when set. Daily leagues cannot be entered until Daily Farms exist. A group cannot be removed by moderation. [m3.1 call 32; m4 calls 9, 13, 16]
 
-**119. A new farm starts on today as Day 1.** There is no run-up with stock. The pasture is run up as a Fast Farm's start does it. [m3.3 second pass item 6]
+**B90.** The ticker shows on website pages only, never the farm screen, and visitors see it on the landing page. Lines have no farm names and are limited to 6 an hour. [m4 calls 10, 11]
 
-**120. Plan moves with no hand.** With no hand working that day the plan is held for the night and the plan card offers the move ("Yes", "Not yet"). "Yes" uses `planMove`, takes the ordinary move time and keeps the plan's rounds. [m3.3 call 5, second pass item 2]
+**B91.** Farm viewing is Daily Farm only, shown as a list of paddocks. Fast Farms viewable too is one migration. [m4 call 14; m6. Change: `app.can_view_farm_for`]
 
-**121. A missed day.** A night after a date the player never opened the farm on. Opening and doing nothing counts as playing. A missed day runs with no jobs but the hands' standing duties and plan moves a working hand makes. [m3.3 calls 6]
+**B92.** Moderation remove on a profile clears its bio and display name. [m4 call 16]
 
-**122. Done for today.** A fact on the farm card and the picker. It does not skip, end or lock anything. [m3.3 call 7]
+#### Purchases
 
-**123. Sale days past the tables.** Real rows are used where they exist, with the district's usual weekly sale after them until real yardings are fetched. SILO's provisional days (code 75) are used as served and never revised. [m3.3 calls 8 and 9, second pass item 10]
+**B93.** No Stripe library is used. The server calls Stripe with `fetch` and checks signatures by hand. [m5.2 call 2]
 
-**124. Time zone.** Taken from the device once and locked. Eight zones are supported (the launch districts' Brisbane, Sydney and Melbourne, other Australian zones, Auckland). A device in another zone cannot start a Daily Farm. A change function exists (once every 30 days, a later date makes the farm wait a day) but no screen offers it. [m3.3 call 10, second pass, m3.1 call 20]
+**B94.** Products are seeded inactive at PRD 10.3 prices with the perks as proposed. [m3.1 call 18]
 
-**125. Slots and plan setup.** 2 Daily Farms for each account, counted apart from the 2 Fast Farms. The plan setup screen does not yet say "you have no staff, so you will need to remember to move them". The data version label is `daily-lag5`. [m3.3 calls 11, 13, 15]
+**B95.** Checkout makes a Stripe customer and only its id is kept. No price ids or publishable key are needed. [m5.2 call 9]
 
-**126. The live feed has never been run.** It is built from the requests the data scripts make and tested on recorded answers. Run it on a preview first with `GG_DAILY_FEED=live`. See "Not checked". [m3.3 call 14]
+#### Ads
 
-**127. Evening warning.** It has words and a queue rule but no job sends it. [m6]
+**B96.** The phone banner is upright only, 30 to 60 seconds, 300-second gap. The PC banner appears and goes, so the map height shifts. The rail shows from 1280 px wide. [m5.1 calls 6 to 8]
 
-### Accounts and privacy
+**B97.** Videos are MP4 only, up to 3 MB and 30 seconds. Pictures up to 1 MB. [m5.1 call 9]
 
-**128. Guests are sessions the server makes.** A hashed cookie secret in `guest_sessions`, not Supabase anonymous sign-ins. No CAPTCHA. A guest's farm moves into the account on sign-up. A guest whose account has no room is refused and nothing moves. [m3.1 calls 2 and 3]
+**B98.** The video break starts muted, skips after 5 seconds, holds "Start year" for at most 40 seconds. [m5.1 call 12]
 
-**129. Guest farm removal.** A guest not seen for 30 days is removed with their farm (database). With files the farm stays 90 days. The guest cookie lasts 30 days with the database. PRD 8.1 says the guest farm lives on the device only. Change: `prune_housekeeping`. [m3.1 call 4, m3.2 calls 2 and build item 4]
+**B99.** A view counts after 1 second with half on screen. Dates are Sydney days. Sponsor reports show counts only. View and click limits are database rows. [m5.1 calls 10, 11, 13, 16]
 
-**130. Under-16 rule.** Worked out live from the date of birth on today's Sydney date. It opens on the 16th birthday. A 29 February birthday counts from 1 March in other years. [m3.1 calls 5 and 31]
+**B100.** `landing_sponsors`, `pc_leaderboard_banner` and `video_between_days` are not placed. "Spots left" is a setting (20) and is not counted. Ads need accounts on. [m5.1 calls 3 to 5, 14, 17; m6]
 
-**131. Admins cannot read a date of birth.** Only the player can. Admin sees "under 16" as Yes or No, role, bans, farms, scores, reports and ads. [m3.1 call 7, m3.5 build item 6]
+#### Notifications
 
-**132. Admins use the community with switches off (database), but not on the site.** The database lets admins in. The site shows nothing with the switch off. [m3.1 call 6, m4.2 call 1]
+**B101.** Email goes only when there is no working device or push failed for good. One-click unsubscribe is on every email. [m3.4 calls 3, 10]
 
-**133. Moderators.** Moderators read reports, the history, the word filter and every post (removed too) in the database. All changes go through the server and the audit log. Moderators cannot open `/admin`. [m3.1 call 8, m4 call 7]
+**B102.** The later reminder is 6 hours after the morning time within a 3-hour window, never after 5 pm. [m3.4 calls 4, 7]
 
-**134. Privacy defaults.** Profile Public, farm view Followers only, ticker activity off until turned on. A followers-only or private profile still shows its card (username, display name, checked photo, district). A private profile cannot be followed. Change: column defaults on `profiles` and `app.can_find_profile_for`. [m3.1 calls 9 and 10]
+**B103.** The daily cap is 6 a day. [m3.4 call 6. Change: `DAILY_CAP`]
 
-**135. Rate limits per account.** Posts 20 an hour (5 for the first 7 days), comments 60 (15), likes 300 an hour, follows 100 a day (30), reports 20 a day (5), new groups 5 a day (1), sign-ups 3 an hour, jobs 1,200 an hour, farm starts 10 an hour, ticker lines 6 an hour. Stand-ins. Change: `rate_limit_rules` rows. [m3.1 call 13]
+**B104.** A device is per browser, up to 10 per account. One sender route runs every 5 minutes. No `web-push` package. [m3.4 calls 11 to 14]
 
-**136. Download my data and delete my account.** The download leaves out the engine save and action log because they hold the hidden rules. It includes farm days, diary and scores. Worth a word with the lawyer about the Privacy Act. Deleting an account hands each group it owns to the longest-standing member 16 or over in good standing, otherwise the group stays ownerless until an admin assigns one. Reports other people wrote about a deleted player stay. [m3.1 calls 15, 16, 32, 35]
+**B105.** The account inbox is separate from the farm's game inbox, and there is no bell in the top bar. [m3.4]
 
-**137. Under-14 refusal.** The refusal is final for that sign-in only. A different email is a fresh sign-in with a fresh try, and the database cannot tell it is the same person. Date of birth alone may not be "reasonable steps" (PRD 18). A refused under-14 can still play as a guest and can delete their sign-in. An admin can clear a mistyped refusal. [m3.1 call 27, m3.2 calls 7 and 18, third pass call 34]
+#### Website
 
-**138. Ban hash survives deletion.** A banned or suspended player who deletes their account leaves a row with only a peppered one-way hash of their sign-in email and the ban's end date, used only to refuse a new sign-up with that email. The moderation history is deleted. A different email gets past it. Gmail dots and googlemail are normalised and Fastmail `+tags`. Gmail `+tags` and Outlook, Apple and Yahoo aliases are not, because no provider page was found. This is a privacy call for you and your lawyer. [m3.1 calls 28 and 33, m3.2 call 14]
+**B106.** `SITE_SWITCHES_ON` is empty, so the pages mention only what is live. The Daily Farm price under 6 months reads "To be set". Advertise has no audience totals or rates. [m5.4 calls 7 to 9]
 
-**139. Audit log and tables.** The audit log takes ids and action names only and refuses anything that looks like an email. Not made from PRD 15: `farm_jobs`, `farm_messages`, `subscriptions`, `plan_features`. Avatars and group photos are in private buckets and are checked like post photos, so a new avatar shows initials until checked. Seed accounts have no email. [m3.1 calls 17, 22, 23, 30]
+**B107.** The privacy page links to the OAIC's complaints page (looked up 14 Nov 2026). [m5.4 call 12]
 
-**140. Sign-up and sign-in details.** Sign-up checks the sign-ups switch. The username check says only "free" or "not available". After sign-in only `/`, `/play`, `/account`, `/about`, `/pricing` and `/store` are allowed as next pages. Link limits are 3 an hour for one address and 10 tries a minute, held in memory per server instance. An account whose sign-up is not finished plays as a guest. The sign-in pages are about 144 KB of script. [m3.1 call 24, m3.2 calls 6, 8 to 10, 13]
+**B108.** Public pages are static with no script. Share images use the default font. [m5.4]
 
-**141. Saves.** The database store uses a `pg` pool, not the Supabase JS client, because it needs transactions (new variable `SUPABASE_DB_POOLER_URL`). Picture of a day: every day for 14 days then weekly to 182 days, gzipped (about 180 KB a farm). Files keep 14 days. A refused job keeps its version. The picker shows at `/play` only for an account with more than one farm. Change: `PAST_DAILY_DAYS` and `PAST_MAX_DAYS` in `server/game/store.ts`. [m3.2 calls 1, 3 to 5, 16]
+#### Admin
 
-**142. Production needs two settings.** `GG_SITE_URL` and `GG_TRUSTED_IP_HEADER` are required for accounts in production. Without them accounts stay off with a start-up warning. [m3.2 calls 12 and 17]
+**B109.** Switch defaults are in the table in the summary. The seed matches the shared list key for key. [m3.1 call 1; m6]
 
-**143. Apple sign-in is not built.** PRD 8.2 lists it. The milestone asked for the emailed link and Google. [m3.2 call 15]
+**B110.** Switches are cached 30 seconds on each server. The website's static pages read them at build time. [m3.5 item 4]
 
-**144. Token lifetime.** Game routes accept an access token for up to its lifetime after "sign out everywhere". Set the Supabase JWT expiry to 900 seconds so that is within 15 minutes. [m3.2 second pass call 19, hand-set setting]
+**B111.** Maintenance mode is read only and uses one of three fixed wordings. [m3.5 calls 1, 2. Change: `MAINTENANCE_WORDINGS`]
 
-**145. Views with owner rights.** Three views run with their owner's rights (`public_profiles`, `leaderboard_rows`, `public_farms`). The Supabase linter flags this (lint 0010). It is the column-safe view the brief asked for. [m3.1 call 25]
+**B112.** The first admin is made by a SQL statement you run (section 7). [m3.5 call 4]
 
-### Community and moderation
+**B113.** Sign out everywhere for another user deletes their auth sessions through a function. Whether Supabase allows it is to be confirmed. [m3.5 call 6]
 
-All of it is behind the `community` switch (and `feed_posts`, `groups`, `activity_ticker`, `farm_viewing`), off by default.
+**B114.** An admin page never refreshes the sign-in, so a stale admin opens `/play` first. [m3.5 call 7]
 
-**146. Staff see the community like any member.** Moderators and admins get the plain not found for an under-16 profile and see a private profile's card only. Staff powers are in `/admin`. [m4.2 review fix 1]
+**B115.** A suspended admin counts as no admin. The last admin cannot lose the role. Ad slot switches are on the Ads screen, not the switch list. [m3.5 calls 8, 9]
 
-**147. Photos.** Photos are stripped of metadata but not re-compressed (adding `sharp` would re-encode and changes the lock file). They upload through the server (6 MB post photo, 2 MB profile photo). An animated WebP is refused. [m4.2 calls 2 and 3]
+**B116.** Site settings are saved and audited but nothing reads them yet. [m3.5 call 10]
 
-**148. No image-check service.** Every photo waits for manual review in `/admin/photos`. Nobody but its author sees a photo before approval. `IMAGE_CHECK_API_KEY` is listed and does nothing until an adapter is written for the service you choose. Decisions are audited. [m4.2 calls 4 and 14]
+**B117.** Dashboard counts: "saves failing" is saves kept aside, "farms played" is farms with a save today and in 7 days. Suspensions are 1, 3, 7, 14 or 30 days. [m3.5 calls 11, 12, 14]
 
-**149. Posts.** A post needs some words (a photo-only post is not allowed). Everyone is newest first and popular ordering is not built. Search is by the start of a username only. Comments show 5 replies then "Show more". [m4.2 calls 5, 6, 11]
+**B118.** The `/admin` script line is held at its 150 KB limit. [m3.5 call 13; m6]
 
-**150. Private profiles.** A private profile's posts are its author's alone, whatever the post's own setting (PRD 9.1). Share my farm from a private profile is refused. Comments a private-profile player writes on other people's posts still show. [m4.2 call 8, review fix 2]
+#### Speed targets
 
-**151. Share my farm and day cards.** Share my farm shows farm and district, date, season, head, average pasture, ground cover and net worth. Day cards are made at the Daily Farm rollover. [m4.2 calls 7 and 9, m6]
+**B119.** Public pages: `/pricing` has a median of 99, not 100. CI asks for 1.0. [m5.4 call 13]
 
-**152. Where the community sits.** The Community link is in the More tab, not the bottom bar and not the public site header. Groups, the Groups tab and the screens were built in Stage 4. [m4.2 calls 10, 13]
+**B120.** The cattle speed test reads 3.4 to 4.5 ms alone and up to 15 ms under load. CI allows 15 ms. [m1.8; m2.7 checks]
 
-**153. Word filter.** Matches whole words in text and letters in usernames. "Block" refuses, "flag" lets it through and queues it. The seed has two placeholder words only. The real list is yours to supply in `/admin/words`. [m3.1 call 14]
+**B121.** Map frame rate was not measured on a phone. [m1.6a]
 
-**154. Hidden characters and flags.** Hangul fillers, the braille blank, invisible maths signs, the grapheme joiner and tag characters are removed. Emoji flags that use tag characters (Scotland, Wales) show as a plain black flag. [m4.2 review fix 6, calls]
+#### Stage 5.3 and 5.5 calls: to be added
 
-**155. Like counts.** A like count counts every like, including from someone the viewer blocked. [m4.2 calls, m4 call 8]
-
-**156. Photo and ticker limits.** Photos 24 an hour and 80 a day (8 and 20 for a new account). `/api/ticker` 30 calls a minute per address. Group and challenge routes 30 and 6 a minute per member. Stand-ins. [m4.2 review fix 4, m4 call 12]
-
-**157. Groups, challenges and leagues.** Ownerless groups can read and post, and an admin gives them an owner on `/admin/challenges`. Group challenges start when set and end on the date given or never. Daily leagues can be set but not entered until Daily Farms exist. A group cannot be removed by moderation, only kept or warned. [m3.1 call 32, m4 calls 9, 13, 16]
-
-**158. The ticker.** Live lines on website pages only (landing page, `/leaderboards`, community pages), never on the farm screen. Visitors see it on the landing page. Lines: started a farm, reached Day 100, 365, 500, 1,000 or 2,000, finished a year. No farm names. Rate 6 an hour each. Signed-in under-16s, banned players and anyone who hid it see nothing. [m4 calls 10 and 11]
-
-**159. Farm viewing.** The read-only farm view is Daily Farm only (PRD 9.5). Every farm in a database today is a Fast Farm, so nobody can be looked at until Daily Farm is on. It is a list of paddocks with no map. A farm name the word filter refuses shows as "A farm". Fast Farms viewable too is one line in `app.can_view_farm_for` and a migration. [m4 call 14, m6]
-
-**160. Moderation.** Remove on a profile clears its bio and display name. Removed content shows as removed to its author and to nobody else. [m4 call 16]
-
-### Purchases
-
-Behind the `purchases` switch (off) and a product switch (off). Nothing is for sale unless both Stripe keys are set.
-
-**161. Buying age is 18.** PRD 10.3 only says to check "purchases by under 18s" with a lawyer, so 18 is the safe default (the first pass said 16). Change: `MIN_PURCHASE_AGE` in `products.ts`. Recommended: 18 until a lawyer advises. [m5.2 call 1]
-
-**162. No Stripe library.** The server calls Stripe's REST API with `fetch` and checks signatures by hand. Swapping to the library changes one file (`stripe.ts`). Say if you would rather use the library. [m5.2 call 2]
-
-**163. Card only.** Hosted Checkout takes cards only, so a payment is not pending for days. Delayed-payment events are still handled. [m5.2 call 3]
-
-**164. Refunds and disputes.** A full refund takes the entitlement away. A dispute raised takes it away until it is won. A lost dispute keeps it away. A part refund changes nothing. PRD 10.3 is silent. A won dispute before its raised event is remembered. An inquiry closed without a dispute never takes anything away. [m5.2 calls 4 and 8]
-
-**165. A refund after a rescue does not undo it.** A refunded paid rescue stays applied to the farm. [m5.2 call 5]
-
-**166. Keep-going tiers and prices.** By days run: under 183 days (price Open, never shown, cannot be switched on), 183 to 364, 365 to 729, 730 and over. PRD gives three points and these are the nearest. The under-6-months price is A$15 until set. [m5.2 call 6, PRD 21 row 30]
-
-**167. Packs.** A second pack is refused. The pack with no ads is refused to an account with the pack (the upgrade is the one to buy). Products are seeded inactive at the PRD 10.3 prices (Fast A$5, Daily A$15, A$25, A$50 and A$100 by age for keep-going; A$30 and A$50 packs and A$20 upgrade). The A$30 pack gives the farm pack, supporter badge and full diary. [m5.2 call 7, m3.1 call 18]
-
-**168. Stripe details.** Checkout creates a Stripe customer for each buyer and only the `cus_` id is kept. Stripe holds the email and name and sends its own receipt if the dashboard setting is on. No price ids or publishable key are needed (inline prices), unlike the BUILD_PLAN list. [m5.2 calls 9, keys list]
-
-**169. Rescue cash.** PRD 10.3 is silent. All stock is sold. Cash is the hard-difficulty starting cash for that farm with no herd, or what the sale leaves after the debt if more, so a rescue never takes away money its own sale raised. Stock already bought and on the way still arrives. [m6 For Claudia]
-
-**170. A rescue needs a free farm slot.** With none, no offer is shown. [m6]
-
-### Ads
-
-All slots off (`ads` master switch plus each slot). The AdSense switch does nothing.
-
-**171. No-ads owners see no sponsor cards.** PRD 10.1 proposes subscribers still see sponsor cards, while PRD 10.3 and the mockups say no ads. Built: no ads at all. Change: `adSlotsFor` and `viewerFor` in `server/ads/serve.ts`. [m5.1 call 1]
-
-**172. Ads for under 16.** The PRD has no rule that bans ads for an under-16 account. Built: allowed, only campaigns for everyone, never aimed. AdSense must never be personalised for them. Guests are shown ads like a free player. [m5.1 call 2]
-
-**173. Slots not placed.** `landing_sponsors` (the home page is static with no script, so views could not be counted), `pc_leaderboard_banner` (the leaderboard page sends no script), `video_between_days` (its cap is by game days, which means reading the farm). Say if the home page should rebuild every few minutes, or the boards page send a script, or how the game-day cap should be counted. [m5.1 calls 3, 4, 5, m6]
-
-**174. Phone banner.** Upright only, floating above the tool bar inside the stack, never over the map on a phone on its side. 30 to 60 seconds on screen, 44 px close button, comes back after a 300-second gap in real time. [m5.1 call 6]
-
-**175. PC banner and rail.** The banner is a strip under the map that appears and goes, so the map changes height a little each time (alternative: a strip that always keeps its room). The farm rail shows from 1280 px wide. [m5.1 calls 7 and 8]
-
-**176. Video limits.** MP4 only, up to 3 MB and 30 seconds, because Vercel limits a request to 4.5 MB and the page sends base64. Pictures up to 1 MB. Longer videos need a signed direct upload to Storage (not built). [m5.1 call 9]
-
-**177. Video break.** It starts muted with a "Sound on" button, skip after 5 seconds, holds "Start year" until it ends or is skipped, and never holds more than 40 seconds. A video that errors or does not start in 6 seconds is dropped. [m5.1 call 12, build item 10]
-
-**178. Counting and dates.** A view counts after 1 second with half the ad on screen (constant in `useSeen.ts` and `events.ts`). Dates are Sydney days, the last day included. The sponsor report shows counts and nothing else. Rate limits are rows you can change (`ad_view` 300 an hour, `ad_click` 60 an hour). [m5.1 calls 10, 11, 13, 16]
-
-**179. Other ad settings.** "Spots left" is a setting (`advertise_spots`, 20) and is not counted. Ads live only when accounts are on. Slots for pages that are not built are ready and not placed. [m5.1 calls 14, 17, 4]
-
-**180. AdSense.** No publisher or unit id fields in admin and no script. It needs your own AdSense account and a consent banner. Add the fields when you decide. [m5.1 call 15, build item 12]
-
-### Notifications
-
-Behind the Push notifications switch. Nothing is sent without keys.
-
-**181. Quiet hours.** Morning reminder, later reminder and evening warning are dropped inside quiet hours. Everything else is held until quiet hours end and dropped if still unsent after 12 hours. The PRD does not say. Change: `expires` in `lib/notify/kinds.ts`. [m3.4 call 1]
-
-**182. Defaults.** Nothing is sent until a device is added or email is turned on. The morning reminder is off until the player turns it on. Farm alerts, evening warning, community and challenges default to push on once a device exists. Email is off for every type. [m3.4 call 2]
-
-**183. Email is a fallback.** It goes when there is no working device or push failed for good. One-click unsubscribe is on every notification email. [m3.4 calls 3 and 10]
-
-**184. Reminder timing.** The later reminder goes 6 hours after the morning time within a 3-hour window, and not at all when the morning time is after 5 pm. The morning reminder is made only within 3 hours after its time. Wording: "Kooringa: 3 things to check." or "A reminder for Kooringa." [m3.4 calls 4 and 7]
-
-**185. Under 16.** Community notifications are never made. Challenge and league notices are still made. Say if challenges should also be hidden. [m3.4 call 5]
-
-**186. Daily cap of 6.** Notifications to phones or email for an account in 24 hours (`DAILY_CAP` in `sender.ts`). The inbox always has everything. [m3.4 call 6]
-
-**187. Evening warning.** At most one a day for each farm, never if the farm was opened that day. What counts as urgent is for the Daily Farm work to decide. [m3.4 call 8]
-
-**188. Push hosts.** Allowed: Apple, Mozilla, Chrome (`fcm.googleapis.com`) and Edge (`notify.windows.com` and subdomains). Chrome's host is documented only as the origin you see when VAPID works. Edge's page states the domain, not the exact address pattern. Both need one test with a real browser. [m3.1 calls 29 and 37, m3.4 call 9]
-
-**189. Devices and sender.** A device is per browser and moves to the account that signs in on that browser, up to 10 per account. The sender is one route that also makes the reminders (cron every 5 minutes). A message deleted before it is sent is never sent. No `web-push` package was used (about 150 lines of Node crypto, checked against RFC 8291). [m3.4 calls 11 to 14]
-
-**190. Two inboxes.** The account inbox is separate from the farm's game inbox (the bell). No bell with an unread count was added to the top bar. [m3.4]
-
-### Website
-
-**191. Domain.** Not chosen. `NEXT_PUBLIC_SITE_URL` sets canonical links, sitemap and share images. [m5.4 call 1]
-
-**192. Owner name and ABN.** For the terms and privacy page (PRD 18). `SITE_OWNER_NAME`. Until set, the pages say "the owner of The Grazing Game". [m5.4 call 2]
-
-**193. Contact address.** `SITE_CONTACT_EMAIL`. Until set there is no contact link anywhere and no way to make a privacy request or an advertising enquiry. [m5.4 call 3]
-
-**194. Lawyer's review.** The privacy page, terms and community rules are plain-English drafts from the PRD, not legal advice. Review them, including the under-16 wording and purchases by under 18s. The "Draft. Not yet reviewed." line stays until done. [m5.4 call 4]
-
-**195. Providers and retention.** The privacy page says "hosting and database providers" and that data may be kept outside Australia, and names none. Vercel and Supabase (Sydney) are the plan. Naming them needs your yes once the accounts exist. Stripe is named only when `purchases` is on. Only the guest-farm rule is written for retention. Account data retention is not decided. [m5.4 calls 5 and 6]
-
-**196. Launch switches and prices.** Which switches are on at launch (`SITE_SWITCHES_ON`, none today, read when the site is built). Daily Farm keep-going price under 6 months is "To be set". Audience totals and ad rates are not on Advertise because there is no audience or rate card. [m5.4 calls 7 to 9]
-
-**197. Analytics only with consent.** The privacy page says analytics run only with consent and that players can still play if they say no. That is stricter than PRD 12 ("where needed") and binds the PostHog work (5.3) to a consent gate. [m5.4 call 10]
-
-**198. Wording that matters.** The SILO credit notice ("soil water and pasture growth figures are worked out from it by The Grazing Game"), "removed if it goes unused for a long time" for guest farms, "Looking is free and takes no time", and community rules shown with a note that the game has no community today. [m5.4 call 11]
-
-**199. Privacy complaints link.** The page points to the OAIC's "Privacy complaints" page, looked up 14 Nov 2026. Check it before launch. [m5.4 call 12]
-
-**200. Site pages are static and send no script.** They are Pages Router pages with the runtime off. The light and dark button is plain HTML with a small inline script. Share images use the default font. [m5.4]
-
-### Admin
-
-**201. Switch defaults.** Feature switches start at the PRD 11.7 launch defaults: sign-ups, both modes, leaderboards and push on, the community, ads, purchases and maintenance off. The seed equals `FEATURE_SWITCHES` key for key. `video_ads` and `banner_ads` are in `FEATURE_SWITCHES` but not named in the PRD table (both off). Daily Farm, sheep and the community parts are set off in migrations. [m3.1 call 1, m6 item 6]
-
-**202. Switch timing.** Switches are cached 30 seconds on each server. A change shows at once on the server that made it. The website's static pages read switches when the site is built, so changing them needs a rebuild. [m3.5 build item 4]
-
-**203. Maintenance mode.** Wording is one of three fixed texts chosen by id, so no free text goes to a player. While on, the game is read only (not stopped), so `/play` stays a static page. A player with the farm open sees the message and can do nothing until it ends. Add a wording in `MAINTENANCE_WORDINGS` in `server/admin/info.ts`. [m3.5 calls 1 and 2]
-
-**204. Banned and suspended accounts can still play their own farm.** The game routes do not check status. Their sessions end when banned or suspended and an access token still works until it runs out. Enforcing a ban in the game is one check in `route()` and changes what a banned player can do. [m3.5 call 3]
-
-**205. First admin by SQL.** The first admin is made by a statement you run in the Supabase SQL editor, not by a route or a variable (see section 7). [m3.5 call 4]
-
-**206. Ban and the hash.** Banning writes the hash when the provider can give the email. If it cannot, the ban still applies and the confirm says it will not survive deleting the account. Lifting a ban is refused when the hash cannot be made. [m3.5 call 5]
-
-**207. Sign out everywhere.** For another user it deletes their rows in `auth.sessions` through a security definer function. Whether the owner role is allowed on Supabase is to be confirmed. If it fails the admin sees "Do it in the Supabase dashboard." [m3.5 calls 6, second pass item 9]
-
-**208. Admin and stale sign-in.** An admin page never refreshes the sign-in. An admin who returns after the token ran out gets the plain not found and must open `/play` first. A redirect route or `proxy.ts` would fix it and is not built. [m3.5 call 7]
-
-**209. Admin roles.** A suspended admin is treated as no admin. A moderator cannot open admin. The last admin in good standing cannot lose the role. Ad slot switches are not in the switches list because they belong to the Ads screen. [m3.5 calls 8, 9]
-
-**210. Site settings are saved but not read.** The announcement, districts and community rules text are saved and audited with only a number. Nothing on the site reads them yet. Each says so on its screen. [m3.5 call 10]
-
-**211. Dashboard meanings.** "Saves failing" counts saves kept aside because they could not be opened. "Farms played" counts farms with a save today and in the last 7 days. Suspension lengths are a fixed list (1, 3, 7, 14, 30 days) and a ban has no end date. [m3.5 calls 11, 12, 14]
-
-**212. Admin script size.** The `/admin` line is 150 KB, held at its limit (heaviest page 149.1 KB after the join). A new client component will fail it. [m3.5 call 13, m6]
-
-### Speed targets
-
-**213. `/play` Lighthouse 0.89 against 0.95.** The CI rule is 0.95 and was not loosened, so CI fails on `/play` until the page is lighter. The largest paint is the setup form heading, which waits for the scripts then two requests in order. The fix is in `PlayApp` and `SetupFlow`. LCP is 3.3 s. [m1.8 calls]
-
-**214. Script size targets.** PRD 14.10 asks for under 100 KB on website pages. The public pages now send none. App pages carry about 140 KB of React and Next.js (`/play` 207.2 KB of 250, sign-in and account pages 141.4 to 146.9 of 150, community pages 145.3 to 149.4 of 150). Several pages sit within 1 KB of their limit. The 100 KB target is not reachable for these without cutting the framework. [m1.8, m3.2, m6]
-
-**215. Public page Lighthouse.** `/pricing` has a median of 99 over 8 runs, not 100. Some single runs on other pages fall below 100 on a busy PC with no script to blame. CI asserts performance 1.0 on every public page (median of 3). If CI fails on a busy runner, run it again. [m5.4 call 13]
-
-**216. Speed tests on a shared machine.** The cattle speed test (limit 5 ms a day with 4,000+ head) reads 3.4 to 4.5 ms alone and 5 to 15 ms under load. CI uses a 15 ms limit for the shared machine. Run it on a quiet machine. [m1.8, m2.7 checks]
-
-**217. Map frame rate.** 60 fps was not measured on a phone. A frame's processor time with 4,409 head and 22,664 grass pieces was 1.0 ms at the 95th percentile on the build PC. [m1.6a]
+Placeholder. Calls from milestones 5.3 (dashboard and analytics) and 5.5 (launch check) will be added here.
 
 ## 2. Stand-in figures
 
@@ -565,73 +442,73 @@ These numbers have no sourced real figure behind them. Each is one constant or s
 
 These are the open calibration rows and review findings. In each case the model works and the tests hold today's figures, but the numbers sit away from published ones.
 
-**218. Calf weaning weights.** Home-bred calves weighed about 80 kg at weaning (9 months) before the fix. The sources say about 160 to 175 kg at 180 to 200 days. After the fix: birth to 200 days is 0.53 (Central Queensland, band 0.6 to 0.95), 0.54 (Tablelands), 0.57 (Central West) and 0.63 kg a day (Western Victoria), against 0.7 to 1.1. Weight at 200 days is 142, 143, 149 and 163 kg. Central Queensland passes (band 140 to 225). The southern three are under 171 to 256. From 100 to 200 days calves gain 0.33, 0.39, 0.29 and 0.36 kg a day against 0.6 to 1.1. Weight at 100 days passes everywhere. Each open row is an expected failure with a regression floor beside it. [m2.5, CALIBRATION]
+**G1. Calf weaning weights.** Home-bred calves weighed about 80 kg at weaning (9 months) before the fix. The sources say about 160 to 175 kg at 180 to 200 days. After the fix: birth to 200 days is 0.53 (Central Queensland, band 0.6 to 0.95), 0.54 (Tablelands), 0.57 (Central West) and 0.63 kg a day (Western Victoria), against 0.7 to 1.1. Weight at 200 days is 142, 143, 149 and 163 kg. Central Queensland passes (band 140 to 225). The southern three are under 171 to 256. From 100 to 200 days calves gain 0.33, 0.39, 0.29 and 0.36 kg a day against 0.6 to 1.1. Weight at 100 days passes everywhere. Each open row is an expected failure with a regression floor beside it. [m2.5, CALIBRATION]
 
-**219. Cows milking off their backs.** Calves born per 100 cows and heifers fall to about 55 by year 3 in Central Queensland and the Tablelands, against 72 to 77 weaned per 100 for northern breeder herds (CashCow). About 17% of Tablelands cows sit under CS 2.25 from August to October in years 2 and 3. With a May start 79 to 82% do. Deaths did not rise. The milk condition figures are stand-ins. [m2.5 calls 1, 2, 5]
+**G2. Cows milking off their backs.** Calves born per 100 cows and heifers fall to about 55 by year 3 in Central Queensland and the Tablelands, against 72 to 77 weaned per 100 for northern breeder herds (CashCow). About 17% of Tablelands cows sit under CS 2.25 from August to October in years 2 and 3. With a May start 79 to 82% do. Deaths did not rise. The milk condition figures are stand-ins. [m2.5 calls 1, 2, 5]
 
-**220. Grass feed quality and the two steer bands.** On the Tablelands in July and August a paddock holds 35 to 55 kg DM/ha of green and about 900 to 1,000 kg of dead feed. The diet is ME 7.0 and CP 5.2%. A dry cow eats 1.0 to 1.1% of live weight and is 11 to 14 MJ a day short. On dry feed at 50% digestibility game cows eat 1.0 to 1.2% against 1.4 to 1.5% measured in Central Queensland. Carrying capacity is 3.5 DSE/ha on Tablelands native against 5, and 5.5 to 7.7 on sown pasture against 12 to 23. The Tablelands steer band is 90 to 105 kg and Central West 115 to 130 kg, with no outside source. The recommended package would put them at 126 and 143 kg. The Central West peak digestibility was tuned from 0.70 to 0.68. [grass review, m1.3]
+**G3. Grass feed quality and the two steer bands.** On the Tablelands in July and August a paddock holds 35 to 55 kg DM/ha of green and about 900 to 1,000 kg of dead feed. The diet is ME 7.0 and CP 5.2%. A dry cow eats 1.0 to 1.1% of live weight and is 11 to 14 MJ a day short. On dry feed at 50% digestibility game cows eat 1.0 to 1.2% against 1.4 to 1.5% measured in Central Queensland. Carrying capacity is 3.5 DSE/ha on Tablelands native against 5, and 5.5 to 7.7 on sown pasture against 12 to 23. The Tablelands steer band is 90 to 105 kg and Central West 115 to 130 kg, with no outside source. The recommended package would put them at 126 and 143 kg. The Central West peak digestibility was tuned from 0.70 to 0.68. [grass review, m1.3]
 
-**221. Central Queensland with lick.** The average year runs up to 2 kg over the top of its 75 to 130 kg band (held as `averageYearOver`). Herd deaths are counted over all herds together. The real-year herd test holds 1.5 to 3.6% on six herds over fair weather years. [m1.3, m1.4]
+**G4. Central Queensland with lick.** The average year runs up to 2 kg over the top of its 75 to 130 kg band (held as `averageYearOver`). Herd deaths are counted over all herds together. The real-year herd test holds 1.5 to 3.6% on six herds over fair weather years. [m1.3, m1.4]
 
-**222. Real years.** Central West with nothing done loses steers heavily in four of 29 years and 5 to 54% of set-stocked weaners in its worst four. The season label reads the whole 12 months, so it can say "Below average" in a year unsupplemented steers lost 41%. A farm starting in 1997 may not pay its way (CHECK 8 to 10). [m1.4]
+**G5. Real years.** Central West with nothing done loses steers heavily in four of 29 years and 5 to 54% of set-stocked weaners in its worst four. The season label reads the whole 12 months, so it can say "Below average" in a year unsupplemented steers lost 41%. A farm starting in 1997 may not pay its way (CHECK 8 to 10). [m1.4]
 
-**223. Sheep: Tablelands winter.** Unfed ewes reach lambing at CS 1.4, 31.7% die and marking is 48.8%. Central West marking is 71.1%. With the grass changes tried in the review, ewes reach CS 1.95, deaths fall from 15 to 18% to about 8% and lambs marked rise from about 50 to 62 per 100 ewes. Skipped benchmarks: SB-59 to SB-62 (carrying capacity), and Tablelands and Central West winter rows run with winter feeding. [m2.3, grass review]
+**G6. Sheep: Tablelands winter.** Unfed ewes reach lambing at CS 1.4, 31.7% die and marking is 48.8%. Central West marking is 71.1%. With the grass changes tried in the review, ewes reach CS 1.95, deaths fall from 15 to 18% to about 8% and lambs marked rise from about 50 to 62 per 100 ewes. Skipped benchmarks: SB-59 to SB-62 (carrying capacity), and Tablelands and Central West winter rows run with winter feeding. [m2.3, grass review]
 
-**224. Sheep deaths.** SB-43 Merino ewe deaths are 3.33% (highest block 4.67, 5.08), 3.98% (5.26, 5.53) and 4.70% for the Tablelands, Central West and Western Victoria, against 2 to 4% with no block over 4.5%. First-cross ewes are 4.95, 5.36 and 5.35%. SB-47 Western Victoria weaners lose 1.66% against 2 to 6% (worms left out). [CALIBRATION, m2.7 review]
+**G7. Sheep deaths.** SB-43 Merino ewe deaths are 3.33% (highest block 4.67, 5.08), 3.98% (5.26, 5.53) and 4.70% for the Tablelands, Central West and Western Victoria, against 2 to 4% with no block over 4.5%. First-cross ewes are 4.95, 5.36 and 5.35%. SB-47 Western Victoria weaners lose 1.66% against 2 to 6% (worms left out). [CALIBRATION, m2.7 review]
 
-**225. Sheep margins.** Start flock first year (no hands, no sales, no feeding) against DPIRD's $50.46 a DSE: Central West $44.28 passes, Tablelands $5.37 and Western Victoria $135.74 are open. SB-GM (a managed flock, band $37.85 to $63.08): Central West $38.69 passes, Tablelands $71.88 and Western Victoria $90.33 are open, mostly wool at 2026 prices. The model's DSE a ewe (1.6 to 2.0) is below the budget's 2.32. [CALIBRATION, m2.7 review]
+**G8. Sheep margins.** Start flock first year (no hands, no sales, no feeding) against DPIRD's $50.46 a DSE: Central West $44.28 passes, Tablelands $5.37 and Western Victoria $135.74 are open. SB-GM (a managed flock, band $37.85 to $63.08): Central West $38.69 passes, Tablelands $71.88 and Western Victoria $90.33 are open, mostly wool at 2026 prices. The model's DSE a ewe (1.6 to 2.0) is below the budget's 2.32. [CALIBRATION, m2.7 review]
 
-**226. Mixed farm left alone.** Western Victoria with 86 cattle and 659 sheep and no action lost 579 sheep in two years and profit fell from $192,435 to $25,757. Not a benchmark. [m2.7]
+**G9. Mixed farm left alone.** Western Victoria with 86 cattle and 659 sheep and no action lost 579 sheep in two years and profit fell from $192,435 to $25,757. Not a benchmark. [m2.7]
 
 ## 4. Not built
 
-**227. Map.** Trees, cattle walking and grazing animation, time-lapse, frost, dust, heat haze and storm clouds, the profit layer, the selected mob and picked animals on the map, half-built fence lines and pegs, the overview inset for a phone held upright, hover, and the farmer. Sheep sprites exist as code art only. [m1.6a, m1.7c]
+**N1. Map.** Trees, cattle walking and grazing animation, time-lapse, frost, dust, heat haze and storm clouds, the profit layer, the selected mob and picked animals on the map, half-built fence lines and pegs, the overview inset for a phone held upright, hover, and the farmer. Sheep sprites exist as code art only. [m1.6a, m1.7c]
 
-**228. Play screens.** Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, a bell with an unread count in the top bar, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
+**N2. Play screens.** Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, a bell with an unread count in the top bar, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
 
-**229. Engine.** Temperature in the growth factor. Moving a running farm to new data. The grass changes in the grass review. Overhead costs a year for sheep. Marking cost for sheep. A managed cattle margin beside SB-GM. A calving window per district. [m1.4b, m1.4, m2.3, m2.7, m2.5]
+**N3. Engine.** Temperature in the growth factor. Moving a running farm to new data. The grass changes in the grass review. Overhead costs a year for sheep. Marking cost for sheep. A managed cattle margin beside SB-GM. A calving window per district. [m1.4b, m1.4, m2.3, m2.7, m2.5]
 
-**230. Data.** The rest of the MLA pull (National Young Cattle Indicator, six national sheep indicators, other yard indicators, sheep yardings and the fill-in yards). Real yardings for Daily Farm sale days. The AussieGRASS licence is unconfirmed, so those figures are used for checking only. A DPIRD budget read (the pages refuse automatic reading). [m1.4a, m3.3, m1.4b]
+**N4. Data.** The rest of the MLA pull (National Young Cattle Indicator, six national sheep indicators, other yard indicators, sheep yardings and the fill-in yards). Real yardings for Daily Farm sale days. The AussieGRASS licence is unconfirmed, so those figures are used for checking only. A DPIRD budget read (the pages refuse automatic reading). [m1.4a, m3.3, m1.4b]
 
-**231. Accounts.** Apple sign-in. A redirect route or `proxy.ts` to refresh an admin's sign-in. Supabase-wide rate limits that survive across server instances. A screen for changing a Daily Farm time zone. [m3.2, m3.5, m3.3]
+**N5. Accounts.** Apple sign-in. A redirect route or `proxy.ts` to refresh an admin's sign-in. Supabase-wide rate limits that survive across server instances. A screen for changing a Daily Farm time zone. [m3.2, m3.5, m3.3]
 
-**232. Daily Farm.** The evening warning job. A read-only view of someone else's Daily Farm for Fast Farms. Daily leagues cannot be entered until Daily Farms exist. [m3.3, m3.4, m4]
+**N6. Daily Farm.** The evening warning job. A read-only view of someone else's Daily Farm for Fast Farms. Daily leagues cannot be entered until Daily Farms exist. [m3.3, m3.4, m4]
 
-**233. Community.** Popular ordering in Everyone, reports of groups from a group page, real farm showcase photos, pull to refresh, a Groups tab list of every group's board, badges and best ranks on profiles, the Grazier Score formula, and weaning %, condition and the "above 1,500 kg DM/ha" share on boards. [m4.2, m4]
+**N7. Community.** Popular ordering in Everyone, reports of groups from a group page, real farm showcase photos, pull to refresh, a Groups tab list of every group's board, badges and best ranks on profiles, the Grazier Score formula, and weaning %, condition and the "above 1,500 kg DM/ha" share on boards. [m4.2, m4]
 
-**234. Ads and notifications.** `landing_sponsors` on the home page, `pc_leaderboard_banner`, `video_between_days`, AdSense and its admin fields. A real push service and a real email run (see "Not checked"). [m5.1, m6, m3.4]
+**N8. Ads and notifications.** `landing_sponsors` on the home page, `pc_leaderboard_banner`, `video_between_days`, AdSense and its admin fields. A real push service and a real email run (see "Not checked"). [m5.1, m6, m3.4]
 
-**235. Website and analytics.** Share images in the display font, audience numbers and ad rates on Advertise, the cookie and consent banner (milestone 5.3). Milestones 5.3 and 5.5 are in progress. [m5.4]
+**N9. Website and analytics.** Share images in the display font, audience numbers and ad rates on Advertise, the cookie and consent banner (milestone 5.3). Calls from milestones 5.3 and 5.5 are a placeholder at the end of Part B. [m5.4]
 
-**236. Tests and checks.** Playwright end-to-end tests (planned for the game screens in milestone 1.0, not recorded as built). The `realism-guardian` agent was not run on most milestones. [m1.0, various]
+**N10. Tests and checks.** Playwright end-to-end tests (planned for the game screens in milestone 1.0, not recorded as built). The `realism-guardian` agent was not run on most milestones. [m1.0, various]
 
 ## 5. Not checked
 
 Each item could not be verified without keys, real services or a real phone. "What you need to do" says how to check it.
 
-**237. Real phone play.** Not done: install to the home screen, the iPhone Add to Home Screen steps, offline viewing in airplane mode, the Android install bar, the iPhone status bar in an installed app, going offline mid-request, touch pan and pinch, and frame rate. Do: play on a real iPhone and an Android phone in portrait and landscape, install, go offline, reconnect. BUILD_PLAN 1.8 says Claudia plays it on a real phone. [m1.8, m1.6a]
+**V1. Real phone play.** Not done: install to the home screen, the iPhone Add to Home Screen steps, offline viewing in airplane mode, the Android install bar, the iPhone status bar in an installed app, going offline mid-request, touch pan and pinch, and frame rate. Do: play on a real iPhone and an Android phone in portrait and landscape, install, go offline, reconnect. BUILD_PLAN 1.8 says Claudia plays it on a real phone. [m1.8, m1.6a]
 
-**238. Screens by eye.** Not looked at: phone on its side in the dark theme for several screens, the game over card, the mixed-farm setup step, keyboard-only runs, the bore's gold ring, a knocked-down fence on screen, the phone plan form and crop sheet, the admin screens on a phone and PC in both themes, the sheep sprites at the far zoom and phone landscape for sheep, the ad cards and video break, the community pages, the notifications page. Do: open each at phone and PC size in both themes. [m1.7 entries, m2.8, m3.5, m5.1, m4.2]
+**V2. Screens by eye.** Not looked at: phone on its side in the dark theme for several screens, the game over card, the mixed-farm setup step, keyboard-only runs, the bore's gold ring, a knocked-down fence on screen, the phone plan form and crop sheet, the admin screens on a phone and PC in both themes, the sheep sprites at the far zoom and phone landscape for sheep, the ad cards and video break, the community pages, the notifications page. Do: open each at phone and PC size in both themes. [m1.7 entries, m2.8, m3.5, m5.1, m4.2]
 
-**239. A real Supabase project.** Nothing has run against one. Do: make the project (section 7), apply the migrations, then check: the `pg` pooler and `set local role` inside its transactions, `@supabase/ssr` cookies and refresh, `getClaims()` on a real token, the emailed link end to end (and that it fails in another browser), the Google round trip, `signOut` scopes, `auth.admin.deleteUser`, Storage removal and uploads, two real connections racing on one save, per-instance rate limits, `delete from auth.sessions` by the admin function, `getUserById`, a stale token on an admin page, the first-admin SQL. See `docs/DATABASE.md` "Still owed". [m3.1, m3.2, m3.5, m4.2]
+**V3. A real Supabase project.** Nothing has run against one. Do: make the project (section 7), apply the migrations, then check: the `pg` pooler and `set local role` inside its transactions, `@supabase/ssr` cookies and refresh, `getClaims()` on a real token, the emailed link end to end (and that it fails in another browser), the Google round trip, `signOut` scopes, `auth.admin.deleteUser`, Storage removal and uploads, two real connections racing on one save, per-instance rate limits, `delete from auth.sessions` by the admin function, `getUserById`, a stale token on an admin page, the first-admin SQL. See `docs/DATABASE.md` "Still owed". [m3.1, m3.2, m3.5, m4.2]
 
-**240. Daily Farm live data.** The live feed has never run against SILO or MLA. Do: set `GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL` on a preview, check a day arrives, and check the rollover cron fires. Look at the 5-day lag after a few weeks. The catch-up sheet, plan card and time on the top bar were not seen in a browser. [m3.3]
+**V4. Daily Farm live data.** The live feed has never run against SILO or MLA. Do: set `GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL` on a preview, check a day arrives, and check the rollover cron fires. Look at the 5-day lag after a few weeks. The catch-up sheet, plan card and time on the top bar were not seen in a browser. [m3.3]
 
-**241. Stripe test purchase.** Not run against Stripe. Do: follow the Stripe steps in section 7, buy the pack with no ads with test card 4242 4242 4242 4242, check the farm limit goes to 5, then refund in admin and check it goes back to 2. If it fails, check: the `v1` signature scheme and 5-minute tolerance, `payment_intent` on dispute events, `customer_creation` with `customer` set, and the `expires_at` repeat. [m5.2]
+**V5. Stripe test purchase.** Not run against Stripe. Do: follow the Stripe steps in section 7, buy the pack with no ads with test card 4242 4242 4242 4242, check the farm limit goes to 5, then refund in admin and check it goes back to 2. If it fails, check: the `v1` signature scheme and 5-minute tolerance, `payment_intent` on dispute events, `customer_creation` with `customer` set, and the `expires_at` repeat. [m5.2]
 
-**242. Notifications.** Nothing was sent through a real push service or Resend. Do: make the VAPID keys and Resend domain (section 7), then test an installed iPhone, Android Chrome, desktop Edge and Firefox. Check the Edge and Chrome hosts. [m3.4]
+**V6. Notifications.** Nothing was sent through a real push service or Resend. Do: make the VAPID keys and Resend domain (section 7), then test an installed iPhone, Android Chrome, desktop Edge and Firefox. Check the Edge and Chrome hosts. [m3.4]
 
-**243. Ads.** No ad has been seen on screen with real storage. Do: run the migration, make an admin, turn on the Ads switch and one slot, make a house campaign, upload a picture and a real MP4 and play the video break. Run Lighthouse on `/play` with a slot on. [m5.1]
+**V7. Ads.** No ad has been seen on screen with real storage. Do: run the migration, make an admin, turn on the Ads switch and one slot, make a house campaign, upload a picture and a real MP4 and play the video break. Run Lighthouse on `/play` with a slot on. [m5.1]
 
-**244. Community photos.** Storage uploads with the secret key, `storage.objects` rows matching what `approve_photo` reads, and photo download. Do: upload as a test account and approve in `/admin/photos`. [m4.2]
+**V8. Community photos.** Storage uploads with the secret key, `storage.objects` rows matching what `approve_photo` reads, and photo download. Do: upload as a test account and approve in `/admin/photos`. [m4.2]
 
-**245. Lawyer and links.** The privacy complaints link, the legal drafts and the provider wording. Do: ask a lawyer to read them. [m5.4]
+**V9. Lawyer and links.** The privacy complaints link, the legal drafts and the provider wording. Do: ask a lawyer to read them. [m5.4]
 
-**246. `realism-guardian`.** Not run on several milestones (1.2c, 1.4b, 1.4, 1.5a, 1.6a, m6 join, others). Do: run it on the final branch before merging.
+**V10. `realism-guardian`.** Not run on several milestones (1.2c, 1.4b, 1.4, 1.5a, 1.6a, m6 join, others). Do: run it on the final branch before merging.
 
-**247. Lighthouse.** Not run on `/play` with the latest changes, on the sign-in and account pages, or after m6. The public pages ran at 99 to 100. Do: run Lighthouse CI on the main pages (mobile) on the final branch. [m3.2, m6]
+**V11. Lighthouse.** Not run on `/play` with the latest changes, on the sign-in and account pages, or after m6. The public pages ran at 99 to 100. Do: run Lighthouse CI on the main pages (mobile) on the final branch. [m3.2, m6]
 
-**248. Calibration judgement.** The real-year tables, the dry and wet years, the 1997 start, and each sheep and calf open row need your eye. Do: read `docs/CALIBRATION.md` and rule on the questions above. [m1.4, m2.5, m2.7]
+**V12. Calibration judgement.** The real-year tables, the dry and wet years, the 1997 start, and each sheep and calf open row need your eye. Do: read `docs/CALIBRATION.md` and rule on the questions above. [m1.4, m2.5, m2.7]
 
 ## 6. Keys and settings you need to provide
 
@@ -785,8 +662,8 @@ Open one pull request from `FINAL-BRANCH` into `main`. Merge it only when you ar
 - `m5.1-ad-slots`: ad slots, campaigns, house ads and reports.
 - `m5.2-purchases`: one-off purchases through Stripe Checkout and paying to keep going.
 - `claude/m5-4-website-363c83`: the public website.
-- `m5.3-dashboard`: the admin dashboard and analytics (in progress; at this point it sits at the same commit as `m6-joined`).
-- `m5.5-launch-check`: end-to-end flows, restore drill and farm export (in progress).
+- `m5.3-dashboard`: the admin dashboard and analytics (its calls are a placeholder at the end of Part B; at this point the branch sits at the same commit as `m6-joined`).
+- `m5.5-launch-check`: end-to-end flows, restore drill and farm export (its calls are a placeholder at the end of Part B).
 
 ### The join
 

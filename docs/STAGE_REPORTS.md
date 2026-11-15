@@ -1,13 +1,13 @@
 # Stage reports
 
-One report for each of the five stages in `docs/BUILD_PLAN.md`, in the shape `CLAUDE.md` asks for: what was built, how it was tested, which PRD section 21 defaults were used, anything not done, and questions for Claudia. Questions are not repeated here. They point to item numbers in `docs/CALLS_FOR_CLAUDIA.md`, where each one is written out with where to change it.
+One report for each of the five stages in `docs/BUILD_PLAN.md`, in the shape `CLAUDE.md` asks for: what was built, how it was tested, which PRD section 21 defaults were used, anything not done, and questions for Claudia. Questions are not repeated here. They point to ids in `docs/CALLS_FOR_CLAUDIA.md`, where each one is written out with where to change it.
 
 The figures come from `docs/DEVELOPMENT_LOG.md`. Test counts are as the log gave them at the end of each milestone. Counts from different branches are not a running total, because some branches were built side by side and joined later.
 
-Item numbers used below, from `docs/CALLS_FOR_CLAUDIA.md`:
+Ids used below, from `docs/CALLS_FOR_CLAUDIA.md`. A1 to A25 are the calls that need you (Part A). B1 and up are decided calls (Part B), found under the same headings.
 
-- Needs your ruling: Cattle and grass 1 to 58, Sheep 59 to 90, Farm hands and contractors 91 to 105, Scores and leaderboards 106 to 116, Daily Farm 117 to 127, Accounts and privacy 128 to 145, Community and moderation 146 to 160, Purchases 161 to 170, Ads 171 to 180, Notifications 181 to 190, Website 191 to 200, Admin 201 to 212, Speed targets 213 to 217.
-- Known gaps in realism 218 to 226. Not built 227 to 236. Not checked 237 to 248.
+- Part A, by theme: grass and cattle A1 to A3, sheep A4 to A6, hands and contractors A7 and A8, Daily Farm A9, scores A10, real years A11 and A12, sale days and plans A13 and A14, accounts and privacy A15 to A18, purchases A19 and A20, website A21, community A22, ads A23, notifications A24, speed A25.
+- Known gaps in realism G1 to G9. Not built N1 to N10. Not checked V1 to V12.
 
 ## Stage 1: engine and the cattle game on all screens
 
@@ -32,7 +32,7 @@ Item numbers used below, from `docs/CALLS_FOR_CLAUDIA.md`:
 - Lighthouse (mobile, local): `/` 0.95 median and `/play` 0.89 (target 0.95) at 1.8, with Accessibility, Best Practices and SEO at 1.
 - Map: processor time for a frame with 4,409 head and 22,664 grass pieces was 1.0 ms at the 95th percentile on the build PC. Frame rate was not measured on a phone.
 - Screens were looked at in the browser pane at phone upright (375, 360 and 390 wide), phone on its side (812 by 375 and 844 by 390) and PC (1,024 and 1,280 wide), in both themes for most screens, with contrast and 44 px target checks by script.
-- The checks listed in BUILD_PLAN section 1 before each pull request were not all run on every milestone. `realism-guardian` ran on some milestones and not others (see item 246).
+- The checks listed in BUILD_PLAN section 1 before each pull request were not all run on every milestone. `realism-guardian` ran on some milestones and not others (see V10).
 - No screenshots were captured for this report. The log records what was looked at in the browser pane, not images. In 1.6a screenshots were taken but cropped by the pane and not kept.
 
 ### PRD section 21 defaults used
@@ -45,19 +45,18 @@ Item numbers used below, from `docs/CALLS_FOR_CLAUDIA.md`:
 
 ### Not done
 
-- The Stage 1 "done when" for 1.8 asks that you have played it on a real phone, and that `/play` meets the PRD 14.10 targets. Neither is met: `/play` is at Lighthouse 0.89 against 0.95. See items 213 to 217 and 237.
-- The map items in "Not built" 227 and the play-screen items in 228. Calibration rows that stay open are in 218 to 226.
-- The 1.3 "done when" is not met as the build plan words it: four benchmarks pass only on a reading that is yours to decide (item 18).
-- Playwright end-to-end tests are not recorded as built (item 236).
+- The Stage 1 "done when" for 1.8 asks that you have played it on a real phone, and that `/play` meets the PRD 14.10 targets. Neither is met: `/play` is at Lighthouse 0.89 against 0.95. See A25 and V1.
+- The map items in N1 and the play-screen items in N2. Calibration rows that stay open are G1 to G9.
+- The 1.3 "done when" is not met as the build plan words it: four benchmarks pass only on a reading that is yours to decide (Part B, cattle and grass, benchmarks judged on the average of twelve blocks).
+- Playwright end-to-end tests are not recorded as built (N10).
 
 ### Questions for Claudia
 
-- Calibration, grass and real data: items 18 to 33 (and the grass-quality questions 11 to 17, which came later in Stage 2).
-- When a cow shows as in calf and what the record pays: items 1 to 4.
-- Working day, sale days and plans: items 34 to 44.
-- Map and play screens: items 45 to 58.
-- Scores and diary: items 106 to 109.
-- Speed targets: items 213 to 217.
+- Real years, weather and prices: A11 and A12. The grass questions that came later in Stage 2: A1.
+- When a cow shows as in calf and what the record pays: A3.
+- Sale days and plans: A13 and A14. Working day times, map and play screens: Part B, cattle and grass.
+- Scores and diary: A10 and Part B, scores and leaderboards.
+- Speed targets: A25.
 
 ## Stage 2: farm hands and sheep
 
@@ -85,22 +84,22 @@ Item numbers used below, from `docs/CALLS_FOR_CLAUDIA.md`:
 
 - Row 15 (contractor price: materials plus a labour charge a metre, same rate for either team). The figure is a $5 stand-in.
 - Row 17 (walking with dogs). With walking cut, dogs now only enlarge a hand's share of stock jobs.
-- Row 23 (hands). The PRD says no limit on hands. The build lets the labour pool offer at most 6 hands at once (item 99).
+- Row 23 (hands). The PRD says no limit on hands. The build lets the labour pool offer at most 6 hands at once (Part B, farm hands and contractors, standing and the pool).
 - Row 24 (sheep districts: Northern Tablelands, Central West, Western Victoria) and row 27 (wool price: a stand-in).
 - Row 34 (contractors carry on over days).
 - Builder's defaults: 2026 award rates on every farm, a sheep DSE of 8.4 per AE, and netting at $10 a metre.
 
 ### Not done
 
-- The sheep model's open gaps and the open calf rows (items 218 to 226). They are why sheep stay switched off.
-- Everything the log lists for Stage 2 as not built (items 227 to 229): a calving window per district, overhead costs a year for sheep, booking sheep onto a later sale, moving the crutching and joining days on screen, the DPIRD budget read, a "cows getting thin" line in Things to do, and real-year wages (every farm pays 2026 rates).
-- The 2.2 and 2.4 "done when" are met in tests and in the browser pane. A real phone check is owed (item 237).
+- The sheep model's open gaps and the open calf rows (G1 to G9). They are why sheep stay switched off.
+- Everything the log lists for Stage 2 as not built (N3): a calving window per district, overhead costs a year for sheep, booking sheep onto a later sale, moving the crutching and joining days on screen, the DPIRD budget read, a "cows getting thin" line in Things to do, and real-year wages (every farm pays 2026 rates).
+- The 2.2 and 2.4 "done when" are met in tests and in the browser pane. A real phone check is owed (V1).
 
 ### Questions for Claudia
 
-- Calves, cows, grass quality and the steer bands: items 5 to 17.
-- Sheep: items 59 to 90.
-- Farm hands and contractors: items 91 to 105.
+- Calves, cows, grass quality and the steer bands: A1 and A2.
+- Sheep: A4 to A6, and Part B, sheep.
+- Farm hands and contractors: A7 and A8, and Part B, farm hands and contractors.
 
 ## Stage 3: accounts, the server and Daily Farm
 
@@ -128,23 +127,23 @@ Item numbers used below, from `docs/CALLS_FOR_CLAUDIA.md`:
 - Row 1 (mode names Daily Farm and Fast Farm, in one constants file).
 - Row 3 as settled in v1.1 (a hand's standing duties run on missed days, otherwise nothing happens without you).
 - Row 7 as settled in v1.1 (2 Daily and 2 Fast Farms free) and row 9 as settled (minimum account age 14, under-16s get no community).
-- PRD 11.7 switch defaults for sign-ups, both modes, leaderboards and push. Daily Farm was built off, against the table (item 117).
-- Row 31 (reminders): built opt-in, with the reminder time as a setting (item 182).
+- PRD 11.7 switch defaults for sign-ups, both modes, leaderboards and push. Daily Farm was built off, against the table (A9).
+- Row 31 (reminders): built opt-in, with the reminder time as a setting (A24).
 - PRD 14.3 (the night runs at midnight).
 
 ### Not done
 
-- Nothing has run against a real Supabase project, SILO or MLA (items 239 and 240).
-- Apple sign-in (item 143), a way to change a Daily Farm time zone, the evening warning job (items 127 and 187), real yardings for sale days, the proxy route that refreshes an admin's sign-in, and cross-instance rate limits ("Not built" 230 to 232).
-- A real push and email run (item 242).
-- Browser walks on a phone in both orientations and both themes for the Stage 3 screens (item 238).
+- Nothing has run against a real Supabase project, SILO or MLA (V3 and V4).
+- Apple sign-in, a way to change a Daily Farm time zone, the evening warning job, real yardings for sale days, the proxy route that refreshes an admin's sign-in, and cross-instance rate limits (N5 and N6, and Part B, accounts and Daily Farm).
+- A real push and email run (V6).
+- Browser walks on a phone in both orientations and both themes for the Stage 3 screens (V2).
 
 ### Questions for Claudia
 
-- Accounts, guests, privacy, ban records and saves: items 128 to 145.
-- Daily Farm: items 117 to 127.
-- Notifications: items 181 to 190.
-- Admin: items 201 to 212.
+- Accounts, guests, privacy, ban records and saves: A15 to A18, and Part B, accounts and privacy.
+- Daily Farm: A9, and Part B, Daily Farm.
+- Notifications: A24.
+- Admin and switches: the switch table in the summary, A18, and Part B, admin.
 - Stage 3 keys and settings: sections 6 and 7 of `docs/CALLS_FOR_CLAUDIA.md`.
 
 ## Stage 4: competition and community
@@ -178,14 +177,14 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 - Daily leagues cannot be entered and day cards were not made automatically until the m6 join wired them to the Daily Farm rollover.
 - Popular ordering in Everyone, reports of groups from a group page, real farm showcase photos, pull to refresh and a Groups tab list of every group's board.
 - No image-check service is wired, so every photo waits for manual review.
-- No run against a real Supabase project and no check of the pages by eye (items 238, 239 and 244).
-- See "Not built" 233 and "Not checked" 238, 239 and 244.
+- No run against a real Supabase project and no check of the pages by eye (V2, V3 and V8).
+- See N7 and V2, V3 and V8.
 
 ### Questions for Claudia
 
-- Scores and leaderboards: items 110 to 116.
-- Community and moderation: items 146 to 160.
-- Privacy and under-16 rules that affect what the community shows: items 130, 132 to 134 and 136.
+- Scores and leaderboards: A10, and Part B, scores and leaderboards.
+- Community and moderation: A22, and Part B, community and moderation.
+- Privacy and under-16 rules that affect what the community shows: A15 to A17.
 - Keys: none new beyond Stage 3, except choosing an image-check service for `IMAGE_CHECK_API_KEY`.
 
 ## Stage 5: money and launch
@@ -194,9 +193,9 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 
 - **5.1 Ad slots.** Every slot in PRD 10.1 with its screen, size and switch, house ads and sponsor campaigns with caps, dates and budgets, a video break with no third-party player, view and click logs counted honestly, sponsor reports as a page and CSV, uploads checked by their bytes, and an empty AdSense adapter. With every ad switch off, nothing is drawn or downloaded.
 - **5.2 Purchases.** One-off purchases through Stripe Checkout (inline prices, card only), the A$30 and A$50 packs and A$20 upgrade, farm slots and no-ads read from what the account owns, a webhook that checks signatures and records each event once, an admin page with refunds and "Check with Stripe", and the paying-to-keep-going offer card.
-- **5.3 Dashboard and analytics.** In progress, to be added.
+- **5.3 Dashboard and analytics.** To be added.
 - **5.4 Website.** Home, pricing, advertise, about, privacy, terms and community rules as static pages that send no script, with titles, descriptions, canonical links, share images and structured data. They say only what is live.
-- **5.5 Launch check.** In progress, to be added. Branch `m5.5-launch-check` holds work toward end-to-end flows, a restore drill and farm export, but it is not in the log.
+- **5.5 Launch check.** To be added.
 - **The m6 join.** Stages 1 to 4 and ad slots and purchases joined on `m6-joined` (engine 0.18.0, save format 13). Wiring done: Daily Farm facts queue notifications, the Daily Farm reminder reader uses the farm's own "opened today", ads ask the purchases' no-ads answer and the new ad places were placed, the rescue is built in the engine (`rescueFarm`), day cards are made at the rollover, follows, comments and likes notify, and every API route was walked with no keys. Lessons in `docs/LESSONS.md` were renumbered by milestone.
 
 ### How it was tested
@@ -218,16 +217,17 @@ All of it sits behind its own switch (`leaderboards`, `community`, `groups`, `ac
 
 ### Not done
 
-- Milestones 5.3 and 5.5: in progress, to be added.
-- AdSense and its admin fields, `landing_sponsors` on the home page, `pc_leaderboard_banner` and `video_between_days` (items 173 and 180 and "Not built" 234).
-- The cookie and consent banner (comes with analytics in 5.3), audience totals and ad rates on Advertise, and share images in the display font ("Not built" 235).
-- The real Stripe calls and the real event shapes are unproven (item 241). The legal pages have no lawyer's review (item 245).
-- The `realism-guardian` check and a Lighthouse run on the final branch (items 246 and 247).
+- Milestones 5.3 and 5.5: to be added.
+- AdSense and its admin fields, `landing_sponsors` on the home page, `pc_leaderboard_banner` and `video_between_days` (A23, Part B ads, and N8).
+- The cookie and consent banner (comes with analytics in 5.3), audience totals and ad rates on Advertise, and share images in the display font (N9).
+- The real Stripe calls and the real event shapes are unproven (V5). The legal pages have no lawyer's review (A21 and V9).
+- The `realism-guardian` check and a Lighthouse run on the final branch (V10 and V11).
 
 ### Questions for Claudia
 
-- Purchases, refunds and the rescue: items 161 to 170.
-- Ads: items 171 to 180.
-- Website, privacy and legal: items 191 to 200.
-- Speed targets: items 213 to 217.
+- Purchases, refunds and the rescue: A19 and A20.
+- Ads: A23, and Part B, ads.
+- Website, privacy and legal: A21, and Part B, website.
+- Speed targets: A25.
+- Stage 5.3 and 5.5 calls: to be added (placeholder at the end of Part B).
 - Keys and settings for ads, purchases and the website: sections 6 and 7 of `docs/CALLS_FOR_CLAUDIA.md`.
