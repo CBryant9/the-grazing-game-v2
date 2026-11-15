@@ -511,7 +511,7 @@ These are the open calibration rows and review findings. In each case the model 
 
 **N8. Ads and notifications.** `landing_sponsors` on the home page, `pc_leaderboard_banner`, `video_between_days`, AdSense and its admin fields. A real push service and a real email run (see "Not checked"). [m5.1, m6, m3.4]
 
-**N9. Website and analytics.** Share images in the display font, audience numbers and ad rates on Advertise, the cookie and consent banner (milestone 5.3). Calls from milestones 5.3 and 5.5 are a placeholder at the end of Part B. [m5.4]
+**N9. Website and analytics.** Share images in the display font, audience numbers and ad rates on Advertise, a cookie and consent banner on the public pages (the consent control is on the account page only). [m5.4, m5.3]
 
 **N10. Tests and checks.** Playwright end-to-end tests (planned for the game screens in milestone 1.0, not recorded as built). The `realism-guardian` agent was not run on most milestones. [m1.0, various]
 
