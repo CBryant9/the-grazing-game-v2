@@ -10,6 +10,7 @@ import {
 import type { SqlRunner } from '../db/sql';
 import { GameError } from '../game/game';
 import { DEFAULT_ZONE, parseClock, safeZone } from './clock';
+import { hostAllowed } from './sender';
 
 /**
  * What the settings page and the inbox read and change, for one signed-in account. Every
@@ -246,7 +247,8 @@ export function parseDevice(body: Record<string, unknown>): DeviceInput {
     typeof p256dh !== 'string' ||
     typeof auth !== 'string' ||
     endpoint.length > 1000 ||
-    !/^https:\/\//.test(endpoint)
+    !/^https:\/\//.test(endpoint) ||
+    !URL.canParse(endpoint)
   ) {
     throw new GameError(400, 'This browser did not send what a device needs.');
   }
@@ -271,12 +273,24 @@ export function parseDevice(body: Record<string, unknown>): DeviceInput {
 }
 
 export const HOST_REFUSED = "Notifications aren't available in this browser yet.";
+export const ENDPOINT_TAKEN =
+  'This browser already gets notifications for another account. Sign in as that account and remove the device there first.';
 
 export async function addDevice(
   sql: SqlRunner,
   userId: string,
   d: DeviceInput,
 ): Promise<{ id: string; ref: string }> {
+  // The host is read the way a browser and the sender read it (WHATWG URL), against the same
+  // allow-list the sender uses, before anything is written. The database guard is the second check.
+  const hosts = (
+    await sql.query<{ host: string; include_subdomains: boolean }>(
+      'select host, include_subdomains from public.push_service_hosts',
+    )
+  ).rows;
+  if (!hostAllowed(d.endpoint, hosts)) {
+    throw new GameError(400, HOST_REFUSED, 'push_host_not_allowed');
+  }
   const count = await sql.query<{ n: string; mine: boolean }>(
     `select count(*)::text as n, bool_or(endpoint = $2) as mine
        from public.push_subscriptions where user_id = $1`,
@@ -286,17 +300,20 @@ export async function addDevice(
     throw new GameError(409, `You can keep up to ${MAX_DEVICES} devices. Remove one first.`);
   }
   try {
-    // The same browser signing in as someone else takes the device over: the old account stops getting it.
+    // A device already saved for the same account is refreshed. One saved for another account is
+    // never taken over (m5.5 review): the update only runs when the row is this account's, and
+    // nothing comes back otherwise.
     const r = await sql.query<{ id: string }>(
       `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret, device)
        values ($1, $2, $3, $4, $5)
        on conflict (endpoint) do update
-         set user_id = excluded.user_id, p256dh = excluded.p256dh,
-             auth_secret = excluded.auth_secret, device = excluded.device
+         set p256dh = excluded.p256dh, auth_secret = excluded.auth_secret, device = excluded.device
+         where push_subscriptions.user_id = excluded.user_id
        returning id`,
       [userId, d.endpoint, d.p256dh, d.auth, d.label],
     );
-    return { id: r.rows[0]!.id, ref: endpointRef(d.endpoint) };
+    if (!r.rows[0]) throw new GameError(409, ENDPOINT_TAKEN, 'push_endpoint_taken');
+    return { id: r.rows[0].id, ref: endpointRef(d.endpoint) };
   } catch (e) {
     const hint = (e as { hint?: unknown }).hint;
     const message = (e as { message?: unknown }).message;

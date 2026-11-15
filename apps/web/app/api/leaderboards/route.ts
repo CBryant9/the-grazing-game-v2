@@ -1,4 +1,5 @@
 import { boardPage } from '@/server/boards/page';
+import { safeDecode } from '@/server/decode';
 import { allow, fail, json } from '@/server/game/http';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,10 @@ export async function GET(req: Request): Promise<Response> {
   const cookies: Record<string, string> = {};
   for (const part of (req.headers.get('cookie') ?? '').split(';')) {
     const at = part.indexOf('=');
-    if (at > 0) cookies[part.slice(0, at).trim()] = decodeURIComponent(part.slice(at + 1).trim());
+    if (at <= 0) continue;
+    // A cookie with a broken escape is skipped, never a 500.
+    const value = safeDecode(part.slice(at + 1).trim());
+    if (value !== null) cookies[part.slice(0, at).trim()] = value;
   }
   const query: Record<string, string> = {};
   for (const [k, v] of url.searchParams) if (!(k in query)) query[k] = v.slice(0, 64);

@@ -103,8 +103,9 @@ export async function shareFarm(
  * One day card for one Daily Farm day (PRD 9.3): the day's diary lines as facts, made by the server
  * at the farm's rollover (m6 join: the night calls the Stage 4 hooks, which call this). Fast Farms make none. A card
  * is made only for an owner who is a community member (16 or over, in good standing) with a profile
- * that is not private, once per farm and day, and only when the diary has something to say. Followers
- * see it in Friends' days; a public profile's day card is public.
+ * that is not private and a farm view that is not off, once per farm and day, and only when the diary
+ * has something to say. Followers see it in Friends' days; it is public only when the profile and the
+ * farm view are both public.
  */
 export async function makeDayCard(
   sql: SqlRunner,
@@ -114,15 +115,20 @@ export async function makeDayCard(
   const f = await sql.query<{
     owner_id: string;
     privacy: 'public' | 'followers' | 'private';
+    farm_view: 'public' | 'followers' | 'off';
   }>(
-    `select f.owner_id, p.privacy_profile as privacy
+    `select f.owner_id, p.privacy_profile as privacy, p.privacy_farm_view as farm_view
        from public.farms f
        join public.profiles p on p.user_id = f.owner_id
       where f.id = $1 and f.mode = 'daily' and app.member_raw(f.owner_id)`,
     [farmId],
   );
   const farm = f.rows[0];
-  if (!farm || farm.privacy === 'private') return null;
+  // A day card shows the farm, so it follows who may see the farm as well as who may see the
+  // profile. The farm view off means no card. It is public only when both are public.
+  if (!farm || farm.privacy === 'private' || farm.farm_view === 'off') return null;
+  const visibility =
+    farm.privacy === 'public' && farm.farm_view === 'public' ? 'public' : 'followers';
   const d = await sql.query<{
     game_date: string;
     lines: string[];
@@ -151,13 +157,7 @@ export async function makeDayCard(
   const r = await sql.query<{ id: string }>(
     `insert into public.posts (author_id, kind, body, farm_id, farm_day, card, visibility)
      values ($1, 'day_card', null, $2, $3, $4::jsonb, $5) returning id`,
-    [
-      farm.owner_id,
-      farmId,
-      day,
-      JSON.stringify(card),
-      farm.privacy === 'public' ? 'public' : 'followers',
-    ],
+    [farm.owner_id, farmId, day, JSON.stringify(card), visibility],
   );
   return { id: r.rows[0]!.id };
 }

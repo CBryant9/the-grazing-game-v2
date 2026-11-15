@@ -1199,6 +1199,28 @@ describe('paying to keep going', () => {
     expect((await post('checkout', pat, { product: 'keep_going_fast' })).status).toBe(400);
   });
 
+  it('a keep-going checkout with no free farm slot is refused before a session is made (m5.5 review)', async () => {
+    setRescueEngine(fakeEngine().engine);
+    await sell(true, ['keep_going_fast']);
+    const pat = await person('pat');
+    const farm = await endedFarm(pat.id, 'fast');
+    // Two Fast Farms going fill the free slots, so the ended one has no room to keep going in.
+    await insertFarm(pat.id, 'fast', 'Going 1');
+    await insertFarm(pat.id, 'fast', 'Going 2');
+    expect(
+      ((await (await get('offer', pat, `?farm=${farm}`)).json()) as { offer: unknown }).offer,
+    ).toBeNull();
+    const res = await post('checkout', pat, { product: 'keep_going_fast', farm });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe('no_room');
+    expect(pay.sessions.size).toBe(0);
+    const rows = await db.query('select id from public.purchases where user_id = $1', [pat.id]);
+    expect(rows.rows).toHaveLength(0);
+    // With a slot free again, the same checkout goes ahead.
+    await db.query(`delete from public.farms where name = 'Going 2'`);
+    expect((await post('checkout', pat, { product: 'keep_going_fast', farm })).status).toBe(200);
+  });
+
   it('the Open price under 6 months is never offered or sold, even if the row is switched on', async () => {
     setRescueEngine(fakeEngine().engine);
     await sell(true, ['keep_going_daily_under_6m']);

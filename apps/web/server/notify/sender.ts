@@ -225,7 +225,7 @@ async function record(
       case 'retry':
         report.retried++;
         await tx.query(
-          `update public.notification_sends set state = 'pending', claimed_at = null, reason = $2, not_before = $3 where id = $1`,
+          `update public.notification_sends set state = 'pending', claimed_at = null, sent_at = null, reason = $2, not_before = $3 where id = $1`,
           [row.id, o.reason, new Date(now + o.afterSec * 1000).toISOString()],
         );
         break;
@@ -233,7 +233,7 @@ async function record(
         report.failed++;
         logFailure({ route: 'notify-send', reason: o.reason });
         await tx.query(
-          `update public.notification_sends set state = 'failed', claimed_at = null, reason = $2 where id = $1`,
+          `update public.notification_sends set state = 'failed', claimed_at = null, sent_at = null, reason = $2 where id = $1`,
           [row.id, o.reason],
         );
         break;
@@ -241,7 +241,7 @@ async function record(
         report.held++;
         // A hold for quiet hours is not a failed attempt.
         await tx.query(
-          `update public.notification_sends set state = 'held', claimed_at = null, reason = $2,
+          `update public.notification_sends set state = 'held', claimed_at = null, sent_at = null, reason = $2,
                   not_before = $3, attempts = greatest(attempts - 1, 0) where id = $1`,
           [row.id, o.reason, new Date(o.until).toISOString()],
         );
@@ -249,7 +249,7 @@ async function record(
       case 'dropped':
         report.dropped++;
         await tx.query(
-          `update public.notification_sends set state = 'dropped', claimed_at = null, reason = $2 where id = $1`,
+          `update public.notification_sends set state = 'dropped', claimed_at = null, sent_at = null, reason = $2 where id = $1`,
           [row.id, o.reason],
         );
         break;
@@ -348,14 +348,35 @@ async function processRow(
   if (when.state === 'dropped') return { state: 'dropped', reason: 'quiet_hours' };
   if (when.state === 'held') return { state: 'held', until: when.notBefore, reason: 'quiet_hours' };
 
-  const cap = await nd.sql.query<{ n: string }>(
-    `select count(distinct notification_id)::text as n from public.notification_sends
-      where user_id = $1 and state = 'sent' and sent_at > $2`,
-    [row.user_id, new Date(now - 24 * 3600 * 1000).toISOString()],
-  );
-  if (Number(cap.rows[0]!.n) >= DAILY_CAP) return { state: 'dropped', reason: 'daily_cap' };
+  if (!(await reserveCapPlace(nd, row, now))) return { state: 'dropped', reason: 'daily_cap' };
 
   return row.channel === 'push' ? sendPush(nd, row, c, hosts, report) : sendEmail(nd, row, c);
+}
+
+/**
+ * Count and claim a place in the account's daily allowance in one step (m5.5 review). Two senders
+ * at once used to count, both see room for one more, and both send. Now the count and the claim
+ * run in one transaction under a lock for the account, and a place is held by setting `sent_at` on
+ * the row while it is still `sending`. A row that is then not sent gives its place back (`record`
+ * clears `sent_at`), and a row left in `sending` by a crashed run holds its place until it is taken
+ * again. The row's own earlier hold never counts against it.
+ */
+async function reserveCapPlace(nd: NotifyDeps, row: Claimed, now: number): Promise<boolean> {
+  return nd.sql.transaction(async (tx) => {
+    await tx.query('select pg_advisory_xact_lock(4712, hashtext($1::text))', [row.user_id]);
+    const cap = await tx.query<{ n: string }>(
+      `select count(distinct notification_id)::text as n from public.notification_sends
+        where user_id = $1 and sent_at > $2 and state in ('sent', 'sending')
+          and id <> $3 and notification_id <> $4`,
+      [row.user_id, new Date(now - 24 * 3600 * 1000).toISOString(), row.id, row.notification_id],
+    );
+    if (Number(cap.rows[0]!.n) >= DAILY_CAP) return false;
+    await tx.query('update public.notification_sends set sent_at = $2 where id = $1', [
+      row.id,
+      new Date(now).toISOString(),
+    ]);
+    return true;
+  });
 }
 
 async function sendPush(

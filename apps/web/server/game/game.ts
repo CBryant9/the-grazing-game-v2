@@ -1307,10 +1307,12 @@ export class GameServer {
   }
 
   /**
-   * Someone else's look at a farm (PRD 9.5, the read-only farm view): its snapshot as it stands,
-   * read WITHOUT marking it opened (m6 join). Looking at a friend's farm must never count as the
-   * owner opening it: that would move its last-opened time and, on a Daily Farm, stop the owner's
-   * morning reminder. A Daily Farm is brought up to today first, as for any reader. Null if none.
+   * Someone else's look at a farm (PRD 9.5, the read-only farm view): its snapshot as it stands in
+   * the store, and nothing is written. Looking at a friend's farm must never count as the owner
+   * opening it (m6 join): that would move its last-opened time and, on a Daily Farm, stop the
+   * owner's morning reminder. Nor does a look run the owner's missed nights (security review,
+   * m5.5): a viewer could move another player's farm on and set its last-opened time by saving
+   * it. The owner's own load, or the rollover, brings a Daily Farm up to today. Null if none.
    */
   async viewSnapshot(farmId: string): Promise<Snapshot | null> {
     try {
@@ -1321,8 +1323,12 @@ export class GameServer {
     return this.locked(farmId, async () => {
       const raw = await this.loadRaw(farmId, false);
       if (!raw) return null;
-      const held = raw.stored.daily ? await this.bringUp(farmId, raw) : raw;
-      return this.snapshotOf(held);
+      if (raw.stored.daily && this.daily) {
+        // Looked at with the data up to the farm's own day, as the owner's screen would be. Read only.
+        const farmDate = isoOf(dateOn(raw.farm));
+        dailyEnvs.set(raw.stored.setup, { data: await this.daily.data.bundleThrough(farmDate) });
+      }
+      return this.snapshotOf(raw);
     });
   }
 

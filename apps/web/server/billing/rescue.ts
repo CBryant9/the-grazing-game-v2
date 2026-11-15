@@ -118,8 +118,11 @@ export async function rescueFarm(
     : null;
 }
 
-/** Is there a free slot for this farm to be going again? Its own row is ended, so it is not counted. */
-async function roomFor(sql: SqlRunner, farm: RescueFarm): Promise<boolean> {
+/**
+ * Is there a free slot for this farm to be going again? Its own row is ended, so it is not counted.
+ * The offer card and the checkout both ask it, so nobody can pay for a rescue with no room.
+ */
+export async function roomFor(sql: SqlRunner, farm: RescueFarm): Promise<boolean> {
   const r = await sql.query<{ going: number; max: number | null }>(
     `select (select count(*)::int from public.farms f
               where f.owner_id = $1 and f.mode = $2 and f.status = 'active' and f.id <> $3) as going,

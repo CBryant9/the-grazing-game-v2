@@ -24,6 +24,27 @@ import type { AuthProvider, AuthUser, CookieJar } from './provider';
  * - `auth.admin.deleteUser(id)` and `storage.from(bucket).remove(paths)` with the secret key
  */
 
+/**
+ * The name supabase-js gives the sign-in cookie for a project: `sb-<first label of the host>-auth-token`
+ * (its default storage key, read in `@supabase/supabase-js` dist/index.mjs on 15 Nov 2026).
+ */
+export function sessionCookieName(url: string): string {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    // A bad address names no cookie.
+  }
+  return `sb-${host.split('.')[0]}-auth-token`;
+}
+
+/** True for the project's sign-in cookie or one of its numbered chunks, and nothing else. */
+export function isSessionCookie(name: string, base: string): boolean {
+  return (
+    name === base || (name.startsWith(`${base}.`) && /^\d{1,2}$/.test(name.slice(base.length + 1)))
+  );
+}
+
 const toUser = (u: User): AuthUser => ({
   id: u.id,
   email: u.email ?? null,
@@ -52,10 +73,14 @@ export function supabaseProvider(
   const admin = () =>
     createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // The project's own sign-in cookie: supabase-js names it `sb-<project ref>-auth-token`, split
+  // into `.0`, `.1` chunks when it is long. Any other `sb-*` cookie is not ours and is ignored.
+  const authCookie = sessionCookieName(url);
   return {
     async session(jar) {
-      // Players with no sign-in cookie are the great majority: they cost nothing here.
-      if (!jar.getAll().some((c) => c.name.startsWith('sb-'))) return null;
+      // Players with no sign-in cookie are the great majority: they cost nothing here. Nor does a
+      // made-up cookie under another name (the rate limit asks this on every account request).
+      if (!jar.getAll().some((c) => isSessionCookie(c.name, authCookie))) return null;
       const { data, error } = await client(jar).auth.getClaims();
       const c = data?.claims;
       if (error || !c || typeof c.sub !== 'string') return null;
@@ -79,9 +104,7 @@ export function supabaseProvider(
       // refreshing in the proxy for that reason.
       try {
         const all = jar.getAll();
-        const base = all
-          .map((c) => /^(sb-.+-auth-token)(?:\.\d+)?$/.exec(c.name)?.[1])
-          .find((n) => n !== undefined);
+        const base = all.some((c) => isSessionCookie(c.name, authCookie)) ? authCookie : null;
         if (!base) return null;
         const raw = await combineChunks(base, (name) => all.find((c) => c.name === name)?.value);
         if (!raw) return null;

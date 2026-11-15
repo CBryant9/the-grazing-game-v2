@@ -748,7 +748,8 @@ describe('storage', () => {
       `select id, public from storage.buckets order by id`,
     );
     expect(b).toEqual([
-      { id: 'ad-media', public: true },
+      // Private since 20261116000100: ad files are served only through the server's media route.
+      { id: 'ad-media', public: false },
       { id: 'avatars', public: false },
       { id: 'group-photos', public: false },
       { id: 'post-photos', public: false },

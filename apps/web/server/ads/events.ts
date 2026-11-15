@@ -92,18 +92,24 @@ export interface ClickTarget {
 }
 
 /**
- * Look up where a click goes, by creative id and slot, and count it. Returns null for an unknown
- * id, a creative or campaign that is off or outside its dates, a slot that is off or not linked
- * to the campaign, a missing link, or a link that is not a plain https address. The address is
- * never taken from the request, so this can not be used to send anyone to a place the admin did
- * not set.
+ * Look up where a click goes, by creative id and slot. Returns null for an unknown id, a creative
+ * or campaign that is off or outside its dates, a slot that is off or not linked to the campaign,
+ * a missing link, or a link that is not a plain https address. The address is never taken from
+ * the request, so this can not be used to send anyone to a place the admin did not set.
+ *
+ * The person always goes to the stored link. The click is counted only when the link carries a
+ * valid, unexpired impression token for this creative, campaign and slot, and only once for that
+ * impression (`ad_events_once`). A bare link (a crafted page that loads it, a crawler) is followed
+ * and not counted.
  */
 export async function followClick(
   sql: SqlClient,
+  pepper: string,
   viewer: Viewer,
   callerKey: string,
   creativeId: string,
   slot: unknown,
+  token: unknown,
   now = Date.now(),
 ): Promise<ClickTarget | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(creativeId))
@@ -124,12 +130,20 @@ export async function followClick(
   const row = r.rows[0];
   const url = row?.link_url ? safeLink(row.link_url) : null;
   if (!row || !url) return null;
-  // Over the limit the person still goes where they clicked; the click is just not counted.
-  if (await allowed(sql, 'ad_click', subjectOf(viewer, callerKey))) {
+  const imp = readImpression(pepper, token, now);
+  const mine =
+    imp !== null &&
+    imp.creative === creativeId &&
+    imp.slot === id &&
+    imp.campaign === row.campaign_id;
+  // Over the limit, or with no valid token, the person still goes where they clicked; the click
+  // is just not counted.
+  if (mine && (await allowed(sql, 'ad_click', subjectOf(viewer, callerKey)))) {
     await sql.query(
-      `insert into public.ad_events (slot_id, campaign_id, creative_id, user_id, guest_session_id, kind)
-       values ($1, $2, $3, $4, $5, 'click')`,
-      [id, row.campaign_id, creativeId, viewer.userId, viewer.guestId],
+      `insert into public.ad_events (slot_id, campaign_id, creative_id, user_id, guest_session_id, kind, impression_id)
+       values ($1, $2, $3, $4, $5, 'click', $6)
+       on conflict (impression_id, kind) where impression_id is not null do nothing`,
+      [id, row.campaign_id, creativeId, viewer.userId, viewer.guestId, imp.id],
     );
   }
   return { url };

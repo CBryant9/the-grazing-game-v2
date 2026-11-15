@@ -1,6 +1,9 @@
 import 'server-only';
 import { isSlotId } from '@/lib/ads/registry';
+import { adminGate } from '../admin/gate';
 import { authDeps } from '../auth/deps';
+import { jarFor } from '../auth/provider';
+import { safeDecode } from '../decode';
 import { callerKey, type AuthContext } from '../auth/route';
 import { GameError } from '../game/game';
 import { allow, fail, readJson } from '../game/http';
@@ -54,16 +57,18 @@ export async function adsEvent(ctx: AuthContext): Promise<unknown> {
 
 export async function adsClick(ctx: AuthContext): Promise<unknown> {
   const url = new URL(ctx.req.url);
-  const id = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '');
+  const id = safeDecode(url.pathname.split('/').filter(Boolean).pop() ?? '') ?? '';
   if (!ctx.deps || !UUID.test(id)) throw new GameError(404, 'Not found.');
   const viewer = await viewerOf(ctx);
   if (!viewer) throw new GameError(404, 'Not found.');
   const target = await followClick(
     ctx.deps.sql,
+    ctx.deps.pepper,
     viewer,
     callerKey(ctx.req),
     id,
     url.searchParams.get('s'),
+    url.searchParams.get('t'),
   );
   if (!target) throw new GameError(404, 'Not found.');
   return new Response(null, {
@@ -79,7 +84,7 @@ export async function adsClick(ctx: AuthContext): Promise<unknown> {
 /** An ad's media, from its creative id, with headers that stop it being anything but a picture or a video. */
 export async function adsMedia(req: Request): Promise<Response> {
   const deps = authDeps();
-  const id = decodeURIComponent(new URL(req.url).pathname.split('/').filter(Boolean).pop() ?? '');
+  const id = safeDecode(new URL(req.url).pathname.split('/').filter(Boolean).pop() ?? '') ?? '';
   const store = adMediaStore();
   if (!deps || !store || !UUID.test(id)) return fail(404, 'Not found.');
   if (!allow(`ad-media:${callerKey(req)}`, 240, 60_000)) {
@@ -88,12 +93,24 @@ export async function adsMedia(req: Request): Promise<Response> {
     });
   }
   const row = (
-    await deps.sql.query<{ media_path: string | null; media_mime: string | null }>(
-      'select media_path, media_mime from public.ad_creatives where id = $1',
+    await deps.sql.query<{
+      media_path: string | null;
+      media_mime: string | null;
+      live: boolean;
+    }>(
+      `select a.media_path, a.media_mime, (a.active and c.active) as live
+         from public.ad_creatives a
+         join public.campaigns c on c.id = a.campaign_id
+        where a.id = $1`,
       [id],
     )
   ).rows[0];
   if (!row?.media_path || !row.media_mime) return fail(404, 'Not found.');
+  // Media is served only while the creative and its campaign are on. Once an ad is switched off
+  // its file is gone from the public site; only an admin (the campaign editor's preview) sees it.
+  if (!row.live && (await adminGate(jarFor(req), { refresh: false })).kind !== 'ok') {
+    return fail(404, 'Not found.');
+  }
   const range = req.headers.get('range');
   const file = await store
     .read(row.media_path, range && /^bytes=\d*-\d*$/.test(range) ? range : null)
@@ -109,7 +126,8 @@ export async function adsMedia(req: Request): Promise<Response> {
     'Cross-Origin-Resource-Policy': 'same-origin',
     'Content-Disposition': 'inline',
     'Referrer-Policy': 'no-referrer',
-    'Cache-Control': 'public, max-age=3600',
+    // Private and short, so a switched-off ad does not live on in a shared cache.
+    'Cache-Control': 'private, max-age=300',
   });
   for (const [k, v] of Object.entries(file.headers)) headers.set(k, v);
   return new Response(file.body as BodyInit, { status: file.status, headers });

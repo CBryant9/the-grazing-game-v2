@@ -84,7 +84,8 @@ export const guestCookie = (req: Request): string | null => {
 
 /**
  * Work out who is looking, from the database. `null` means "show this person nothing": they own
- * no-ads. A signed-in account with no finished profile is a guest. Never throws.
+ * no-ads, or the database could not be asked (fail closed). A signed-in account with no finished
+ * profile is a guest. Never throws.
  */
 export async function viewerFor(
   sql: SqlClient,
@@ -120,7 +121,8 @@ export async function viewerFor(
     const guestId = await guestIdOf(sql, guestCookie(req));
     return { ...ANON, guestId };
   } catch {
-    return ANON;
+    // Fail closed: when the database can not say whether this person owns no-ads, show nothing.
+    return null;
   }
 }
 
@@ -133,10 +135,15 @@ export async function adSlotsFor(
   account: { userId: string } | null,
   now = Date.now(),
 ): Promise<AdSlotId[]> {
-  const live = await liveSlotIds(sql, now);
-  if (live.length === 0) return [];
-  if (account && (await ownsNoAds(sql, account.userId).catch(() => false))) return [];
-  return live;
+  // Fail closed: any error (the slots, the no-ads answer) shows no ads, never ads to a no-ads owner.
+  try {
+    const live = await liveSlotIds(sql, now);
+    if (live.length === 0) return [];
+    if (account && (await ownsNoAds(sql, account.userId))) return [];
+    return live;
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------- choosing
@@ -360,7 +367,9 @@ export async function chooseAds(sql: SqlClient, input: ChooseInput): Promise<Pic
       sponsor: c.sponsor,
       label: c.is_house_ad ? 'Ad' : 'Sponsored',
       mediaUrl: c.has_media ? `/api/ads/media/${c.creative_id}` : null,
-      href: c.has_link ? `/api/ads/click/${c.creative_id}?s=${slot}` : null,
+      // The click link carries the signed impression, so only a click on an ad the server really
+      // showed is counted, and only once (server/ads/events.ts, followClick).
+      href: c.has_link ? `/api/ads/click/${c.creative_id}?s=${slot}&t=${token}` : null,
       width: c.width,
       height: c.height,
       durationS: c.duration_s,

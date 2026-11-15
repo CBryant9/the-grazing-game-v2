@@ -8,6 +8,12 @@ import { SITE_PAGES, absoluteUrl } from '@/lib/site';
  * and any structured data. The public pages use the pages router so they can
  * send no JavaScript, so this replaces the metadata export the app router has.
  */
+/**
+ * Structured data as text for a script tag. Every `<` becomes the six characters < (JSON
+ * reads them back as `<`), so nothing in the data can close the tag.
+ */
+export const jsonLdText = (data: unknown): string => JSON.stringify(data).replace(/</g, '\\u003c');
+
 export function PageHead({
   path,
   jsonLd = [],
@@ -44,7 +50,7 @@ export function PageHead({
         <script
           key={i}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\u003c') }}
+          dangerouslySetInnerHTML={{ __html: jsonLdText(data) }}
         />
       ))}
     </Head>

@@ -235,8 +235,9 @@ describe('Daily Farm calls the notifications', () => {
     await keepThrough(r, '2026-11-16');
     await r.db.query('delete from public.posts');
     await r.db.query(
-      `insert into public.profiles (user_id, username, privacy_profile) values ($1, 'daily_one', 'public')
-       on conflict (user_id) do update set privacy_profile = 'public'`,
+      `insert into public.profiles (user_id, username, privacy_profile, privacy_farm_view)
+       values ($1, 'daily_one', 'public', 'public')
+       on conflict (user_id) do update set privacy_profile = 'public', privacy_farm_view = 'public'`,
       [USER],
     );
     await r.db.query(

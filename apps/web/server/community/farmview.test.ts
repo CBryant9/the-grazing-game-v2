@@ -313,7 +313,7 @@ describe('the links to a farm', () => {
     expect(await look(bob, annFarm)).toContain('Annie Downs');
   });
 
-  it('a day card carries no farm link when the viewer may not look at the farm', async () => {
+  it('makes no day card when the farm view is off, so a follower sees none', async () => {
     const owner = await kit.person('owner15', { farmView: 'off' });
     const fan = await kit.person('fan15');
     await follow(fan, owner);
@@ -322,9 +322,8 @@ describe('the links to a farm', () => {
       `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, 1, current_date, $2)`,
       [id, ['Moved 1 mob']],
     );
-    await makeDayCard(kit.deps.sql, id, 1);
+    expect(await makeDayCard(kit.deps.sql, id, 1)).toBeNull();
     const page = await asUser(kit.deps.sql, fan.id, (tx) => feedPage(tx, fan.id, 'friends', null));
-    expect(page.items).toHaveLength(1);
-    expect(page.items[0]!.farmId).toBeUndefined();
+    expect(page.items).toHaveLength(0);
   });
 });

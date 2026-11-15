@@ -33,9 +33,9 @@ export interface AuthRouteOptions {
   write?: boolean;
   /**
    * What the limit counts. `address` (the default) is for the routes a visitor with no session
-   * uses (sign-in). `session` counts each signed-in player on their own, so players behind one
-   * address (a farm's wifi, a phone network) do not use each other's allowance; with no sign-in
-   * cookie it falls back to the address.
+   * uses (sign-in). `session` counts each signed-in player on their own, by the account id the
+   * provider verified, so players behind one address (a farm's wifi, a phone network) do not use
+   * each other's allowance. With no verified sign-in it falls back to the address.
    */
   by?: 'address' | 'session';
 }
@@ -43,23 +43,36 @@ export interface AuthRouteOptions {
 const sha = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 24);
 
 /**
- * The caller for a limit. Never one bucket for everybody: with no trusted address (a developer's
- * machine; production does not turn accounts on without one) callers are told apart by their
- * browser's own headers, which is weak, but only ever limits a caller more narrowly.
+ * The caller for a limit, by address. Never one bucket for everybody: with no trusted address (a
+ * developer's machine; production does not turn accounts on without one) callers are told apart
+ * by their browser's own headers, which is weak, but only ever limits a caller more narrowly.
+ *
+ * It never reads a cookie. Cookie text is written by the caller, so a key made from it gave a fresh
+ * count for every made-up `sb-*` cookie (security review, m5.5). A signed-in player is counted on
+ * their own by `sessionCallerKey`, from the account id the provider verified.
  */
-export function callerKey(req: Request, by: 'address' | 'session' = 'address'): string {
-  if (by === 'session') {
-    const cookies = (req.headers.get('cookie') ?? '')
-      .split(';')
-      .map((c) => c.trim())
-      .filter((c) => /^(sb-[^=]*|fake_session)=/.test(c))
-      .sort()
-      .join(';');
-    if (cookies) return `s:${sha(cookies)}`;
-  }
+export function callerKey(req: Request, by?: 'address'): string;
+export function callerKey(req: Request): string {
   const address = clientAddress(req);
   if (address) return `a:${address}`;
   return `u:${sha(`${req.headers.get('user-agent') ?? ''}|${req.headers.get('accept-language') ?? ''}`)}`;
+}
+
+/**
+ * The caller for a `session` limit: the verified account id, or the address. The provider's
+ * `session` checks the token's signature and only looks at the project's own sign-in cookie, so a
+ * junk cookie verifies as nobody and is counted with its address, never in a bucket of its own.
+ */
+export async function sessionCallerKey(
+  req: Request,
+  deps: AuthDeps | null,
+  jar: CookieJar,
+): Promise<string> {
+  if (deps) {
+    const user = await deps.provider.session(jar).catch(() => null);
+    if (user && !user.anonymous && /^[0-9A-Za-z-]{1,64}$/.test(user.id)) return `id:${user.id}`;
+  }
+  return callerKey(req);
 }
 
 /**
@@ -76,15 +89,26 @@ export function authRoute(
     try {
       const refusal = options.write ? csrfRefusal(req) : null;
       if (refusal) return fail(403, refusal);
-      const who = callerKey(req, options.by);
+      const jar = jarFor(req);
+      const deps = authDeps();
+      const who =
+        options.by === 'session' ? await sessionCallerKey(req, deps, jar) : callerKey(req);
       if (!allow(`auth-${options.name}:${who}`, options.max, options.windowMs ?? 60_000)) {
-        return fail(429, 'That was a lot of tries. Wait a minute and try again.', {
+        const res = fail(429, 'That was a lot of tries. Wait a minute and try again.', {
           'Retry-After': '60',
         });
+        // Checking the session may have refreshed it. The new tokens go out on the refusal too.
+        for (const c of jar.out) {
+          res.headers.append(
+            'Set-Cookie',
+            c.value === '' || c.maxAge === 0
+              ? clearCookieText(req, c.name)
+              : cookieText(req, c.name, encodeURIComponent(c.value), c.maxAge ?? 400 * 86400),
+          );
+        }
+        return res;
       }
-      const jar = jarFor(req);
       const setCookies: string[] = [];
-      const deps = authDeps();
       const out = await handler({
         req,
         deps,

@@ -927,6 +927,10 @@ describe('the feed', () => {
   it("shows a Friends' day card to a follower only, built from facts, and makes none for a private profile, a Fast Farm or an empty day", async () => {
     const a = await person('alice');
     const b = await person('bobby');
+    // A public day card needs a public profile and a public farm view.
+    await db.query(`update public.profiles set privacy_farm_view = 'public' where user_id = $1`, [
+      b.id,
+    ]);
     const { asUser } = await import('../auth/accounts');
     const { feedPage } = await import('./data');
     const farm = (
@@ -978,6 +982,49 @@ describe('the feed', () => {
       [farm],
     );
     expect(await makeDayCard(deps.sql, farm, 6)).toBeNull();
+  });
+
+  it('follows who may see the farm: none with the farm view off, followers unless profile and farm view are both public', async () => {
+    const b = await person('fern');
+    const farm = (
+      await db.query<{ id: string }>(
+        `insert into public.farms (owner_id, mode, name, district, size, size_ha, enterprise, start_type, difficulty, engine_version, timezone, sim_through, current_day, game_date)
+       values ($1, 'daily', 'View Farm', 'cq', 'small', 100, 'grazing', 'scratch', 'medium', 'x', 'Australia/Sydney', '2026-03-09', 10, '2026-03-10') returning id`,
+        [b.id],
+      )
+    ).rows[0]!.id;
+    for (const day of [1, 2, 3]) {
+      await db.query(
+        `insert into public.farm_days (farm_id, day, game_date, lines) values ($1, $2, '2026-03-0${day}', array['Moved 1 mob'])`,
+        [farm, day],
+      );
+    }
+    const visibility = async (id: string): Promise<string> =>
+      (
+        await db.query<{ visibility: string }>(
+          'select visibility from public.posts where id = $1',
+          [id],
+        )
+      ).rows[0]!.visibility;
+    // A public profile with the farm view off: no card at all.
+    await db.query(
+      `update public.profiles set privacy_profile = 'public', privacy_farm_view = 'off' where user_id = $1`,
+      [b.id],
+    );
+    expect(await makeDayCard(deps.sql, farm, 1)).toBeNull();
+    // A public profile with the farm view for followers: followers only.
+    await db.query(
+      `update public.profiles set privacy_farm_view = 'followers' where user_id = $1`,
+      [b.id],
+    );
+    const two = await makeDayCard(deps.sql, farm, 2);
+    expect(await visibility(two!.id)).toBe('followers');
+    // Both public: public.
+    await db.query(`update public.profiles set privacy_farm_view = 'public' where user_id = $1`, [
+      b.id,
+    ]);
+    const three = await makeDayCard(deps.sql, farm, 3);
+    expect(await visibility(three!.id)).toBe('public');
   });
 });
 

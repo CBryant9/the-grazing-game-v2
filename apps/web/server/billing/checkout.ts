@@ -12,7 +12,7 @@ import {
   ownedRefusal,
 } from './products';
 import { isUuid } from '../admin/store';
-import { rescueFarm, rescueProductId, rescueReady } from './rescue';
+import { rescueFarm, rescueProductId, rescueReady, roomFor } from './rescue';
 
 /** How long a Checkout Session lasts, from the moment the purchase row was made. Stripe allows 30 minutes to 24 hours. */
 const SESSION_MINUTES = 60;
@@ -97,6 +97,16 @@ export async function startCheckout(
       throw new GameError(
         409,
         'That is not the offer for this farm. Open the farm to see its offer.',
+      );
+    }
+    // The same room check the offer card makes (security review, m5.5): a checkout made straight
+    // to this route, or from a card left open while another farm started, would take the money
+    // for a rescue the database then refuses.
+    if (!(await roomFor(deps.sql, farm))) {
+      throw new GameError(
+        409,
+        'There is no free farm slot for this farm to keep going in. End or delete another farm first.',
+        'no_room',
       );
     }
     farmId = farm.id;

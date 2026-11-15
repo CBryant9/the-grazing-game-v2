@@ -90,6 +90,8 @@ export function farmViewOf(
     coverPct: Math.round(snap.totals.coverPct),
     netWorth: Math.round(snap.totals.netWorth),
     score: { year: snap.score.year, total: Math.round(snap.score.total) },
+    // Paddock and mob names are made by the engine from fixed patterns ("Paddock 3", "Mob 2").
+    // Players can not name them, so they need no word filter (farmviewnames.test.ts).
     paddocks: snap.paddocks.map((p) => ({
       name: p.name,
       ha: p.ha,

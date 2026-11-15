@@ -150,7 +150,10 @@ describe('one slot on shows one ad and records one view', () => {
     expect(got.items).toHaveLength(1);
     expect(got.items[0]!.label).toBe('Ad');
     // The link goes through the server's click route, never straight to the sponsor.
-    expect(got.items[0]!.href).toBe(`/api/ads/click/${c.creatives[0]}?s=summary_sponsor_card`);
+    // It carries the signed impression token, so the click can be counted once for this showing.
+    expect(got.items[0]!.href).toBe(
+      `/api/ads/click/${c.creatives[0]}?s=summary_sponsor_card&t=${got.items[0]!.token}`,
+    );
     expect(JSON.stringify(got)).not.toContain('example.com.au');
     // Seen for a second: counted. Sooner than that: not.
     const early = await recordEvent(
@@ -339,6 +342,32 @@ describe('no-ads owners see no ads anywhere', () => {
     await kit.db.query(`update public.account_entitlements set revoked_at = now()`);
     expect((await me(owner)).ads).toEqual(['summary_sponsor_card']);
     expect(await events()).toBe(0);
+  });
+
+  it('fails closed: when the no-ads answer can not be read, nobody is shown an ad', async () => {
+    const c = await campaign(kit, { house: true, slots: ['summary_sponsor_card'] });
+    await slotOnDb(kit, 'summary_sponsor_card');
+    await switches(kit, 'ads');
+    const owner = await person(kit, 'owner');
+    expect((await me(owner)).ads).toEqual(['summary_sponsor_card']);
+    setNoAdsReader(async () => {
+      throw new Error('the database went away');
+    });
+    try {
+      expect((await me(owner)).ads).toEqual([]);
+      expect(await pick('summary_sponsor_card', owner.full)).toEqual({ items: [] });
+      const t = makeImpression(PEPPER, 'summary_sponsor_card', c.id, c.creatives[0]!).token;
+      const res = await call(
+        kit,
+        clickRoute.GET,
+        `/api/ads/click/${c.creatives[0]}?s=summary_sponsor_card&t=${t}`,
+        { cookie: owner.full },
+      );
+      expect(res.status).toBe(404);
+      expect(await events()).toBe(0);
+    } finally {
+      setNoAdsReader(undefined);
+    }
   });
 });
 
@@ -619,10 +648,14 @@ describe('the click redirect', () => {
       address,
     });
 
+  /** The query a shown ad's link carries: the slot and a freshly signed impression. */
+  const signed = (c: { id: string; creatives: string[] }, slot = 'summary_sponsor_card') =>
+    `s=${slot}&t=${makeImpression(PEPPER, slot as 'summary_sponsor_card', c.id, c.creatives[0]!).token}`;
+
   it('redirects to the link saved with the creative, counts the click, and sends no referrer', async () => {
     const c = await setup();
     const pat = await person(kit, 'pat');
-    const res = await click(c.creatives[0]!, undefined, pat.full);
+    const res = await click(c.creatives[0]!, signed(c), pat.full);
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('https://example.com.au/offer');
     expect(res.headers.get('referrer-policy')).toBe('no-referrer');
@@ -709,8 +742,60 @@ describe('the click redirect', () => {
     );
     const pat = await person(kit, 'pat');
     for (let i = 0; i < 4; i++)
-      expect((await click(c.creatives[0]!, undefined, pat.full)).status).toBe(302);
+      expect((await click(c.creatives[0]!, signed(c), pat.full)).status).toBe(302);
     expect(await events('click')).toBe(2);
+  });
+
+  it('counts a click only with a valid token for this creative, campaign and slot, and once per impression', async () => {
+    const c = await setup({ creatives: [{ headline: 'A' }, { headline: 'B' }] });
+    const pat = await person(kit, 'pat');
+    const go = async (query: string) => {
+      const res = await click(c.creatives[0]!, query, pat.full);
+      // The person always goes to the stored link, counted or not.
+      expect(res.status, query).toBe(302);
+      expect(res.headers.get('location')).toBe('https://example.com.au/offer');
+    };
+    // A bare link, as a page on another site could load it: followed, not counted.
+    await go('s=summary_sponsor_card');
+    await go('s=summary_sponsor_card&t=junk');
+    // Forged (another key), for the other creative, for another slot, for another campaign, too old.
+    const other = makeImpression(
+      'another-pepper'.padEnd(48, 'x'),
+      'summary_sponsor_card',
+      c.id,
+      c.creatives[0]!,
+    );
+    await go(`s=summary_sponsor_card&t=${other.token}`);
+    const wrongCreative = makeImpression(PEPPER, 'summary_sponsor_card', c.id, c.creatives[1]!);
+    await go(`s=summary_sponsor_card&t=${wrongCreative.token}`);
+    const wrongSlot = makeImpression(PEPPER, 'phone_banner', c.id, c.creatives[0]!);
+    await go(`s=summary_sponsor_card&t=${wrongSlot.token}`);
+    const wrongCampaign = makeImpression(
+      PEPPER,
+      'summary_sponsor_card',
+      '00000000-0000-4000-8000-0000000000cc',
+      c.creatives[0]!,
+    );
+    await go(`s=summary_sponsor_card&t=${wrongCampaign.token}`);
+    const old = makeImpression(
+      PEPPER,
+      'summary_sponsor_card',
+      c.id,
+      c.creatives[0]!,
+      Date.now() - TOKEN_LIFE_MS - 1000,
+    );
+    await go(`s=summary_sponsor_card&t=${old.token}`);
+    expect(await events('click')).toBe(0);
+    // A real one counts once, however often the same link is followed.
+    const real = makeImpression(PEPPER, 'summary_sponsor_card', c.id, c.creatives[0]!);
+    for (let i = 0; i < 3; i++) await go(`s=summary_sponsor_card&t=${real.token}`);
+    expect(await events('click')).toBe(1);
+    const row = (
+      await kit.db.query<{ impression_id: string }>(
+        `select impression_id from public.ad_events where kind = 'click'`,
+      )
+    ).rows[0]!;
+    expect(row.impression_id).toBe(real.impression.id);
   });
 
   it('a link in a creative with no link has no click route to follow', async () => {

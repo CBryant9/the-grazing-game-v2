@@ -511,6 +511,40 @@ describe('sending', () => {
     expect((await runSender(w.nd)).sent).toBe(1);
   });
 
+  it('holds the daily cap when two senders run at the same moment (m5.5 review)', async () => {
+    const p = await addPerson(w, 'ann');
+    await addDeviceFor(w, p.id);
+    for (let i = 0; i < DAILY_CAP - 1; i++)
+      await alert(p.id, `Fact number ${i}.`, { dedupeKey: `a${i}` });
+    expect((await runSender(w.nd)).sent).toBe(DAILY_CAP - 1);
+    // One left in the allowance, and four waiting. Two senders take one row each, side by side.
+    for (let i = 0; i < 4; i++) await alert(p.id, `Later fact ${i}.`, { dedupeKey: `b${i}` });
+    const [r1, r2] = await Promise.all([
+      runSender(w.nd, { batch: 1 }),
+      runSender(w.nd, { batch: 1 }),
+    ]);
+    expect(r1.sent + r2.sent).toBe(1);
+    const rows = await sends(w, p.id);
+    expect(rows.filter((r) => r.state === 'sent')).toHaveLength(DAILY_CAP);
+    expect(rows.filter((r) => r.reason === 'daily_cap')).toHaveLength(3);
+    expect(new Set(w.push.sent.map((s) => s.message.id)).size).toBe(DAILY_CAP);
+  });
+
+  it('gives the allowance back when a send does not go', async () => {
+    const p = await addPerson(w, 'ann');
+    const e = await addDeviceFor(w, p.id);
+    for (let i = 0; i < DAILY_CAP - 1; i++)
+      await alert(p.id, `Fact number ${i}.`, { dedupeKey: `a${i}` });
+    expect((await runSender(w.nd)).sent).toBe(DAILY_CAP - 1);
+    // The last place in the day is taken by a send that fails and waits to try again.
+    w.push.plan.set(e, ['throw']);
+    await alert(p.id, 'Fact that fails once.', { dedupeKey: 'x' });
+    expect(await runSender(w.nd)).toMatchObject({ sent: 0, retried: 1 });
+    // It did not use the place: another one still goes.
+    await alert(p.id, 'Fact that goes.', { dedupeKey: 'y' });
+    expect((await runSender(w.nd)).sent).toBe(1);
+  });
+
   it('drops one that went stale, and one the player has turned off since', async () => {
     const p = await addPerson(w, 'ann');
     await addDeviceFor(w, p.id);
@@ -763,9 +797,66 @@ describe('a device', () => {
     });
   });
 
-  it('takes the Chrome and Edge hosts, and a device moves to the account that signs in on it', async () => {
+  it('reads the host as a browser does, so a backslash can not hide another host (m5.5 review)', async () => {
+    const p = await addPerson(w, 'ann');
+    // A browser reads a backslash as a slash: the host here is evil.example, not a push.apple.com name.
+    const sneaky = 'https://evil.example\\.push.apple.com/x';
+    expect(new URL(sneaky).hostname).toBe('evil.example');
+    const d = parseDevice({ endpoint: sneaky, keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH } });
+    await expect(addDevice(w.deps.sql, p.id, d)).rejects.toMatchObject({
+      status: 400,
+      code: 'push_host_not_allowed',
+    });
+    for (const bad of [
+      'https://evil.example\\.push.apple.com/x',
+      'https://evil.example%2e.push.apple.com/x',
+      'https://evil example.push.apple.com/x',
+    ]) {
+      // The database refuses it too, whoever writes the row.
+      await expect(
+        db.query(
+          `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
+           values ($1, $2, $3, $4)`,
+          [p.id, bad, FAKE_P256DH, FAKE_AUTH],
+        ),
+        bad,
+      ).rejects.toThrow(/push_host_not_allowed/);
+    }
+    expect((await db.query('select 1 from public.push_subscriptions')).rows).toHaveLength(0);
+    // A plain push.apple.com address still goes in.
+    await db.query(
+      `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
+       values ($1, $2, $3, $4)`,
+      [p.id, 'https://web.push.apple.com:443/ok', FAKE_P256DH, FAKE_AUTH],
+    );
+  });
+
+  it('is never taken over by another account: the second account is refused, the first keeps it (m5.5 review)', async () => {
     const a = await addPerson(w, 'ann');
     const b = await addPerson(w, 'bob');
+    const shared = parseDevice({
+      endpoint: 'https://web.push.apple.com/shared',
+      keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH },
+    });
+    await addDevice(w.deps.sql, a.id, shared);
+    await expect(addDevice(w.deps.sql, b.id, { ...shared, label: 'Bob' })).rejects.toMatchObject({
+      status: 409,
+      code: 'push_endpoint_taken',
+    });
+    const owner = await db.query<{ user_id: string; device: string }>(
+      "select user_id, device from public.push_subscriptions where endpoint = 'https://web.push.apple.com/shared'",
+    );
+    expect(owner.rows).toEqual([{ user_id: a.id, device: 'A device' }]);
+    // The same account saving the same browser again just refreshes it.
+    await addDevice(w.deps.sql, a.id, { ...shared, label: 'Ann phone' });
+    const again = await db.query<{ user_id: string; device: string }>(
+      'select user_id, device from public.push_subscriptions',
+    );
+    expect(again.rows).toEqual([{ user_id: a.id, device: 'Ann phone' }]);
+  });
+
+  it('takes the Chrome and Edge hosts, and refuses look-alikes', async () => {
+    const a = await addPerson(w, 'ann');
     for (const host of [
       'fcm.googleapis.com',
       'wns2-par02p.notify.windows.com',
@@ -777,12 +868,6 @@ describe('a device', () => {
       endpoint: 'https://web.push.apple.com/shared',
       keys: { p256dh: FAKE_P256DH, auth: FAKE_AUTH },
     });
-    await addDevice(w.deps.sql, a.id, shared);
-    await addDevice(w.deps.sql, b.id, shared);
-    const owner = await db.query<{ user_id: string }>(
-      "select user_id from public.push_subscriptions where endpoint = 'https://web.push.apple.com/shared'",
-    );
-    expect(owner.rows).toEqual([{ user_id: b.id }]);
     for (const evil of [
       'https://notify.windows.com.evil.org/x',
       'https://evilnotify.windows.com.org/x',

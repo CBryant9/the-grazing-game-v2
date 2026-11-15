@@ -671,6 +671,51 @@ describe('ad media is served with safe headers', () => {
     expect(odd.status).toBe(200);
   });
 
+  it('serves a file only while the creative and its campaign are on (an admin still sees it), privately and briefly cached', async () => {
+    const admin = await person(kit, 'admin', { role: 'admin' });
+    const pat = await person(kit, 'pat');
+    const made = await ok(
+      await act(
+        {
+          action: 'campaign_save',
+          name: 'H',
+          house: true,
+          startDay: sydneyToday(),
+          slots: ['video_between_years'],
+          active: true,
+        },
+        admin,
+      ),
+    );
+    const png = await ok(
+      await act(
+        {
+          action: 'creative_save',
+          campaignId: made.id,
+          kind: 'image',
+          alt: 'x',
+          upload: { data: b64(pngBytes()) },
+        },
+        admin,
+      ),
+    );
+    const get = (cookie?: string) =>
+      call(kit, mediaRoute.GET, `/api/ads/media/${png.id}`, cookie ? { cookie } : {});
+    const live = await get();
+    expect(live.status).toBe(200);
+    expect(live.headers.get('cache-control')).toBe('private, max-age=300');
+    // The campaign switched off: gone for everyone but an admin.
+    await kit.db.query('update public.campaigns set active = false where id = $1', [made.id]);
+    expect((await get()).status).toBe(404);
+    expect((await get(pat.full)).status).toBe(404);
+    expect((await get(admin.full)).status).toBe(200);
+    // The creative switched off with its campaign on: the same.
+    await kit.db.query('update public.campaigns set active = true where id = $1', [made.id]);
+    await kit.db.query('update public.ad_creatives set active = false where id = $1', [png.id]);
+    expect((await get()).status).toBe(404);
+    expect((await get(admin.full)).status).toBe(200);
+  });
+
   it('with no keys it serves nothing', async () => {
     setAuthDeps(null);
     expect(
