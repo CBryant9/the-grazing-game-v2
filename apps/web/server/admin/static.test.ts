@@ -58,7 +58,7 @@ describe('the admin area is never found, cached or indexed', () => {
     expect(read('server/admin/route.ts')).toMatch(/if \(gated\) res\.headers\.set\('X-Robots-Tag'/);
   });
 
-  it('checks the role in every page and the layout, and every route goes through adminRoute and exports only POST', () => {
+  it('checks the role in every page and the layout, and every route goes through adminRoute and exports only POST (or only GET for a read)', () => {
     const pages = walk('app/admin', /^page\.tsx$/);
     expect(pages.length).toBeGreaterThanOrEqual(10);
     for (const p of [...pages, 'app/admin/layout.tsx'])
@@ -71,7 +71,9 @@ describe('the admin area is never found, cached or indexed', () => {
       const exported = [...text.matchAll(/export (?:const|async function|function) (\w+)/g)].map(
         (m) => m[1],
       );
-      expect(exported.sort(), r).toEqual(['POST', 'dynamic']);
+      // A read route says so to adminRoute (no body, no CSRF rule) and exports only GET.
+      const isRead = /method: 'GET'/.test(text);
+      expect(exported.sort(), r).toEqual([isRead ? 'GET' : 'POST', 'dynamic']);
     }
   });
 

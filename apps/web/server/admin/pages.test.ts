@@ -6,6 +6,7 @@ import { pgliteSql } from '../test-support/pgliteSql';
 import { FakeAuth } from '../test-support/fakeAuth';
 import { resetSwitchCache, type AuthDeps } from '../auth/accounts';
 import { setAuthDeps } from '../auth/deps';
+import { ADMIN_LINKS } from '../../components/admin/AdminNav';
 
 /**
  * Every admin page and the admin layout, run as the five kinds of visitor. The pages are server
@@ -109,11 +110,13 @@ describe('every admin page', () => {
         '/challenges',
         '/moderation',
         '/notifications',
+        '/photos',
         '/purchases',
         '/settings',
         '/switches',
         '/users',
         '/users/[id]',
+        '/words',
       ].sort(),
     );
   });
@@ -181,17 +184,10 @@ describe('every admin page', () => {
     }
   });
 
-  it('the placeholders say plainly that they are built in a later milestone', async () => {
+  it('every admin page is built now (m6 join), and the dashboard still names what is later', async () => {
     state.cookie = cookies.admin!;
-    for (const name of ['moderation', 'challenges']) {
-      const Page = (
-        (await pageModules[`../../app/admin/${name}/page.tsx`]!()) as {
-          default: () => Promise<unknown>;
-        }
-      ).default;
-      const html = renderToStaticMarkup((await Page()) as never);
-      expect(html, name).toContain('Built in a later milestone');
-    }
+    // Since the join no navigation entry is a placeholder.
+    expect(ADMIN_LINKS.filter((l) => l.later).map((l) => l.href)).toEqual([]);
     // Purchases is a real page since 5.2: it says whether Stripe is connected.
     const purchases = (
       (await pageModules['../../app/admin/purchases/page.tsx']!()) as {

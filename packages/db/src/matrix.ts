@@ -420,8 +420,12 @@ export const MATRIX: Record<string, TableSpec> = {
     },
   },
   groups: {
-    // Ava's private group; Ben is a member.
-    select: { sql: `select id from public.groups where id = '${ID.group}'`, pass: MEMBERS },
+    // Ava's private group; Ben is a member. The admin is not, and since Stage 4 staff see the
+    // community as any member does (the admin tools use the server's connection).
+    select: {
+      sql: `select id from public.groups where id = '${ID.group}'`,
+      pass: ['a', 'b', 'service'],
+    },
     insert: {
       sql: (me) =>
         `insert into public.groups (name, visibility, owner_id) values ('Another group', 'public', '${me}')`,
@@ -437,7 +441,7 @@ export const MATRIX: Record<string, TableSpec> = {
     // Ben's membership of Ava's group.
     select: {
       sql: `select 1 from public.group_members where group_id = '${ID.group}' and user_id = '${ID.b}'`,
-      pass: MEMBERS,
+      pass: ['a', 'b', 'service'],
     },
     insert: {
       sql: (me) =>

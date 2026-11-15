@@ -5,6 +5,7 @@ import { PublicHeader } from '@/components/site/PublicHeader';
 import { PageHead } from '@/components/site/PageHead';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { FarmScene } from '@/components/site/FarmScene';
+import { Ticker } from '@/components/site/Ticker';
 import site from '@/components/site/site.module.css';
 import { absoluteUrl, siteSwitchOn } from '@/lib/site';
 import styles from '@/components/site/landing.module.css';
@@ -77,6 +78,8 @@ export default function LandingPage() {
   const sheepOn = siteSwitchOn('sheep');
   const communityOn = siteSwitchOn('community');
   const leaderboardsOn = siteSwitchOn('leaderboards');
+  // The live ticker (PRD 9.4). With its switch off at build, the page sends no script at all.
+  const tickerOn = siteSwitchOn('activity_ticker');
 
   return (
     <>
@@ -289,6 +292,7 @@ export default function LandingPage() {
         </section>
       </main>
       <SiteFooter />
+      {tickerOn ? <Ticker /> : null}
     </>
   );
 }

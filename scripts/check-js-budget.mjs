@@ -160,6 +160,10 @@ const ADMIN_GROUPS = [
       'admin/users/[id]',
       'admin/users',
       'admin',
+      'admin/photos',
+      'admin/moderation',
+      'admin/words',
+      'admin/challenges',
     ],
   },
   {
@@ -219,6 +223,76 @@ for (const group of ADMIN_GROUPS) {
   if (ok && worst.kb >= 100) {
     console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');
   }
+  if (!ok) failed = true;
+}
+// ---- /community (milestone 4.2 and 4.3). Rendered on demand like /admin, so measured the same way.
+// Each page has its own line. The limit is the measured size with room to spare, never raised to
+// make a change pass.
+const COMMUNITY_PAGES = [
+  'community',
+  'community/people',
+  'community/requests',
+  'community/me',
+  'community/post/[id]',
+  'community/u/[username]',
+  'community/u/[username]/[list]',
+  'community/farm/[id]',
+  'community/groups',
+  'community/groups/[id]',
+];
+const COMMUNITY_LIMIT_KB = Number(arg('--limit-community', '150'));
+for (const rel of COMMUNITY_PAGES) {
+  const srcs = adminScripts(rel);
+  if (srcs === null) {
+    console.error(`/${rel}: no build manifest. Run \`pnpm build\` first.`);
+    process.exit(1);
+  }
+  let bytes = 0;
+  for (const src of srcs) {
+    const file = join(STATIC, src.replace(/^\/_next\/static\//, '').split('?')[0]);
+    if (!existsSync(file)) {
+      console.error(`/${rel}: the manifest names ${src}, which is not in the build.`);
+      process.exit(1);
+    }
+    bytes += gzipSync(readFileSync(file), { level: 9 }).length;
+  }
+  const kb = bytes / 1024;
+  const ok = kb < COMMUNITY_LIMIT_KB;
+  console.log(
+    `${ok ? 'ok  ' : 'OVER'} /${rel.padEnd(19)} ${kb.toFixed(1)} KB compressed in ${srcs.length} scripts (limit ${COMMUNITY_LIMIT_KB} KB)`,
+  );
+  if (ok && kb >= 100) {
+    console.log('     note: above the PRD 14.10 target of 100 KB, held at the limit.');
+  }
+  if (!ok) failed = true;
+}
+// ---- /leaderboards (milestone 4.1): a public page rendered on the server for each request (it
+// reads the boards), built with the pages router and its runtime switched off, so it sends no
+// script file at all. There is no built HTML to read, so the check reads the page's own config
+// and that it uses no client component. The limit is 0 scripts.
+{
+  const src = readFileSync(join(ROOT, 'apps/web/pages/leaderboards.tsx'), 'utf8');
+  const off = /unstable_runtimeJS:\s*false/.test(src) && !/['"]use client['"]/.test(src);
+  console.log(
+    `${off ? 'ok  ' : 'OVER'} ${'/leaderboards'.padEnd(20)} 0.0 KB compressed in 0 scripts (runtime off, checked from the page config; the ticker's line below when its switch is on)`,
+  );
+  if (!off) failed = true;
+}
+// ---- The live ticker's own script (PRD 9.4): hand written, in `public`. Where the ticker is on
+// (the landing page when its switch is on at build, the community pages from the live switches)
+// this is all it sends, besides the page's own scripts, and nothing at all when it is off.
+{
+  const file = join(ROOT, 'apps/web/public/ticker.js');
+  const limitBytes = Number(arg('--limit-ticker', '2')) * 1024;
+  if (!existsSync(file)) {
+    console.error('Missing apps/web/public/ticker.js.');
+    process.exit(1);
+  }
+  const bytes = gzipSync(readFileSync(file), { level: 9 }).length;
+  const ok = bytes < limitBytes;
+  console.log(
+    `${ok ? 'ok  ' : 'OVER'} ${'/ticker.js'.padEnd(20)} ${bytes} bytes compressed in 1 script when the ticker is on, 0 when off (limit ${limitBytes / 1024} KB)`,
+  );
   if (!ok) failed = true;
 }
 if (failed) {

@@ -16,8 +16,9 @@ export interface AdminContext {
   req: Request;
   admin: AdminSession;
   deps: AuthDeps;
-  /** The parsed JSON body (a small object) for a write. */
+  /** The parsed JSON body (a small object) for a write. Empty for a read. */
   body: Record<string, unknown>;
+  url: URL;
 }
 
 export interface AdminRouteOptions {
@@ -27,6 +28,8 @@ export interface AdminRouteOptions {
   max: number;
   /** The most bytes a body may have. Small by default. */
   bodyLimit?: number;
+  /** `GET` for a read that changes nothing (no body, no CSRF rule). `POST` (the default) for a change. */
+  method?: 'GET' | 'POST';
 }
 
 const NOT_FOUND = 'Not found.';
@@ -48,7 +51,8 @@ const NOINDEX = 'noindex, nofollow';
  * must reach the browser or the next request is signed out. Only answers given after the gate
  * passed carry `X-Robots-Tag: noindex`.
  *
- * Only POST is exported by the routes, so a GET is the framework's 405.
+ * A write route exports only POST, so a GET is the framework's 405. A read route (`method: 'GET'`,
+ * the photo preview) exports only GET, changes nothing, and skips the CSRF rule and the body.
  */
 export function adminRoute(
   options: AdminRouteOptions,
@@ -84,8 +88,11 @@ export function adminRoute(
       gated = true;
       // After the gate, so a visitor who is not an admin can not tell this route exists by what
       // the CSRF rule says. A real admin's cookies never ride a cross-site POST (SameSite=Lax).
-      const refusal = csrfRefusal(req);
-      if (refusal) return finish(fail(403, refusal));
+      const method = options.method ?? 'POST';
+      if (method === 'POST') {
+        const refusal = csrfRefusal(req);
+        if (refusal) return finish(fail(403, refusal));
+      }
       if (!allow(`admin-${options.name}:${gate.admin.userId}`, options.max, 60_000)) {
         return finish(
           fail(429, 'That was a lot of changes. Wait a minute and try again.', {
@@ -93,17 +100,21 @@ export function adminRoute(
           }),
         );
       }
-      const raw = await readJson(req, options.bodyLimit ?? 4096);
-      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-        throw new AdminError(400, 'That request was not sent properly.');
+      let raw: unknown = {};
+      if (method === 'POST') {
+        raw = await readJson(req, options.bodyLimit ?? 4096);
+        if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+          throw new AdminError(400, 'That request was not sent properly.');
+        }
       }
       const out = await handler({
         req,
         admin: gate.admin,
         deps,
         body: raw as Record<string, unknown>,
+        url: new URL(req.url),
       });
-      return finish(json(out ?? { ok: true }, 200));
+      return finish(out instanceof Response ? out : json(out ?? { ok: true }, 200));
     } catch (e) {
       if (e instanceof AdminError || e instanceof GameError)
         return finish(fail(e.status, e.message));

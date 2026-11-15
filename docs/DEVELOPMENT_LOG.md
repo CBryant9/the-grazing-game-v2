@@ -2063,6 +2063,120 @@ Branch `m5.2-purchases`, from `m3.5-admin-shell` (78930e7). One-off purchases th
 
 **How it was tested.** `apps/web/server/billing/billing.test.ts` on the PGlite harness with the fake auth provider and a fake Stripe that signs events the way Stripe does: the whole flow (named test "A test purchase lifts the farm limit and removes ads": buy, webhook, entitlement, farm limit lifted from 2 to 5 by the database, no-ads flag set, no personal detail stored); a bad, missing, wrong-secret and altered-body signature, an old and a future timestamp, a replay, out-of-order events, a wrong amount, a wrong currency, a wrong or forged product, an unknown event type, a database failure rolling back; double click and retried request; refund, part refund, dispute raised, won and lost; buying signed out, under 18 (17 refused, 18 allowed), banned, suspended, unfinished sign-up, with the switch off, with no keys and with no accounts; a walk over every file under `app/api/billing` (each uses the wrappers, exports only GET, POST and dynamic, a POST says `write: true`), with CSRF and rate limit tests for each route; the rescue ("A rescue does exactly what the card said": the card's amount and lines, the right farm only, once only across a replay, a second event and a reconcile, a failing engine retried by reconcile, a refunded rescue not applied); admin product, refund and reconcile with audit rows and rollback.
 
+### 15 Nov 2026: m4.2 Community
+
+Milestones 4.2 (profiles and following) and 4.3 (posts and the feed), built together on branch `m4.2-community` from `m3.5-admin-shell`. All of it sits behind the Community switch (and `feed_posts` for the post routes), off by default. With the switch off, or with no database keys, no community page, link or route answers: every one is the same plain 404, and the game and website are untouched. No migration was needed: the rules were already in the database (docs/DATABASE.md, "What the server does for the community").
+
+**What was built**
+
+- Profiles (`/community/me` to edit, `/community/u/<name>` to view): display name, photo, bio, town, district, farming answers, links, experience, courses, privacy (profile, farm view, ticker). A private profile shows its card only. "See it as others see it" shows a stranger's view.
+- Following: follow, unfollow, requests for followers-only profiles (accept, decline, cancel), followers and following lists, block and unblock with a plain Yes or No confirm, search by the start of a username.
+- Posts, comments (one level of replies), likes, reports (post, comment, profile, the PRD's reasons), edit and delete your own. A removed post shows as removed to its author and can not be deleted by them.
+- Feed (`/community`): Friends' days, Everyone, Groups, paged by a keyset cursor, with empty states.
+- Share my farm and day cards: plain facts stored at posting time. A share image (`/api/community/share-image?post=`) for public posts.
+- Photos: upload to the server, cleaned (metadata removed), stored in the player's own folder, pending, an image-check interface with a "held for review" default, and the admin queue (`/admin/photos`).
+- Navigation: a Community button in the More tab's account section, only when the server says the switch is on and the player is 16 or over.
+
+**How it was tested** (`apps/web/server/community/*.test.ts`, on PGlite with the fake sign-in provider and a fake storage and image check)
+
+- `community.test.ts`: the walked routes (a route file must use `communityRoute`, export only GET or POST, and be in the test table, so a new route can not skip the gate, CSRF and limits); visitor, under 16, banned, suspended, no profile, switch off (admin too) and no keys all get the same 404 on every route; cross-site and non-JSON writes get 403; limits; profiles and privacy; follows, requests, blocks both ways; posts, comments, likes, reports; the word filter (including a zero-width trick), rate limits, script tags, `javascript:` links, bidi and zero-width characters; cursor paging over 45 posts; day cards; Share my farm; the whole photo path.
+- Named tests: "An under-16 test account sees no community anywhere" (routes in `community.test.ts`, pages in `pages.test.ts`) and "A photo never shows before it has been checked" (pending to nobody, the author's note only, swapped file, approval by exact file, queue, check pass and fail).
+- `pages.test.ts`: every page and the layout as each caller; every page calls `requireMember()` itself.
+- `image.test` cases inside `community.test.ts`: JPEG, PNG and WebP metadata removal, bombs, oversize, renamed files.
+- `scripts/check-js-budget.test.ts` has a community case; `admin/pages.test.ts` lists the new `/photos` page.
+
+**Results.** Full `pnpm test`: 157 files, 3,252 tests (the one run with a failure was the generic admin route walk, which could not give the photo queue a real photo; it now skips `photos`, whose own gate, CSRF, no-keys and rollback tests are in `community.test.ts`). `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build` and `pnpm check:browser-bundle` pass. JS (gzip): `/` 0.0 KB (limit 1), `/play` 198.7 KB, `/community` 145.4, `/community/me` 147.1, the other community pages 144.3 (new line, limit 150 each, never raised), `/admin` 147.8 (unchanged limit). Production build with no keys on port 3301: every community page and route answers 404 (`/admin/photos` shows the "needs accounts" notice like the other admin pages), no 5xx, `/` and `/play` 200, and the farm API answers as a guest.
+
+**How photos are cleaned.** No image library is installed, so the server rebuilds each file keeping only the picture's own parts (image.ts): JPEG without EXIF, XMP, IPTC and comments; PNG without text, `eXIf` and time chunks; WebP without `EXIF`, `XMP ` and the colour profile (header flags rewritten); animated WebP refused. It reads the real type from the bytes and the size from the header (over 12,000 a side or 36 million pixels is refused). It does not re-compress. The page shrinks and re-encodes in the browser first, which also applies the camera's rotation.
+
+**Calls for Claudia**
+
+1. **An admin does not see the community with the switch off** on this site, although the database would let them. This keeps "switch off means nothing is reachable" true. To check it before launch, turn the switch on in a preview copy. One line in `server/community/gate.ts` would let admins through.
+2. **Photos are stripped, not re-compressed.** Adding `sharp` (already in the build for Next) as a dependency would re-encode them on the server. It needs your say-so because it changes the lock file.
+3. **Photos upload through the server**, not straight from the browser to Storage: 6 MB for a post photo, 2 MB for a profile photo.
+4. **The image check is an interface with no service behind it.** Until you choose one, every photo waits in `/admin/photos`. `IMAGE_CHECK_API_KEY` is listed in `.env.example` and does nothing yet.
+5. **A post needs some words.** A photo-only post is not allowed (the database wants a body for a plain post).
+6. **Everyone is newest first.** The PRD says "newest and popular"; popular ordering is not built.
+7. **Day cards are built and tested (`makeDayCard`) but nothing calls it.** The Daily Farm rollover belongs to the Daily Farm work and is to call it after each day.
+8. **A private profile's page lists no posts**, but its public posts still appear in the Everyone feed, because that is how the database rule for posts works. If a private profile should post only to followers, that is a change to the post rule.
+9. **Share my farm shows**: farm and district, date, season, head, average pasture, ground cover, net worth: all on the farm screen already.
+10. **The Groups tab reads group posts, but there is no group screen yet** (the groups milestone). Reports of groups are left for it.
+11. **Search is by the start of a username only**, not display name.
+12. **Real farm photos (showcase photos), the ticker, the leaderboard tabs, pull to refresh (the mockup does not show it) and looking at someone's farm (4.5) are not built.**
+13. **The Community link is in the More tab**, not the bottom bar, and not on the public site header (public pages send no script).
+14. **Photo queue decisions are audited** as `photo_approve` and `photo_reject`.
+
+**Keys Claudia must set up:** none for 4.2 and 4.3 beyond those already listed (Supabase URL, publishable key, secret key, pooler URL, ban pepper, site address). Photos use Storage through the secret key. For the image check: an image-check service (BUILD_PLAN section 8), then its key as `IMAGE_CHECK_API_KEY`, and an adapter written for it.
+
+**Still owed against a real project:** Storage uploads with the secret key, `storage.objects` rows matching what `approve_photo` reads, and the photo route's download; the pages by eye on a phone and a PC in both themes.
+
+**Fixes after the security review (Stage 4, Phase 1).** Migration `20261115001000_stage4_review.sql`, tests in `server/community/review.test.ts` and `packages/db/src/stage4.test.ts`, each written first and seen to fail.
+
+1. Staff see the community as any member does. The helpers the community's rules use (`can_find_profile_for`, `can_find_profile`, `can_see_profile`, `can_see_group`, `post_row_visible`, `comment_visible`, and the read rules on comments, post photos and showcase photos) no longer let a moderator or admin through. A moderator or admin gets the plain not found for an under-16 profile, its posts and its follower list, sees a private profile's card only, and no followers-only post they do not follow. Staff powers are in `/admin`, which uses the server's own connection. Tests that expected the old staff view now expect the member's view.
+2. A private profile's posts are its author's alone (PRD 9.1), whatever the post's own setting: not in Everyone, not on the post page, not in the share image. Share my farm from a private profile is refused with a plain reason.
+3. Images: a JPEG with a second frame header is refused; the JFIF header is rebuilt without its thumbnail; players can no longer write to Storage with their own token (the three insert rules are gone: only the server stores a photo); `servePhoto`, the image check and the new admin preview read the real type from the bytes, require the file name's extension to match and the file to parse, and refuse anything else.
+4. A database limit on photos: `photo` (24 an hour, 8 for a new account) and `photo_day` (80 a day, 20 for a new account), counted by a trigger on each new post or showcase photo row and each avatar change made with a player's token. Stand-in figures.
+5. The word filter now reads the farm name on Share my farm (it goes on the card) and the words of profile links.
+6. Hidden characters: the Hangul fillers (U+3164, U+115F, U+1160, U+FFA0), the braille blank (U+2800), the invisible maths signs (U+2061 to U+2064), the grapheme joiner (U+034F) and the tag characters (U+E0000 to U+E007F) are removed. A display name that would show as blank is refused.
+7. Slow queries: username search keeps its prefix index (a test checks the plan); the Friends tab reads each followed author's newest posts through a new index (`posts_author_feed`) and a lateral join; like counts come from one safe count each (`app.like_count_post`, `app.like_count_comment`: the count, told only to someone who may see the post or comment).
+8. A banned or suspended player is not shown the Community link (`/api/auth/me` asks `member_raw`); a comment shows its first 5 replies and then "Show more replies" (the thread shows up to 200); the admin photo queue loads each preview from `/api/admin/photo-preview` (admins only, only a photo still waiting) instead of a data address of up to 6 MB.
+
+Calls: a like count counts every like, including one from someone the viewer has blocked (a count is not an identity). Tag characters are removed, so an emoji flag that uses them (Scotland, Wales) shows as a plain black flag. Comments a private-profile player writes on other people's posts still show (only their own posts are hidden).
+
+### 15 Nov 2026: m4 Stage 4 report
+
+Stage 4 (competition and community), milestones 4.1 to 4.5, finished on branch `m4.2-community` on top of the m4.2 work. Phase 1 fixed the security review of what m4.2 built (see "Fixes after the security review" in the m4.2 entry). Phase 2 built the rest. Every part sits behind its own switch (`leaderboards`, `community`, `groups`, `activity_ticker`, `farm_viewing`, `feed_posts`); with a switch off, or with no database keys, nothing of that part answers and the game is untouched. No community anywhere for an account under 16, both ways, from the database's own test (`app.member_raw`).
+
+**What was built**
+
+- **4.1 Scores and leaderboards.** A score provider (`server/boards/score.ts`) and a board writer (`server/boards/write.ts`) called by the game server after a year closes (`server/stage4/hooks.ts`: the end day and skip paths in `server/game/game.ts`). Boards: Score (the headline, a marked stand-in), profit per ha, weight gain per ha, ground cover, days survived, and a board for each real year that ranks on the change over that year. Filters: mode, district, farm size, start, enterprise, period (this week, month, season, all time), people I follow, a group, a challenge. The public page `/leaderboards` is drawn on the server for each request and sends no script (the filters are a plain form); your own row is pinned at the bottom. A pages-router page can not load the server's own modules, so its server side reads the board from `/api/leaderboards` at the site's configured address (`NEXT_PUBLIC_SITE_URL`, never the request's Host header), passing on the caller's cookie. Rows are written only by the server, after the action log check (PRD 14.5); read through `leaderboard_rows` as the viewer, so under-16 and private rows show the username and district only, banned or deleted accounts show as "Former player", and a block hides both ways.
+- **4.4 Groups and challenges.** `/community/groups` (your groups, public groups, join by code, start a group, the public challenges) and `/community/groups/<id>` (members, the group board, the group's challenges and their boards, the group feed with a composer, and for the owner the invite code, remove a member, hand over, change, delete, set a challenge). An ownerless group says so; its members still read and post; an admin gives it an owner on `/admin/challenges`. Challenges: a Fast Farm challenge (same farm and seed for everyone) or a Daily league, set by a group's owner or an admin; entering starts a farm on the challenge's settings and seed (the seed never leaves the server) and makes it the current farm. `/admin/challenges`: make, end, see entries and results, groups with no owner. All audited.
+- **4.5 The ticker.** Live activity lines on website pages only: the landing page (when the switch is on at build), `/leaderboards` and the community pages (from the live switches). Never on the farm screen. Facts only, written for players who switched ticker activity on (off by default), 16 or over, not private, not banned, at most 6 an hour each: "started a Fast Farm in Western Victoria", "reached Day 100 on their farm", "finished year 3 on their farm". With the switch off the public pages still send no script. With it on they send `/ticker.js` (1,345 bytes gzip, its own budget line, limit 2 KB) and it reads `/api/ticker` (at most 10 lines from the last 3 days).
+- **4.5 Look at someone's farm.** `/community/farm/<id>`: a read-only view built on the server from the owner's own farm snapshot, keeping only what PRD 9.5 lists (farm, district, day, date, season, head, average kg DM/ha, net worth, ground cover, each paddock with its label, area, pasture and mob, and the stand-in score). No buttons. Linked from profiles ("Their farm today") and day cards. Follows the farm-view setting (followers only by default), blocks and the under-16 rule.
+- **4.5 Moderation.** `/admin/moderation`: the open reports with the content, its context, how many reports the target has and the author's history; remove, keep, warn, suspend for N days, ban, each resolving every open report on that target, recorded in the moderation history, audited, and told to the author in plain words through their notifications. `/admin/words`: the word filter editor. Removed content shows as removed to its author and to nobody else. Reporting has its rate limit (5 a day for a new account, 20 for others, and the route's own per-minute limit).
+
+**How it was tested** (PGlite with the fake sign-in provider, fake Storage and image check)
+
+- `server/boards/boards.test.ts`: the score provider, period keys, the writer and its refusals (log gap, a step after the farm's day, rescued, unranked), players can not write rows or scores, a real skip writes the rows through the hook, filters, privacy and blocks, the friends filter (members only), the public page (no script, not found with the switch off or no keys). Named tests: "Your row pins at the bottom", "A real-year board ranks on the change over that year".
+- `server/community/groups.test.ts`: create, join by code, leave, owner tools, the ownerless group and the admin fix, challenges (owner only, entering on the fixed seed, one entry each, no seed in any answer, outsiders refused, its board), a Daily league refused, admin challenges audited, under 16, banned, signed out, switch off and no keys. Named test: "Two accounts in one group see the same board".
+- `server/community/farmview.test.ts` and `ticker.test.ts`: every viewer case (owner, follower, stranger with each setting, blocked both ways, under 16 both ways, banned, signed out, switch off, no keys), no engine words, form or button on the farm page, the ticker's opt-in, privacy, blocks, hide, the landing page with the switch off and on, no ticker in the game. Named test: "Two test accounts follow each other and see each other's day cards and farms".
+- `server/admin/moderation.test.ts`: every action, audit rollback, notifications, the gate for every kind of caller, CSRF, the word filter editor, the report rate limit.
+- The walked-route tests now include `group` and `challenge` (community) and `words` and `challenges` (admin: gate, CSRF, rollback on a failed audit write, noindex); the read-only preview and the moderation route have their own. Page lists in `pages.test.ts` (community and admin) and the JS budget lines include every new page.
+- `packages/db/src/stage4.test.ts`: the review migration and the word filter change at the database.
+
+**Results.** Full `pnpm test`: 164 files, 3,368 tests, all passing. `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm check:browser-bundle` and `pnpm check:js-budget` pass. JS (gzip): `/` 0.0 KB (limit 1), `/leaderboards` 0 scripts (runtime off), `/ticker.js` 1,345 bytes when the ticker is on (limit 2 KB), `/play` 198.7 KB, `/admin` 149.0 KB (heaviest `/admin/challenges`, limit 150 unchanged), community pages 144.3 to 147.1 KB (`/community/groups` 145.8, `/community/groups/[id]` 146.8, `/community/farm/[id]` 144.3; limit 150 each, never raised). Production build with no keys on port 3301: every new page and route answers 404 (the admin pages show the "needs accounts" notice), `/api/ticker` answers an empty list, no 5xx, `/` and `/play` 200, and a guest can start a farm and end a day.
+
+**Calls for Claudia**
+
+1. **The headline Score is a stand-in.** PRD 5.8's Grazier Score has no agreed weights. The headline board ranks on the game's own year score averaged over a farm's finished years, and the page says so. Swapping it is one function (`headline` in `server/boards/score.ts`) once calibration farms are run and you rule on the weights.
+2. **The other boards** use what the year view already holds: profit per ha is the average yearly change in net worth per ha; "beef per ha" is the average yearly live-weight gain per ha (kg/ha); ground cover is the average of the yearly averages; days survived is the farm's day.
+3. **A real-year board ranks on the change in net worth over that game year, per ha**, so a farm that started small and grew a lot beats one that started big and grew a little (your words in REQUIREMENTS).
+4. **A period board** (week, month, season) lists the farms that closed a year in that period, each with its figure over all its finished years. Periods are by Sydney time.
+5. **The action log check** is what the tables allow: at least one day or skip run by the server, no step after the farm's day, no gap in the numbering. No replay (PRD v1.1: every farm runs on the server).
+6. **Private profiles and under-16s on group boards:** their rows show on the main boards (username and district) but not on a group or friends board, because those filters match by account and the board does not show those accounts.
+7. **Moderators can not open `/admin`** (it is admins only). The moderator role still reads reports and the history through the database.
+8. **A like count counts every like**, including one from someone the viewer blocked.
+9. **Daily leagues can be set but not entered** until Daily Farms exist.
+10. **Visitors see the ticker on the landing page** (PRD 9.4 says Landing). Signed-in under-16s, banned players and anyone who hid the ticker see nothing.
+11. **The ticker lines** are: started a farm, reached Day 100, 365, 500, 1,000 or 2,000, finished a year. No farm names (free text). Rate 6 an hour each.
+12. **Stand-in limits:** photos 24 an hour and 80 a day (8 and 20 for a new account); `/api/ticker` 30 calls a minute per address; group and challenge routes 30 and 6 a minute per member.
+13. **Group challenges** start when set and end on the date given (or never).
+14. **The farm view** shows a farm as a list of paddocks (no map drawing), and a farm name the word filter refuses shows as "A farm".
+15. **Leaderboards are not in the header or sitemap** yet (the community pages link to it). Add when you switch it on.
+16. **Moderation "remove" on a profile** clears its bio and display name; a group can not be removed, only kept or warned.
+17. **Tag characters are stripped** from text, so flag emoji that use them (Scotland, Wales) show as a black flag.
+
+**Keys Claudia must set up:** none new. `NEXT_PUBLIC_SITE_URL` (already listed) must be the live address, because the leaderboard page reads its board from the site's own `/api/leaderboards`. The Supabase keys, pooler URL, ban pepper and site address from earlier stages are all that Stage 4 needs. The image-check service is still to be chosen (`IMAGE_CHECK_API_KEY`). To show the ticker on the landing page, add `activity_ticker` to `SITE_SWITCHES_ON` at build.
+
+**Not done**
+
+- The Grazier Score formula (needs calibration farms in the engine and your ruling). Weaning %, condition and the "above 1,500 kg DM/ha" share are not in any board.
+- Daily leagues can not be entered, and day cards are not made automatically (both wait for the Daily Farm rollover). The farm view works for Daily Farms only, so today it is reachable only for a farm marked daily.
+- A leaderboard tab inside the game, a farm's summary from a board row, badges and best ranks on profiles.
+- The Groups tab in the leaderboard page shows your groups as a filter, not as a list of every group's board.
+- Popular ordering in Everyone; reports of groups from a group page.
+- Checks against a real Supabase project, and the pages by eye on a phone and a PC in both themes.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

@@ -15,6 +15,9 @@ export interface ConfirmActionProps {
     | '/api/admin/users'
     | '/api/admin/notifications'
     | '/api/admin/purchases'
+    | '/api/admin/moderation'
+    | '/api/admin/words'
+    | '/api/admin/challenges'
     | '/api/ads/admin';
   body: Record<string, unknown>;
   danger?: boolean;
