@@ -504,9 +504,12 @@ describe('the webhook', () => {
     const b = await buy(pat, 'farm_pack');
     const sid = b.row!.stripe_checkout_session_id!;
     pay.pay(sid);
+    // The exact 300 second edge is held by the pure check below (t + 301 is refused).
+    // Here the clock keeps running between calls, so stand 30 seconds clear of the edge:
+    // on a busy machine a second or two passes and "301 ahead" is no longer ahead.
     const now = Math.floor(Date.now() / 1000);
-    expect((await hook(pay.completed(sid, {}, { at: now - 301 }))).status).toBe(400);
-    expect((await hook(pay.completed(sid, {}, { at: now + 301 }))).status).toBe(400);
+    expect((await hook(pay.completed(sid, {}, { at: now - 330 }))).status).toBe(400);
+    expect((await hook(pay.completed(sid, {}, { at: now + 330 }))).status).toBe(400);
     expect(await status(b.row!.id)).toBe('pending');
     expect((await hook(pay.completed(sid, {}, { at: now - 200 }))).status).toBe(200);
     expect(await status(b.row!.id)).toBe('paid');
