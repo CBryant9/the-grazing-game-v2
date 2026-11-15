@@ -6,7 +6,15 @@ import * as pickRoute from '../../app/api/ads/pick/route';
 import * as eventRoute from '../../app/api/ads/event/route';
 import * as clickRoute from '../../app/api/ads/click/[id]/route';
 import { recordEvent, safeLink, MIN_VIEW_DELAY_MS } from './events';
-import { chooseAds, setNoAdsReader, targetsViewer, ANON, type Viewer } from './serve';
+import { hasNoAds } from '../billing/products';
+import {
+  chooseAds,
+  ownsNoAds,
+  setNoAdsReader,
+  targetsViewer,
+  ANON,
+  type Viewer,
+} from './serve';
 import { makeImpression, readImpression, TOKEN_LIFE_MS } from './token';
 import {
   PEPPER,
@@ -341,6 +349,25 @@ describe('no-ads owners see no ads anywhere', () => {
   });
 });
 
+describe('the ads ask the purchases (m6 join)', () => {
+  it("the real no-ads reader gives the purchases' own hasNoAds answer in every state", async () => {
+    setNoAdsReader(undefined);
+    const p = await person(kit, 'buyer');
+    const both = async () => [await ownsNoAds(kit.deps.sql, p.id), await hasNoAds(kit.deps.sql, p.id)];
+    expect(await both()).toEqual([false, false]);
+    await kit.db.query(
+      `insert into public.account_entitlements (user_id, entitlement) values ($1, 'no_ads')`,
+      [p.id],
+    );
+    expect(await both()).toEqual([true, true]);
+    await kit.db.query(
+      `update public.account_entitlements set revoked_at = now() where user_id = $1`,
+      [p.id],
+    );
+    expect(await both()).toEqual([false, false]);
+  });
+});
+
 describe('under 16 (PRD 8.3: nothing aimed by interest)', () => {
   it('an under-16 account is shown ads for everyone only, never an aimed one', async () => {
     await campaign(kit, {
@@ -564,10 +591,20 @@ describe('campaign dates, budgets and caps are enforced when choosing', () => {
       slots: ['video_daily_summary'],
       creatives: [{ kind: 'video' }],
     });
-    // Not placed yet: a place has to exist before anything shows (the registry says so).
+    // Placed since the m6 join (the Daily Farm catch-up). Its seed setting is 1 a day.
     await slotOnDb(kit, 'video_daily_summary');
     await switches(kit, 'ads', 'video_ads');
-    expect((await me()).ads).toEqual([]);
+    expect((await me()).ads).toEqual(['video_daily_summary']);
+    const pat = await person(kit, 'pat');
+    const viewer = { ...ANON, userId: pat.id };
+    const pick1 = () =>
+      chooseAds(sql(), { slot: 'video_daily_summary', viewer, pepper: PEPPER, now: Date.now() });
+    expect((await pick1()).items).toHaveLength(1);
+    await kit.db.query(
+      `insert into public.ad_events (slot_id, kind, user_id) values ('video_daily_summary', 'view', $1)`,
+      [pat.id],
+    );
+    expect((await pick1()).items).toEqual([]);
   });
 });
 

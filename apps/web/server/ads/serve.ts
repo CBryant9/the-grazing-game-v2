@@ -1,4 +1,5 @@
 import 'server-only';
+import { hasNoAds } from '../billing/products';
 import type { AdSlotId } from '@gg/shared';
 import { SLOTS, type CreativeKind } from '@/lib/ads/registry';
 import { sessionHash } from '../db/dbstore';
@@ -42,19 +43,13 @@ export const ANON: Viewer = {
 // ---------------------------------------------------------------- no-ads
 
 /**
- * Does this account own no-ads (PRD 10.3)? Read through this one small function so the purchases
- * milestone can change where it looks, and the tests can give a fake.
+ * Does this account own no-ads (PRD 10.3)? Read through this one small function so the tests can
+ * give a fake. The real answer is the purchases' own `hasNoAds` (server/billing/products.ts, m6
+ * join): one rule for what owning no-ads means, kept where the purchases keep it.
  */
 export type NoAdsReader = (sql: SqlRunner, userId: string) => Promise<boolean>;
 
-const fromTable: NoAdsReader = async (sql, userId) => {
-  const r = await sql.query(
-    `select 1 from public.account_entitlements
-      where user_id = $1 and entitlement = 'no_ads' and revoked_at is null`,
-    [userId],
-  );
-  return r.rowCount > 0;
-};
+const fromTable: NoAdsReader = (sql, userId) => hasNoAds(sql, userId);
 
 let reader: NoAdsReader = fromTable;
 

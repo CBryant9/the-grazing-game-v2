@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { durationText, plural, shortDate } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
 import type { DailyWire, PlanDueWire, Snapshot } from '@/lib/game/types';
@@ -88,14 +89,16 @@ function CatchUp({ daily }: { daily: DailyWire }) {
   const busy = useGame((s) => s.busy > 0);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const c = daily.catchUp!;
+  // A video break (when the slot is on, m6) holds the button until it ends or is skipped.
+  const [blocked, setBlocked] = useState(false);
   useEffect(() => {
-    buttonRef.current?.focus();
-  }, []);
+    if (!blocked) buttonRef.current?.focus();
+  }, [blocked]);
   return (
     <div
       className={play.scrim}
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && !busy) void ack();
+        if (e.key === 'Escape' && !busy && !blocked) void ack();
       }}
     >
       <div className={play.summary} role="dialog" aria-modal="true" aria-labelledby="catchup-title">
@@ -134,12 +137,19 @@ function CatchUp({ daily }: { daily: DailyWire }) {
             </ul>
           </section>
         )}
+        <AdSlot id="video_daily_summary" screen="daily_summary" onBlock={setBlocked} />
+        {blocked && (
+          <p id="catchup-wait" className={play.sumwhen}>
+            The button works when the video ends or you skip it.
+          </p>
+        )}
         <div className={play.sumbtns}>
           <button
             ref={buttonRef}
             type="button"
             className="btn coral"
-            disabled={busy}
+            disabled={busy || blocked}
+            aria-describedby={blocked ? 'catchup-wait' : undefined}
             onClick={() => void ack()}
           >
             Start today

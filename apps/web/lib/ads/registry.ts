@@ -231,8 +231,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     timed: false,
     video: true,
     publicPage: false,
-    placed: false,
-    notPlacedWhy: 'The Daily Farm cannot be started yet.',
+    // m6: on the Daily Farm catch-up ("While you were away"), which holds its button for the break.
+    placed: true,
     priority: 0,
   },
   summary_sponsor_card: {
