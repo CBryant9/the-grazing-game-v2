@@ -8,6 +8,7 @@ import {
   bakedLabelThrough,
   bakedThrough,
   longTermWeather,
+  seriesFor,
 } from './data';
 import { HELP_TOPICS } from '../../components/play/helptopics';
 import { database, keepThrough, rig, weatherFor } from './testrig';
@@ -119,5 +120,28 @@ describe('the real data a Daily Farm runs on', () => {
     ).cattleSales;
     const next = sales.nextSale(parts(addDays(bakedThrough('wv'), 3)));
     expect(next).not.toBeNull();
+  }, 120_000);
+
+  // m6: the engine has sheep now, so Daily Farm keeps the sheep and lamb indicators too.
+  it('reads the sheep and lamb indicators, nationally and at a sheep yard, and labels them Daily', async () => {
+    const wv = seriesFor('wv').map((s) => `${s.saleyard}/${s.indicator}`);
+    for (const ind of ['light-lamb', 'trade-lamb', 'heavy-lamb', 'merino-lamb', 'restocker-lamb', 'mutton']) {
+      expect(wv).toContain(`national/${ind}`);
+      expect(wv).toContain(`HAM/${ind}`);
+    }
+    expect(seriesFor('cw').map((s) => `${s.saleyard}/${s.indicator}`)).toContain('DUB/mutton');
+    // A district with no sheep yard keeps only the national sheep figures.
+    expect(seriesFor('cq').filter((s) => s.indicator === 'mutton')).toEqual([
+      { indicator: 'mutton', saleyard: 'national' },
+    ]);
+    expect(new Set(wv).size).toBe(wv.length);
+    const r = await rig({ date: '2026-11-13', time: '10:00:00' });
+    // Well past the baked tables, the last figure is carried forward, and the version is the
+    // Daily label, so a farm's kept sheep prices are never refused from one night to the next.
+    const sheep = (await r.data.bundleThrough(addDays(bakedLabelThrough('wv'), 30))).sheep();
+    expect(sheep.version).toBe(DAILY_DATA_VERSION);
+    const on = sheep.on(parts(addDays(bakedLabelThrough('wv'), 30)), 'today');
+    expect(on.mutton).toBeGreaterThan(0);
+    expect(on.tradeLamb).toBeGreaterThan(0);
   }, 120_000);
 });

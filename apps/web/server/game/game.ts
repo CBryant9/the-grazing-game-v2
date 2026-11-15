@@ -113,6 +113,9 @@ import { configuredStore } from '../db/farmstore';
 import { nightOf } from '../daily/advance';
 import { addDays, daysBetween, isoOf, isSupportedZone, localDate, longDate } from '../daily/clock';
 import type { DailyData } from '../daily/data';
+import { dailyReminderReader, type NightNews } from '../daily/notices';
+import { sqlFromEnv } from '../db/sql';
+import { setDailyFarmReader } from '../notify/reminders';
 import { AWAY_KEPT, ROLLED_KEPT, type DailyStored } from '../daily/state';
 import { dailyRuntime } from '../daily/runtime';
 import { MIDNIGHT_TEXT, PAUSED_TEXT, UNAVAILABLE_TEXT, dailyWire } from '../daily/wire';
@@ -246,6 +249,11 @@ export interface DailyRuntime {
   data: DailyData;
   /** Is Daily Farm switched on? */
   enabled(): Promise<boolean>;
+  /**
+   * Told after a night is saved, for the night that brings the farm up to today (m6: the
+   * notifications, server/daily/notices.ts). Never stops a night: a failure is logged and dropped.
+   */
+  notify?(news: NightNews): Promise<void>;
 }
 
 /** What the player reads when Daily Farm is not open yet. */
@@ -677,7 +685,8 @@ export class GameServer {
     return held && held.stored.daily ? this.bringUp(farmId, held) : held;
   }
 
-  private async loadRaw(farmId: string): Promise<Held | null> {
+  /** `touch` false: read the farm without marking it opened (the reminder's count, m6). */
+  private async loadRaw(farmId: string, touch = true): Promise<Held | null> {
     const hit = this.cache.get(farmId);
     if (hit) {
       // A store shared by several servers can be changed from another one (or another tab
@@ -689,7 +698,7 @@ export class GameServer {
         (await this.store.version(farmId)) === `${hit.stored.version}:${hit.stored.rev ?? 0}`
       ) {
         const last = this.touched.get(farmId) ?? 0;
-        if (this.now() - last > 3600_000) {
+        if (touch && this.now() - last > 3600_000) {
           this.touched.set(farmId, this.now());
           await this.store.touch(farmId).catch(() => undefined);
         }
@@ -715,8 +724,10 @@ export class GameServer {
       throw e instanceof BrokenFarmError ? e : new BrokenFarmError('The save would not load.');
     }
     // Marking the farm as used is a courtesy. If it fails the player still plays.
-    await this.store.touch(farmId).catch(() => undefined);
-    this.touched.set(farmId, this.now());
+    if (touch) {
+      await this.store.touch(farmId).catch(() => undefined);
+      this.touched.set(farmId, this.now());
+    }
     this.remember(farmId, held);
     return held;
   }
@@ -1204,6 +1215,18 @@ export class GameServer {
         .noteFallback(farmDate, 'night_price_fallback', `district=${district}`)
         .catch(() => undefined);
     }
+    // The night's news, once it is saved, and only for the night that brings the farm to today.
+    const notify = this.daily?.notify;
+    if (notify && addDays(farmDate, 1) === localDate(this.now(), daily.timezone)) {
+      await notify
+        .call(this.daily, {
+          farmId,
+          farmName: held.stored.name,
+          date: farmDate,
+          events: end.day.events,
+        })
+        .catch((e: unknown) => logFailure({ route: 'daily-notify', reason: 'notify_failed' }, e));
+    }
     return saved;
   }
 
@@ -1226,6 +1249,30 @@ export class GameServer {
         over: cur.farm.over !== null,
       };
     });
+  }
+
+  /**
+   * For the morning reminder (m6): how many things need a look on a Daily Farm (the things to do
+   * and the plan moves due), read without bringing the farm up or marking it opened. Null when it
+   * is not a Daily Farm, is over, or can not be read.
+   */
+  async dailyToCheck(farmId: string): Promise<number | null> {
+    try {
+      this.sheepOn = await this.sheepSwitch().catch(() => false);
+      return await this.locked(farmId, async () => {
+        const held = await this.loadRaw(farmId, false);
+        if (!held?.stored.daily || held.farm.over) return null;
+        if (this.daily) {
+          dailyEnvs.set(held.stored.setup, {
+            data: await this.daily.data.bundleThrough(isoOf(dateOn(held.farm))),
+          });
+        }
+        const snap = this.snapshotOf(held);
+        return snap.todo.length + (snap.daily?.planDue.length ?? 0);
+      });
+    } catch {
+      return null;
+    }
   }
 
   /** The player has opened a Daily Farm today. Recorded once a day, so a night after a date with no open is a missed day. */
@@ -1881,10 +1928,17 @@ declare global {
  */
 export function gameServer(): GameServer {
   // Kept on globalThis so a dev reload does not lose the cache.
-  shared ??= globalThis.__ggGameServer ??= new GameServer({
-    store: configuredStore(),
-    daily: dailyRuntime(),
-  });
+  if (!shared) {
+    const created = (globalThis.__ggGameServer ??= new GameServer({
+      store: configuredStore(),
+      daily: dailyRuntime(),
+    }));
+    shared = created;
+    // The morning reminder reads Daily Farms through Daily Farm's own reader (m6), with the
+    // "things to check" count from this server. With no database the notifications are off.
+    const sql = sqlFromEnv();
+    if (sql) setDailyFarmReader(dailyReminderReader(sql, (id) => created.dailyToCheck(id)));
+  }
   return shared;
 }
 

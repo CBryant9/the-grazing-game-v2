@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { fixtureFeed, liveFeed, parseMla, parseSilo, parseYardings } from './feed';
+import { DISTRICT_IDS } from '@gg/shared';
+import { seriesFor } from './data';
+import {
+  MLA_INDICATOR,
+  fixtureFeed,
+  liveFeed,
+  parseMla,
+  parseSilo,
+  parseYardings,
+} from './feed';
 
 const HEADER =
   'latitude,longitude,YYYY-MM-DD,daily_rain,daily_rain_source,max_temp,max_temp_source,min_temp,min_temp_source,radiation,radiation_source,evap_comb,evap_comb_source,et_short_crop,et_short_crop_source,metadata';
@@ -119,5 +128,11 @@ describe('the feeds', () => {
     ]);
     expect(await feed.weather('cq', '2026-11-20', '2026-11-21')).toEqual([]);
     expect(feed.asked).toHaveLength(2);
+  });
+
+  it('knows an MLA indicator number for every price series Daily Farm reads, sheep included', () => {
+    for (const d of DISTRICT_IDS) {
+      for (const s of seriesFor(d)) expect(MLA_INDICATOR[s.indicator], s.indicator).toBeDefined();
+    }
   });
 });

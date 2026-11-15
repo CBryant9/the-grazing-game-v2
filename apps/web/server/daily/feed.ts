@@ -70,14 +70,24 @@ const SILO_POINTS: Record<DistrictId, { lat: number; lon: number }> = {
   wv: { lat: -37.65, lon: 142.05 },
 };
 
-/** MLA's indicator numbers for the six cattle indicators the game reads (docs/DATA.md). */
-const MLA_INDICATOR: Record<string, number> = {
+/**
+ * MLA's indicator numbers for the six cattle and six sheep indicators the game reads (docs/DATA.md),
+ * the same numbers scripts/data/pull-mla.mjs asks for (it checks each name against MLA's list).
+ */
+export const MLA_INDICATOR: Record<string, number> = {
   'restocker-yearling-steer': 2,
   'restocker-yearling-heifer': 12,
   'feeder-steer': 3,
   'feeder-heifer': 17,
   'heavy-steer': 4,
   'processor-cow': 13,
+  // Sheep and lamb (m6), as seriesFor lists them.
+  'light-lamb': 6,
+  'trade-lamb': 7,
+  'heavy-lamb': 8,
+  'merino-lamb': 9,
+  'restocker-lamb': 10,
+  mutton: 11,
 };
 
 const SILO_ENDPOINT = 'https://www.longpaddock.qld.gov.au/cgi-bin/silo/DataDrillDataset.php';

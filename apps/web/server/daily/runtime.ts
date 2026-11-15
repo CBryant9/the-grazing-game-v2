@@ -1,9 +1,12 @@
 import 'server-only';
 import { featureSwitches } from '../auth/accounts';
+import { authDeps } from '../auth/deps';
+import { notifyDepsFor } from '../notify/deps';
 import { sqlFromEnv } from '../db/sql';
 import type { DailyRuntime } from '../game/game';
 import { DailyData, type DailyFeed } from './data';
 import { liveFeed } from './feed';
+import { dailyNotifier } from './notices';
 
 /*
  * What Daily Farm runs on in the real site, from the environment (docs/DATABASE.md, milestone 3.3).
@@ -35,6 +38,11 @@ export function dailyRuntime(): DailyRuntime | undefined {
       async enabled() {
         return (await featureSwitches(sql)).daily_farm;
       },
+      // A night's news goes to the notifications queue (m6). With no accounts set up, nothing.
+      notify: dailyNotifier(() => {
+        const auth = authDeps();
+        return auth ? notifyDepsFor(auth) : null;
+      }),
     },
   };
   return globalThis.__ggDaily.runtime;
