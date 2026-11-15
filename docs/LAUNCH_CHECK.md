@@ -58,7 +58,7 @@ Milestone 5.5, 15 Nov 2026, branch `m5.5-launch-check`. Every launch requirement
 |---|---|---|---|
 | 25 | Website page JavaScript under 100 KB; public pages send no script | Passes | `pnpm check:js-budget`: `/` 0 KB, `/leaderboards` 0 KB |
 | 26 | Game page under 250 KB before the art | Passes | `pnpm check:js-budget`: `/play` 207.6 KB |
-| 27 | Lighthouse 100 on website pages, 95+ Performance on `/play`, mobile | Not done on this branch | `lighthouserc.json` exists; it was not run for 5.5. `/play` is now made for each request (for its nonce), which may move its Performance score: run `pnpm lighthouse` on CI and compare with the m5.4 figures before merging |
+| 27 | Lighthouse 100 on website pages, 95+ Performance on `/play`, mobile | Not done for `/play`; passes for `/` on this PC | Run on `m7-final` with the repo settings, mobile, three runs, local production build: `/` 100 in all four categories every run; `/play` Performance 89, 90, 90 against 95 (largest paint about 3.45 s), 100 in the other three. The other public pages were not rerun. Not run on CI (CALLS A25, V14) |
 | 28 | Under 5 ms a simulated day with 4,000+ head | Passes on its own run | `pnpm test:speed` (kept out of the suite, LESSONS W6) |
 | 29 | 60 fps with 4,000+ head on a mid-range Android phone | Needs a device | Claudia plays a 4,000-head farm on a 3-year-old Android phone and says whether it stutters |
 | 30 | Real Supabase: pooler, Auth cookies, Storage, two servers racing | Needs keys | Claudia makes the Supabase project and sets the keys on a preview deployment; then the list in docs/DATABASE.md ("Still owed") is walked once |
