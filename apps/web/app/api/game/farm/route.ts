@@ -7,6 +7,7 @@ import { sheepSwitchOn } from '@/server/game/switches';
 import { FARM_COOKIE, newFarm } from '@/server/player';
 import { clearCookieText, cookieText } from '@/server/security';
 import type { FarmResponse } from '@/lib/game/types';
+import { trackServer } from '@/server/analytics/collect';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,14 @@ export const POST = route(
     const parsed = parseSetup(await readJson(req), await sheepSwitchOn());
     if (!parsed.ok) throw new GameError(400, parsed.message);
     const deps = authDeps();
+    // Analytics (m5.3): counted only with consent and the switch on; never fails the request.
+    await trackServer(req, player.user?.id ?? null, 'farm_started', {
+      mode: parsed.value.mode ?? 'fast',
+      district: parsed.value.district,
+      size: parsed.value.size,
+      start: parsed.value.startType,
+      difficulty: parsed.value.difficulty,
+    });
     // A finished account starts an account farm. Anyone else (a visitor, a sign-in not finished,
     // one refused as under 14) starts the guest's one farm.
     if (player.user && player.signedUp && deps) {

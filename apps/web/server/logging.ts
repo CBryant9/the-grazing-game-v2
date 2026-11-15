@@ -43,18 +43,38 @@ export function failureLine(f: Failure, e?: unknown): string {
   ].join(' ');
 }
 
+let listener: ((f: Failure) => void) | null = null;
+
 /**
- * Log a failure to the server log, and send it to Sentry when `SENTRY_DSN` is set (milestone 5.5).
- * Sentry gets the same three facts as the line (route, reason, error class) and a trimmed stack,
- * never the message (server/errors/sentry.ts).
+ * Be told of every failure logged, by route and reason only (game health, milestone 5.3). One
+ * listener; a later call replaces it.
+ */
+export function onFailure(fn: ((f: Failure) => void) | null): void {
+  listener = fn;
+}
+
+/**
+ * Log a failure to the server log, tell the game health listener (milestone 5.3), and send it to
+ * Sentry when `SENTRY_DSN` is set (milestone 5.5). Sentry gets the same three facts as the line
+ * (route, reason, error class) and a trimmed stack, never the message (server/errors/sentry.ts).
+ * Neither the listener nor Sentry can throw into the caller.
  */
 export function logFailure(f: Failure, e?: unknown): void {
   console.error(failureLine(f, e));
-  void reportError({
-    source: 'server',
-    route: f.route,
-    reason: f.reason,
-    errorClass: e === undefined ? 'none' : errorKind(e).error,
-    stack: typeof e === 'object' && e !== null ? (e as { stack?: unknown }).stack : undefined,
-  });
+  try {
+    listener?.({ route: f.route, reason: f.reason });
+  } catch {
+    // Counting a failure must never fail the request.
+  }
+  try {
+    void reportError({
+      source: 'server',
+      route: f.route,
+      reason: f.reason,
+      errorClass: e === undefined ? 'none' : errorKind(e).error,
+      stack: typeof e === 'object' && e !== null ? (e as { stack?: unknown }).stack : undefined,
+    });
+  } catch {
+    // Reporting must never fail the request.
+  }
 }

@@ -10,7 +10,7 @@ import {
   setSentryTransport,
   trimStack,
 } from './sentry';
-import { logFailure } from '../logging';
+import { logFailure, onFailure } from '../logging';
 
 const DSN = 'https://0123456789abcdef0123456789abcdef@o12345.ingest.sentry.example/4501234';
 
@@ -111,6 +111,36 @@ describe('sending', () => {
       .values[0]!;
     expect(ex.type).toBe('Error');
     expect(ex.value).toBe('send_link_failed');
+  });
+
+  it('a logged failure reaches both the health listener and Sentry, and a listener that throws stops neither (m7 join)', async () => {
+    const box = capture();
+    const old = process.env.SENTRY_DSN;
+    process.env.SENTRY_DSN = DSN;
+    const heard: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      onFailure((f) => {
+        heard.push(`${f.route}:${f.reason}`);
+        throw new Error('listener broke');
+      });
+      expect(() =>
+        logFailure({ route: 'game-day', reason: 'save_failed' }, new Error('x')),
+      ).not.toThrow();
+      await new Promise((r) => setTimeout(r, 5));
+    } finally {
+      onFailure(null);
+      if (old === undefined) delete process.env.SENTRY_DSN;
+      else process.env.SENTRY_DSN = old;
+      spy.mockRestore();
+    }
+    expect(heard).toEqual(['game-day:save_failed']);
+    expect(box.calls).toHaveLength(1);
+    // And a Sentry transport that throws does not stop the line or the listener.
+    setSentryTransport(() => {
+      throw new Error('down');
+    });
+    expect(() => logFailure({ route: 'r', reason: 'x' })).not.toThrow();
   });
 
   it('carries no cookie, request, user name, body or query, whatever is in the report', async () => {

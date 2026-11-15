@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Vitals } from '@/components/analytics/Vitals';
 import { PlayApp } from '@/components/play/PlayApp';
 import { PlayBoundary } from '@/components/shell/PlayBoundary';
 import { PlayOffline } from '@/components/shell/PlayOffline';
@@ -19,6 +20,7 @@ export default function PlayPage() {
   return (
     <PlayBoundary>
       <PwaRegister />
+      <Vitals page="play" />
       <PlayOffline>
         <PlayApp />
       </PlayOffline>

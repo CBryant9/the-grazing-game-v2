@@ -9,7 +9,7 @@ import { SITE_PAGES, absoluteUrl } from '@/lib/site';
  * send no JavaScript, so this replaces the metadata export the app router has.
  */
 /**
- * Structured data as text for a script tag. Every `<` becomes the six characters < (JSON
+ * Structured data as text for a script tag. Every `<` becomes the six characters \u003c (JSON
  * reads them back as `<`), so nothing in the data can close the tag.
  */
 export const jsonLdText = (data: unknown): string => JSON.stringify(data).replace(/</g, '\\u003c');

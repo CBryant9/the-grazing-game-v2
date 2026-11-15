@@ -730,6 +730,36 @@ export const MATRIX: Record<string, TableSpec> = {
     `insert into public.price_daily (indicator, date, cents_per_kg) values ('other_indicator', '2026-11-01', 1)`,
     'cents_per_kg = 2',
   ),
+  // m5.3: the consent choice and the small aggregate rows of analytics and game health.
+  analytics_consent: serverOnly(
+    'analytics_consent',
+    `user_id = '${ID.a}'`,
+    (me) =>
+      `insert into public.analytics_consent (user_id) values ('${me}') on conflict (user_id) do nothing`,
+    'granted = false',
+    `insert into public.analytics_consent (user_id) values ('${ID.a}') on conflict (user_id) do nothing;`,
+  ),
+  analytics_daily: serverOnly(
+    'analytics_daily',
+    `event = 'seed_event'`,
+    `insert into public.analytics_daily (day, event) values ('2026-11-02', 'other_event')`,
+    'count = 3',
+    `insert into public.analytics_daily (day, event) values ('2026-11-01', 'seed_event') on conflict do nothing;`,
+  ),
+  web_vitals_daily: serverOnly(
+    'web_vitals_daily',
+    `page = 'seed_page'`,
+    `insert into public.web_vitals_daily (day, page, metric, bucket) values ('2026-11-02', 'other_page', 'LCP', 100)`,
+    'count = 3',
+    `insert into public.web_vitals_daily (day, page, metric, bucket) values ('2026-11-01', 'seed_page', 'CLS', 10) on conflict do nothing;`,
+  ),
+  health_daily: serverOnly(
+    'health_daily',
+    `route = 'seed-route'`,
+    `insert into public.health_daily (day, kind, route) values ('2026-11-02', 'route', 'other-route')`,
+    'count = 3',
+    `insert into public.health_daily (day, kind, route) values ('2026-11-01', 'route', 'seed-route') on conflict do nothing;`,
+  ),
   daily_counts: adminRead(
     'daily_counts',
     `metric = 'signups'`,

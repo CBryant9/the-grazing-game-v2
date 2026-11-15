@@ -323,6 +323,13 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | ST4 | A moderator could not remove an old post once its word was blocked | The word filter ran on every update, not only when the text changed | Check the text only when it changes. **Rule: a guard on content checks the columns it guards, not the whole row.** |
 | ST5 | Setting a group challenge hung the tests | The server's own connection ran inside the player's transaction (one PGlite connection: each waited for the other), the same as C1 | The owner check runs as the player first, then the server writes on its own. **Rule (C1 again): never a second connection inside a transaction.** |
 
+### m5.3 Dashboard and analytics
+
+| # | What went wrong | Why | The fix and the rule |
+|---|---|---|---|
+| DA1 | Every app page grew by 0.3 to 0.4 KB, pages this milestone did not touch included (`/sign-in` 143.8 to 144.1 KB, `/community/groups/[id]` 149.4 to 149.8 KB of its 150 KB limit) | Not found. The first guess was the event list in the `@gg/shared` index; it moved to its own path, `@gg/shared/analytics`, and the sizes did not change, so that was not it. The likely cause is the bundler's shared runtime growing with each new route and module, which was not proven | Still open; every page is under its limit and no limit was raised. **Rule: compare `check:js-budget` before and after on every page, not only the pages you changed, and name a cause only once a build shows it** |
+| DA2 | The CSV export test could not suspend or ban the admin it signed in as | A database trigger keeps one admin in good standing, so the only admin can not be suspended or banned (AS4) | The test makes a second admin for those checks. **Rule (AS4 again): a test that changes the only admin needs a second one first** |
+
 ### m5.5 Launch check
 
 | # | What went wrong | Why | The fix and the rule |
@@ -337,7 +344,7 @@ Each entry gives the symptom, the cause and the fix, plus a rule for next time. 
 | LC8 | Someone else looking at a Daily Farm ran the owner's missed nights and saved them. Found in the security review | The read-only view reused the owner's "bring up to today" step | The view never saves. **Rule: a read for someone other than the owner never writes; test that the stored version, revision and timestamps do not move** |
 | LC9 | A switched-off sponsor's file stayed readable and publicly cached for an hour. Found in the security review | The media route did not check the ad was on, and the bucket was public | Served only while the creative and campaign are on, cached privately for 5 minutes, from a private bucket. **Rule: content that can be switched off is served only through a route that checks the switch** |
 | LC10 | `/api/leaderboards` answered 500 to a cookie with a broken `%` escape; two ad routes did the same for a broken path | `decodeURIComponent` throws and was called bare on request data | `safeDecode`. **Rule: never decode request data with a call that can throw** |
-| LC11 | The JSON-LD "escape" did nothing | In a JavaScript string `'<'` is `<` itself | The six characters `<` are written. **Rule: test an escape by feeding it what it guards against (`</script>`), never by reading the code** |
+| LC11 | The JSON-LD "escape" did nothing | In a JavaScript string `'\u003c'` is `<` itself | The six characters `\u003c` are written. **Rule: test an escape by feeding it what it guards against (`</script>`), never by reading the code** |
 | LC12 | A second account saving the same push endpoint took the device from the first. Found in the security review | The upsert set the owner to the new account on conflict | Update only the caller's own row; refuse the rest with `push_endpoint_taken`. **Rule: an upsert on a key another owner can hold updates only rows the caller owns** |
 | LC13 | Two senders running at once could both send past the daily cap. Found in the security review | Each counted sent rows, sent, then recorded | Count and claim in one transaction under a per-account lock. **Rule: a cap is counted and claimed in one step, with the claim visible to the next count** |
 | LC14 | One entry stayed in a game server's memory for every farm it had ever opened, for as long as it ran. Found while reading the load test's memory figures | The "last marked opened" list was only ever added to; the farm cache beside it was capped at 64 | The list keeps only farms the cache holds (`server/game/held.test.ts`). **Rule: anything kept beside a capped cache is capped with it** |

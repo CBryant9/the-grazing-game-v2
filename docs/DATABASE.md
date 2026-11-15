@@ -399,3 +399,14 @@ Migrations `20261115001000_stage4_review.sql` (the security review of the commun
 - **The notifications sender on the database scheduler.** New migration `20261115003000_notify_cron.sql`: `public.notify_send_ping()` and the pg_cron job `gg-notify-send` (every 5 minutes) call `/api/notify/send` through `pg_net` with the same two Vault secrets as the rollover job (`gg_site_url`, `gg_cron_secret`). Like the rollover's, it does nothing until both are stored. **The two ways to run the scheduled routes**, either alone is enough: Vercel's crons in `apps/web/vercel.json` (`/api/daily/rollover` every 15 minutes, `/api/notify/send` every 5; Vercel sends `CRON_SECRET` itself, and needs a plan that allows crons that often), or the two pg_cron jobs. Turn the sender's off with `select cron.unschedule('gg-notify-send');`.
 - **Rescues.** A paid rescue is applied by the game server (the engine's `rescueFarm`) and then `farms.continued = true` and `farms.rescue_count = greatest(rescue_count, <rescues the farm records>)`. `applyRescue` no longer holds the purchase row locked across the farm's save: it reads, the engine applies (keyed on the purchase id and recorded on the farm), then marks `applied_at`. An offer needs a free slot of the farm's kind (`public.farm_limit`), because the rescued farm is going again.
 - **Still owed** (unchanged by the join): one run of every migration on a real Supabase project.
+
+## Dashboard and analytics (milestone 5.3)
+
+Migration `20261117000100_analytics.sql` (the `20261117` range is this branch's; the launch-check branch uses `20261116`). Every table is server only (no grant for `anon` or `authenticated`). The admin dashboard reads them through the server (`apps/web/server/admin/dashboard.ts`).
+
+- **`analytics_consent`**: an account's yes or no to analytics. No row means no. The trigger `app.analytics_consent_guard` refuses a yes for an account under 16, or one with no date of birth kept, whatever the server asks. Deleted with the account.
+- **`analytics_daily`**: event counts by Sydney day, event name and a fixed `key=value` text of the event's word properties. No id and no person, only counts. Website page views are kept here as `website_view`.
+- **`web_vitals_daily`**: Web Vitals as a histogram by day, page, measure and bucket (bucket edges in `server/analytics/vitals.ts`). No single reading is kept.
+- **`health_daily`**: game health by day, kind (`route`, `failure`, `save_conflict`, `rollover`), route and reason code, as a count, a total in ms and the longest in ms. Each server adds up in memory and writes at most every 30 seconds. A rollover run is written at once.
+- **`daily_counts`** gains the metric `days_played` (dims `mode=daily` or `mode=fast`). The farm store writes it in the same transaction as a day's diary row, the first time that row is kept.
+- **The `analytics` feature switch**, off.

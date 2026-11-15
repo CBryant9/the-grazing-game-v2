@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { NextRequest } from 'next/server';
+import { NextRequest, type NextFetchEvent } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import { proxy, config } from '../proxy';
 import { INLINE_SCRIPTS, contentSecurityPolicy } from './csp';
@@ -15,11 +15,15 @@ const directives = (policy: string): Map<string, string> =>
     }),
   );
 
+/** The proxy hands the page-view count to `waitUntil`; the test keeps what it was given. */
+const waited: Promise<unknown>[] = [];
+const event = { waitUntil: (p: Promise<unknown>) => waited.push(p) } as unknown as NextFetchEvent;
+
 const hashOf = (s: string) => `'sha256-${createHash('sha256').update(s).digest('base64')}'`;
 
 describe('the Content-Security-Policy', () => {
   it('a static website page gets the hash policy: no nonce, no inline, no eval', () => {
-    const res = proxy(new NextRequest('http://localhost:3000/'));
+    const res = proxy(new NextRequest('http://localhost:3000/'), event);
     const policy = res.headers.get('content-security-policy')!;
     const d = directives(policy);
     expect(d.get('default-src')).toBe("'self'");
@@ -34,7 +38,7 @@ describe('the Content-Security-Policy', () => {
     // Nothing per request is handed on to the page, so it stays static.
     expect(res.headers.get('x-middleware-request-x-nonce')).toBeNull();
     for (const path of ['/about', '/pricing', '/privacy', '/terms', '/leaderboards']) {
-      const p = proxy(new NextRequest(`http://localhost:3000${path}`)).headers.get(
+      const p = proxy(new NextRequest(`http://localhost:3000${path}`), event).headers.get(
         'content-security-policy',
       );
       expect(p, path).toBe(policy);
@@ -44,7 +48,7 @@ describe('the Content-Security-Policy', () => {
   it('an app page gets a fresh nonce each time, handed to Next.js on the request', () => {
     const nonces = new Set<string>();
     for (const path of ['/play', '/account', '/community', '/admin', '/play']) {
-      const res = proxy(new NextRequest(`http://localhost:3000${path}`));
+      const res = proxy(new NextRequest(`http://localhost:3000${path}`), event);
       const policy = res.headers.get('content-security-policy')!;
       const d = directives(policy);
       const m = /'nonce-([A-Za-z0-9+/=]+)'/.exec(d.get('script-src')!);
@@ -72,6 +76,17 @@ describe('the Content-Security-Policy', () => {
       }),
     );
     expect(bad.get('img-src')).toBe("'self' data: blob:");
+  });
+
+  it('one proxy: a public page also hands on its page-view count; an app page does not (m7 join)', async () => {
+    waited.length = 0;
+    proxy(new NextRequest('http://localhost:3000/pricing'), event);
+    expect(waited).toHaveLength(1);
+    // With no database the count is a quiet no, never a failure.
+    await expect(waited[0]).resolves.toBeUndefined();
+    proxy(new NextRequest('http://localhost:3000/play'), event);
+    proxy(new NextRequest('http://localhost:3000/account'), event);
+    expect(waited).toHaveLength(1);
   });
 
   it('adds eval only for the dev server', () => {

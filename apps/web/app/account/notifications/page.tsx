@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Vitals } from '@/components/analytics/Vitals';
 import { AccountShell } from '@/components/account/Shell';
 import { Notifications } from '@/components/notify/Notifications';
 
@@ -13,6 +14,7 @@ export default function Page() {
   return (
     <AccountShell title="Your notifications">
       <Notifications />
+      <Vitals page="account_notifications" />
     </AccountShell>
   );
 }

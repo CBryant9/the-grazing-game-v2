@@ -47,7 +47,9 @@ function walk(dir: string, match: RegExp): string[] {
 // `photo-preview` is a read (GET only): its gate is tested in community/review.test.ts.
 // `moderation` acts on an open report about real content, which needs a post and a report made first,
 // so its gate, CSRF, rollback and pass checks are in admin/moderation.test.ts.
-const OWN_TESTS = new Set(['photos', 'photo-preview', 'moderation']);
+// `dashboard` is the CSV export, a read (GET only) that writes an audit row: its gate (every kind of
+// visitor and no keys), audit row and noindex are tested in admin/dashboard.test.ts.
+const OWN_TESTS = new Set(['photos', 'photo-preview', 'moderation', 'dashboard']);
 const adminRouteNames = walk('app/api/admin', /^route\.ts$/)
   .map((f) => f.replace('app/api/admin/', '').replace('/route.ts', ''))
   .filter((n) => !OWN_TESTS.has(n));

@@ -8,6 +8,7 @@ import { identify, type Player } from '../player';
 import { clearCookieText, cookieText, csrfRefusal } from '../security';
 import { GameError, gameServer, isSessionId } from './game';
 import { gameStoreKind } from './kind';
+import { timed } from '../analytics/health';
 
 export const SESSION_COOKIE = 'gg_session';
 /**
@@ -221,7 +222,7 @@ export function route(
   options: RouteOptions,
   handler: (ctx: RouteContext) => Promise<unknown>,
 ): (req: Request) => Promise<Response> {
-  return async (req) => {
+  return timed(`game-${options.name}`, async (req) => {
     // The sign-in provider may refresh an expired session while we work out who is asking. The new
     // tokens must reach the browser on every answer, including a refusal, or the next request is signed out.
     const jar = jarFor(req);
@@ -303,5 +304,5 @@ export function route(
       logFailure({ route: `game-${options.name}`, reason: 'game_route_failed' }, e);
       return refused(fail(500, 'Something went wrong on the server. Try again in a moment.'));
     }
-  };
+  });
 }

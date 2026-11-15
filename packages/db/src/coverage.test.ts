@@ -39,6 +39,10 @@ const SERVER_ONLY = [
   'notification_sends',
   'signup_email_checks',
   'deletion_tokens',
+  'analytics_consent',
+  'analytics_daily',
+  'web_vitals_daily',
+  'health_daily',
 ];
 
 /** What a visitor with no account may read. Nothing else, and never a write. */
@@ -498,6 +502,8 @@ describe('migration files', () => {
       ['stage4_review', 'stage4_community'],
       ['notify_queue', 'notify_cron'],
       ['daily_cron', 'notify_cron'],
+      ['system', 'analytics'],
+      ['notify_cron', 'analytics'],
     ];
     for (const [first, then] of after) {
       expect(at(first), `${first} before ${then}`).toBeLessThan(at(then));

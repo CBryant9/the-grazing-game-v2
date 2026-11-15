@@ -350,4 +350,17 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [x] Ads and sponsors in admin: every slot with its switch and caps, sponsors, campaigns with dates, targeting, weight and budgets, house ads, creatives with upload and a preview at each slot size, views and clicks by day, and a sponsor report with a CSV. *(PRD 11.4, built in 5.1. The AdSense field is not built: see the log. "Spots left" for the Advertise card is a setting, not yet counted.)*
 - [x] No-ads owners see no banners, videos or sponsor cards anywhere. *(5.1: read through one function; the purchases milestone fills in what grants it.)*
 - [x] Nothing aimed by interest for an under-16 account, a guest or anyone with no profile. *(5.1: such viewers are shown only campaigns for everyone.)*
-- [ ] Moderation, ads and sponsors, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5. Stage 4 built moderation (with the word filter editor) and challenges, 5.1 ads and sponsors, 5.2 purchases; all joined in m6. The analytics dashboard is still the 3.5 one.)*
+- [x] Moderation, ads and sponsors, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5. Stage 4 built moderation (with the word filter editor) and challenges, 5.1 ads and sponsors, 5.2 purchases; all joined in m6. The analytics dashboard was built in 5.3.)*
+
+### Dashboard and analytics (milestone 5.3)
+
+- [x] The dashboard numbers match the database: every figure comes from the database through one server module, in a date range, and a test seeds rows and checks each one. *(BUILD_PLAN 5.3 "done when".)*
+- [x] Each dashboard table downloads as CSV, for admins only, written to the audit log, with no email or date of birth in it, and text a spreadsheet would run as a formula made safe.
+- [x] Game health: server timings and failures by route and reason code, save conflicts, rollover runs and how long they took, and queue depth, kept as small sums, not one row a request.
+- [x] No analytics script or library in the browser. The browser sends a small beacon to our own `/api/collect`; the server sends events on to PostHog only when its key is set. No JS budget was raised for it. *(Decided for 5.3.)*
+- [x] Nothing is counted for a person until they say yes. Default off. Under 16: off and can not be turned on. The choice is kept with the account (account page) or, for a guest, in a cookie. *(PRD 12, decided for 5.3.)*
+- [x] Events use a fixed list of names and property words from `packages/shared`: no free text, email, username or address; a random id per browser, or the account id hashed with a server secret.
+- [x] The public website pages still send no script. Their views are counted on the server with no cookie and no id.
+- [x] Web Vitals (LCP, CLS, INP) from the game and signed-in pages, with consent, shown as the 75th percentile by page against the PRD 14.10 targets.
+- [x] An `analytics` feature switch, off by default.
+- [ ] Average minutes a day, return rates, Daily Farm streaks, game overs by cause and replay check failures on the dashboard. *(Need data not kept yet; the dashboard lists them under "Built in a later milestone".)*
