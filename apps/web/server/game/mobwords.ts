@@ -100,6 +100,57 @@ export function mobLines(i: WhyInputs): MobLines {
   return { why, details };
 }
 
+/** One reason, short, for the herd list's Why column. Facts with the figure; never advice. */
+export function shortReason(r: GainReason): string {
+  switch (r.reason) {
+    case 'notEnoughFeed':
+      return `Short of feed (${Math.round(r.mass / 10) * 10} kg DM/ha)`;
+    case 'lowMe':
+      return `Low energy feed (ME ${r.me.toFixed(1)} MJ/kg)`;
+    case 'lowProtein':
+      return 'Feed under 7% CP';
+    case 'milking':
+      return 'Milking for a calf';
+    case 'latePregnancy':
+      return 'Late pregnancy';
+    case 'justShort':
+      return `Eating ${r.intake.toFixed(1)} kg DM a head at ME ${r.me.toFixed(1)} MJ/kg`;
+  }
+}
+
+export interface GainWhyInputs {
+  where: 'paddock' | 'lot' | 'yards';
+  hasWater: boolean;
+  dryDays: number;
+  /** Average gain, kg a head a day, or null before the mob's first day. */
+  adg: number | null;
+  /** The mob's diet ME (MJ/kg) and CP % from its last day, or null before it. */
+  me: number | null;
+  cp: number | null;
+  /** The engine's reasons for each class not gaining (only worked out for a mob gaining under 0.05 kg a day or short of feed). */
+  forecasts: readonly GainForecast[];
+}
+
+/**
+ * One short line for why a mob is gaining what it is, for the herd list: no
+ * water first, then where it is off pasture, then the engine's first reason
+ * for a class not gaining, else the feed's own figures. Null before the
+ * mob's first day. Facts only.
+ */
+export function gainWhy(i: GainWhyInputs): string | null {
+  if (i.where === 'paddock' && (!i.hasWater || i.dryDays > 0)) return 'No water';
+  if (i.where === 'lot') return 'On the feedlot ration';
+  if (i.where === 'yards') return 'In the stock yards';
+  if (i.adg === null) return null;
+  for (const f of i.forecasts) {
+    const r = f.why[0];
+    // "Just short" is not a reason for a mob that is holding or gaining.
+    if (r && !(r.reason === 'justShort' && i.adg >= -LOSING_KG)) return shortReason(r);
+  }
+  if (i.me === null || i.cp === null) return null;
+  return `Feed at ME ${i.me.toFixed(1)} MJ/kg, CP ${Math.round(i.cp)}%`;
+}
+
 /** What a class eats, as a plain fact. */
 function intakeWord(r: Extract<GainReason, { reason: 'justShort' }>): string {
   return `They eat about ${r.intake.toFixed(1)} kg DM a head a day of feed at ME ${r.me.toFixed(1)} MJ/kg.`;

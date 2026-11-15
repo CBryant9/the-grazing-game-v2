@@ -567,7 +567,13 @@ export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from 
 export { PTIC_DAYS, onRecordPtic, recordClassOf, recordGroupOf } from './sim/told';
 // Reads the web server needs, so it never copies a rule (14 Nov 2026).
 export { portableRefund, supplementCosts } from './sim/reads';
-export type { SupplementCost } from './sim/reads';
+export type { SupplementAdds, SupplementCost } from './sim/reads';
+// The stock book, the feed forecast and small facts for the screens (m8, engine 0.21.0).
+export { originOf, stockBook } from './sim/stockbook';
+export type { StockBookRow, StockOrigin } from './sim/stockbook';
+export { FORECAST_DAYS, FORECAST_POINTS, feedForecast } from './sim/forecast';
+export type { FeedForecast, FeedForecastPoint } from './sim/forecast';
+export { lastRainMm, paddockRestDays } from './sim/paddockfacts';
 export {
   perDay,
   planDueTonight,

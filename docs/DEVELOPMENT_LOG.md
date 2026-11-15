@@ -2520,6 +2520,33 @@ The first item came on day 74 in Central Queensland and day 0 in Central West (b
 - The marking note in the inbox (`toMark`, every 45 days) is unchanged.
 - Engine tests were compared with `m7-final` by count (22 expected failures, 4 skips), not file by file by name. The `realism-guardian` agent was not run. No browser check.
 
+## m8 second pass: the stock book, the Feed panel and the paddock comment line (engine 0.21.0, save format 16)
+
+Three things in the mockups and REQUIREMENTS that milestone 1.7 never built (LESSONS SB1), built on the engine and server side with self-contained components. Branch `m8-stockbook-feed` from `m8-playability` (0d14d26).
+
+**Built**
+
+- **Stock book and profit per animal.** The engine already kept each animal's purchase price (`paid`) and running cost (`cost`: purchase, feed, health, marking). New: `stockBook` (engine) and `RecordResponse.stockBook` on the record route (every head; it is not in the snapshot, which a herd of 4,000 would take past its 150 KB limit: class, age, kg, CS, PTIC, where it came from, bought, spent, value now after selling costs, profit), and `money` on every Sell row (`mobs[].sellGroups[]`, `market.sell.classes[]`). `createFarm` records `startTags`, so the start herd reads "Taken over" (save format 16; an older save reads "Bought or taken over"). Components `StockBook` and `SellProfitLine`.
+- **Feed panel.** `feedForecast` runs the tick's own start of the day on a copy for 365 days in an average season, with the stock on hand eating what they ate today. `snapshot.feed` sends 12 points of tonnes, the floor, what the stock eat a month, the facts, the average-season note, and each cattle mob's supplement with its cost a day and what each one adds. Component `FeedPanel` (SVG chart, no library).
+- **Paddock comment line.** `paddocks[].comment`: seven lines, each tied to one condition (MODEL section 14).
+- **Display fields.** `paddocks[].restDays` (from a new `stockedOn` record), `totals.rainMm`, `market.prices[].lastWeekCKg`, `mobs[].gainWhy`. Already sent: `mobs[].weightKg`, `farm.setup.districtName`, `totals.head`, `totals.netWorth`.
+- **Leftovers.** The inbox's eaten-out line no longer says days of feed left; the engine's 45-day marking note shows once a drop in the inbox.
+- **Plans with legs.** The engine took up to 8 legs already; the server now takes `moreLegs` on `setPlan`.
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 238 files, 4,331 tests: 4,305 passed, 22 expected failures and 4 skips (as on `m8-playability`). 53 new tests (engine 13, server 30, components 10).
+- `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised (`/play` 208.6 KB, unchanged: the new components are not mounted yet).
+- The snapshot for a 4,000-head farm stays under its 150 KB limit: the stock book went to the record route after the first try put it in the snapshot (782 KB).
+- The feed forecast takes about a tenth of a second a farm (a year of the grass model); the server reuses it while the pasture, crops and stock are unchanged.
+
+**Not done or not checked**
+
+- Nothing is mounted: the restyle builder mounts `StockBook`, `SellProfitLine` and `FeedPanel` and draws `comment`, `restDays`, `rainMm`, `gainWhy` and `lastWeekCKg`. No browser check, so no phone or PC screenshot.
+- Grazing evenly or patchily is not in the comment line. The plan form has no Leg 2.
+- The diary still lists the engine's marking note every 45 days.
+- The `realism-guardian` agent was not run.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

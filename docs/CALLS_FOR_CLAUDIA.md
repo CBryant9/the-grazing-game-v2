@@ -460,6 +460,44 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B150. The setup step shows the money.** For each difficulty, on the chosen district and size: starting cash taking over a running farm and from scratch, how far the bank lends, and where it takes the farm, as display numbers (`SetupOptions.districts[].sizes[].money`). The words stay as they were. [m8 item 10]
 
+#### Stock book, Feed panel and paddock comment (m8 second pass)
+
+**B151. How profit per animal is worked out.** Profit is what the animal would put in the bank sold today (its weight at today's c/kg for its class, the in-calf premium from PTIC, less 5% commission and $30 a head) less what it cost: what was paid for it (with the head fee and freight), plus everything spent on it since (supplement or feedlot ration, the district's health cost a day, marking). It is the same sum the saleyard uses when cattle are sold. Other choice: leave out the feed and health costs, as the mockup's "bought for · profit" does. What it changes: a mob on supplement shows less profit. [Change: `sim/stockbook.ts`]
+
+**B152. Calves born on the farm start at $0.** A calf bred here has no purchase price; its own health, supplement and marking costs count from birth, and its dam carries her own feed, not the calf's. So calves show as profit and cows carry the cost of rearing. Other choices: split the cow's costs to her calf, or value a calf at its weaning value. What it changes: which cattle look as if they are making money. [Change: `sim/stockbook.ts`]
+
+**B153. The start herd is valued at takeover.** Cattle that came with a running farm show "Taken over" at their value on that day without fees (the engine's own start value). Farms saved before this change cannot tell a start animal from a bought one, so they say "Bought or taken over". [Change: `FarmState.startTags`, save format 16]
+
+**B154. Value now never goes below $0.** A very light calf can be worth less than the $30 head fee. The stock book shows $0, as net worth counts it; the sale itself would charge the fee. [Change: `sim/stockbook.ts`]
+
+**B155. The stock book is cattle only.** Sheep are kept as records of several head with averaged costs, so they are not listed one by one. Other choice: a sheep row for each record, with its head count. [Change: `sim/stockbook.ts`]
+
+**B156. The stock book comes with the record, not the snapshot; 50 rows show at a time.** Every head is about 150 bytes, so a herd of 4,000 would take the snapshot far past its 150 KB limit. The stock book rides on the record (`GET /api/game/record`, `RecordResponse.stockBook`), which the Scores and Diary panels already fetch on request, so it is sent only when asked for. The list shows 50 rows and "Show more". Other choice: a route of its own for the stock book. [Change: `GameServer.record`, `server/game/stockbook.ts`, `StockBook`]
+
+**B157. Sell rows show the money a head.** A cow's figures include her calf at foot, which goes with her when sold. A draft from more than one origin says "Cost in at". [Change: `sellMoney` in `server/game/stockbook.ts`]
+
+**B158. The feed forecast is an average season.** Growth at the district's long-term average from today (season and month factor 1), never the real weather to come, for 365 days, drawn as today and about every month (12 points). The panel says it is an average-season forecast. [Change: `sim/forecast.ts`]
+
+**B159. What the forecast assumes about the stock.** The stock on hand eat each day what they wanted on their last day (constant all year: no births, sales, weight gain or plan moves), taken from all pasture squares shared by the feed on each, green and dead alike. Cattle in the feedlot are left out. Crops are drawn apart as spikes and not grazed in the forecast. The floor is 800 kg DM/ha over the native and sown pasture. Other choices: grow the stock through the year, or graze where each mob is. [Change: `sim/forecast.ts`]
+
+**B160. The forecast is kept and reused.** A forecast takes about a tenth of a second; the server keeps the last 32 by pasture, crops and stock, so each job on an unchanged day reuses it. [Change: `server/game/feed.ts`]
+
+**B161. The supplements table.** Cattle mobs only (sheep feed stays on the sheep card). Each row: what the mob is on, its cost a day, and what each supplement adds a head a day (hay and pellets: kg DM with ME and CP and the pasture it replaces; lick: the lift in pasture eaten on this feed). The buttons send the mob card's own `setSupplement`, through the same job card. No buying in a table: supplements are switched on at a daily price. [Change: `server/game/feed.ts`, `FeedPanel`]
+
+**B162. The paddock comment line.** Seven lines, each tied to one condition (MODEL section 14): what the stock pick (down to what they'd normally leave; tall dry grass with green near the base; picking the best bits, from the diet ME 0.5 MJ/kg over the paddock's), then the feed (getting short under 800 kg DM/ha; growing away from them; a high impact when they eat over twice what grows; a little more than grows). The thresholds 0.5 MJ/kg, 35% green, 25 cm and twice are for the words only. Sheep count as stock. Grazing evenly or patchily is not built: nothing in the model measures it fairly on a big paddock. [Change: `server/game/paddockwords.ts`]
+
+**B163. Rest days.** Whole days since stock last spent a day anywhere on the paddock's grazing area, 0 the morning after they leave, none while stock are on it. A new record (`stockedOn`, save format 16) because the pasture's own last-grazed day is set only by hard grazing. An older farm starts from that last hard grazing at its next night. [Change: `sim/paddockfacts.ts`]
+
+**B164. Rain in the top bar.** Last night's rain in mm on a real-year farm. A farm with random seasons has no rain figure and sends none. [Change: `lastRainMm`]
+
+**B165. The weekly price arrow.** Each class's c/kg seven days ago, from the prices the farm has lived; none in a farm's first week. [Change: `lastWeekCKg` in `server/game/market.ts`]
+
+**B166. The reason line for a mob's gain.** In order: no water; the feedlot or the yards; the engine's first reason for a class not gaining (worked out only for a mob gaining under 0.05 kg a day or short of feed); else the feed's ME and CP. "Just short of what they need" is never the reason for a mob that is holding or gaining. [Change: `gainWhy` in `server/game/mobwords.ts`]
+
+**B167. The inbox's eaten-out line and marking note.** The eaten-out line now says "The whole farm is eaten out with stock on it. Feed averages under 800 kg DM/ha. The game ends if it stays that way for 9 more days.", never days of feed left. The engine's 45-day marking note is shown once a drop in the inbox (a drop starts with calving or ends with marking); the engine note itself is unchanged because the MVP comparison checks it, and the diary still lists it as the engine raises it. [Change: `server/game/inboxwords.ts`]
+
+**B168. Plans with more than one leg.** The engine already took up to 8 legs. The server now takes them too: `setPlan` sends the first leg as `stops`, `trigger` and `rounds` and the rest as `moreLegs`, with `step` counted across every leg. The plan form was not touched, so a plan of more than one leg still shows as not editable there. [Change: `parsePlanAction` in `server/game/plans.ts`]
+
 ## 2. Stand-in figures
 
 These numbers have no sourced real figure behind them. Each is one constant or setting. "Replaced by" says what would replace it.
@@ -535,7 +573,7 @@ These are the open calibration rows and review findings. In each case the model 
 
 **N1. Map.** Trees, cattle walking and grazing animation, time-lapse, frost, dust, heat haze and storm clouds, the profit layer, the selected mob and picked animals on the map, half-built fence lines and pegs, the overview inset for a phone held upright, hover, and the farmer. Sheep sprites exist as code art only. [m1.6a, m1.7c]
 
-**N2. Play screens.** Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, a bell with an unread count in the top bar, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
+**N2. Play screens.** The stock book, the Sell money line and the Feed panel are built as components but not mounted (the screen restyle mounts them), the paddock sheet does not yet draw `comment`, the paddocks list does not yet sort by `restDays`, the top bar does not yet show `rainMm`, the herd list does not yet show `gainWhy`, and the plan form has no Leg 2. Drawing a fence or pipe by keyboard, setup cards with pictures, a "cows getting thin" item and a line saying condition falls because of milking, things to do for crops to lock up and grain shedding, red marks on squares that cannot take a crop, moving the crutching and joining days on screen, booking sheep onto a later sale, a sheep figure for paddock days of feed, a bell with an unread count in the top bar, the drag timeline in the Diary, a leaderboard tab inside the game. [m1.7, m2.2, m2.5, m2.8, m3.4]
 
 **N3. Engine.** Temperature in the growth factor. Moving a running farm to new data. The grass changes in the grass review. Overhead costs a year for sheep. Marking cost for sheep. A managed cattle margin beside SB-GM. A calving window per district. [m1.4b, m1.4, m2.3, m2.7, m2.5]
 

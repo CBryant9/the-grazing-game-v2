@@ -3,6 +3,7 @@ import {
   MARKET_CLASSES,
   MAX_BUY,
   SALE_CLASSES,
+  animalLookup,
   centsPerKg,
   dateOn,
   estimateBuy,
@@ -10,6 +11,7 @@ import {
   pricesOf,
   type FarmState,
   type MarketClassId,
+  type Animal,
   type MarketView,
   type SaleClassId,
 } from '@gg/engine';
@@ -29,6 +31,7 @@ import {
   sellNote,
   weightText,
 } from './marketwords';
+import { sellMoney } from './stockbook';
 
 const dateParts = (d: { year: number; month: number; date: number }): DateParts => ({
   year: d.year,
@@ -99,8 +102,20 @@ export function priceChart(farm: FarmState): PriceChartWire {
   };
 }
 
+/** Days back for the weekly change arrow. */
+const WEEK = 7;
+
+/** Each class's price a week ago, c/kg, from the prices the farm has lived. Null with less than a week of them. */
+function lastWeek(farm: FarmState): Record<string, number> | null {
+  const back = farm.day - WEEK;
+  let found: (typeof farm.priceHistory)[number] | null = null;
+  for (const p of farm.priceHistory) if (p.day <= back && (!found || p.day > found.day)) found = p;
+  return found ? (found.c as Record<string, number>) : null;
+}
+
 export function priceRows(farm: FarmState, chart: PriceChartWire): PriceRowWire[] {
   const prices = pricesOf(farm).classes;
+  const week = lastWeek(farm);
   return ORDER.map((id) => {
     const cKg = Math.round(prices[id]);
     const kg = typicalKg(farm, id);
@@ -114,6 +129,7 @@ export function priceRows(farm: FarmState, chart: PriceChartWire): PriceRowWire[
       perHead: kg === null ? null : Math.round((kg * prices[id]) / 100),
       changeCKg: points.length > 1 && first !== undefined ? cKg - first : null,
       changeDays: Math.max(0, points.length - 1),
+      lastWeekCKg: week && week[id] !== undefined ? Math.round(week[id]) : null,
     };
   });
 }
@@ -146,19 +162,23 @@ function sellClasses(farm: FarmState): SellClassWire[] {
   const booked = new Set<number>();
   for (const b of farm.saleBookings) for (const id of b.animalIds) booked.add(id);
   const prices = pricesOf(farm).classes;
-  const head = new Map<MarketClassId, number>();
+  const drafts = new Map<MarketClassId, Animal[]>();
   for (const m of farm.mobs) {
     for (const a of m.animals) {
       if (a.kind === 'calf' || booked.has(a.id)) continue;
       const c = marketClass(a);
-      head.set(c, (head.get(c) ?? 0) + 1);
+      const list = drafts.get(c);
+      if (list) list.push(a);
+      else drafts.set(c, [a]);
     }
   }
-  return ORDER.filter((id) => (head.get(id) ?? 0) > 0).map((id) => ({
+  const all = animalLookup(farm.mobs);
+  return ORDER.filter((id) => (drafts.get(id)?.length ?? 0) > 0).map((id) => ({
     id,
     label: MARKET_CLASSES[id],
-    head: head.get(id)!,
+    head: drafts.get(id)!.length,
     cKg: Math.round(prices[id]),
+    money: sellMoney(farm, drafts.get(id)!, all),
   }));
 }
 

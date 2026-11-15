@@ -4,6 +4,7 @@ import {
   DISTRICTS,
   JOINING_DAYS,
   SUPPLEMENTS,
+  animalLookup,
   areaIdOf,
   areaWatered,
   breedingReports,
@@ -27,6 +28,7 @@ import {
   type MobBreedingReport,
   type MobHusbandry,
   type MobSummary,
+  type AnimalLookup,
   type SourceEnv,
   type SupplementCost,
   type Survey,
@@ -40,7 +42,16 @@ import type {
   SuppId,
   SuppOptionWire,
 } from '../../lib/game/types';
-import { GROUP_NAME, SUPP_LABEL, REASON, breedingLines, mobLines, pticWords } from './mobwords';
+import {
+  GROUP_NAME,
+  SUPP_LABEL,
+  REASON,
+  breedingLines,
+  gainWhy,
+  mobLines,
+  pticWords,
+} from './mobwords';
+import { sellMoney } from './stockbook';
 
 const round = (n: number, places = 0): number => {
   const k = 10 ** places;
@@ -110,6 +121,7 @@ interface MobReads {
   reports: Map<number, MobBreedingReport>;
   husbandry: Map<number, MobHusbandry>;
   supp: Map<number, SupplementCost>;
+  all: AnimalLookup;
 }
 
 /**
@@ -127,6 +139,7 @@ export function buildMobs(farm: FarmState, env: SourceEnv, market: MarketView): 
     reports: new Map(breedingReports(farm).map((r) => [r.mob, r])),
     husbandry: new Map(husbandryNow(farm, env).map((h) => [h.mob, h])),
     supp: new Map(supplementCosts(farm, env).map((c) => [c.mob, c])),
+    all: animalLookup(farm.mobs),
   };
   const byId = new Map<number, FarmMob>(farm.mobs.map((m) => [m.id, m]));
   return mobSummaries(farm).map((s) => mobWire(farm, byId.get(s.id)!, s, reads));
@@ -192,13 +205,12 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
   const sale = r.market.booked.find((b) => b.animalIds.some((id) => mine.has(id)));
   const bookedIds = new Set<number>();
   for (const b of r.market.booked) for (const id of b.animalIds) bookedIds.add(id);
-  const sellGroups: SellGroupWire[] = SELL_GROUPS.map((id) => ({
-    id,
-    name: GROUP_NAME[id],
-    head: m.animals.filter(
+  const sellGroups: SellGroupWire[] = SELL_GROUPS.map((id) => {
+    const draft = m.animals.filter(
       (a) => a.kind !== 'calf' && recordGroupOf(a) === id && !bookedIds.has(a.id),
-    ).length,
-  })).filter((g) => g.head > 0);
+    );
+    return { id, name: GROUP_NAME[id], head: draft.length, money: sellMoney(farm, draft, r.all) };
+  }).filter((g) => g.head > 0);
 
   const adults = m.animals.filter((a) => a.kind !== 'calf');
   const report = r.reports.get(m.id);
@@ -236,6 +248,15 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
     classes: classRows(m.animals),
     why,
     details,
+    gainWhy: gainWhy({
+      where: s.where.kind,
+      hasWater: s.hasWater,
+      dryDays: s.dryDays,
+      adg: m.st ? m.st.adg : null,
+      me: s.day ? s.day.me : null,
+      cp: s.day ? s.day.cp : null,
+      forecasts,
+    }),
     ptic: report ? report.ptic.cows + report.ptic.heifers : 0,
     pticText: report ? pticWords(report.ptic, report.months) : null,
     breeding: breedingLines({

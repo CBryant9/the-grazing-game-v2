@@ -45,6 +45,7 @@ import type {
   SheepWire,
   TodoWire,
 } from '../../lib/game/types';
+import { gainWhy } from './mobwords';
 import type { DateOf } from './labourwords';
 import {
   SHEEP_CLASS_LABEL,
@@ -269,6 +270,16 @@ export function sheepMobWires(farm: FarmState, sr: SheepReads, dateOf: DateOf): 
       classes,
       why: whyLines(r, m, hasWater, r.area, sr.loss.get(r.id)),
       details: [],
+      // The sheep card's reasons are its own (why); the herd list's short line is the feed's figures.
+      gainWhy: gainWhy({
+        where: m.where.kind,
+        hasWater,
+        dryDays: r.dryDays,
+        adg: st ? st.adg : null,
+        me: st ? st.me : null,
+        cp: st ? st.cp : null,
+        forecasts: [],
+      }),
       ptic: 0,
       pticText: null,
       breeding: [],

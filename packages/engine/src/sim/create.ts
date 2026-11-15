@@ -390,6 +390,9 @@ export function createFarm(o: CreateFarmOptions, env: SourceEnv = {}): FarmState
     running && stock !== 'cattle'
       ? startFlock(farm, rngStream(o.seed, FLOCK_STREAM), stock === 'mix' ? 0.5 : 1)
       : null;
+  // Every tag below this one was on the farm when it was taken over (save format 16), so the
+  // stock book can tell a start value from a purchase price.
+  farm.startTags = farm.animalIds.next;
   // A real-year farm with sheep sells and values them at the real date's indicators.
   refreshSheepPrices(farm, env);
   farm.year = newYear(farm);

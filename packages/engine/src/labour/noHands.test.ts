@@ -5,8 +5,11 @@
  * The digests below were taken on engine 0.12.1 (save format 8, commit
  * 34fecf2), before any labour code existed. The farm is hashed with the
  * fields that only say which engine and format ran it left out, and with
- * the labour state left out (a farm with no hands has none). Every other
- * figure, the inbox and the action log must be what they were.
+ * the labour state left out (a farm with no hands has none). The two records
+ * no rule reads (engine 0.21.0: `startTags`, the first tag after setup, and
+ * `stockedOn`, the days stock were on each square, for the stock book and
+ * rest days) are left out too. Every other figure, the inbox and the action
+ * log must be what they were.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -24,6 +27,8 @@ function digest(farm: FarmState): string {
   delete saved.engineVersion;
   delete saved.saveFormat;
   delete saved.labour;
+  delete saved.startTags;
+  delete saved.stockedOn;
   const canonical = (v: unknown): string => {
     if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
     if (v !== null && typeof v === 'object') {

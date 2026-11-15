@@ -495,6 +495,21 @@ export interface FarmState {
    * that has never been rescued, which then saves and plays exactly as it did before.
    */
   rescues?: RescueRecord[];
+
+  /**
+   * The first tag number given out after the farm was set up (save format 16). Cattle with a
+   * lower tag came with the farm, so the stock book shows their value on the day it was taken
+   * over, not a purchase price. Left out on a farm saved before format 16: the stock book then
+   * says "bought or taken over" for any animal that was not bred on the farm.
+   */
+  startTags?: number;
+
+  /**
+   * The last farm day cattle or sheep spent on each square's grazing area (save format 16), for
+   * the paddocks' rest days. A record only: no rule reads it. Made at the first night after
+   * format 16, from `PastureState.lastG`; left out until then.
+   */
+  stockedOn?: Int32Array;
 }
 
 /** The MVP's price chart kept 31 days. */

@@ -30,7 +30,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] **Water:** every animal dies after 4 days without water, not just the poor ones. Warn before +1 week or +1 month if any mob has no water, and stop the clock.
 - [ ] **Warnings explain why.** Never just "losing weight". Give the cause: not enough feed, low ME, protein under 7%, milking for a calf, or late pregnancy. "We need to know why."
 - [ ] Supplements (lick, hay, pellets) and a feedlot are available, and they cost money.
-- [ ] Profit is shown per animal, and you can see which cattle are making money. The stock book is in Herd.
+- [x] Profit is shown per animal, and you can see which cattle are making money. The stock book is in Herd. *(Built m8 second pass, server and component: `RecordResponse.stockBook` (sent with the record, on request), every head with bought or taken-over value, spent since, value now after selling costs and profit, sortable and by mob. `StockBook` is ready for Herd's "Mobs | Stock book" switch and waits to be mounted.)*
 
 ## Breeding
 
@@ -58,7 +58,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 - [ ] The market moves over time following real yearly prices (2019–2025), then a realistic random path.
 - [ ] Each class has its own price, and an animal's price changes as it moves class (weaner to yearling and so on). Chart classes match the buy list exactly.
-- [ ] Buy: a modal with a price per class. Your own cattle and their profit sit beside it for selling.
+- [ ] Buy: a modal with a price per class. Your own cattle and their profit sit beside it for selling. *(m8 second pass: each Sell row carries `money`, bought for, spent and profit a head. `SellProfitLine` draws it and waits to be mounted.)*
 - [ ] **Confirm before spending, then show the result right where you clicked**: "You have bought these cows. You'll now see them on the map." No double buys into debt on a narrow screen.
 - [ ] Saleyard buttons: "Close" and "Keep shopping" / "Keep selling", not "Watch".
 - [ ] Net worth is explained (cash, plus stock at sale value after costs, plus 80% of what's been spent on infrastructure).
@@ -77,7 +77,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] **After harvest there is stubble:** a set amount of low-value feed that breaks down to fallow. *(Reversed: first "later", then wanted now.)* Message along the lines of "you're putting them on stubble that's not very nutritious, but go for it".
 - [ ] **A finished crop never regrows.** No warnings about a crop once it's harvested.
 - [ ] Sowing prompts when a window opens ("If you want to plant oats, now's the time").
-- [ ] A feed graph forecasts the rest of the year, with crops showing as spikes.
+- [x] A feed graph forecasts the rest of the year, with crops showing as spikes. *(Built m8 second pass: `snapshot.feed`, an average-season forecast from the engine's own growth, never the real weather to come, against what the stock on hand eat and the ground cover floor. `FeedPanel` draws it in SVG with the supplements table and waits to be mounted as the PC Feed tab and More, Feed.)*
 - [ ] Mixed-farm setup: choose grazing or mixed, then % arable land (realistic per district, tiny in the NT), then % actively cropped. Warn that more cropping means more of the farm starts in fallow. Converting pasture to cropping costs extra and asks first. Plant only on arable land, and highlight it.
 - [ ] Arable land is a natural patch, "not just small bits everywhere". The rotation sits in square blocks, at a stage that suits the start month.
 
@@ -123,7 +123,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] "Paddock 1", not "P1", in anything a player reads first.
 - [ ] **Neutral paddock labels: Green, Mixed, Dry & rank, Short.** No "green zone / buffer / haystack" or any three-zone wording or commentary. *(Rejected: "that's kind of enforcing the three-zone adaptive grazing". "Buffer" was also wrong; it sat on short dry pasture.)*
 - [ ] **Don't say "overgrazed"** until rest history is modelled ("you can graze it short as long as it has a long rest"). Say short or very short. Say "bare" only when ground cover is actually being lost.
-- [ ] Commentary describes, it doesn't judge, and it only appears on paddocks with cattle in them. For example: "The grass is growing away from them", "They're having a high impact", grazing evenly or patchily, picking the best bits, down to eating what they'd normally leave, getting short.
+- [x] Commentary describes, it doesn't judge, and it only appears on paddocks with cattle in them. For example: "The grass is growing away from them", "They're having a high impact", grazing evenly or patchily, picking the best bits, down to eating what they'd normally leave, getting short. *(Built m8 second pass: `paddocks[].comment`, seven lines each tied to a stated condition (MODEL section 14). Grazing evenly or patchily is not built: the model keeps no measure of it that holds on a big paddock. The paddock sheet draws it once the restyle mounts it.)*
 
 ## Not built yet (raised by Claudia or offered)
 

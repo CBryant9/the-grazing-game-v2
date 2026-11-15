@@ -1523,6 +1523,14 @@ What changed (no grass, cattle, sheep, crop, season, price or score formula, no 
 
 Existing engine tests edited, none a calibration test, each for a decided change: the version test (`day/saves.test.ts`, 0.20.0 and format 15) and the rescue save test (format 15); two skip tests in `day/days.test.ts` (deaths from no water and the first eaten-out day now stop a skip); the rescue "eaten out" test runs its skip on past the new stop; `day/todo.test.ts` (the marking item carries `sinceCalving`, a sale within the week is listed, facts have `does: null`); the list of reads in `day/clock.test.ts` (four new reads); the action list in `day/jobs.test.ts` (51 kinds, with `dismissTodo`). New: `day/playability.test.ts` (13 tests).
 
+### 15 Nov 2026, m8 second pass (stock book and feed): engine 0.21.0, save format 16
+
+What changed (no grass, cattle, sheep, crop, season, price or score formula, no data table figure, no band): reads only (`stockBook`, `feedForecast`, `supplementCosts` now says what each supplement adds, `paddockRestDays`, `lastRainMm`) and two saved records no rule reads: `startTags` (set by `createFarm`) and `stockedOn` (the tick marks the squares stock were on each day, after placing the mob and before its day runs). The forecast runs the tick's own start of the day on a copy.
+
+**The benchmarks were re-run and none moved.** The full suite on this tip gives the same 22 expected failures (the open calibration rows) and the same 4 skips as `m8-playability` (0d14d26). No band, skip, `it.fails` or tolerance changed. The no-hands digests hold every figure, the inbox and the action log; they now leave out the two records no rule reads (`startTags`, `stockedOn`), as they already left out the labour state.
+
+Existing tests edited, none a calibration test, each for a decided change: the version tests (`day/saves.test.ts`, 0.21.0 and format 16; `money/rescue.test.ts`, format 16; `server/game/oldsaves.test.ts`); the no-hands digest leaves out the two new records (`labour/noHands.test.ts`); the list of reads in `day/clock.test.ts` (five new reads); the key lists in `server/game/snapshotkeys.test.ts` and the record's keys in `server/game/routes.test.ts`. New: `sim/stockbook.test.ts` (13 tests), `server/game/stockfeed.test.ts` (30), `components/play/stockfeed.test.ts` (10).
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

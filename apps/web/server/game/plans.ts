@@ -11,6 +11,7 @@ import {
   type Action,
   type FarmState,
   type JobCard,
+  type PlanLegSpec,
   type PlanRule,
   type PlanView,
 } from '@gg/engine';
@@ -195,7 +196,29 @@ function parseTrigger(t: unknown): PlanRule | null {
   return null;
 }
 
-/** Check a setPlan or resumePlan request. Whole numbers in range, a short list of squares, a known rule. */
+/** Check one leg: a short list of squares, a known rule and whole rounds in range. */
+function parseLeg(stopsIn: unknown, trigger: unknown, roundsIn: unknown): PlanLegSpec | null {
+  const F = PLAN_FIGURES;
+  if (!Array.isArray(stopsIn) || stopsIn.length < 1 || stopsIn.length > F.maxStops.value) {
+    return null;
+  }
+  const stops: number[] = [];
+  for (const c of stopsIn as unknown[]) {
+    const cell = int(c, 0, GRID_N - 1);
+    if (cell === null) return null;
+    stops.push(cell);
+  }
+  const rule = parseTrigger(trigger);
+  const rounds = int(roundsIn, 0, F.maxRounds.value);
+  if (!rule || rounds === null) return null;
+  return { stops, rule, rounds };
+}
+
+/**
+ * Check a setPlan or resumePlan request. Whole numbers in range, a short list of squares, a known
+ * rule. A plan of more than one leg sends its first leg as `stops`, `trigger` and `rounds`, and the
+ * rest as `moreLegs`; the engine takes up to `PLAN_FIGURES.maxLegs` legs and checks them again.
+ */
 export function parsePlanAction(a: Record<string, unknown>): Action | null {
   const mob = int(a.mob, 1, 1e6);
   if (mob === null) return null;
@@ -206,19 +229,22 @@ export function parsePlanAction(a: Record<string, unknown>): Action | null {
   }
   if (a.type !== 'setPlan') return null;
   const F = PLAN_FIGURES;
-  if (!Array.isArray(a.stops) || a.stops.length < 1 || a.stops.length > F.maxStops.value) {
-    return null;
+  const first = parseLeg(a.stops, a.trigger, a.rounds);
+  if (!first) return null;
+  const legs: PlanLegSpec[] = [first];
+  if (a.moreLegs !== undefined) {
+    if (!Array.isArray(a.moreLegs) || a.moreLegs.length + 1 > F.maxLegs.value) return null;
+    for (const l of a.moreLegs as unknown[]) {
+      if (typeof l !== 'object' || l === null) return null;
+      const r = l as Record<string, unknown>;
+      const leg = parseLeg(r.stops, r.trigger, r.rounds);
+      if (!leg) return null;
+      legs.push(leg);
+    }
   }
-  const stops: number[] = [];
-  for (const c of a.stops as unknown[]) {
-    const cell = int(c, 0, GRID_N - 1);
-    if (cell === null) return null;
-    stops.push(cell);
-  }
-  const rule = parseTrigger(a.trigger);
-  const rounds = int(a.rounds, 0, F.maxRounds.value);
-  const step = int(a.step, 0, stops.length - 1);
-  if (!rule || rounds === null || step === null) return null;
+  const stopsInAll = legs.reduce((t, l) => t + l.stops.length, 0);
+  const step = int(a.step, 0, stopsInAll - 1);
+  if (step === null) return null;
   if (a.after !== 'repeat' && a.after !== 'stay') return null;
   const id = a.planId === undefined ? undefined : int(a.planId, 1, 1e6);
   if (id === null) return null;
@@ -227,7 +253,7 @@ export function parsePlanAction(a: Record<string, unknown>): Action | null {
     mob,
     plan: {
       ...(id === undefined ? {} : { id }),
-      legs: [{ stops, rule, rounds }],
+      legs,
       after: a.after,
     },
     step,
@@ -248,11 +274,18 @@ export function planLines(farm: FarmState, action: Action, card: JobCard): strin
   const lines: string[] = [];
   if (action.type === 'setPlan') {
     if (!('legs' in action.plan)) return [];
-    const leg = action.plan.legs[0];
-    cell = leg?.stops[action.step ?? 0];
-    if (leg) {
+    const legs = action.plan.legs;
+    cell = legs.flatMap((l) => l.stops)[action.step ?? 0];
+    if (legs.length === 1) {
+      const leg = legs[0]!;
       lines.push(ruleText(leg.rule));
       lines.push(`${roundsText(leg.rounds ?? 0)}. ${afterText(action.plan.after)}`);
+    } else {
+      legs.forEach((leg, n) => {
+        const names = leg.stops.map(nameOf).join(', ');
+        lines.push(`Leg ${n + 1}: ${names}. ${ruleText(leg.rule)} ${roundsText(leg.rounds ?? 0)}.`);
+      });
+      lines.push(afterText(action.plan.after));
     }
   } else if (m.plan) {
     const tpl = farm.plans.find((t) => t.id === m.plan!.template);

@@ -182,7 +182,7 @@ describe('a rescue', () => {
     if (!r.ok) throw new Error(r.message);
     const saved = saveFarm(r.farm);
     expect(saved.saveFormat).toBe(SAVE_FORMAT_VERSION);
-    expect(SAVE_FORMAT_VERSION).toBe(15);
+    expect(SAVE_FORMAT_VERSION).toBe(16);
     const loaded = loadFarm(JSON.parse(JSON.stringify(saved)));
     expect(loaded.rescues).toEqual(r.farm.rescues);
     expect(farmHash(loaded)).toBe(farmHash(r.farm));

@@ -239,6 +239,12 @@ describe('looking is free', () => {
       bankLevel: (f) => engine.bankLevel(f),
       headToSell: (f) => engine.headToSell(f),
       daysToYearEnd: (f) => engine.daysToYearEnd(f),
+      // The stock book, the feed forecast and screen facts (engine 0.21.0).
+      stockBook: (f) => engine.stockBook(f),
+      originOf: (f) => engine.originOf(f, 1, 100),
+      feedForecast: (f, env) => engine.feedForecast(f, env),
+      lastRainMm: (f, env) => engine.lastRainMm(f, env),
+      paddockRestDays: (f) => engine.paddockRestDays(f),
       // Grazing plans: the plans, and the stops a mob's plan gives it today.
       plansView: (f) => engine.plansView(f),
       stopsToday: (f) => engine.stopsToday(f, f.mobs[0]!),

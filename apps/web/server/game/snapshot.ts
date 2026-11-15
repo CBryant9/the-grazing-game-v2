@@ -7,9 +7,13 @@ import {
   materialsOnHand,
   DSE_PER_AE,
   FEED_FLOOR_KG_HA,
+  areaIdOf,
   farmView,
+  lastRainMm,
   marketView,
+  paddockRestDays,
   paddockSummaries,
+  surveyOf,
   sheepDistrict,
   sheepMobsOf,
   stockingRead,
@@ -37,8 +41,10 @@ import {
   type TodoWire,
 } from '../../lib/game/types';
 import { buildWire } from './buildwords';
+import { feedWire } from './feed';
+import { commentLine } from './paddockwords';
 import { arableHaByPaddock, cropsWire } from './crops';
-import { inboxMessage } from './inboxwords';
+import { inboxMessage, repeatMarkNotes } from './inboxwords';
 import { contractsWire, owedTodo, workforceWire } from './labourwords';
 import { marketWire } from './market';
 import { buildMobs } from './mobs';
@@ -164,6 +170,8 @@ export function buildSnapshot(
   const haOf = new Map(view.paddocks.map((p) => [p.id, p.ha]));
   const cellOf = new Map(view.paddocks.map((p) => [p.id, p.labelCell]));
   const summaries = paddockSummaries(farm, env);
+  const rest = paddockRestDays(farm);
+  const comments = paddockComments(farm, summaries);
   const paddocks: PaddockWire[] = summaries.map((p) => ({
     id: p.id,
     name: p.name,
@@ -192,6 +200,8 @@ export function buildSnapshot(
     carryingDsePerHa: round(p.cc * DSE_PER_AE, 1),
     cell: cellOf.get(p.id) ?? 0,
     arableHa: round(arable.get(p.id) ?? 0, 1),
+    comment: comments.get(p.id) ?? null,
+    restDays: rest.get(p.id) ?? null,
   }));
 
   const mobs: MobWire[] = buildMobs(farm, env, market);
@@ -208,8 +218,11 @@ export function buildSnapshot(
   const dateOf = dateOfDay;
   const read = stored.inboxRead ?? 0;
   const worded: InboxWire[] = [];
+  // Marking is told once for each drop of calves (the rule Things to do follows).
+  const repeats = repeatMarkNotes(farm.inbox);
   for (let i = farm.inbox.length - 1; i >= 0; i--) {
     const m = farm.inbox[i]!;
+    if (repeats.has(m.seq)) continue;
     const words = inboxMessage(m.event, dateOf);
     if (!words) continue;
     worded.push({
@@ -246,6 +259,7 @@ export function buildSnapshot(
       bankLimit: round(farm.broke),
       lendLimit: round(farm.overdraft),
       netWorth: round(totals.netWorth.total),
+      rainMm: rainMm(farm, env),
       massKgHa: round(totals.massKgHa, -1),
       greenKgHa: round(totals.greenKgHa, -1),
       coverPct: round(totals.coverPct),
@@ -272,6 +286,7 @@ export function buildSnapshot(
     cropping: cropsWire(farm, mixed),
     mobs,
     paddocks,
+    feed: feedWire(farm, env, mobs),
     build: buildWire(materialsOnHand(farm), shown),
     workforce: workforceWire(farm, stored.missedWages ?? []),
     contracts: contractsWire(farm),
@@ -282,6 +297,70 @@ export function buildSnapshot(
     // Set by the game server for a Daily Farm, which carries the server's clock.
     daily: null,
   };
+}
+
+/** Last night's rain, mm, one place. Null on a farm with random seasons (no rain figure). */
+function rainMm(farm: FarmState, env: SourceEnv): number | null {
+  const mm = lastRainMm(farm, env);
+  return mm === null ? null : round(mm, 1);
+}
+
+/**
+ * The comment line for each stocked paddock, from the model's own figures: the feed, its green
+ * share and height, what grew and what the stock ate on the last day (cattle and sheep, the
+ * paddock's share), and the diet the stock chose against the paddock's average. The diet is read
+ * only from stock on pasture alone or lick, so hay or pellets never read as picking.
+ */
+function paddockComments(
+  farm: FarmState,
+  summaries: ReturnType<typeof paddockSummaries>,
+): Map<number, string | null> {
+  const survey = surveyOf(farm);
+  const out = new Map<number, string | null>();
+  for (const p of summaries) {
+    const cattle = farm.mobs.filter((m) => p.mobs.includes(m.id) && m.animals.length > 0);
+    const sheep = (farm.sheep?.mobs ?? []).filter(
+      (m) => m.sheep.length > 0 && areaIdOf(survey, m) === p.areaId,
+    );
+    const stocked = cattle.length > 0 || sheep.length > 0;
+    if (!stocked || p.ha <= 0) {
+      out.set(p.id, null);
+      continue;
+    }
+    const areaHa = survey.topology.areas[p.areaId]!.ha;
+    const share = areaHa > 0 ? p.ha / areaHa : 0;
+    let sheepEat = 0;
+    for (const m of sheep) if (m.st) sheepEat += m.st.demand * m.st.f * share;
+    let dietMe: number | null = null;
+    for (const m of cattle) {
+      if (m.st && (m.supp === 'none' || m.supp === 'lick')) {
+        dietMe = m.st.me;
+        break;
+      }
+    }
+    if (dietMe === null) {
+      for (const m of sheep) {
+        if (m.st && (m.feed === 'none' || m.feed === 'lick')) {
+          dietMe = m.st.me;
+          break;
+        }
+      }
+    }
+    out.set(
+      p.id,
+      commentLine({
+        stocked,
+        massKgHa: p.mass,
+        green: p.green,
+        heightCm: p.height,
+        growKgHa: p.grow / p.ha,
+        eatKgHa: (p.eat + sheepEat) / p.ha,
+        dietMe,
+        paddockMe: p.me,
+      }),
+    );
+  }
+  return out;
 }
 
 /**
