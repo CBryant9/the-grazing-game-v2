@@ -1,10 +1,67 @@
-.hero {
-  padding: clamp(28px, 7vw, 72px) 0 clamp(24px, 5vw, 48px);
-  background: linear-gradient(var(--panel2), var(--bg));
+/* The admin's announcement bar, above the header (mockup K). */
+.announce {
+  background: var(--panel2);
   border-bottom: 1px solid var(--line);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.announce p {
+  min-height: 36px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.announce a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  margin: -4px 0;
+  text-underline-offset: 3px;
+}
+
+/*
+ * The hero: the farm at dusk fills it, and the title sits over it with a fade from the left so
+ * the words always read (mockup K, `--hero-fade` from globals.css). On a phone the fade runs
+ * from the top, and the farm shows under the buttons.
+ */
+.hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid var(--line);
+  background: rgb(var(--hero-fade));
+}
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  /* Its layout and paint stay inside its own box, so the first paint of the title is not held up. */
+  contain: strict;
+  pointer-events: none;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Full strength behind every word; the farm shows clearly only in the space under the note. */
+  background: linear-gradient(
+    to top,
+    rgba(var(--hero-fade), 0.1) 0,
+    rgba(var(--hero-fade), 0.94) 104px
+  );
+}
+.heroText {
+  padding-top: clamp(28px, 7vw, 30px);
+  padding-bottom: 96px;
 }
 .title {
-  font-size: clamp(3.5rem, 17vw, 9rem);
+  font-size: clamp(3.5rem, 17vw, 9.125rem);
+  line-height: 0.9;
   text-transform: uppercase;
 }
 .coral {
@@ -25,47 +82,49 @@
 .note {
   margin-top: 14px;
   font-size: 0.8125rem;
+  color: var(--muted);
 }
-.h2 {
-  font-size: 1rem;
-  color: var(--accent-text);
-  margin: 28px 0 12px;
+@media (min-width: 760px) {
+  .hero::before {
+    background: linear-gradient(
+      90deg,
+      rgba(var(--hero-fade), 0.94) 0%,
+      rgba(var(--hero-fade), 0.78) 38%,
+      rgba(var(--hero-fade), 0) 62%
+    );
+  }
+  .heroText {
+    min-height: 540px;
+    padding-top: 30px;
+    padding-bottom: 40px;
+    padding-left: max(var(--gutter), 40px);
+  }
+  .note {
+    max-width: 30ch;
+  }
 }
-.cards {
+
+/* The three ways to play, under the hero (mockup K). */
+.modes {
   list-style: none;
-  padding: 0;
+  padding: 18px 0 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
   gap: 16px;
 }
-.cardItem {
+.mode {
   padding: 14px;
 }
-.cardItem h3 {
+.mode h3 {
   font-size: 0.875rem;
   margin-bottom: 4px;
 }
-.districts {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.footer {
-  margin-top: 40px;
-  padding: 20px 0 28px;
-  border-top: 1px solid var(--line);
-  font-size: 0.8125rem;
+.mode p {
+  font-size: 0.75rem;
 }
 
-/* The farm picture, drawn in code. It sits under the title so no text is laid over it. */
-.scene {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 160 / 52;
-  max-height: 460px;
-  min-height: 150px;
-  object-fit: cover;
-  border-bottom: 1px solid var(--line);
+/* Sections below the first screen are laid out when they come near, so the first paint stays quick. */
+.below {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px;
 }

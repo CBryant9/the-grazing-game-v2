@@ -3,16 +3,18 @@
  * Pure functions, so each can be tested without a screen. Nothing here knows a
  * rule or a number from the game; it only reads what the player has done.
  *
- * The steps (PRD 21a): open a paddock, move cattle, build a short fence and
- * watch the daylight bar move, open the market, end the day. A step is done
- * when the player really does it. Doing a step early counts. A farm with no
- * cattle has no move step.
+ * The steps (PRD 21a, changed after the m8 playtest): open a paddock, open a
+ * mob and read its card, look at the fence tool and its card (no need to
+ * build), open the market, end the day. The tour never asks the player to
+ * join mobs or spend money: on the default farm a move could only join the
+ * weaners with the cows. A step is done when the player really does it.
+ * Doing a step early counts. A farm with no cattle has no mob step.
  */
 
-export type TourStepId = 'paddock' | 'move' | 'fence' | 'market' | 'day';
+export type TourStepId = 'paddock' | 'mob' | 'fence' | 'market' | 'day';
 
-/** All the steps, in the order they are offered. */
-export const TOUR_ORDER: readonly TourStepId[] = ['paddock', 'move', 'fence', 'market', 'day'];
+/** All the steps, in the order they are offered. Five at most. */
+export const TOUR_ORDER: readonly TourStepId[] = ['paddock', 'mob', 'fence', 'market', 'day'];
 
 export interface TourProgress {
   v: 1;
@@ -35,13 +37,13 @@ export const TOUR_TEXT: Record<TourStepId, TourStepText> = {
     title: 'Open a paddock',
     body: 'Tap a paddock on the map to see its feed, its water and the mob in it.',
   },
-  move: {
-    title: 'Move cattle',
-    body: 'Open a paddock, tap Move a mob here, pick a mob, then press Move.',
+  mob: {
+    title: 'Open a mob',
+    body: 'Tap a mob in the Herd tab to read its card: head, weight, condition and what it is eating.',
   },
   fence: {
-    title: 'Build a short fence',
-    body: 'Pick Fence in the build tools, drag a short line, then press Build. Watch the daylight bar.',
+    title: 'Look at the fence tool',
+    body: 'Tap the Build tab, pick Fence and drag a short line. The card shows the cost and the light it uses. Cancel is fine.',
   },
   market: {
     title: 'Open the market',
@@ -61,9 +63,9 @@ export function startTour(day: number): TourProgress {
   return { v: 1, status: 'active', done: [], skipped: [], startDay: day };
 }
 
-/** The steps this farm gets. A farm with no cattle has no move step. */
+/** The steps this farm gets. A farm with no cattle has no mob step. */
 export function tourSteps(hasCattle: boolean): TourStepId[] {
-  return TOUR_ORDER.filter((s) => hasCattle || s !== 'move');
+  return TOUR_ORDER.filter((s) => hasCattle || s !== 'mob');
 }
 
 /** The step the player is on: the first one not done and not skipped. Null when there are none left. */
@@ -83,8 +85,10 @@ export function stepLabel(p: TourProgress, hasCattle: boolean): string | null {
 /** What the player has done, read from the game's state. */
 export interface TourObservation {
   paddockOpen: boolean;
-  moved: boolean;
-  fenceBuilt: boolean;
+  /** A mob's card is open. */
+  mobOpen: boolean;
+  /** The fence tool's card is showing (or the fence was built). Nothing has to be spent. */
+  fenceSeen: boolean;
   marketOpen: boolean;
   /** The farm's day now, or null when there is no farm on screen. */
   day: number | null;
@@ -93,7 +97,8 @@ export interface TourObservation {
 /** The slice of the game's state the tour reads. Kept narrow so a test can make one. */
 export interface TourReadState {
   paddockId: number | null;
-  move: { phase: string } | null;
+  /** The open mob card, if any. Left out reads as none. */
+  mobId?: number | null;
   build: { tool: string; phase: string } | null;
   tab: string;
   snapshot: { day: number } | null;
@@ -103,8 +108,11 @@ export interface TourReadState {
 export function observe(s: TourReadState): TourObservation {
   return {
     paddockOpen: s.paddockId !== null,
-    moved: s.move?.phase === 'done',
-    fenceBuilt: s.build?.tool === 'fence' && s.build.phase === 'done',
+    mobOpen: s.mobId !== undefined && s.mobId !== null,
+    // The card is showing: the step ends here, before the confirm.
+    fenceSeen:
+      s.build?.tool === 'fence' &&
+      (s.build.phase === 'confirm' || s.build.phase === 'blocked' || s.build.phase === 'done'),
     marketOpen: s.tab === 'market',
     day: s.snapshot?.day ?? null,
   };
@@ -125,8 +133,8 @@ export function noteProgress(p: TourProgress, o: TourObservation): TourProgress 
     if (yes) done = withStep(done, id);
   };
   add('paddock', o.paddockOpen);
-  add('move', o.moved);
-  add('fence', o.fenceBuilt);
+  add('mob', o.mobOpen);
+  add('fence', o.fenceSeen);
   add('market', o.marketOpen);
   add('day', o.day !== null && o.day > p.startDay);
   return done === p.done ? p : { ...p, done };

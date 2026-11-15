@@ -1,5 +1,15 @@
 import 'server-only';
-import { SPECIES, type FarmEvent, type SkipStop, type ThingToDo } from '@gg/engine';
+import {
+  FEED_FLOOR_KG_HA,
+  MARKET_CLASSES,
+  MARKET_WEIGHTS,
+  SPECIES,
+  todoKey as engineTodoKey,
+  type FarmEvent,
+  type MarketClassId,
+  type SkipStop,
+  type ThingToDo,
+} from '@gg/engine';
 import type { TodoWire } from '../../lib/game/types';
 import { layoutWord } from './buildwords';
 import { labourMessage, type DateOf } from './labourwords';
@@ -22,22 +32,41 @@ const SUPP_WORD = { none: 'no supplement', lick: 'lick', hay: 'hay', pellet: 'pe
 
 const FENCE_WORD = { electric: 'electric', tape: 'tape' } as const;
 
-/** A stable key for a thing to do, so the browser can name it and the server can find it again. */
-export function todoKey(t: ThingToDo): string {
-  switch (t.type) {
-    case 'calves-to-mark':
-    case 'no-water':
-    case 'plan-waiting':
-    case 'in-yards':
-      return `${t.type}:${t.mob}`;
-    case 'crop-ready':
-      return `${t.type}:${t.fieldId}`;
-    case 'fence-down':
-      return `${t.type}:${t.edge.line}${t.edge.index}`;
-    case 'trough-empty':
-    case 'trough-low':
-      return `${t.type}:${t.portId}`;
+/** A stable key for a thing to do, so the browser can name it and the server can find it again. The engine's own. */
+export const todoKey = (t: ThingToDo): string => engineTodoKey(t);
+
+/** Signed whole dollars: "-$12,400". */
+export const signedMoney = (n: number): string => `${n < 0 ? '-' : ''}${money(n)}`;
+
+/** A market class with its weights, from the market's own split: "yearling steers (280 to 450 kg)". */
+export function classWithWeight(cls: MarketClassId): string {
+  const W = MARKET_WEIGHTS;
+  const name = MARKET_CLASSES[cls].toLowerCase();
+  switch (cls) {
+    case 'wean':
+    case 'wheif':
+      return `${name} (under ${W.weanerUnderKg} kg)`;
+    case 'feed':
+      return `${name} (${W.weanerUnderKg} to ${W.heavyFromKg} kg)`;
+    case 'heavy':
+      return `${name.replace(' (bullocks)', '')} (${W.heavyFromKg} kg and over)`;
+    case 'heifer':
+      return `${name} (${W.weanerUnderKg} kg and over)`;
+    default:
+      return name;
   }
+}
+
+const away = (days: number): string =>
+  days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+
+/** The bank fact, the same in the inbox, Things to do and a skip that stopped. */
+export function bankWords(level: 1 | 2, cash: number, limit: number, head: number): string {
+  const first =
+    level === 1
+      ? `Cash is ${signedMoney(cash)}. The bank takes the farm at ${signedMoney(limit)}.`
+      : `Cash is ${signedMoney(cash)}, past three quarters of the way to ${signedMoney(limit)}, where the bank takes the farm.`;
+  return `${first} On hand: ${plural(head, 'head', 'head')} that could be sold.`;
 }
 
 export function todoWire(t: ThingToDo): TodoWire {
@@ -46,11 +75,13 @@ export function todoWire(t: ThingToDo): TodoWire {
   const base = { key, mob: null, opens: null, edge: null } as const;
   switch (t.type) {
     case 'calves-to-mark': {
-      const bulls = t.youngBulls > 0 ? ` and ${plural(t.youngBulls, 'young bull')}` : '';
+      const bulls = t.youngBulls > 0 ? `, and ${plural(t.youngBulls, 'young bull')}` : '';
+      const since =
+        t.sinceCalving !== null ? ` Calving started ${plural(t.sinceCalving, 'day')} ago.` : '';
       return {
         ...base,
         mob: t.mob,
-        text: `${t.mobName} has ${plural(t.count, 'calf', 'calves')} old enough to mark${bulls}.`,
+        text: `${t.mobName} has ${plural(t.count, 'bull calf', 'bull calves')} to mark${bulls}.${since}`,
         button: button('Mark calves'),
         urgent: false,
       };
@@ -112,6 +143,46 @@ export function todoWire(t: ThingToDo): TodoWire {
         button: button('Refill it'),
         urgent: false,
       };
+    case 'bank':
+      return {
+        ...base,
+        text: bankWords(t.level, t.cash, t.limit, t.count),
+        button: null,
+        urgent: t.level === 2,
+      };
+    case 'sale-soon':
+      return {
+        ...base,
+        text: `Cattle sale on ${dateText(t.date)}, ${away(t.daysAway)}. On the farm and not booked: ${t.classes
+          .map((c) => `${c.head.toLocaleString('en-AU')} ${classWithWeight(c.cls)}`)
+          .join(', ')}.`,
+        button: null,
+        urgent: false,
+      };
+    case 'low-condition':
+      return {
+        ...base,
+        mob: t.mob,
+        text: `${t.mobName} averages condition score ${t.cs.toFixed(1)}${t.area ? ` in ${t.area}` : ''}.`,
+        button: null,
+        urgent: false,
+      };
+    case 'calving':
+      return {
+        ...base,
+        mob: t.mob,
+        text: `Calving has started in ${t.mobName}. ${plural(t.count, 'calf', 'calves')} born so far.`,
+        button: null,
+        urgent: false,
+      };
+    case 'feed-floor':
+      return {
+        ...base,
+        mob: t.mob,
+        text: `${t.area}, where ${t.mobName} grazes, has about ${Math.round(t.massKgHa / 10) * 10} kg DM/ha. That is under ${t.floorKgHa.toLocaleString('en-AU')} kg DM/ha.`,
+        button: null,
+        urgent: false,
+      };
   }
 }
 
@@ -145,8 +216,19 @@ export function stopWord(s: SkipStop): string {
       return gameOverWord(s.reason);
     case 'plan-waiting':
       return `${s.mobName}'s grazing plan could not move it into ${s.area}, because ${waitWhyWord(s.why)}.`;
+    case 'bank':
+      return bankWords(s.level, s.cash, s.limit, s.head);
+    case 'out-of-feed':
+      return `The whole farm is eaten out with stock on it. The game ends if it stays that way for ${plural(s.daysLeft, 'more day')}.`;
+    case 'deaths':
+      return `${plural(s.count, s.species === 'sheep' ? 'sheep' : 'head', s.species === 'sheep' ? 'sheep' : 'head')} died in ${s.mobName}, from ${causeWord(s.cause)}.`;
+    case 'calving':
+      return `Calving has started in ${s.mobName}.`;
   }
 }
+
+/** The grazing floor in words, for a paddock under it: "Under 800 kg DM/ha". */
+export const UNDER_FLOOR = `Under ${FEED_FLOOR_KG_HA.toLocaleString('en-AU')} kg DM/ha`;
 
 export function gameOverWord(reason: 'bank' | 'feed'): string {
   return reason === 'bank'
@@ -229,6 +311,9 @@ export function doneWord(events: readonly FarmEvent[], dateOf?: DateOf): string 
         break;
       case 'plan-cleared':
         parts.push('The mob is off its plan.');
+        break;
+      case 'todo-dismissed':
+        parts.push('Put away. It shows again if it stops and then starts again.');
         break;
       case 'layout-job':
         parts.push(layoutWord(e) ?? 'Done.');

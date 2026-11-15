@@ -2399,6 +2399,28 @@ Branch `m7.1-realism-fixes`, cut from `m7-final` (ca7ff39). Engine 0.19.0, save 
 - The review's exact Central West rescue farm (-$73,277) was not rebuilt; a farm of the same kind was used.
 - No browser check of the plan card wording; the `realism-guardian` agent was not run on this pass.
 
+### 15 Nov 2026: m8 Site look
+
+Branch `m8-look-site`, cut from `m7-final` (6a27291). The website, admin, community pages and the map's surround brought into line with `docs/mockups/index.html`. No game rule, figure or engine code changed. Lesson LS1.
+
+- **Landing page:** the title sits over the dusk farm with the mockup's fade (`--hero-fade`, both themes, in `globals.css`): from the left on PC, from the top on a phone, where the farm shows under the buttons. Hero buttons: Play free, then Leaderboard while `leaderboards` is in the site's switch list, otherwise How a day works. The three cards under the hero (Daily Farm, Fast Farm, Community) follow the switch list. **Daily Farm is on by default** in the site's list (`SITE_SWITCHES_DEFAULT_ON`; `SITE_SWITCHES_OFF=daily_farm` turns it off). The other sections stay lower down. The admin's announcement shows as a bar at the top when there is one and a database is set: the page is built with `getStaticProps` and rebuilt every 5 minutes only when `SUPABASE_DB_POOLER_URL` is set, otherwise fully static. It still sends no script file. The announcement rules moved to `lib/announcement.ts` so the page and the admin form share them (a pages-router page can not load a `server-only` module). Sections below the first screen use `content-visibility: auto`.
+- **Public header:** links are the mockup's small ghost buttons.
+- **Map surround:** bush country in both themes (VISUALS, "The surround"), in `packages/render/src/surround.ts`, drawn as a screen tile under the farm. No farm view changed, so the map fixtures did not need making again.
+- **Admin:** headings in Silkscreen 20 px, chunky buttons in every button row (coral for the main one), the switch look on the switches screen with its confirm step kept, the mockup's menu (logo and ADMIN, active item, a coral count of open reports on Moderation), KPI tiles four to a row from 900 px. The logo and the count are drawn by the server layout and handed to the menu, so no script was added.
+- **Community:** headings in Anton (40 to 64 px). The feed page has the mockup's 340 px right column on PC, holding the side ad slot, while ads are on (no new data, no new script). A sponsored post after every 8 posts (the mockup and the slot's stored default; the feed does not read the stored `every_n_posts` yet).
+- **Tokens:** `.badge.coral`, the `.btn.lime` bevel, `.pagehead h1` letter spacing.
+- **Ticker:** the mockup's green border and glow, 340 px wide, 20 px in from the corner. 1,437 bytes compressed (limit 2 KB).
+
+**Proof:** see the m8 report for the test counts, the JS sizes and Lighthouse on `/` before and after.
+
+**Not done or not checked**
+
+- Signed-in admin and community pages (no database here): only their not-set-up answers were seen.
+- The announcement bar with a real database.
+- Lighthouse on this PC was noisy while another build ran beside it; the quiet runs matched the m7 figures.
+
+**Merged with `m7-final` (53da309).** Both branches had made the site show Daily Farm by default. One mechanism is kept: the default-on list `SITE_SWITCHES_DEFAULT_ON` in `lib/site.ts`, turned off by name with `SITE_SWITCHES_OFF=daily_farm`. The minus form in `SITE_SWITCHES_ON` (`-daily_farm`, in the m8 Daily Farm entry below) is removed and now does nothing; `.env.example`, SETUP, RUNBOOK, CALLS_FOR_CLAUDIA and the tests say the same.
+
 ### 15 Nov 2026: m8 Daily Farm on by default
 
 Branch `m8-daily-on-and-speed`, cut from `m7-final` (6a27291). Claudia asked: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." (REQUIREMENTS, 15 Nov 2026.)
@@ -2456,6 +2478,47 @@ Branch `m8-look-game` (from `m8-daily-on-and-speed`). Claudia asked that the bui
 **Proof.** `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 236 files, 4,268 tests: 4,242 passed, 22 expected failures, 4 skipped (plus a new case in `playfirst.test.ts`: Fast Farm checked and "Next: choose district" in the first HTML). `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit moved: `/play` 214.1 KB of 250 KB (208.4 KB before). Lighthouse on `/play` (repo settings, mobile, 5 runs, local production build, a PC busy with other builders): after 0.91, 0.96, 0.89, 0.94, 0.95 (median 0.94), largest paint about 0.93 s, layout shift 0, accessibility, best practices and SEO 100. Before (336c9ce, two tries, each with runs that failed on the busy PC): 0.81, 0.82, 0.83 (3 of 5 runs, largest paint 3.6 s), then 0.93 (1 of 5). The two are not a clean pair; the median is within the noise of the 0.95 measured when the speed fix landed, and total blocking time (React's first hydration) is still what holds it under 0.95. Screens checked with headless Chrome against the production build with no keys, a guest farm taken through setup on the recommended start: phone 390 x 844 and on its side 844 x 390 in both themes, PC 1440 x 900 dark (PC light was refused a new farm by the guest farm limit, 5 in 10 minutes), beside screenshots of the mockups.
 
 **Waiting on server fields** (drawn when present, read through `components/play/ui.ts`): `totals.rainMm`, `market.buy.classes[].weekChangeCKg` (and a week and year change on the price table), `paddocks[].restDays`, `paddocks[].comment`, the Feed panel and the Stock book components (slots left in More, the PC tabs and Herd).
+
+### 15 Nov 2026: m8 Playability fixes
+
+Branch `m8-playability`, cut from `m7-final` (6a27291). Engine 0.20.0, save format 15, snapshot version 7. From a playtest of 144 three-year games. Calls B141 to B150, A10 (doing nothing out-scores sensible play, for Claudia, nothing changed), stand-ins and G10. Lessons PF1 to PF8. Only the engine, `apps/web/server`, `lib/game/tour.ts`, `lib/game/types.ts` (new fields only), `components/play/helptopics.ts` and docs were touched: the screens are other builders'.
+
+**What was built**
+
+1. The bank: two facts before it takes the farm (cash below zero, three quarters of the way to the limit), in the inbox, Things to do and as skip stops; `totals.bankLimit` and `totals.lendLimit` as display numbers. Nothing came off the browser deny list. Tests: `day/playability.test.ts`, `server/game/playability.test.ts`.
+2. Skip stops for the first eaten-out day, the bank facts, deaths other than natural, and calving starting, each with its words. Tests: `day/playability.test.ts`, `day/days.test.ts`.
+3. A year skip runs to the farm's year end: 366 days across 29 February (a Central West farm from September 2007). Test: `day/playability.test.ts`.
+4. Things to do facts: a sale within 7 days with the head at sale weight by class, a mob under CS 2.5, calving started, feed under the floor; each once while true; `dismissTodo` puts one away. Tests: both playability files, `day/todo.test.ts`.
+5. Marking once per drop, when most calves are old enough or 30 days after calving started. Test: `day/playability.test.ts`.
+6. Mob card warnings only when losing worse than 0.05 kg a head a day, CS under 2.5 or no water; otherwise `details`. Tests: `mobwords.test.ts`, `server/game/playability.test.ts`.
+7. "Under 800 kg DM/ha" in place of "0 days" (`feedText`); "Feed is about 760 kg DM/ha. Under about 900 they eat less." Tests: same.
+8. The tour: open a mob, look at the fence card; never join mobs or spend money. Test: `lib/game/tour.test.ts`.
+9. The year card's change lines. Test: `server/game/playability.test.ts`.
+10. Setup money per difficulty for each district and size (`sizes[].money`). Test: `server/game/playability.test.ts`.
+
+**A small playtest through the real `GameServer`** (real years, small farms, three years; sensible player on week skips doing every job with a button, selling steers and heifers at sale weight when a sale is near, moving mobs out of the yards; do-nothing player on month skips):
+
+| District | Player | New to-do items a week | Items shown | Warning lines at each look | Skips | Stopped early | Missed stops |
+|---|---|---|---|---|---|---|---|
+| Central Queensland | sensible | 0.40 | 0.87 | 2.7 | 161 | 10 | 0 |
+| Central Queensland | nothing | 0.33 | 2.87 | 3.6 | 44 | 15 | 0 |
+| Central West | sensible | 0.37 | 0.61 | 3.1 | 160 | 8 | 0 |
+| Central West | nothing | 0.35 | 2.68 | 2.9 | 43 | 13 | 0 |
+
+The first item came on day 74 in Central Queensland and day 0 in Central West (before: day 133 to 160). On hard difficulty the Central Queensland do-nothing farm was taken by the bank in year 3; its skips stopped first at -$44 (below zero) and again at -$45,095 (three quarters of the way), then at the end. A buyer spending to the overdraft on hard was warned the night each buy took cash below zero. "Missed stops" counts inbox facts that should stop a skip on a day that was not the last of its skip: none.
+
+**Proof**
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 235 files, 4,278 tests: 22 expected failures and 4 skips (as on `m7-final`); after the fixes to the tests listed in CALIBRATION (the m8 entry), the two tests that failed only on time under load (`cattle/gains.test.ts`, `server/boards/boards.test.ts`) pass alone.
+- `pnpm build` passes. `pnpm check:browser-bundle` clean. `pnpm check:js-budget` passes with no limit raised (`/play` 208.6 KB).
+- `pnpm test:speed` alone: sheep 2.27 ms a day (passes). The cattle case failed on time on every run (45, 20, 6.7 and 7.7 ms a day) while other builders were running on the same PC; `m7-final`'s own engine, run the same way in the same hour, gave 17 ms. No change here touches the cattle tick's work (the bank check is two comparisons a day). Not yet seen under 5 ms on this tip.
+
+**Not done or not checked**
+
+- The screens do not yet draw the new fields: `totals.bankLimit` and `totals.lendLimit` beside Cash, `paddocks[].feedText` in place of the days, `mobs[].details` in the mob card's details, `setup` `sizes[].money` on the difficulty step, and a "put away" button on each Things to do item that sends `{ action: { type: 'dismissTodo', key } }`. Until then the paddock sheet still shows "About 0 days", and Help does not mention putting an item away.
+- The inbox's own out-of-feed line still says "The farm has about N days of feed left"; the skip stop words are the new ones.
+- The marking note in the inbox (`toMark`, every 45 days) is unchanged.
+- Engine tests were compared with `m7-final` by count (22 expected failures, 4 skips), not file by file by name. The `realism-guardian` agent was not run. No browser check.
 
 ## Ideas raised but not built yet
 

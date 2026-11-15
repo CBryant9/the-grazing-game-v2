@@ -26,28 +26,18 @@ export const useUi = create<UiState>()((set) => ({
 }));
 
 /*
- * Fields the screens draw when the server sends them. Some are on the playability branch
- * (m8-playability) and arrive with the merge; until then they may be missing, so every read
- * here is optional. The game's own wire types are not changed on this branch.
+ * Fields the screens draw when the server sends them, which the server does not send yet. Every
+ * read here is optional. The fields the server does send are read from the game's own types.
  */
 export interface PendingTotals {
-  /** Where the bank takes the farm, dollars (negative). */
-  bankLimit?: number;
-  lendLimit?: number;
   /** Rain last night, mm. Not sent yet. */
   rainMm?: number | null;
 }
 export interface PendingPaddock {
-  /** "About 12 days" or "Under 800 kg DM/ha". */
-  feedText?: string | null;
   /** The neutral comment line on the paddock sheet. Not sent yet. */
   comment?: string | null;
   /** Days since stock last left, for the Rest sort. Not sent yet. */
   restDays?: number | null;
-}
-export interface PendingMob {
-  /** Plain fact lines for a mob that is holding or gaining. Never a warning. */
-  details?: string[];
 }
 export interface PendingBuyClass {
   /** This week's change in c/kg. Not sent yet. */
@@ -56,4 +46,3 @@ export interface PendingBuyClass {
 
 export const pendingTotals = (s: Snapshot): PendingTotals => s.totals as unknown as PendingTotals;
 export const pendingPaddock = (p: object): PendingPaddock => p as unknown as PendingPaddock;
-export const pendingMob = (m: object): PendingMob => m as unknown as PendingMob;

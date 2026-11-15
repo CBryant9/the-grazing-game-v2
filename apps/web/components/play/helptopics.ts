@@ -27,7 +27,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       'Jobs use light. Before you confirm a job, its card says how long it takes and how much light is left after it. A job that fits in the light left is done. A job that does not fit is not done.',
       'Some jobs, like sowing, take none of the day.',
       'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
-      'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. A skip stops early and says why if something needs you, such as a mob with no water.',
+      'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. +1 year runs to the end of the farm year.',
+      'A skip stops early and says why if something needs you: a mob with no water, a trough run dry, a crop ready, stock dying of anything but natural causes, calving starting, the whole farm eaten out, or cash going below zero and then three quarters of the way to where the bank takes the farm.',
     ],
   },
   {
@@ -55,7 +56,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: 'build',
     title: 'Building',
     lines: [
-      'Open the build tools (the Build tab on a phone). The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
+      'Open the build tools with the Build tab. The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
       'Fence: pick permanent, electric or tape, then drag along the paddock lines. Gate: tap a fence to put a gate in it, and tap a gate to open or shut it. Pipe: drag across squares, starting from the bore, a trough, a hub or pipe that is already there. Trough: tap a square that water reaches. Water hub: tap a fence corner or a square.',
       'Every job shows a card first, with its cost and the light it uses. You confirm, and the tool goes back to Look.',
       'Red on the map while you draw means one thing: this can not be done. The part of a line that does not fit in today shows red and is not built. Only the part that fits is built. Draw the rest again another day. A line the game can not build at all shows red too.',
@@ -86,7 +87,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     title: 'Husbandry',
     lines: [
       'Stock work is done where the mob is. The cattle never have to come to the yards for it.',
-      'Things to do says what needs doing, such as calves to mark or a mob with no water. It is a banner over the map on a phone. Where there is a job, its button sits right there. Open mob goes to the mob card.',
+      'Things to do lists facts that need you, such as calves to mark, a mob with no water, cash below zero, a sale in the next week with cattle at sale weight, a mob under CS 2.5, calving under way, or a paddock with stock under the grazing floor. Each shows once, while it is true. On a phone it is the "things to check" banner under the top bar: the first three show, and See all opens the rest. Where there is a job, its button sits right there. Open mob goes to the mob card. Put away takes an item off the list while it stays true.',
+      'Marking shows once for a drop, with the count, when most of the calves are old enough or a month after calving started.',
       'The mob card has the jobs as buttons: Mark calves, Wean, Sell, Move and the supplement. A button that is off says why.',
       'There is no preg testing. A cow goes on the record as PTIC by herself, once she is far enough along. The mob card shows how many head are known in calf.',
     ],
@@ -175,7 +177,7 @@ export const SHEEP_HELP_TOPICS: readonly HelpTopic[] = [
     lines: [
       'Contractors shear and crutch each mob by themselves on its days. The card says when, and about what it costs a head.',
       'To move the shearing day, open the mob and tap Move shearing. It takes none of the day.',
-      'Wool is sold by itself at shearing. The summary and the diary say the clip per head, the micron, what the wool made and what shearing cost. Wool is its own money line on the Scores tab.',
+      'Wool is sold by itself at shearing. The summary and the diary say the clip per head, the micron, what the wool made and what shearing cost. Wool is its own money line in Scores.',
     ],
   },
   {

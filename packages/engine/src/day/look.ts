@@ -4,19 +4,15 @@
  * changes the farm or moves the clock.
  */
 
-import type { Action, ActionRefusalReason, ActionType } from '../actions/types';
+import type { Action, ActionRefusalReason } from '../actions/types';
 import type { CalendarDate } from '../calendar';
-import { MARK_NOTE_MIN_AGE, markable, weanable } from '../cattle/breeding';
+import { markable, weanable } from '../cattle/breeding';
 import { JOB_TIMES } from '../data/jobTimes';
-import { SPECIES, type SpeciesId } from '../data/species';
-import { EDGE, H_EDGES, V_EDGES, type EdgeRef } from '../farm/topology';
-import { PORTABLE_CAPACITY_L, PORTABLE_LOW_SHARE } from '../farm/water';
 import { dayMinutes, lightLeft, timeNow } from '../sim/clock';
-import { areaIdOf, dateOn, nextSaleDay, saleDayOn, surveyOf, type SourceEnv } from '../sim/derived';
+import { dateOn, nextSaleDay, saleDayOn, type SourceEnv } from '../sim/derived';
 import { animalLookup } from '../cattle/types';
 import type { SaleClassId } from '../data/cattle';
-import { stepOf, templateOf } from '../sim/plans';
-import type { FarmState, LoggedAction, PlanWaitReason } from '../sim/state';
+import type { FarmState, LoggedAction } from '../sim/state';
 import { NO_TIME, previewAction } from './act';
 
 /**
@@ -68,220 +64,17 @@ export function clockView(farm: FarmState): ClockView {
   };
 }
 
-/**
- * One thing that needs doing on the farm now, as a fact: what it is, the
- * mob or the place, and the count. It never says what the player should
- * do. `does` names the action that deals with it, and `action` is that
- * action ready to send when it needs no further choice (null when the
- * player has to pick something first, such as a paddock).
- */
-export type ThingToDo =
-  /** Bull calves old enough for the model's "to mark" note (60 days), and unmarked young bulls. */
-  (
-    | {
-        type: 'calves-to-mark';
-        mob: number;
-        mobName: string;
-        area: string | null;
-        /** Unmarked bull calves 60 days or older. */
-        count: number;
-        /** Unmarked young bulls in the mob, which marking also deals with. */
-        youngBulls: number;
-      }
-    /** A mob on ground with no water. `count` is its head, calves included. Everything dies on day 4. */
-    | {
-        type: 'no-water';
-        mob: number;
-        mobName: string;
-        area: string | null;
-        count: number;
-        /** Days in a row without water so far. */
-        dryDays: number;
-      }
-    /**
-     * A grazing plan that can not move a mob: the area it wants next has no
-     * water, or another mob is in it. `count` is the mob's head. `step`
-     * counts the stops of the plan from the first stop of the first leg.
-     * The plan tries again each day by itself.
-     */
-    | {
-        type: 'plan-waiting';
-        mob: number;
-        mobName: string;
-        area: string;
-        why: PlanWaitReason;
-        step: number;
-        count: number;
-      }
-    /** A grain crop ready to harvest. `count` is its hectares. */
-    | { type: 'crop-ready'; fieldId: number; sp: SpeciesId; count: number }
-    /**
-     * A mob in the stock yards, where bought cattle arrive. `count` is its
-     * head, calves at foot included, and `days` is how many days it has
-     * been there. The player picks the paddock to move it to.
-     */
-    | {
-        type: 'in-yards';
-        mob: number;
-        mobName: string;
-        count: number;
-        days: number;
-        /** The yards have water. */
-        hasWater: true;
-        /**
-         * What the mob can graze there: almost none. Stock in the yards graze
-         * only the square the yards stand on, so a mob left there runs short
-         * of feed.
-         */
-        feed: 'almost-none';
-        /** Hectares the mob can graze in the yards: the one square they stand on. */
-        grazingHa: number;
-      }
-    /** A fence segment that has been knocked down. `count` is 1. */
-    | { type: 'fence-down'; edge: EdgeRef; fence: 'electric' | 'tape'; count: number }
-    /** A portable trough that is empty, or under a quarter full. `count` is the litres left. */
-    | { type: 'trough-empty' | 'trough-low'; portId: number; cell: number; count: number }
-  ) & {
-    does: ActionType;
-    action: Action | null;
-  };
-
-/**
- * What needs doing on the farm now, for the banner and the mob card. It
- * uses only what the model already knows: the age at which the model
- * notes calves for marking, a mob's water, a crop's maturity, fences that
- * are down and the level in a portable trough. Weaning is not listed,
- * because the model weans a drop by itself when it is due. Weaning earlier
- * is the player's choice, offered on the mob card. In the order: water,
- * stock, crops, fences.
- */
-export function thingsToDo(farm: FarmState): ThingToDo[] {
-  const out: ThingToDo[] = [];
-  if (farm.over) return out;
-  const survey = surveyOf(farm);
-  const areaName = (id: number): string | null => (id < 0 ? null : survey.topology.areas[id]!.name);
-
-  // Water.
-  for (const m of farm.mobs) {
-    if (m.where.kind !== 'paddock' || !m.animals.length) continue;
-    const id = areaIdOf(survey, m);
-    if (survey.points.areaTroughs[id]!.length) continue;
-    out.push({
-      type: 'no-water',
-      mob: m.id,
-      mobName: m.name,
-      area: areaName(id),
-      count: m.animals.length,
-      dryDays: m.dry,
-      does: 'moveMob',
-      action: null,
-    });
-  }
-  // Plans that are waiting. A paused plan is not waiting: it is stopped.
-  for (const m of farm.mobs) {
-    const run = m.plan;
-    if (!run?.waiting || run.paused || !m.animals.length) continue;
-    const tpl = templateOf(farm, run);
-    if (!tpl) continue;
-    const { target, why } = run.waiting;
-    const next = stepOf(tpl, run.leg, run.idx);
-    out.push({
-      type: 'plan-waiting',
-      mob: m.id,
-      mobName: m.name,
-      area: survey.topology.areas[survey.topology.areaOf[target]!]!.name,
-      why,
-      step: next,
-      count: m.animals.length,
-      does: 'pausePlan',
-      action: { type: 'pausePlan', mob: m.id },
-    });
-  }
-  for (const pt of farm.layout.water.ports) {
-    // The model's own low-water mark: under a quarter full.
-    if (pt.level >= PORTABLE_CAPACITY_L * PORTABLE_LOW_SHARE) continue;
-    out.push({
-      type: pt.level <= 0 ? 'trough-empty' : 'trough-low',
-      portId: pt.id,
-      cell: pt.cell,
-      count: Math.max(0, pt.level),
-      does: 'refillPortable',
-      action: { type: 'refillPortable', port: pt.id },
-    });
-  }
-
-  // Stock.
-  for (const m of farm.mobs) {
-    if (m.where.kind === 'yards' && m.animals.length) {
-      out.push({
-        type: 'in-yards',
-        mob: m.id,
-        mobName: m.name,
-        count: m.animals.length,
-        days: Math.max(0, farm.day - (m.where.since ?? farm.day)),
-        hasWater: true,
-        feed: 'almost-none',
-        grazingHa: farm.layout.scale.haPerSquare,
-        does: 'moveMob',
-        action: null,
-      });
-    }
-    const area = areaName(areaIdOf(survey, m));
-    let toMark = 0;
-    let youngBulls = 0;
-    for (const a of m.animals) {
-      if (a.kind === 'calf') {
-        if (a.sex === 'M' && a.age >= MARK_NOTE_MIN_AGE) toMark++;
-      } else if (a.sex === 'M' && a.young) youngBulls++;
-    }
-    if (toMark > 0) {
-      out.push({
-        type: 'calves-to-mark',
-        mob: m.id,
-        mobName: m.name,
-        area,
-        count: toMark,
-        youngBulls,
-        does: 'markCalves',
-        action: { type: 'markCalves', mob: m.id },
-      });
-    }
-  }
-
-  // Crops.
-  for (const f of farm.crops.fields) {
-    const sp = SPECIES[f.sp];
-    if (sp.type !== 'crop' || farm.day - f.sown < sp.mature!) continue;
-    out.push({
-      type: 'crop-ready',
-      fieldId: f.id,
-      sp: f.sp,
-      count: f.cells.length * farm.layout.scale.haPerSquare,
-      does: 'harvest',
-      action: { type: 'harvest', field: f.id },
-    });
-  }
-
-  // Fences that are down.
-  const down = (line: 'h' | 'v', codes: Uint8Array, n: number): void => {
-    for (let index = 0; index < n; index++) {
-      const c = codes[index];
-      if (c !== EDGE.electricDown && c !== EDGE.tapeDown) continue;
-      const edge: EdgeRef = { line, index };
-      out.push({
-        type: 'fence-down',
-        edge,
-        fence: c === EDGE.electricDown ? 'electric' : 'tape',
-        count: 1,
-        does: 'fixFence',
-        action: { type: 'fixFence', edge },
-      });
-    }
-  };
-  down('h', farm.layout.fences.hE, H_EDGES);
-  down('v', farm.layout.fences.vE, V_EDGES);
-  return out;
-}
+export {
+  CALVING_SHOWN_DAYS,
+  LOW_CS,
+  MARK_AFTER_CALVING_DAYS,
+  SALE_SOON_DAYS,
+  allThingsToDo,
+  pruneTodoOff,
+  thingsToDo,
+  todoKey,
+  type ThingToDo,
+} from './todo';
 
 /** Whether a stock job can be done on a mob now, and on how many head. */
 export interface HusbandryJob {

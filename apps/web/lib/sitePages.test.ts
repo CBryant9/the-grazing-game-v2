@@ -15,13 +15,18 @@ import {
 
 /*
  * The public pages are built once, with the feature switches off except Daily Farm
- * (on by default, as in the game). Each part
+ * (on by default, as in the game; SITE_SWITCHES_OFF turns it off). Each part
  * that depends on a switch must stay out of the page until that switch is on,
  * so the live site never promises what is not built. These tests render each
  * page to HTML the way the build does.
  */
 
-const ENV_KEYS = ['SITE_SWITCHES_ON', 'SITE_CONTACT_EMAIL', 'SITE_OWNER_NAME'] as const;
+const ENV_KEYS = [
+  'SITE_SWITCHES_ON',
+  'SITE_SWITCHES_OFF',
+  'SITE_CONTACT_EMAIL',
+  'SITE_OWNER_NAME',
+] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const k of ENV_KEYS) {
@@ -48,15 +53,19 @@ describe('at the build defaults', () => {
     expect(await html('index')).toContain('Daily Farm');
   });
 
-  it('a minus in front of the key takes Daily Farm off the site', async () => {
-    process.env.SITE_SWITCHES_ON = 'community,-daily_farm';
+  it('SITE_SWITCHES_OFF takes Daily Farm off the site, and a minus in SITE_SWITCHES_ON does nothing', async () => {
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
     expect(await html('index')).not.toContain('Daily Farm');
+    delete process.env.SITE_SWITCHES_OFF;
+    process.env.SITE_SWITCHES_ON = 'community,-daily_farm';
+    expect(await html('index')).toContain('<h3 class="px">Daily Farm</h3>');
   });
 });
 
 describe('with every switch off', () => {
+  // Daily Farm is on by default (SITE_SWITCHES_DEFAULT_ON), so it is turned off here by name.
   beforeEach(() => {
-    process.env.SITE_SWITCHES_ON = '-daily_farm';
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
   });
 
   it('the landing page names only what is live', async () => {
@@ -153,7 +162,8 @@ describe('with switches on', () => {
   });
 
   it('Daily Farm keep-going rows stay out while Daily Farm is off', async () => {
-    process.env.SITE_SWITCHES_ON = 'purchases,-daily_farm';
+    process.env.SITE_SWITCHES_ON = 'purchases';
+    process.env.SITE_SWITCHES_OFF = 'daily_farm';
     const h = await html('pricing');
     expect(h).toContain('A$5');
     expect(h).not.toContain('Daily Farm');
@@ -175,6 +185,27 @@ describe('with switches on', () => {
     expect(p).toContain('Analytics');
     expect(p).toContain('The community');
     expect(p).toContain('If you make an account');
+  });
+});
+
+describe('the site switch defaults', () => {
+  it('Daily Farm is on with nothing set, and the home page shows its card before Fast Farm', async () => {
+    const h = await html('index');
+    expect(h).toContain('<h3 class="px">Daily Farm</h3>');
+    expect(h.indexOf('Daily Farm')).toBeLessThan(h.indexOf('Fast Farm'));
+    expect(h).not.toContain('<h3 class="px">Community</h3>');
+  });
+
+  it('the hero offers the leaderboard only while leaderboards are on', async () => {
+    expect(await html('index')).toContain('How a day works</a>');
+    process.env.SITE_SWITCHES_ON = 'leaderboards,community';
+    const h = await html('index');
+    expect(h).toContain('href="/leaderboards"');
+    expect(h).toContain('<h3 class="px">Community</h3>');
+  });
+
+  it('the home page has no announcement bar without one', async () => {
+    expect(await html('index')).not.toContain('aria-label="Announcement"');
   });
 });
 

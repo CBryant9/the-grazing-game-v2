@@ -1,4 +1,4 @@
-import type { PageConfig } from 'next';
+import type { GetStaticProps, PageConfig } from 'next';
 import Link from '@/components/site/SiteLink';
 import { DISTRICTS, DISTRICT_IDS, MODES, SITE } from '@gg/shared';
 import { PublicHeader } from '@/components/site/PublicHeader';
@@ -9,6 +9,7 @@ import { Ticker } from '@/components/site/Ticker';
 import site from '@/components/site/site.module.css';
 import { absoluteUrl, siteSwitchOn } from '@/lib/site';
 import styles from '@/components/site/landing.module.css';
+import { announcementDbOn, readAnnouncement, type Announcement } from '@/server/site/announcement';
 
 // No JavaScript is sent to the browser for this page.
 export const config: PageConfig = { unstable_runtimeJS: false };
@@ -73,7 +74,43 @@ const LANDING_DATA = {
   ],
 };
 
-export default function LandingPage() {
+/** The admin's announcement bar (PRD 11.8), read from the database when one is set. */
+type Props = { announcement?: Announcement | null };
+
+/** How often the page is rebuilt to pick up a new announcement, in seconds. Only with a database. */
+const ANNOUNCEMENT_REFRESH = 300;
+
+/**
+ * Built once with no database. With a database the page is rebuilt every few minutes so a new
+ * announcement shows. Either way it sends no script: the props only go into the HTML.
+ */
+export const getStaticProps: GetStaticProps<Props> = async () => {
+  if (!announcementDbOn()) return { props: { announcement: null } };
+  return {
+    props: { announcement: await readAnnouncement() },
+    revalidate: ANNOUNCEMENT_REFRESH,
+  };
+};
+
+function AnnouncementBar({ value }: { value: Announcement }) {
+  return (
+    <aside className={styles.announce} aria-label="Announcement">
+      <p className="wrap">
+        {value.link === null ? (
+          value.text
+        ) : value.link.startsWith('/') ? (
+          <Link href={value.link}>{value.text}</Link>
+        ) : (
+          <a href={value.link} rel="noopener">
+            {value.text}
+          </a>
+        )}
+      </p>
+    </aside>
+  );
+}
+
+export default function LandingPage({ announcement = null }: Props = {}) {
   const dailyOn = siteSwitchOn('daily_farm');
   const sheepOn = siteSwitchOn('sheep');
   const communityOn = siteSwitchOn('community');
@@ -84,10 +121,13 @@ export default function LandingPage() {
   return (
     <>
       <PageHead path="/" jsonLd={[LANDING_DATA]} />
+      {announcement ? <AnnouncementBar value={announcement} /> : null}
       <PublicHeader current="/" />
       <main id="main">
+        {/* The title sits over the farm at dusk, with a fade behind the words (mockup K). */}
         <section className={styles.hero}>
-          <div className="wrap">
+          <FarmScene className={styles.scene} />
+          <div className={`wrap ${styles.heroText}`}>
             <h1 className={`display ${styles.title}`}>
               The Grazing <span className={styles.coral}>Game</span>
             </h1>
@@ -96,30 +136,59 @@ export default function LandingPage() {
               <Link href="/play" className="btn coral big">
                 Play free
               </Link>
-              <a href="#how" className="btn ghost big">
-                How a day works
-              </a>
+              {leaderboardsOn ? (
+                <Link href="/leaderboards" className="btn ghost big">
+                  Leaderboard
+                </Link>
+              ) : (
+                <a href="#how" className="btn ghost big">
+                  How a day works
+                </a>
+              )}
             </div>
-            <p className={`muted ${styles.note}`}>
+            <p className={styles.note}>
               Free to play on your phone or PC. Nothing to download. No sign-up.
             </p>
           </div>
         </section>
-        <FarmScene className={styles.scene} />
 
         <section className="wrap" aria-labelledby="ways">
-          <div className={site.section}>
-            <h2 id="ways" className={`px ${site.h2}`}>
-              What you can play
-            </h2>
-            <ul className={site.cards}>
-              <li className={`card ${site.card}`}>
-                <h3 className="px">{MODES.fast.name}</h3>
+          <h2 id="ways" className="sr-only">
+            What you can play
+          </h2>
+          <ul className={styles.modes}>
+            {dailyOn ? (
+              <li className={`card ${styles.mode}`}>
+                <h3 className="px">{MODES.daily.name}</h3>
                 <p className="muted">
-                  Play at your own pace through a run of seasons. Skip ahead and see what your plan
-                  did to the grass and the stock.
+                  One day a day. Check in at first light and make your moves before dark.
                 </p>
               </li>
+            ) : null}
+            <li className={`card ${styles.mode}`}>
+              <h3 className="px">{MODES.fast.name}</h3>
+              <p className="muted">
+                Play at your own pace through a run of seasons. Skip ahead and see what your plan
+                did to the grass and the stock.
+              </p>
+            </li>
+            {communityOn ? (
+              <li className={`card ${styles.mode}`}>
+                <h3 className="px">Community</h3>
+                <p className="muted">
+                  Follow graziers, start a group with your mates and share your farm.
+                </p>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        <section className={`wrap ${styles.below}`} aria-labelledby="farm">
+          <div className={site.section}>
+            <h2 id="farm" className={`px ${site.h2}`}>
+              On your farm
+            </h2>
+            <ul className={site.cards}>
               <li className={`card ${site.card}`}>
                 <h3 className="px">Real country</h3>
                 <p className="muted">
@@ -134,14 +203,6 @@ export default function LandingPage() {
                   paddock fallow. Buy and sell at the saleyard on sale days.
                 </p>
               </li>
-              {dailyOn ? (
-                <li className={`card ${site.card}`}>
-                  <h3 className="px">{MODES.daily.name}</h3>
-                  <p className="muted">
-                    One day a day. Check in at first light and make your moves before dark.
-                  </p>
-                </li>
-              ) : null}
               {sheepOn ? (
                 <li className={`card ${site.card}`}>
                   <h3 className="px">Sheep and wool</h3>
@@ -154,19 +215,11 @@ export default function LandingPage() {
                   <p className="muted">See how your farm compares with other graziers.</p>
                 </li>
               ) : null}
-              {communityOn ? (
-                <li className={`card ${site.card}`}>
-                  <h3 className="px">Community</h3>
-                  <p className="muted">
-                    Follow graziers, start a group with your mates and share your farm.
-                  </p>
-                </li>
-              ) : null}
             </ul>
           </div>
         </section>
 
-        <section className="wrap" aria-labelledby="how">
+        <section className={`wrap ${styles.below}`} aria-labelledby="how">
           <div className={site.section}>
             <h2 id="how" className={`px ${site.h2}`}>
               How a day works
@@ -197,7 +250,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="wrap" aria-labelledby="districts">
+        <section className={`wrap ${styles.below}`} aria-labelledby="districts">
           <div className={site.section}>
             <h2 id="districts" className={`px ${site.h2}`}>
               Four districts
@@ -216,7 +269,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="wrap" aria-labelledby="real">
+        <section className={`wrap ${styles.below}`} aria-labelledby="real">
           <div className={site.section}>
             <h2 id="real" className={`px ${site.h2}`}>
               What makes it realistic
@@ -261,7 +314,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="wrap" aria-labelledby="faq">
+        <section className={`wrap ${styles.below}`} aria-labelledby="faq">
           <div className={site.section}>
             <h2 id="faq" className={`px ${site.h2}`}>
               Questions
@@ -277,7 +330,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="wrap" aria-labelledby="start">
+        <section className={`wrap ${styles.below}`} aria-labelledby="start">
           <div className={`${site.section} ${site.closing}`}>
             <h2 id="start" className={`px ${site.h2}`}>
               Ready?

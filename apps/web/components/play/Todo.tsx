@@ -42,7 +42,7 @@ function Row({
   // Put a thing to do away (m8 playability). It takes none of the day and costs nothing, so
   // there is no card to confirm: the server is asked, and the list comes back without it.
   const putAway = async (): Promise<void> => {
-    const action = { type: 'dismissTodo', key: item.key } as unknown as SimpleAction;
+    const action: SimpleAction = { type: 'dismissTodo', key: item.key };
     await startAct(slot, 'Put away', action);
     if (useGame.getState().acts[slot]?.phase === 'confirm') await confirmAct(slot);
     if (useGame.getState().acts[slot]?.phase === 'done') dismissAct(slot);

@@ -6,6 +6,7 @@ import {
   farmTotals,
   materialsOnHand,
   DSE_PER_AE,
+  FEED_FLOOR_KG_HA,
   farmView,
   marketView,
   paddockSummaries,
@@ -52,7 +53,7 @@ import {
   viewWithSheep,
 } from './sheepmobs';
 import { sheepSummaryLines } from './sheepwords';
-import { NO_WATER_WHY, causeWord, stopWord, todoWire } from './words';
+import { NO_WATER_WHY, UNDER_FLOOR, causeWord, stopWord, todoWire } from './words';
 
 /**
  * Whether a farm shows sheep: in a sheep district (never Central Queensland), with the sheep
@@ -92,6 +93,18 @@ function workforceTodo(farm: FarmState): TodoWire[] {
         },
       ]
     : [];
+}
+
+/**
+ * The feed line on the paddock sheet: the days of feed above the grazing floor, or "Under 800
+ * kg DM/ha" where the paddock is under it, so a paddock is never shown as "0 days". Null with no
+ * stock on it.
+ */
+export function feedText(feedDays: number, massKgHa: number): string | null {
+  if (!Number.isFinite(feedDays)) return null;
+  if (massKgHa < FEED_FLOOR_KG_HA) return UNDER_FLOOR;
+  const days = Math.round(feedDays);
+  return `About ${days.toLocaleString('en-AU')} ${days === 1 ? 'day' : 'days'}`;
 }
 
 const change = (c: { before: number; after: number }, places = 0): ChangeWire => ({
@@ -173,6 +186,7 @@ export function buildSnapshot(
     aePerHa: round(p.rate, 2),
     dsePerHa: round(p.dsePerHa, 1),
     feedDays: Number.isFinite(p.feedDays) ? round(p.feedDays) : null,
+    feedText: feedText(p.feedDays, p.mass),
     growKgHaDay: round(p.ha > 0 ? p.grow / p.ha : 0),
     noWaterWhy: p.water === 'none' ? NO_WATER_WHY : null,
     carryingDsePerHa: round(p.cc * DSE_PER_AE, 1),
@@ -229,6 +243,8 @@ export function buildSnapshot(
       ae: round(stocking.totalAe, 1),
       dse: round(stocking.totalDse),
       cash: round(totals.cash),
+      bankLimit: round(farm.broke),
+      lendLimit: round(farm.overdraft),
       netWorth: round(totals.netWorth.total),
       massKgHa: round(totals.massKgHa, -1),
       greenKgHa: round(totals.greenKgHa, -1),
@@ -246,7 +262,7 @@ export function buildSnapshot(
     },
     view,
     todo: [
-      ...thingsToDo(farm).map(todoWire),
+      ...thingsToDo(farm, env).map(todoWire),
       ...(sr ? sheepTodo(farm, sr) : []),
       ...workforceTodo(farm),
     ],

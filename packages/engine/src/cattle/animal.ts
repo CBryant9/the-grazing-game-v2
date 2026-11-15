@@ -11,6 +11,7 @@ import {
   BARREN_CHANCE,
   BOUGHT_CALF,
   CLASS_LABELS,
+  MARKET_WEIGHTS,
   SALE_CLASSES,
   type CattleClassId,
   type GroupId,
@@ -136,9 +137,13 @@ export function groupKey(a: Animal): GroupId {
 export function marketClass(a: Pick<Animal, 'kind' | 'wt'>): MarketClassId {
   switch (a.kind) {
     case 'steer':
-      return a.wt < 280 ? 'wean' : a.wt < 450 ? 'feed' : 'heavy';
+      return a.wt < MARKET_WEIGHTS.weanerUnderKg
+        ? 'wean'
+        : a.wt < MARKET_WEIGHTS.heavyFromKg
+          ? 'feed'
+          : 'heavy';
     case 'heifer':
-      return a.wt < 280 ? 'wheif' : 'heifer';
+      return a.wt < MARKET_WEIGHTS.weanerUnderKg ? 'wheif' : 'heifer';
     case 'cow':
       return 'cow';
     case 'bull':

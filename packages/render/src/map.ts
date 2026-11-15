@@ -34,6 +34,7 @@ import {
   Sprite,
   Text,
   Texture,
+  TilingSprite,
 } from 'pixi.js';
 import {
   FARM_VIEW_VERSION,
@@ -107,6 +108,7 @@ import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
 import { NATURAL, breedFor, paletteFor, type MapPalette, type MapTheme } from './palette';
 import { scatter } from './random';
+import { SURROUND_TILE, paintSurround, surroundScale } from './surround';
 import { cattleSprite, defaultSprites, sheepSprite } from './sprites/painters';
 import { packAtlas, type SpriteDef, type SpriteRegistry } from './sprites/registry';
 
@@ -437,6 +439,9 @@ class PixiFarmMap implements FarmMap {
   };
 
   private base = new Graphics();
+  /** The bush round the farm, in screen space under the world, moved with it (mockup: the bush tile). */
+  private surround: TilingSprite | null = null;
+  private surroundCanvas: HTMLCanvasElement | null = null;
   private far = new Graphics();
   private pipeG = new Graphics();
   private footprints = new Graphics();
@@ -700,15 +705,38 @@ class PixiFarmMap implements FarmMap {
     this.rain.boundsArea = new Rectangle(0, 0, 4096, 4096);
     this.rain.visible = false;
     this.ui.addChild(this.labelLayer, this.rain);
-    this.app.stage.addChild(world, this.ui);
+    this.surroundCanvas = makeCanvas(SURROUND_TILE, SURROUND_TILE);
+    this.surround = new TilingSprite({
+      texture: new Texture({
+        source: new CanvasSource({
+          resource: this.surroundCanvas,
+          scaleMode: 'linear',
+          addressMode: 'repeat',
+        }),
+      }),
+      width: this.vp.width,
+      height: this.vp.height,
+    });
+    this.app.stage.addChild(this.surround, world, this.ui);
     this.drawBase();
   }
 
   private drawBase(): void {
+    this.drawSurround();
     this.base
       .clear()
       .rect(-0.12, -0.12, WORLD_W + 0.24, WORLD_H + 0.24)
       .fill(this.palette.ui.farmEdge);
+  }
+
+  /** Paint the bush tile in the theme's colours. */
+  private drawSurround(): void {
+    const canvas = this.surroundCanvas;
+    if (!canvas || !this.surround) return;
+    const img = new ImageData(SURROUND_TILE, SURROUND_TILE);
+    paintSurround(this.palette.ui.surround, this.palette.ui.surroundSpeck, img.data);
+    canvas.getContext('2d')!.putImageData(img, 0, 0);
+    this.surround.texture.source.update();
   }
 
   // -------------------------------------------------------------------------
@@ -813,6 +841,13 @@ class PixiFarmMap implements FarmMap {
     const { cam, vp, world } = this;
     world.scale.set(cam.zoom);
     world.position.set(vp.width / 2 - cam.x * cam.zoom, vp.height / 2 - cam.y * cam.zoom);
+    // The bush covers the screen and moves with the farm, so a pan never slides the farm over it.
+    if (this.surround) {
+      const s = surroundScale(cam.zoom);
+      this.surround.setSize(vp.width, vp.height);
+      this.surround.tileScale.set(s);
+      this.surround.tilePosition.set(world.position.x, world.position.y);
+    }
 
     const mode = lodMode(cam.zoom, this.lodStarted ? this.lod.mode : undefined);
     // The first picture, and every change with reduce motion on, is shown at once.
@@ -1757,6 +1792,8 @@ class PixiFarmMap implements FarmMap {
   private applyLight(): void {
     const light = this.view?.light ?? { first: 360, last: 1080 };
     this.world.tint = mapTint(this.minutes, light.first, light.last, this.weather.kind);
+    // The country round the farm gets the same light as the farm.
+    if (this.surround) this.surround.tint = this.world.tint;
     this.invalidate();
   }
 

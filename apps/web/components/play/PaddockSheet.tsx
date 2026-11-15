@@ -73,7 +73,7 @@ export function PaddockSheet({
         : null;
   const extra = pendingPaddock(p);
   // The feed line in words when the server sends it ("Under 800 kg DM/ha"), else the days.
-  const feedLine = extra.feedText ?? (p.feedDays === null ? null : `About ${num(p.feedDays)} days`);
+  const feedLine = p.feedText ?? (p.feedDays === null ? null : `About ${num(p.feedDays)} days`);
   const stock = snapshot.market.sheep ? 'stock' : 'cattle';
   return (
     <Sheet
@@ -109,7 +109,7 @@ export function PaddockSheet({
         <p className={styles.mobline}>
           <b>{here.length > 1 ? 'Mobs:' : 'Mob:'}</b> {here.map((m) => m.name).join(', ')},{' '}
           {feedLine.charAt(0).toLowerCase() + feedLine.slice(1)}
-          {extra.feedText ? '.' : ' of feed at this rate.'}
+          {p.feedText ? '.' : ' of feed at this rate.'}
         </p>
       )}
       <Sward paddock={vp} plantings={snapshot.view.plantings} />

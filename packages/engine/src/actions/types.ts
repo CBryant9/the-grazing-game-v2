@@ -81,6 +81,12 @@ export type Action =
   | { type: 'planMove'; mob: number }
   /** Take a mob off its plan. The template stays. */
   | { type: 'clearPlan'; mob: number }
+  /**
+   * Put a thing to do away, by its key (`todoKey`). It stays off the list
+   * while it stays true, and shows again if it stops and starts again. A
+   * decision: it takes none of the day (engine 0.20.0).
+   */
+  | { type: 'dismissTodo'; key: string }
   /** Wean every calf of 90 days or more. With no `to`, the weaners go where the daily tick would send them. */
   | { type: 'wean'; mob: number; to?: MoveTarget }
   /** Mark every bull calf and unmarked young bull in the mob. */
@@ -236,7 +242,9 @@ export type ActionRefusalReason =
   /** Sheep graze the area cattle were to go to (one mob to an area, one species to a paddock). */
   | 'sheep-there'
   /** Cattle graze the area sheep were to go to. */
-  | 'cattle-there';
+  | 'cattle-there'
+  /** That thing to do is not on the list now. */
+  | 'not-on-list';
 
 /** Why an action was not done. Nothing has changed. */
 export interface ActionRefusal {

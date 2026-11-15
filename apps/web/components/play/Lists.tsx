@@ -16,7 +16,7 @@ import type { MobWire, PaddockWire, Snapshot } from '@/lib/game/types';
 import { EmptyState } from './EmptyState';
 import { CHIP } from './PaddockSheet';
 import { PanelHead } from './PanelHead';
-import { pendingMob, pendingPaddock } from './ui';
+import { pendingPaddock } from './ui';
 import styles from './play.module.css';
 
 function SortBar<K extends string>({
@@ -165,7 +165,7 @@ export function HerdList({ snapshot }: { snapshot: Snapshot }) {
           <SortBar label="Sort the herd" keys={MOB_KEYS} active={key} dir={dir} onPick={pick} />
           <ul className={styles.rows}>
             {rows.map((m) => {
-              const reason = m.why[0] ?? pendingMob(m).details?.[0] ?? null;
+              const reason = m.why[0] ?? m.details[0] ?? null;
               return (
                 <li key={m.id}>
                   <button type="button" className={styles.row} onClick={() => openMob(m.id)}>

@@ -305,6 +305,21 @@ Her words: "Let's take the driving and all of that part out." "The drive home is
   - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
 - [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
 
+## 15 Nov 2026: playability fixes from the playtest (m8)
+
+A playtest of 144 three-year games found the game hard to read and quick to run into trouble unseen. Decided (calls B141 to B150):
+
+- [x] The bank never takes the farm with no warning: when cash first goes below zero, and again at three quarters of the way to the bank's limit, an inbox fact and a Things to do fact name the cash, the limit and the head on hand that could be sold, and a skip stops at both. The bank's limit is a display number beside Cash.
+- [x] A skip stops early and says why for: no water, a trough run dry, a crop ready, the year end, game over, the first day the whole farm is eaten out, the bank facts, deaths from anything but natural causes, and calving starting.
+- [x] +1 year ends on the farm's year end, also across a leap day.
+- [x] Things to do holds facts that come once and go when they stop being true or are put away, never repeated daily: a sale within 7 days with the head at sale weight by class, a mob under CS 2.5, calving started, a stocked paddock under the feed floor, and marking once per drop with the count.
+- [x] Mob card reasons are warnings only when the mob is losing weight or in low condition. Otherwise the same facts are plain details.
+- [x] Words for feed under the floor state the fact and its effect with the real figures, never "0 days" or "not enough feed" on a herd that is growing.
+- [x] The tour never asks the player to join mobs or spend money.
+- [x] The year card names a part of the score that moved a lot, with both figures, and a cause only where it is a fact.
+- [x] The setup step can show each difficulty's starting cash and the bank's limit.
+- [ ] Doing nothing out-scores sensible play (A10): for Claudia to rule on after she has played. Nothing changed.
+
 ## 14 Nov 2026: build it all, with a list of calls at the end
 
 Her words (as typed): "ok yeah hook in- I would like them all done and would prefer a list of clals at the ends that yu explain and i could say if i wnated something diffferent - let sjust focu son getting this done, maybe you should open some chats unde ryou to get it done faster pleas"

@@ -456,3 +456,37 @@ summary:focus-visible {
   border-radius: var(--radius);
   background: var(--panel2);
 }
+
+/* Page headings in Anton, as the website pages (mockup H: 64 px on PC, 40 px on a phone). */
+h1.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+/* The feed page: one column on a phone. On PC, with ads on, the feed and a 340 px right column. */
+.cols,
+.feed,
+.side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.side:empty {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .main:has(.cols[data-side]) {
+    max-width: 1160px;
+  }
+  .cols[data-side] {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+  }
+  .cols[data-side] .side:empty {
+    display: grid;
+  }
+}

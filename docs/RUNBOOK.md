@@ -54,7 +54,8 @@ Every variable may be empty. With none set, the site runs guest play with farm f
 | `GG_TRUSTED_IP_HEADER` | Every caller with no session shares one limit (farm creation: 5 farms in 10 minutes for everyone together; sign-in limits). **Set to `x-real-ip` on Vercel.** The server logs a warning at start-up when it is unset |
 | `SITE_CONTACT_EMAIL` | The website has no "contact us" links. Read at build |
 | `SITE_OWNER_NAME` | The privacy page and terms say "the owner of The Grazing Game". Read at build |
-| `SITE_SWITCHES_ON` | The public pages talk about nothing that is switched off (all off while unset, except Daily Farm, which is on by default as in the game; `-daily_farm` takes it off). Read at build |
+| `SITE_SWITCHES_ON` | The public pages talk about nothing that is switched off (all off while unset, except Daily Farm, which is on by default as in the game). Read at build |
+| `SITE_SWITCHES_OFF` | Nothing: Daily Farm shows on the public pages. `daily_farm` here takes it off. Read at build |
 | `NEXT_PUBLIC_SUPABASE_URL` | Accounts and the database are off. Community photos can not be shown |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Accounts are off |
 | `SUPABASE_SECRET_KEY` | Accounts are off. No account can be deleted (Auth admin), no Storage file removed, no ad media read |

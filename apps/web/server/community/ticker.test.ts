@@ -252,7 +252,9 @@ describe('where the ticker is, and is not', () => {
     expect(text).toContain('prefers-reduced-motion');
     expect(text).toContain('localStorage');
     expect(text).toContain('/api/ticker');
-    expect(text).toContain('max-width:360px');
+    // The mockup's toast: 340 px wide, and never wider than the screen less its 20 px insets.
+    expect(text).toContain('width:340px');
+    expect(text).toContain('max-width:calc(100vw - 40px)');
     expect(text).toContain('min-width:44px');
     expect(text).toContain('min-height:44px');
     expect(text).not.toContain(String.fromCharCode(0x2014));

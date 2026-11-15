@@ -164,15 +164,13 @@ function Bell({ small }: { small?: boolean }) {
 
 function Cash({ snapshot, worth }: { snapshot: Snapshot; worth?: boolean }) {
   const { cash, netWorth } = snapshot.totals;
-  const limit = pendingTotals(snapshot).bankLimit;
+  const limit = snapshot.totals.bankLimit;
   return (
     <div className={styles.cashbox}>
       <p className={styles.cash} aria-label={`Cash ${money(cash)}`}>
         {money(cash)}
       </p>
-      {cash < 0 && typeof limit === 'number' && (
-        <p className={styles.cashsub}>Bank limit {money(limit)}</p>
-      )}
+      {cash < 0 && <p className={styles.cashsub}>Bank limit {money(limit)}</p>}
       {worth && <p className={styles.cashsub}>net worth {shortMoney(netWorth)}</p>}
     </div>
   );

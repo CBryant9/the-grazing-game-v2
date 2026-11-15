@@ -13,6 +13,7 @@ import type {
   SetupOptions,
   SetupSize,
   SetupStart,
+  SetupMoneyWire,
   SetupStock,
   SetupYears,
 } from '@/lib/game/types';
@@ -129,15 +130,6 @@ const NEXT: Record<StepId, string> = {
   name: 'name your farm',
   summary: 'check the farm',
 };
-
-/** One difficulty's money on a district and size, when the server sends it (m8). */
-interface SetupMoney {
-  difficulty: SetupDifficulty;
-  cashRunning: number;
-  cashScratch: number;
-  lendLimit: number;
-  bankLimit: number;
-}
 
 /**
  * The recommended start, picked already on every step so a new player can tap straight
@@ -287,10 +279,8 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
   };
   const label = <T extends { id: string; label: string }>(list: T[], id?: string): string =>
     list.find((x) => x.id === id)?.label ?? '';
-  const moneyFor = (id: SetupDifficulty): SetupMoney | null =>
-    ((size as { money?: SetupMoney[] } | undefined)?.money ?? []).find(
-      (m) => m.difficulty === id,
-    ) ?? null;
+  const moneyFor = (id: SetupDifficulty): SetupMoneyWire | null =>
+    (size?.money ?? []).find((m) => m.difficulty === id) ?? null;
 
   const take = async (): Promise<void> => {
     const daily = draft.mode === 'daily';

@@ -1,5 +1,6 @@
 import 'server-only';
 import { DISTRICTS, DISTRICT_IDS } from '@gg/shared';
+import { ANNOUNCEMENT_MAX, checkAnnouncement } from '@/lib/announcement';
 import { MAINTENANCE_SETTING, MAINTENANCE_WORDINGS } from './info';
 
 /**
@@ -28,7 +29,7 @@ export const SETTINGS: readonly SettingDef[] = [
   {
     key: 'announcement',
     label: 'Announcement bar',
-    help: 'A short line and an optional link for the bar on the home page. Saved now. The pages do not show it yet: they start reading it in a later milestone.',
+    help: 'A short line and an optional link for the bar at the top of the home page. The home page shows a change within about five minutes. Leave the text empty for no bar.',
     isPublic: true,
     initial: { text: null, link: null },
   },
@@ -58,7 +59,7 @@ export const SETTINGS: readonly SettingDef[] = [
 export const settingDef = (key: unknown): SettingDef | undefined =>
   SETTINGS.find((s) => s.key === key);
 
-export const ANNOUNCEMENT_MAX = 140;
+export { ANNOUNCEMENT_MAX };
 export const RULES_MAX = 10_000;
 
 export type Parsed =
@@ -67,43 +68,10 @@ export type Parsed =
 
 const bad = (message: string): Parsed => ({ ok: false, message });
 
-/** Plain single-line text: no control characters, no line breaks. */
-const oneLine = /^[^\u0000-\u001f\u007f]*$/;
-
 function parseAnnouncement(input: unknown): Parsed {
-  if (typeof input !== 'object' || input === null) return bad('Send the text and the link.');
-  const raw = input as { text?: unknown; link?: unknown };
-  const text = typeof raw.text === 'string' ? raw.text.trim() : '';
-  const link = typeof raw.link === 'string' ? raw.link.trim() : '';
-  if (raw.text !== undefined && raw.text !== null && typeof raw.text !== 'string') {
-    return bad('The text must be words.');
-  }
-  if (raw.link !== undefined && raw.link !== null && typeof raw.link !== 'string') {
-    return bad('The link must be an address.');
-  }
-  if (text.length > ANNOUNCEMENT_MAX) {
-    return bad(`Keep the announcement to ${ANNOUNCEMENT_MAX} characters or fewer.`);
-  }
-  if (!oneLine.test(text)) return bad('The announcement must be one line.');
-  if (link && !text) return bad('Add the announcement text before a link.');
-  if (link) {
-    const ownPage = /^\/(?!\/)[A-Za-z0-9\-._~/%]{0,98}$/.test(link);
-    let https = false;
-    try {
-      const u = new URL(link);
-      https = u.protocol === 'https:' && link.length <= 200 && !/\s/.test(link);
-    } catch {
-      https = false;
-    }
-    if (!ownPage && !https) {
-      return bad('The link must be a page on this site (starting with /) or an https address.');
-    }
-  }
-  return {
-    ok: true,
-    value: { text: text || null, link: link || null },
-    audit: { count: text.length },
-  };
+  const r = checkAnnouncement(input);
+  if (!r.ok) return bad(r.message);
+  return { ok: true, value: r.value, audit: { count: r.value.text?.length ?? 0 } };
 }
 
 function parseDistricts(input: unknown): Parsed {

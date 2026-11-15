@@ -63,3 +63,17 @@
     display: inline-flex;
   }
 }
+
+/* The public pages' links: the mockup's small ghost buttons (mock K). Hidden on a phone, where the footer lists them. */
+.nav .ghostLink {
+  display: none;
+}
+.nav .ghostLink[aria-current='page'] {
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
+@media (min-width: 760px) {
+  .nav .ghostLink {
+    display: inline-flex;
+  }
+}
