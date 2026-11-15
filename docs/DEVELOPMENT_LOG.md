@@ -2244,7 +2244,7 @@ Branch `m5.3-dashboard`, from `m6-joined` (32ca9cf). Migration `20261117000100_a
 - `server/db/dbstore.test.ts`: days played counted once per diary row by mode; a save conflict counted.
 - `packages/db`: the four new tables are server only in the access matrix and the coverage list; the new migration comes after the ones it builds on.
 - The walked-route test now names `collect`, `consent` and `admin/dashboard`; `second.test.ts` leaves the export to its own test (it is a read).
-- Full checks: see the numbers below.
+- Full checks: `pnpm typecheck`, `pnpm lint`, `pnpm format:check` clean. `pnpm test`: 214 files, 4,153 tests: 4,127 passed, 22 expected failures (the open calibration rows), 4 skipped, 0 failed. `pnpm build` passes (the proxy is listed). `pnpm check:browser-bundle` clean. `pnpm check:js-budget`: every page under its limit, none raised. Before and after: `/play` 207.2 to 208.3 KB (limit 250), `/account` 145.4 to 147.6 (150), `/account/notifications` 146.9 to 148.6, `/store` 142.8 to 144.6, `/purchase/success` 142.7 to 144.4, `/purchase/cancelled` 141.4 to 143.2, `/admin` 149.1 to 149.5, `/community/groups/[id]` 149.4 to 149.8, `/` and `/leaderboards` still 0. Pages not touched grew by 0.3 to 0.4 KB as well, cause not found (LESSONS DA1). Several pages are now within 0.5 KB of 150 KB.
 
 **Calls made for Claudia** (each easy to change)
 
