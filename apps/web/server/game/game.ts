@@ -101,7 +101,7 @@ import {
   type Owner,
   type StoredFarm,
 } from './store';
-import { setupOptions } from './setup';
+import { DAILY_NO_DATABASE, DAILY_SWITCHED_OFF, setupOptions } from './setup';
 import {
   fenceRuleNotes,
   isSheepAction,
@@ -260,14 +260,19 @@ export interface DailyRuntime {
   /** Is Daily Farm switched on? */
   enabled(): Promise<boolean>;
   /**
+   * Development only (GG_DEV_LOCAL_DAILY=1 in `pnpm dev` with no database, server/daily/runtime.ts):
+   * farm files instead of the database, a guest may start a Daily Farm, and there is no rollover
+   * job, so each night is run when the farm is next opened. Never set on a production build.
+   */
+  local?: boolean;
+  /**
    * Told after a night is saved, for the night that brings the farm up to today (m6: the
    * notifications, server/daily/notices.ts). Never stops a night: a failure is logged and dropped.
    */
   notify?(news: NightNews): Promise<void>;
 }
 
-/** What the player reads when Daily Farm is not open yet. */
-export const COMING_MESSAGE = 'Daily Farm is coming. Fast Farm is ready to play now.';
+export { DAILY_NO_DATABASE, DAILY_SWITCHED_OFF };
 /** What the player reads when a guest asks for a Daily Farm. */
 export const DAILY_NEEDS_ACCOUNT =
   'Daily Farm needs an account, so the farm is kept for you from day to day. Sign in to start one.';
@@ -1074,11 +1079,14 @@ export class GameServer {
    * nothing decided for them.
    */
   private async createDaily(id: string, choices: SetupChoices, who: Owner): Promise<Snapshot> {
-    if (who.kind !== 'user') throw new GameError(403, DAILY_NEEDS_ACCOUNT, 'daily_needs_account');
     const runtime = this.daily;
-    if (!runtime || this.store.kind !== 'db' || !(await runtime.enabled())) {
-      throw new GameError(403, COMING_MESSAGE, 'daily_off');
+    if (who.kind !== 'user' && !runtime?.local) {
+      throw new GameError(403, DAILY_NEEDS_ACCOUNT, 'daily_needs_account');
     }
+    if (!runtime || (this.store.kind !== 'db' && !runtime.local)) {
+      throw new GameError(403, DAILY_NO_DATABASE, 'daily_off');
+    }
+    if (!(await runtime.enabled())) throw new GameError(403, DAILY_SWITCHED_OFF, 'daily_off');
     if (!isSupportedZone(choices.timezone)) {
       throw new GameError(400, dailyZoneMessage(choices.timezone), 'daily_zone');
     }

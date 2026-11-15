@@ -2399,6 +2399,16 @@ Branch `m7.1-realism-fixes`, cut from `m7-final` (ca7ff39). Engine 0.19.0, save 
 - The review's exact Central West rescue farm (-$73,277) was not rebuilt; a farm of the same kind was used.
 - No browser check of the plan card wording; the `realism-guardian` agent was not run on this pass.
 
+### 15 Nov 2026: m8 Daily Farm on by default
+
+Branch `m8-daily-on-and-speed`, cut from `m7-final` (6a27291). Claudia asked: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." (REQUIREMENTS, 15 Nov 2026.)
+
+- **The default.** `daily_farm: true` in `FEATURE_SWITCHES`; new migration `20261120000100_daily_farm_on.sql` sets it on where no admin has set it by hand; the seed test checks the two agree (on). The admin switches screen reads its default from the shared list, so it follows. The website's own default now shows Daily Farm (`SITE_SWITCHES_DEFAULT_ON` in `lib/site.ts`); `-daily_farm` in `SITE_SWITCHES_ON` takes it off.
+- **No database.** Setup no longer says "Daily Farm is coming". With no database it says: "Daily Farm needs the game database, which keeps each farm from day to day and runs its nights. This copy of the game has no database set up yet. Fast Farm is ready to play now." With a database but no sign-in: Daily Farm needs an account and sign-in is not set up. Switched off by the admin: "Daily Farm is switched off at the moment." The setup state `coming` is renamed `off`.
+- **Trying it before the database.** `GG_DEV_LOCAL_DAILY=1`, honoured only in `pnpm dev` with no database: a guest can start a Daily Farm on farm files (`DailyData(null)`, so the baked tables then the averages and last prices). No rollover job: the nights owed run when the farm is opened, by the same `bringUp` code. A small change: a `local` flag on the Daily runtime and two guards in `createDaily`.
+- **What Daily Farm needs to run** is written down in `docs/RUNBOOK.md` section 5.1. `.env.example` said a farm with no feed runs "only as far as the days already kept"; it runs on, on averages and last prices, with a diary line. Fixed there and in the RUNBOOK.
+- **Proof.** `daily.e2e.test.ts` no longer forces the switch: it reads the migrations' default from the database (on), checks setup offers Daily Farm to the new account, starts a farm, runs the rollover route after midnight and opens the farm next morning on the next day (passes). New `server/daily/offer.test.ts` (7 tests): the no-database line, the sign-in line, the development setting ignored in production and with a database, and a guest's local farm moving on overnight. `start.test.ts`, `rollover.test.ts`, `coverage.test.ts`, `sitePages.test.ts` pass.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

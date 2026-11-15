@@ -45,24 +45,31 @@ export const DETAILS_TO_COME = 'Contact details will be added before launch.';
 export type SiteSwitchKey = FeatureSwitchKey | 'sheep' | 'farm_hands' | 'analytics';
 
 /**
- * A small "off by default" read for the website.
+ * Switches the website shows as on when the build environment says nothing about them. Daily Farm
+ * is on in the game by default (FEATURE_SWITCHES, at Claudia's request of 15 November 2026), so the
+ * landing and pricing pages show it too, and the site and the game agree.
+ */
+export const SITE_SWITCHES_DEFAULT_ON: readonly SiteSwitchKey[] = ['daily_farm'];
+
+/**
+ * The website's read of a switch, made when the site is built.
  *
- * The shared defaults (`FEATURE_SWITCHES`) describe launch, and a few of them
- * are on (Daily Farm, leaderboards, sign-ups) although those parts are not
- * built yet. The public pages must never promise what is not there, so every
- * switch here is OFF unless the environment turns it on:
+ * The public pages must never promise what is not there, so every switch here is OFF unless the
+ * environment turns it on, except the ones in SITE_SWITCHES_DEFAULT_ON. A key with a minus in
+ * front turns one of those off:
  *
- *   SITE_SWITCHES_ON=community,leaderboards
+ *   SITE_SWITCHES_ON=community,leaderboards,-daily_farm
  *
- * The admin back end (Stage 5) replaces this read with the live switches.
- * The keys are the ones in `@gg/shared` so the two line up.
+ * The keys are the ones in `@gg/shared` so the two line up. The game and account routes read the
+ * live switches; these pages change only when the site is built again.
  */
 export function siteSwitchOn(key: SiteSwitchKey): boolean {
-  const on = (process.env.SITE_SWITCHES_ON ?? '')
+  const listed = (process.env.SITE_SWITCHES_ON ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  return on.includes(key);
+  if (listed.includes(`-${key}`)) return false;
+  return listed.includes(key) || SITE_SWITCHES_DEFAULT_ON.includes(key);
 }
 
 /** For tests: the shared switch keys. */

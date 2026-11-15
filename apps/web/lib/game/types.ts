@@ -958,12 +958,12 @@ export interface SetupOptions {
 }
 
 /**
- * Daily Farm at setup. `open`: it can be started. `coming`: it is switched off or has no database
- * behind it, so setup shows the plain "coming" state. `guest`: it needs an account. `full`: the
- * account has all the Daily Farms it can have.
+ * Daily Farm at setup. `open`: it can be started. `off`: it can not run here (no database, or the
+ * admin switched it off), and `text` says which in plain words. `guest`: it needs an account.
+ * `full`: the account has all the Daily Farms it can have.
  */
 export interface DailyOffer {
-  state: 'open' | 'coming' | 'guest' | 'full';
+  state: 'open' | 'off' | 'guest' | 'full';
   text: string;
   limit: number;
   going: number;

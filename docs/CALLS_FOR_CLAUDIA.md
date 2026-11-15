@@ -28,15 +28,15 @@ How to read it:
 
 Every feature switch and its real default is in the table below. The defaults come from the shared switch list in `packages/shared/src/index.ts` and the seed migrations in `supabase/migrations` (the reference data, then the Daily Farm and sheep migrations). A test checks the two agree key for key. With no keys set, the game plays as a guest on farm files whatever the switches say.
 
-Switched off: Daily Farm, sheep, the whole community (posts, groups, ticker, farm viewing), every kind of ad and AdSense, purchases, and maintenance mode. Daily Farm is off against the PRD table (which says on) because you said off by default and its live data feed has never run. Sheep are off until the open sheep gaps are ruled on. The rest are off as in the PRD, and each needs a key, an outside account or your ruling.
+Switched off: sheep, the whole community (posts, groups, ticker, farm viewing), every kind of ad and AdSense, purchases, and maintenance mode. Sheep are off until the open sheep gaps are ruled on. The rest are off as in the PRD, and each needs a key, an outside account or your ruling.
 
-Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups and leaderboards do nothing visible until the database keys exist. Push sends nothing until the push keys and a schedule exist.
+Switched on: sign-ups, Daily Farm, Fast Farm, leaderboards and push notifications. Daily Farm is on at your request of 15 November 2026 ("I want to be able to get on and try both rounds of gameplay"), as the PRD table says. Sign-ups, Daily Farm and leaderboards do nothing visible until the database keys exist: with no database, setup says Daily Farm needs the game database. Push sends nothing until the push keys and a schedule exist.
 
 | Switch | Default | What it needs before it can go on |
 | --- | --- | --- |
 | `signups_open` | On | Supabase keys, or sign-in is not offered |
 | `fast_farm` | On | Nothing |
-| `daily_farm` | Off | Database keys, `CRON_SECRET` and a 15-minute schedule, a test of the live feed (`GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL`), and your ruling A9 |
+| `daily_farm` | On (your request, 15 Nov 2026) | To run: database and account keys. For the nights to run on time: `CRON_SECRET` and a 15-minute schedule (without it each night runs when the farm is opened). For real data after 12 Nov 2026: `GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL` (without it, long-term average weather and last prices, said in the diary). `docs/RUNBOOK.md` section 5.1 |
 | `community` | Off | Database keys, your rulings A22, A15 and A17, a lawyer's read of the community rules |
 | `feed_posts` | Off | `community` on, and the photo approach in A22 |
 | `groups` | Off | `community` on |
@@ -53,14 +53,14 @@ Switched on: sign-ups, Fast Farm, leaderboards and push notifications. Sign-ups 
 | `maintenance_mode` | Off | Nothing. Turn it on from the admin switches screen |
 | `analytics` | Off | Database keys. Your ruling A21 on consent. `POSTHOG_KEY` and `POSTHOG_HOST` only if events should leave our own database. The privacy page reads it at build, so also add `analytics` to `SITE_SWITCHES_ON` and redeploy |
 
-Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built, and every entry in it is off until you set it.
+Each ad slot also has its own switch on the Ads screen (all off). The public website reads its own list, `SITE_SWITCHES_ON`, when it is built. Every entry in it is off until you set it, except Daily Farm, which the site shows by default so the site and the game agree (`-daily_farm` takes it off).
 
 ### The rulings that matter most
 
 1. **The grass, calves and cows (A1, A2).** These change how the game plays more than anything else: winter feed, steer gains, calf weights and cow condition.
 2. **When a cow shows as in calf (A3).** 50 days against 42 changes sale values.
 3. **Sheep (A4, A5, A6).** Needed before sheep can be switched on.
-4. **Daily Farm (A9).** Needed before the real-time mode can be switched on.
+4. **Daily Farm data lag (A9).** Daily Farm is on at your request. Its game day runs 5 days behind the real date.
 5. **Legal and privacy risk (A15, A16, A17, A21, A22, A23).** No lawyer has read the legal pages. The under-14 retry, the ban record that outlives a deleted account, retention and photo moderation all carry risk.
 6. **Money (A19, A20).** Buying age, refunds and what the rescue pays.
 
@@ -86,7 +86,7 @@ These are the calls that change how the game plays in a way you would notice, th
 
 **A8. Contractor price and wages.** Built: a contractor charges materials plus $5 a metre labour, the same for either team. Wages use 2026 Pastoral Award rates (paid every 14 days) on every farm, whichever year is played. Other choice: a contractor's real quote, weekly pay, and wages of the year played. What it changes: the cost of fencing and a farm's running costs. The $5 is a stand-in because no labour-only rate was found. [m2.1 calls 4, 8, 9, 18. Change: `labourPerMetre`, `payCycleDays`]
 
-**A9. Daily Farm: on or off, and data 5 days behind.** Built: Daily Farm is off. Its game day runs on the real weather and prices of 5 days earlier, so the midnight run never waits for late data. A new farm starts on today's date as Day 1. The live data feed has never been run. Other choice: switch it on, use a different lag, or run each day on the day's own data and correct later. What it changes: whether the real-time mode exists at all. The PRD table says on and you said off by default. [m3.3 call 1, second pass calls 3 and 6, call 14. Change: the `daily_farm` switch and `DAILY_DATA_LAG_DAYS`]
+**A9. Daily Farm: data 5 days behind.** On or off is settled: you asked on 15 November 2026 for Daily Farm to be turned on, so it is on by default (the switch, migration `20261120000100_daily_farm_on` and the public pages). Still built for your ruling: its game day runs on the real weather and prices of 5 days earlier, so the midnight run never waits for late data. A new farm starts on today's date as Day 1. The live data feed has never been run. Other choice: use a different lag, or run each day on the day's own data and correct later. What it changes: how far behind the real season the farm's weather runs. [m3.3 call 1, second pass calls 3 and 6, call 14; m8. Change: `DAILY_DATA_LAG_DAYS`]
 
 **A10. The score and the leaderboards.** Built: the score shown is the game's own year score from five parts (profit, weight gain, pasture use, ground cover, deaths), with each part's points shown. The Grazier Score has no agreed weights. The headline board averages the year score over finished years. The real-year board ranks on the change in net worth per hectare over that year. Other choice: set the Grazier Score weights, show fewer points, or rank on something else. What it changes: what players chase, and a player could work the weights back from the points shown. Weights are to be set once calibration farms are run. [m1.7g calls 1, 11, 14; m4 calls 1 to 4. Change: `headline` in `server/boards/score.ts` and `YearBlocks.tsx`]
 

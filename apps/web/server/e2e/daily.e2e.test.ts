@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { resetSwitchCache } from '../auth/accounts';
+import { featureSwitches, resetSwitchCache } from '../auth/accounts';
 import { setAuthDeps } from '../auth/deps';
 import { handleRollover } from '../daily/cronroute';
 import { at, choices, database, keepThrough, rig, type Rig } from '../daily/testrig';
@@ -12,6 +12,10 @@ import { FakeAuth } from '../test-support/fakeAuth';
  * morning the farm shows the new day. The player signs up and plays through the real route
  * handlers. The rollover goes through the rollover route's own handler (secret check and all),
  * with the Daily Farm test rig's clock, data and run in place of the environment's.
+ *
+ * Daily Farm is left at its default from the migrations (on since 20261120000100, at Claudia's
+ * request): the test reads the switch from the database, gives the rig that value, and checks
+ * that setup offers Daily Farm to the new account.
  */
 
 const PEPPER = 'pepper-for-tests-'.padEnd(48, 'x');
@@ -30,6 +34,7 @@ beforeAll(async () => {
   routes.callback = (await import('@/app/auth/callback/route')) as Mod;
   routes.finish = (await import('@/app/api/auth/finish/route')) as Mod;
   routes.farm = (await import('@/app/api/game/farm/route')) as Mod;
+  routes.setup = (await import('@/app/api/game/setup/route')) as Mod;
   routes.act = (await import('@/app/api/game/act/route')) as Mod;
   routes.record = (await import('@/app/api/game/record/route')) as Mod;
 }, 120_000);
@@ -86,9 +91,13 @@ describe('launch flow 3: Daily Farm start, rollover, next morning', () => {
     await keepThrough(r, '2026-11-16');
     await r.db.exec(
       `delete from auth.users where email like 'launch.%';
-       update public.feature_switches set enabled = true where key in ('signups_open', 'daily_farm');`,
+       update public.feature_switches set enabled = true where key = 'signups_open';`,
     );
     resetSwitchCache();
+    // The switch as the migrations leave it, read the way the game reads it.
+    const dailyOn = (await featureSwitches(r.sql)).daily_farm;
+    expect(dailyOn).toBe(true);
+    r.switchOn.value = dailyOn;
     auth = new FakeAuth(r.db);
     setAuthDeps({ provider: auth, sql: r.sql, pepper: PEPPER });
     setGameServer(r.game);
@@ -107,6 +116,11 @@ describe('launch flow 3: Daily Farm start, rollover, next morning', () => {
       dob: '1985-06-15',
     });
     expect(fin.status).toBe(200);
+
+    // Setup offers Daily Farm to the new account.
+    const setup = await call('setup', 'GET', '/api/game/setup');
+    expect(setup.status).toBe(200);
+    expect(((await setup.json()) as { daily: { state: string } }).daily.state).toBe('open');
 
     // Start a Daily Farm at 10 am Sydney time on 13 November.
     const made = await call('farm', 'POST', '/api/game/farm', choices({ name: 'Launch Daily' }));

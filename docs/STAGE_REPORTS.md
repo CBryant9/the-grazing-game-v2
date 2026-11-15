@@ -246,3 +246,14 @@ A fix pass after a read-only realism review of the final branch (engine 0.19.0, 
 - **Tested:** a test for each fix; `pnpm test` 4,227 passed, 22 expected failures, 4 skipped; no benchmark moved; speed, build, browser bundle and page budgets pass with no limit raised.
 - **Not done:** see the log entry (the supplement price read on a hand-moved several-moves-a-day plan; a browser check of the plan card).
 - **Questions for Claudia:** B137 to B140, and A20 as updated.
+
+## After the stages: m8 Daily Farm on, and /play speed
+
+Branch `m8-daily-on-and-speed`. Full detail in `docs/DEVELOPMENT_LOG.md` (m8).
+
+### Daily Farm on by default
+
+- **Built:** Daily Farm is on by default at Claudia's request (15 Nov 2026): the shared switch list, a new seed migration and the public pages agree. With no database, setup says Daily Farm needs the game database, never "coming". In development only, `GG_DEV_LOCAL_DAILY=1` lets a guest try Daily Farm on farm files before the database exists. What Daily Farm needs to run is in `docs/RUNBOOK.md` section 5.1.
+- **Tested:** the Daily end-to-end test with the switch at its new default (start, midnight rollover, next morning); new tests for the no-database line and the development setting.
+- **Not done:** the live weather and price feed has still never run against SILO and MLA (A9, V-list).
+

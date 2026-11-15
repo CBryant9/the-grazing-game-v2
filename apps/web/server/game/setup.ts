@@ -23,6 +23,13 @@ import type {
 import { startFlockText } from './sheepwords';
 
 export const NAME_MAX = 40;
+
+/** What the player reads when this copy of the game has no database, so Daily Farm can not run. */
+export const DAILY_NO_DATABASE =
+  'Daily Farm needs the game database, which keeps each farm from day to day and runs its nights. This copy of the game has no database set up yet. Fast Farm is ready to play now.';
+/** What the player reads when the admin has switched Daily Farm off. */
+export const DAILY_SWITCHED_OFF =
+  'Daily Farm is switched off at the moment. Fast Farm is ready to play now.';
 const SIZES: readonly SetupSize[] = ['small', 'medium', 'large'];
 const YEARS: readonly SetupYears[] = ['real-in-order', 'real-random', 'random'];
 const STARTS: readonly SetupStart[] = ['running', 'scratch'];
@@ -171,8 +178,8 @@ export function setupOptions(sheepOn = false): SetupOptions {
     nameMax: NAME_MAX,
     // The route fills this in for the player who asked (server/daily/offer.ts).
     daily: {
-      state: 'coming',
-      text: 'Daily Farm is coming. Fast Farm is ready to play now.',
+      state: 'off',
+      text: DAILY_NO_DATABASE,
       limit: 0,
       going: 0,
     },

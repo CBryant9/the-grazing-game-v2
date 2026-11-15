@@ -138,7 +138,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 These came from planning the phone and PC rebuild. Full detail and open questions are in [PRD.md](PRD.md).
 
-- [x] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going. *(3.3: setup asks for the mode first, as the mockup shows, and the top bar says which mode the farm is. Daily Farm is behind its switch, off until Claudia turns it on, and needs an account. The limit is now 2 and 2, below.)*
+- [x] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going. *(3.3: setup asks for the mode first, as the mockup shows, and the top bar says which mode the farm is. Daily Farm is behind its switch, and needs an account. The switch was off until Claudia asked for it on, 15 Nov 2026: see below. The limit is now 2 and 2, below.)*
 - [ ] Jobs take realistic time. The day starts at first light and "the time only moving as you did things". If you only look, it stays first light. You can only do what fits before dark, so "they can't just build all their fencing in one day". This applies to both modes.
 - [x] Daily mode: at midnight in the player's time zone the day is simulated with the cattle where they were left. *(3.3: the engine's own night, run by the rollover job or by opening the farm, whichever comes first, with the same result. The time zone is the device's, locked when the farm starts. The sub-day grazing split is the engine's own. m7.1: on a night with no hand, a plan of several moves a day grazes the day across the paddocks the player really moved the mob through, split as the engine splits its own stops, or where the mob is if it was not moved.)* Daily dry matter, intake and gain must be "as dialed in as we can get it to reality", especially at high density and with several moves a day.
 - [ ] Self-paced mode keeps +1 day, +1 week, +1 month skips, with the time controls along the top and the paddock filling the screen.
@@ -364,3 +364,11 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [x] Web Vitals (LCP, CLS, INP) from the game and signed-in pages, with consent, shown as the 75th percentile by page against the PRD 14.10 targets.
 - [x] An `analytics` feature switch, off by default.
 - [ ] Average minutes a day, return rates, Daily Farm streaks, game overs by cause and replay check failures on the dashboard. *(Need data not kept yet; the dashboard lists them under "Built in a later milestone".)*
+
+## 15 Nov 2026: Daily Farm on
+
+Her words: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." She will set up the database and other services later on another computer, so nothing may need keys on this one.
+
+- [x] **Daily Farm is on by default.** The shared switch list, a new seed migration (`20261120000100_daily_farm_on`) and the public pages agree. The admin can still switch it off. *(Built in m8. Reverses the 3.3 call that kept it off until she turned it on.)*
+- [x] **With no database, setup says what Daily Farm needs, never "coming".** It says Daily Farm needs the game database, which keeps each farm from day to day and runs its nights, and that Fast Farm is ready to play now. *(Built in m8.)*
+- [x] **She can try Daily Farm before the database exists.** In development only (`pnpm dev`, no database), `GG_DEV_LOCAL_DAILY=1` lets a guest start a Daily Farm kept in a farm file; the nights run when the farm is next opened. *(Built in m8. `docs/RUNBOOK.md` section 5.1.)*

@@ -50,10 +50,11 @@ Every variable may be empty. With none set, the site runs guest play with farm f
 | `GG_FARMS_DIR` | Only used with no database. Farm files go to `apps/web/.farms`. On Vercel the file system is not kept between requests, so the live site must have the database set |
 | `GG_SWITCHES_ON` | Nothing. Only for a machine with no database. Leave unset on the live site |
 | `GG_DEV_PAGES` | Nothing. Builder pages under `/dev` answer 404. Leave unset on the live site |
+| `GG_DEV_LOCAL_DAILY` | Nothing. Development only: set to 1 in `pnpm dev` with no database to try Daily Farm as a guest on farm files (section 5.1). Ignored in a production build. Leave unset on the live site |
 | `GG_TRUSTED_IP_HEADER` | Every caller with no session shares one limit (farm creation: 5 farms in 10 minutes for everyone together; sign-in limits). **Set to `x-real-ip` on Vercel.** The server logs a warning at start-up when it is unset |
 | `SITE_CONTACT_EMAIL` | The website has no "contact us" links. Read at build |
 | `SITE_OWNER_NAME` | The privacy page and terms say "the owner of The Grazing Game". Read at build |
-| `SITE_SWITCHES_ON` | The public pages talk about nothing that is switched off (all off while unset). Read at build |
+| `SITE_SWITCHES_ON` | The public pages talk about nothing that is switched off (all off while unset, except Daily Farm, which is on by default as in the game; `-daily_farm` takes it off). Read at build |
 | `NEXT_PUBLIC_SUPABASE_URL` | Accounts and the database are off. Community photos can not be shown |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Accounts are off |
 | `SUPABASE_SECRET_KEY` | Accounts are off. No account can be deleted (Auth admin), no Storage file removed, no ad media read |
@@ -61,7 +62,7 @@ Every variable may be empty. With none set, the site runs guest play with farm f
 | `SUPABASE_DB_POOLER_URL` | **The database is off.** No accounts, no saved farms in the database, no Daily Farm, ads, purchases, notifications or community |
 | `BAN_HASH_PEPPER` | Accounts are off. Changing it makes every ban record stop matching and every ad impression token invalid |
 | `CRON_SECRET` | The rollover (`/api/daily/rollover`) and the notification sender (`/api/notify/send`) answer 404. Daily Farms only move on when opened; no notification is sent |
-| `GG_DAILY_FEED` | No real weather or prices are fetched. Daily Farm runs only as far as the days already kept (then uses averages, section 6.5) |
+| `GG_DAILY_FEED` | No real weather or prices are fetched. After the last day kept, each night runs on the district's long-term average weather and the last published prices, and the farm's diary says so (section 7.5). Nothing stops |
 | `SILO_CONTACT_EMAIL` | The weather fetch from SILO can not run |
 | `RESEND_API_KEY` | No notification email is sent (push and the inbox still work). Sign-in emails go through Supabase's own SMTP settings, not this |
 | `NOTIFY_FROM_ADDRESS` | No notification email is sent |
@@ -146,7 +147,7 @@ All switches are in `/admin/switches`. Each change is in the audit log (`/admin/
 | `signups_open` | on | Accounts keys set (section 2) and email and Google sign-in turned on in Supabase | Sign up with a test address, finish the profile, see `/account` |
 | `leaderboards` | on | Nothing | `/leaderboards` lists rows |
 | `push_notifications` | on | The VAPID pair set | On a phone, turn notifications on in `/account/notifications`, get the test reminder |
-| `daily_farm` | off | `CRON_SECRET`, `GG_DAILY_FEED=live`, `SILO_CONTACT_EMAIL`; one of the two schedulers running (section 6) | Start a Daily Farm. Next morning it is on the next day. `daily_counts` shows `rollover_runs` counting |
+| `daily_farm` | on (since 15 Nov 2026, at Claudia's request) | See section 5.1 | Start a Daily Farm. Next morning it is on the next day. `daily_counts` shows `rollover_runs` counting |
 | `community` | off | Moderators in place; the word list checked in `/admin/words` | A test account can post; an under-16 test account sees no community |
 | `feed_posts`, `groups`, `farm_viewing`, `activity_ticker` | off | `community` on | Each page opens; the ticker shows only on website pages |
 | `ads`, `banner_ads`, `video_ads` | off | A house ad or campaign made in `/admin/ads` | The slot shows the ad; `/admin/ads/stats` counts a view |
@@ -154,6 +155,23 @@ All switches are in `/admin/switches`. Each change is in the audit log (`/admin/
 | `purchases` | off | Both Stripe keys set, the webhook made (section 6.3), each product switched on in `/admin/purchases`. Start in Stripe test mode | A test purchase lifts the farm limit and removes ads; a refund takes it back |
 | `sheep` | off | Claudia's ruling on the sheep benchmarks | A sheep farm starts outside Central Queensland |
 | `maintenance_mode` | off | Choose the wording (section 7.8) | A player sees the wording and can not change their farm; you (admin) still can |
+
+### 5.1 What Daily Farm needs to start and run
+
+Daily Farm is on by default (the switch, the seed migration `20261120000100_daily_farm_on` and the public pages agree). What each part needs:
+
+| Part | What it needs | Without it |
+|---|---|---|
+| Keeping the farm | The database: `SUPABASE_DB_POOLER_URL`, with the migrations applied | Setup says: "Daily Farm needs the game database, which keeps each farm from day to day and runs its nights. This copy of the game has no database set up yet. Fast Farm is ready to play now." |
+| Who can start one | An account (sign-in, profile finished). Guests can not. Accounts need all of `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_POOLER_URL` and `BAN_HASH_PEPPER` (32 characters or more), and in production `GG_SITE_URL` and `GG_TRUSTED_IP_HEADER` too (section 2) | With a database but no sign-in, setup says Daily Farm needs an account and sign-in is not set up. A guest is told to sign in |
+| The switch | `daily_farm` on in `/admin/switches` (the default) | Setup says Daily Farm is switched off. Farms already going show "paused" and do not move on |
+| The nights | `CRON_SECRET` set, and one scheduler calling `/api/daily/rollover` every 15 minutes with it as `Authorization: Bearer <secret>`: Vercel's cron (`apps/web/vercel.json`, sends it by itself), or pg_cron `gg-daily-rollover` with the Vault secrets `gg_site_url` and `gg_cron_secret` (section 6) | The route answers 404 and no job runs. A farm still moves on: every night owed is run when the player next opens it, by the same code |
+| Real weather and prices | `GG_DAILY_FEED=live` and `SILO_CONTACT_EMAIL` (the address SILO asks for; never kept in the repo). MLA needs no key | Nothing is fetched. The baked tables run to about 12 November 2026 (game date 17 November, as the game runs 5 days behind). After that each night uses the district's long-term average weather for the day and carries the last published prices forward, and the diary says "Weather data was not available for ... The long-term average for the day was used." (and the same for cattle prices). `daily_counts` counts the fallbacks. Nothing stops |
+| Time zone | The player's device on one of the 8 supported Australian and New Zealand zones | Setup says the zone is not supported. Fast Farm has no time zone |
+
+**Trying it with no database (development only).** In `pnpm dev` on a machine with no `SUPABASE_DB_POOLER_URL`, set `GG_DEV_LOCAL_DAILY=1` in `apps/web/.env.local` and restart. Setup then offers Daily Farm to a guest, kept in a farm file under `apps/web/.farms`. There is no rollover job: the nights owed run when the farm is next opened (move the computer's clock, or come back the next day). Weather and prices are the baked tables, then the averages and last prices as above. No notifications. It is ignored in a production build (`pnpm build` and `pnpm start`) and whenever a database is set.
+
+**Proof.** `apps/web/server/e2e/daily.e2e.test.ts` leaves the switch at the migrations' default, reads it from the database (on), checks setup offers Daily Farm to a new account, starts a farm at 10 am, runs the rollover route after midnight and opens the farm next morning on the next day. `apps/web/server/daily/offer.test.ts` covers the no-database line, the development setting and a guest's local farm moving on overnight.
 
 ---
 
