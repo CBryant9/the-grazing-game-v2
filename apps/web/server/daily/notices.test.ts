@@ -25,7 +25,11 @@ afterAll(async () => {
 describe('the notifications a night makes', () => {
   it('turns the engine facts of a night into one notification each, in plain words', () => {
     const events = [
-      { type: 'water', paddock: 'River', event: { type: 'portable-low', portId: 2, cell: 9, pct: 20, daysLeft: 1 } },
+      {
+        type: 'water',
+        paddock: 'River',
+        event: { type: 'portable-low', portId: 2, cell: 9, pct: 20, daysLeft: 1 },
+      },
       { type: 'water', paddock: 'Hill', event: { type: 'portable-empty', portId: 3, cell: 4 } },
       { type: 'cattle', mob: 1, mobName: 'Cows', area: 'Hill', note: { type: 'noWater', days: 1 } },
       { type: 'cattle', mob: 1, mobName: 'Cows', area: 'Hill', note: { type: 'calvingStarted' } },
@@ -178,7 +182,14 @@ describe('Daily Farm calls the notifications', () => {
     await game.create(farm.key, choices({ name: 'Kooringa' }), OWNER);
     const reader = dailyReminderReader(r.sql, (id) => game.dailyToCheck(id));
     const roll = () =>
-      runRollover({ game, store: r.store, data: r.data, feed: null, sql: r.sql, now: () => r.clock.now });
+      runRollover({
+        game,
+        store: r.store,
+        data: r.data,
+        feed: null,
+        sql: r.sql,
+        now: () => r.clock.now,
+      });
 
     // Midnight: the rollover loads the farm, which moves farms.last_opened_at (with the database's
     // own clock, so this rig can not show it). That is not the player opening it: Daily Farm's

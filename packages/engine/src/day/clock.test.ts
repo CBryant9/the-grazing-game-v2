@@ -256,6 +256,9 @@ describe('looking is free', () => {
       sheepYearRead: (f) => engine.sheepYearRead(f),
       sheepConditionFacts: (f) => engine.sheepConditionFacts(f),
       sheepFeedCosts: (f, env) => engine.sheepFeedCosts(f, env),
+      // Paying to keep going (m6): the terms, and the rescue, which gives a new farm and leaves this one.
+      rescueTerms: (f) => engine.rescueTerms(f),
+      rescueFarm: (f) => engine.rescueFarm(f, { purchaseId: 'looking' }),
       // Milestone 3.3: does a hand work on a day? A question about a hand's days, never a change.
       worksOn: (f) =>
         engine.worksOn(

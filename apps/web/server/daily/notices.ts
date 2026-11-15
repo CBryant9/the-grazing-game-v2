@@ -45,8 +45,7 @@ const CAUSE: Record<string, string> = {
   weaner: 'weaner losses',
   natural: 'natural causes',
 };
-const causeWords = (c: string): string =>
-  CAUSE[c] ?? c.replace(/([A-Z])/g, ' $1').toLowerCase();
+const causeWords = (c: string): string => CAUSE[c] ?? c.replace(/([A-Z])/g, ' $1').toLowerCase();
 
 export interface Notice {
   event: NotifyEvent;
@@ -108,9 +107,7 @@ export function nightNotices(farm: string, events: readonly FarmEvent[]): Notice
  * The hook the game server calls after a night (`DailyRuntime.notify`). `deps` gives the
  * notification dependencies, or null when accounts are not set up (then nothing is queued).
  */
-export function dailyNotifier(
-  deps: () => NotifyDeps | null,
-): (news: NightNews) => Promise<void> {
+export function dailyNotifier(deps: () => NotifyDeps | null): (news: NightNews) => Promise<void> {
   return async (news) => {
     const notices = nightNotices(news.farmName, news.events);
     if (notices.length === 0) return;

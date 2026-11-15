@@ -7,11 +7,10 @@ import { dollars, getProduct, type ProductRow } from './products';
  * back to modest funds. This file builds everything up to the engine: which product a finished
  * farm is offered, what the card says, and the once-only application of a paid rescue.
  *
- * THE ENGINE FUNCTION THIS NEEDS DOES NOT EXIST YET. It is a port here (`RescueEngine`), with no
- * implementation registered, so `rescueReady()` is false, the keep-going products can not be
- * switched on, and no offer is ever shown. When the engine has the function (see the m5.2 log
- * entry for its name and what it must change), the game server registers an implementation with
- * `setRescueEngine` and the rest already works.
+ * The engine function is `rescueFarm` (packages/engine/src/money/rescue.ts, m6). The game server
+ * registers it here through `setRescueEngine` (server/billing/rescueEngine.ts) when there is a
+ * database; without one `rescueReady()` is false, the keep-going products can not be switched on
+ * and no offer is shown. The Open-priced tier (under 6 months) is never offered or sold.
  */
 
 export interface RescueFarm {
@@ -26,8 +25,17 @@ export interface RescueFarm {
 
 /** What the engine tells the offer card the rescue will do on this farm. */
 export interface RescuePreview {
-  /** Cash the farm restarts with, in whole dollars (the hard-difficulty starting cash for this farm). */
+  /**
+   * Cash the farm restarts with, in whole dollars: the hard-difficulty starting cash for this farm,
+   * or what the stock sale left after the debt if that is more.
+   */
   cashAfter: number;
+  /** The hard-difficulty starting cash for this farm, whole dollars (the engine's terms). */
+  hardStartCash?: number;
+  /** Head of stock the rescue sells. */
+  head?: number;
+  /** What that stock fetches, whole dollars. */
+  stockValue?: number;
 }
 
 export interface RescueEngine {
@@ -42,14 +50,27 @@ export interface RescueEngine {
   apply(input: { purchaseId: string; farm: RescueFarm }): Promise<{ diary: string }>;
 }
 
-let engine: RescueEngine | null = null;
+/** Set by a test (a fake, or null for none). Left undefined, the game server's own is used. */
+let override: RescueEngine | null | undefined;
+/** The game server's rescue (m6), made when first asked for. Null where there is no database. */
+let factory: (() => RescueEngine | null) | null = null;
+let made: RescueEngine | null | undefined;
 
-/** The game server registers the engine's rescue here. Tests register a fake. */
-export function setRescueEngine(e: RescueEngine | null): void {
-  engine = e;
+/** Tests register a fake here, or null for none; `undefined` goes back to the game server's. */
+export function setRescueEngine(e: RescueEngine | null | undefined): void {
+  override = e;
 }
-export const rescueEngine = (): RescueEngine | null => engine;
-export const rescueReady = (): boolean => engine !== null;
+/** The game server registers how to make its rescue (server/game/game.ts). */
+export function setRescueEngineFactory(f: (() => RescueEngine | null) | null): void {
+  factory = f;
+  made = undefined;
+}
+export const rescueEngine = (): RescueEngine | null => {
+  if (override !== undefined) return override;
+  if (made === undefined && factory) made = factory();
+  return made ?? null;
+};
+export const rescueReady = (): boolean => rescueEngine() !== null;
 
 /** Days a Daily Farm has run, by price tier. The call made where PRD 10.3 gives only three points. */
 export const DAILY_TIERS = [
@@ -97,6 +118,18 @@ export async function rescueFarm(
     : null;
 }
 
+/** Is there a free slot for this farm to be going again? Its own row is ended, so it is not counted. */
+async function roomFor(sql: SqlRunner, farm: RescueFarm): Promise<boolean> {
+  const r = await sql.query<{ going: number; max: number | null }>(
+    `select (select count(*)::int from public.farms f
+              where f.owner_id = $1 and f.mode = $2 and f.status = 'active' and f.id <> $3) as going,
+            public.farm_limit($1, null, $2) as max`,
+    [farm.ownerId, farm.mode, farm.id],
+  );
+  const row = r.rows[0];
+  return !!row && row.max !== null && row.going < row.max;
+}
+
 export interface Offer {
   productId: string;
   farmId: string;
@@ -118,13 +151,23 @@ export async function offerFor(
   farmId: string,
   ownerId: string,
 ): Promise<{ offer: Offer; product: ProductRow } | null> {
-  const eng = engine;
+  const eng = rescueEngine();
   if (!eng) return null;
   const farm = await rescueFarm(sql, farmId, ownerId);
   if (!farm || !farm.over) return null;
   const product = await getProduct(sql, rescueProductId(farm));
   if (!product || !product.active || product.kind !== 'keep_going') return null;
+  // A rescued farm is going again, so it needs a free slot of its kind: no offer without one
+  // (m6), so nobody pays for a rescue the database would then refuse.
+  if (!(await roomFor(sql, farm))) return null;
   const preview = await eng.preview(farm);
+  const hard = preview.hardStartCash ?? preview.cashAfter;
+  const sold =
+    preview.head === undefined
+      ? 'Your stock is sold first to pay the debt.'
+      : preview.head > 0
+        ? `Your stock (${preview.head.toLocaleString('en-AU')} head) is sold first to pay the debt.`
+        : 'There is no stock to sell.';
   return {
     product,
     offer: {
@@ -135,10 +178,14 @@ export async function offerFor(
       priceText: `${dollars(product.priceCents)}, GST included`,
       cashAfter: preview.cashAfter,
       does: [
-        'Your stock is sold first to pay the debt.',
-        `Your cash is then set to the hard-difficulty starting cash for this farm, ${dollars(
-          preview.cashAfter * 100,
-        )}.`,
+        sold,
+        preview.cashAfter > hard
+          ? `The sale leaves more than the hard-difficulty starting cash for this farm (${dollars(
+              hard * 100,
+            )}) after the debt, so your cash is then ${dollars(preview.cashAfter * 100)}.`
+          : `Your cash is then set to the hard-difficulty starting cash for this farm, ${dollars(
+              preview.cashAfter * 100,
+            )}.`,
         'The farm opens again on the day it ended, with its paddocks and buildings as they are.',
         'Its leaderboard score stays where it stopped, and the farm shows a "continued" mark.',
         'Nothing else changes.',
@@ -148,19 +195,29 @@ export async function offerFor(
 }
 
 /**
- * Apply a paid rescue to its farm, once. The purchase row is locked for the whole step, so two
- * callers (a replayed event, a reconcile, a second try) take turns, and the second finds
- * `applied_at` set and does nothing. If the engine throws, the transaction rolls back, nothing is
- * marked applied, and a later try (reconcile, or the webhook sent again) does it. The engine call
- * is itself keyed on the purchase id, so a crash between its work and our mark changes nothing twice.
+ * Apply a paid rescue to its farm, once. Three steps, none holding a transaction open across the
+ * farm's save (m6: the engine's rescue saves the farm through the game server, which is another
+ * connection; a lock held around it would wait on itself on a single-connection database and
+ * keep a transaction open in production):
+ *
+ *  1. read the purchase: it must be a paid keep-going purchase for a farm of its buyer, and not
+ *     marked applied;
+ *  2. the engine applies it. The engine's rescue is keyed on the purchase id and recorded on the
+ *     farm itself, so two callers at once (a replayed event, a reconcile) or a try after a crash
+ *     between steps 2 and 3 never rescue twice: the second gets the same answer and changes nothing;
+ *  3. mark it applied (only if not already).
+ *
+ * If the engine throws, nothing is marked, and a later try (reconcile, or the webhook sent again)
+ * does it. A farm that is no longer over is passed to the engine too: if this purchase's rescue is
+ * already on it, step 3 is finished; if not, the engine refuses and the answer is "not applicable".
  */
 export async function applyRescue(
   deps: { sql: { transaction<T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> } },
   purchaseId: string,
 ): Promise<'applied' | 'already' | 'not_ready' | 'not_applicable'> {
-  const eng = engine;
+  const eng = rescueEngine();
   if (!eng) return 'not_ready';
-  return deps.sql.transaction(async (tx) => {
+  const found = await deps.sql.transaction(async (tx) => {
     const r = await tx.query<{
       id: string;
       user_id: string | null;
@@ -171,21 +228,32 @@ export async function applyRescue(
     }>(
       `select p.id, p.user_id, p.farm_id, p.status, p.applied_at, pr.kind
          from public.purchases p join public.products pr on pr.id = p.product_id
-        where p.id = $1 for update of p`,
+        where p.id = $1`,
       [purchaseId],
     );
     const p = r.rows[0];
     if (!p || p.kind !== 'keep_going' || p.status !== 'paid' || !p.user_id || !p.farm_id) {
-      return 'not_applicable';
+      return 'not_applicable' as const;
     }
-    if (p.applied_at) return 'already';
+    if (p.applied_at) return 'already' as const;
     const farm = await rescueFarm(tx, p.farm_id, p.user_id);
-    if (!farm || !farm.over) return 'not_applicable';
-    await eng.apply({ purchaseId: p.id, farm });
-    await tx.query(
-      `update public.purchases set applied_at = now() where id = $1 and applied_at is null`,
-      [p.id],
-    );
-    return 'applied';
+    if (!farm) return 'not_applicable' as const;
+    return { id: p.id, farm };
   });
+  if (typeof found === 'string') return found;
+  try {
+    await eng.apply({ purchaseId: found.id, farm: found.farm });
+  } catch (e) {
+    // A farm that is playing and does not carry this rescue: the engine refused, nothing to do.
+    if (!found.farm.over) return 'not_applicable';
+    throw e;
+  }
+  const marked = await deps.sql.transaction((tx) =>
+    tx.query(
+      `update public.purchases set applied_at = now()
+        where id = $1 and applied_at is null and status = 'paid'`,
+      [found.id],
+    ),
+  );
+  return marked.rowCount > 0 ? 'applied' : 'already';
 }

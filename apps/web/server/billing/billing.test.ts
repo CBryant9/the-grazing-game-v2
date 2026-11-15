@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { freshDb } from '../../../../packages/db/src/harness';
 import { GameServer, setGameServer } from '../game/game';
 import { TRUSTED_IP_HEADER_ENV, resetRateLimits } from '../game/http';
-import { DbFarmStore } from '../db/dbstore';
+import { DbFarmStore, toUuid } from '../db/dbstore';
 import { pgliteSql } from '../test-support/pgliteSql';
 import { FakeAuth } from '../test-support/fakeAuth';
 import { FakePayments } from '../test-support/fakePayments';
@@ -14,6 +14,9 @@ import { resetSwitchCache, type AuthDeps } from '../auth/accounts';
 import { setAuthDeps } from '../auth/deps';
 import { setPaymentsProvider } from './payments';
 import { setRescueEngine, type RescueEngine, type RescueFarm } from './rescue';
+import { gameRescueEngine } from './rescueEngine';
+import { loadFarm, saveFarm, type SavedFarm } from '@gg/engine';
+import { newFarm } from '../player';
 import { handleWebhook } from './webhook';
 import { purchasesOverview, reconcilePurchase, refundPurchase, setProductActive } from './admin';
 import { MIN_PURCHASE_AGE, hasNoAds } from './products';
@@ -1057,6 +1060,112 @@ describe('paying to keep going', () => {
     await reconcilePurchase(deps, pay, admin.id, b.row!.id);
     expect(fake.applied).toEqual([b.row!.id]);
   });
+
+  it('A rescue does exactly what the card said (the engine itself, end to end)', async () => {
+    const game = new GameServer({
+      store: new DbFarmStore(deps.sql),
+      seed: () => 3,
+      saveRetryMs: [0, 0],
+    });
+    setGameServer(game);
+    setRescueEngine(gameRescueEngine(game, () => deps.sql));
+    await sell(true, ['keep_going_fast', 'keep_going_daily_under_6m']);
+    const pat = await person('pat');
+    const f = newFarm();
+    await game.create(
+      f.key,
+      {
+        district: 'cq',
+        size: 'small',
+        enterprise: 'grazing',
+        years: 'random',
+        startType: 'running',
+        difficulty: 'medium',
+        name: 'Rescued',
+        mode: 'fast',
+      },
+      { kind: 'user', id: pat.id },
+    );
+    const farmId = toUuid(f.id);
+    // The bank takes the farm: cash a dollar above its limit, then a day.
+    const saved = await db.query<{ save: SavedFarm }>(
+      'select save from public.farm_saves where farm_id = $1',
+      [farmId],
+    );
+    const brokeFarm = loadFarm(saved.rows[0]!.save);
+    brokeFarm.cash = brokeFarm.broke + 1;
+    await db.query(
+      'update public.farm_saves set save = $2::jsonb, rev = rev + 1 where farm_id = $1',
+      [farmId, JSON.stringify(saveFarm(brokeFarm))],
+    );
+    await game.endDay(f.key);
+    const before = (await game.snapshot(f.key))!;
+    expect(before.over).not.toBeNull();
+    expect(before.totals.head).toBeGreaterThan(0);
+    const farmRow = async () =>
+      (
+        await db.query<{ status: string; continued: boolean; rescue_count: number }>(
+          'select status, continued, rescue_count from public.farms where id = $1',
+          [farmId],
+        )
+      ).rows[0]!;
+    expect(await farmRow()).toMatchObject({ status: 'ended', continued: false, rescue_count: 0 });
+
+    // The card.
+    const offer = (
+      (await (await get('offer', pat, `?farm=${farmId}`)).json()) as {
+        offer: { productId: string; does: string[]; cashAfter: number };
+      }
+    ).offer;
+    expect(offer.productId).toBe('keep_going_fast');
+    const card = offer.does.join(' ');
+    expect(card).toContain(
+      `Your stock (${(before.totals.head + before.totals.calves).toLocaleString('en-AU')} head) is sold first to pay the debt.`,
+    );
+    expect(card).toMatch(/starting cash for this farm/);
+    expect(card).toMatch(/opens again on the day it ended/);
+
+    // Pay, and the rescue is applied by the webhook.
+    const b = await buyAndPay(pat, 'keep_going_fast', farmId);
+    expect(b.answer.status).toBe(200);
+    const after = (await game.snapshot(f.key))!;
+    // Exactly what the card said: the stock sold, the cash it named, open on the same day.
+    expect(after.over).toBeNull();
+    expect(after.totals.head).toBe(0);
+    expect(after.totals.cash).toBe(offer.cashAfter);
+    expect(after.day).toBe(before.day);
+    expect(after.date).toEqual(before.date);
+    // Nothing else changed: the paddocks, their water and the fences are as they were.
+    const land = (s: typeof before) => ({
+      paddocks: s.paddocks.map((p) => [p.cell, p.water]),
+      fences: s.view.fences,
+    });
+    expect(land(after)).toEqual(land(before));
+    expect(await farmRow()).toMatchObject({ status: 'active', continued: true, rescue_count: 1 });
+    const lines = (await game.record(f.key)).diary.flatMap((d) => d.lines);
+    const said = lines.filter((l) => l.startsWith('You paid to keep going.'));
+    expect(said).toHaveLength(1);
+    expect(said[0]).toContain(`cash was set to $${offer.cashAfter.toLocaleString('en-AU')}`);
+    // It plays on.
+    expect((await game.endDay(f.key)).snapshot.day).toBe(before.day + 1);
+
+    // A replay, a second event and a reconcile never rescue twice.
+    await hook(b.e);
+    await hook(pay.completed(b.sid));
+    const admin = await person('admin', { role: 'admin' });
+    expect((await reconcilePurchase(deps, pay, admin.id, b.row!.id)).rescue).toBe('already');
+    expect(await farmRow()).toMatchObject({ rescue_count: 1 });
+    expect(
+      (await game.record(f.key)).diary
+        .flatMap((d) => d.lines)
+        .filter((l) => l.startsWith('You paid to keep going.')),
+    ).toHaveLength(1);
+    // The Open-priced tier stays off: it is never offered or sold, even switched on.
+    const daily = await endedFarm(pat.id, 'daily', 100);
+    expect(
+      (await post('checkout', pat, { product: 'keep_going_daily_under_6m', farm: daily })).status,
+    ).toBe(404);
+  }, 180_000);
 
   it('the server picks the offer for the farm: the wrong tier, another account, or a farm still running is refused', async () => {
     setRescueEngine(fakeEngine().engine);

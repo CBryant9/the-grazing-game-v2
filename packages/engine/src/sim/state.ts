@@ -25,6 +25,7 @@ import type { Action } from '../actions/types';
 import type { FarmEvent } from './events';
 import type { LabourState } from '../labour/types';
 import type { SheepState } from '../sheep/types';
+import type { RescueRecord } from '../money/rescue';
 
 /** Where a mob is. */
 export type MobWhere =
@@ -461,6 +462,12 @@ export interface FarmState {
    * exactly as it did before sheep existed.
    */
   sheep?: SheepState;
+
+  /**
+   * Paid rescues the farm has had, oldest first (PRD 10.3, save format 13). Left out on a farm
+   * that has never been rescued, which then saves and plays exactly as it did before.
+   */
+  rescues?: RescueRecord[];
 }
 
 /** The MVP's price chart kept 31 days. */

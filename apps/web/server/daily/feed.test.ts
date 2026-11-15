@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DISTRICT_IDS } from '@gg/shared';
 import { seriesFor } from './data';
-import {
-  MLA_INDICATOR,
-  fixtureFeed,
-  liveFeed,
-  parseMla,
-  parseSilo,
-  parseYardings,
-} from './feed';
+import { MLA_INDICATOR, fixtureFeed, liveFeed, parseMla, parseSilo, parseYardings } from './feed';
 
 const HEADER =
   'latitude,longitude,YYYY-MM-DD,daily_rain,daily_rain_source,max_temp,max_temp_source,min_temp,min_temp_source,radiation,radiation_source,evap_comb,evap_comb_source,et_short_crop,et_short_crop_source,metadata';

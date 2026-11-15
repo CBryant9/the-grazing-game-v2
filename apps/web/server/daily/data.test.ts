@@ -125,7 +125,14 @@ describe('the real data a Daily Farm runs on', () => {
   // m6: the engine has sheep now, so Daily Farm keeps the sheep and lamb indicators too.
   it('reads the sheep and lamb indicators, nationally and at a sheep yard, and labels them Daily', async () => {
     const wv = seriesFor('wv').map((s) => `${s.saleyard}/${s.indicator}`);
-    for (const ind of ['light-lamb', 'trade-lamb', 'heavy-lamb', 'merino-lamb', 'restocker-lamb', 'mutton']) {
+    for (const ind of [
+      'light-lamb',
+      'trade-lamb',
+      'heavy-lamb',
+      'merino-lamb',
+      'restocker-lamb',
+      'mutton',
+    ]) {
       expect(wv).toContain(`national/${ind}`);
       expect(wv).toContain(`HAM/${ind}`);
     }

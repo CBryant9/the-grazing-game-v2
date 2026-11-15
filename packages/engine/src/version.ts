@@ -115,9 +115,11 @@
  * `planMove` action makes a plan's next move now (the tick's own
  * `planStep`), and `createFarm` takes an optional `start.date` (the day of
  * the month day 0 falls on; left out it is the 1st). No rule or number
- * changed: every calibration row, comparison and digest is 0.17.0's. The
- * stored `start.date` is optional and left out unless given, so every older
- * save loads as it did and the save format stays 12.
+ * changed: every calibration row, comparison and digest is 0.17.0's. And
+ * `rescueFarm` (PRD 10.3, paying to keep going): a farm whose game is over
+ * sells its stock to clear the debt, its cash is set to the hard-difficulty
+ * starting cash (or what the sale left, if more), and it opens again; once
+ * for each purchase id (`money/rescue.ts`, MODEL section 13). Save format 13.
  */
 export const ENGINE_VERSION = '0.18.0';
 
@@ -182,5 +184,13 @@ export const ENGINE_VERSION = '0.18.0';
  * real-year farm, `sheep.prices` keeps today's sheep indicators and their
  * data version (left out with random seasons). A format 10 lamb doomed to
  * die after day 2 now dies on its next day.
+ *
+ * 13: the m6 join (engine 0.18.0). A farm may have `rescues` (the paid
+ * rescues it has had, each with its purchase id and terms), left out on a
+ * farm never rescued, and `start` may have `date` (the day of the month a
+ * Daily Farm's day 0 fell on), left out on every farm that started on the
+ * 1st. An older save has neither and loads unchanged. An engine that knows
+ * only format 12 refuses a format 13 save, which is right: it would put a
+ * Daily Farm on the wrong dates and could apply a rescue twice.
  */
-export const SAVE_FORMAT_VERSION = 12;
+export const SAVE_FORMAT_VERSION = 13;

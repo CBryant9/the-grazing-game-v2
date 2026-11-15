@@ -422,6 +422,9 @@ export {
   stockWorth,
   tapeOwned,
 } from './money/worth';
+// Paying to keep going (PRD 10.3, m6): the rescue of a farm whose game is over.
+export { rescueFarm, rescueTerms } from './money/rescue';
+export type { RescueRecord, RescueRefusal, RescueResult, RescueTerms } from './money/rescue';
 
 export {
   BULL_PRICE,

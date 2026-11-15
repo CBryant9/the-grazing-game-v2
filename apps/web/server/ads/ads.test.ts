@@ -7,14 +7,7 @@ import * as eventRoute from '../../app/api/ads/event/route';
 import * as clickRoute from '../../app/api/ads/click/[id]/route';
 import { recordEvent, safeLink, MIN_VIEW_DELAY_MS } from './events';
 import { hasNoAds } from '../billing/products';
-import {
-  chooseAds,
-  ownsNoAds,
-  setNoAdsReader,
-  targetsViewer,
-  ANON,
-  type Viewer,
-} from './serve';
+import { chooseAds, ownsNoAds, setNoAdsReader, targetsViewer, ANON, type Viewer } from './serve';
 import { makeImpression, readImpression, TOKEN_LIFE_MS } from './token';
 import {
   PEPPER,
@@ -353,7 +346,10 @@ describe('the ads ask the purchases (m6 join)', () => {
   it("the real no-ads reader gives the purchases' own hasNoAds answer in every state", async () => {
     setNoAdsReader(undefined);
     const p = await person(kit, 'buyer');
-    const both = async () => [await ownsNoAds(kit.deps.sql, p.id), await hasNoAds(kit.deps.sql, p.id)];
+    const both = async () => [
+      await ownsNoAds(kit.deps.sql, p.id),
+      await hasNoAds(kit.deps.sql, p.id),
+    ];
     expect(await both()).toEqual([false, false]);
     await kit.db.query(
       `insert into public.account_entitlements (user_id, entitlement) values ($1, 'no_ads')`,

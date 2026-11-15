@@ -473,6 +473,9 @@ function upgrade(f: Record<string, unknown>, format: number): void {
     // before the farm's first day can be a negative day. Older saves stored -1 for "not yet".
     if (format < 12 && m.join && m.join.lambingStart === -1) m.join.lambingStart = null;
   }
+  // Rescues (format 13): a farm saved before had none. `rescues` is left out until the first,
+  // so there is nothing to fill in.
+  if (farm.rescues === null) delete farm.rescues;
 }
 
 /**

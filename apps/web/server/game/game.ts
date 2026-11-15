@@ -18,6 +18,9 @@ import {
   loadFarm,
   portableRefund,
   previewAction,
+  rescueFarm,
+  rescueTerms,
+  type RescueTerms,
   saveFarm,
   sheepDistrict,
   sheepMobsOf,
@@ -116,6 +119,9 @@ import type { DailyData } from '../daily/data';
 import { dailyReminderReader, type NightNews } from '../daily/notices';
 import { sqlFromEnv } from '../db/sql';
 import { setDailyFarmReader } from '../notify/reminders';
+import { authDeps } from '../auth/deps';
+import { setRescueEngineFactory } from '../billing/rescue';
+import { gameRescueEngine } from '../billing/rescueEngine';
 import { AWAY_KEPT, ROLLED_KEPT, type DailyStored } from '../daily/state';
 import { dailyRuntime } from '../daily/runtime';
 import { MIDNIGHT_TEXT, PAUSED_TEXT, UNAVAILABLE_TEXT, dailyWire } from '../daily/wire';
@@ -1252,6 +1258,49 @@ export class GameServer {
   }
 
   /**
+   * Paying to keep going (PRD 10.3, m6): what a rescue would do to this farm, from the engine's
+   * own terms (the offer card is built from these). Refused when the game is not over.
+   */
+  async rescueTerms(farmId: string): Promise<RescueTerms> {
+    return this.locked(farmId, async () => {
+      const held = await this.need(farmId);
+      if (!held.farm.over) throw new GameError(409, 'The game is not over on this farm.');
+      return rescueTerms(held.farm);
+    });
+  }
+
+  /**
+   * Apply a paid rescue (the engine's `rescueFarm`, keyed on the purchase id): one diary line
+   * states the fact, and the farm is saved open again. A second call with the same purchase
+   * changes nothing and gives the same line. The farm's row (continued, the rescue count) is the
+   * billing side's to mark (server/billing/rescueEngine.ts).
+   */
+  async rescue(
+    farmId: string,
+    purchaseId: string,
+  ): Promise<{ diary: string; terms: RescueTerms; rescues: number; already: boolean }> {
+    return this.locked(farmId, async () => {
+      const held = await this.need(farmId);
+      const r = rescueFarm(held.farm, { purchaseId });
+      if (!r.ok) throw new GameError(409, r.message, 'rescue_refused');
+      const diary = rescueLine(r.terms);
+      const rescues = r.farm.rescues?.length ?? 0;
+      if (r.already) return { diary, terms: r.terms, rescues, already: true };
+      const day = held.farm.day;
+      await this.save(
+        farmId,
+        held,
+        r.farm,
+        undefined,
+        [{ day, date: dateParts(dateOn(held.farm, day)), lines: [diary] }],
+        [],
+        { action: { day, action: { type: 'rescue', purchaseId }, ok: true } },
+      );
+      return { diary, terms: r.terms, rescues, already: false };
+    });
+  }
+
+  /**
    * For the morning reminder (m6): how many things need a look on a Daily Farm (the things to do
    * and the plan moves due), read without bringing the farm up or marking it opened. Null when it
    * is not a Daily Farm, is over, or can not be read.
@@ -1916,6 +1965,17 @@ export class GameServer {
   }
 }
 
+/** The one diary line a rescue writes: the facts, in plain words. */
+export function rescueLine(t: RescueTerms): string {
+  const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
+  const sold = t.cattleSold + t.sheepSold;
+  const stock =
+    sold > 0
+      ? `${sold.toLocaleString('en-AU')} head of stock were sold for ${money(t.stockValue)} to pay the debt`
+      : 'There was no stock to sell';
+  return `You paid to keep going. ${stock}, and cash was set to ${money(t.cashAfter)}. The farm is open again.`;
+}
+
 let shared: GameServer | undefined;
 
 declare global {
@@ -1941,6 +2001,12 @@ export function gameServer(): GameServer {
   }
   return shared;
 }
+
+// Paying to keep going (m6): the purchases' rescue port gets the engine's rescue through this
+// process's game server, where there is a database. Made when the purchases first ask for it.
+setRescueEngineFactory(() =>
+  sqlFromEnv() ? gameRescueEngine(gameServer(), () => authDeps()?.sql ?? sqlFromEnv()) : null,
+);
 
 /** For tests: use this game server (or `undefined` to go back to the configured one). */
 export function setGameServer(game: GameServer | undefined): void {
