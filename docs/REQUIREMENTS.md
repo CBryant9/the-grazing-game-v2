@@ -146,7 +146,7 @@ These came from planning the phone and PC rebuild. Full detail and open question
 - [ ] Visuals more polished: "that retro feel but not be so pixelly", like the Ship or Die art in docs/reference/.
 - [ ] Grass, saleyard, messages and paddock views must work well on every screen size.
 - [x] Anyone can join; date of birth at sign-up; the social side is hidden for under 16s. *(Built in 3.2: emailed link and Google, a finish page for username and date of birth, and the flags (`community`, `interestAds`) come from the server. Proven against a fake sign-in provider; a real project is still owed.)*
-- [ ] Ad slots (banners, videos between days and years, sponsor cards) are built in-house so Claudia can run her own business's ads or sell them. No Google game video ads for now.
+- [x] Ad slots (banners, videos between days and years, sponsor cards) are built in-house so Claudia can run her own business's ads or sell them. No Google game video ads for now. *(Built in 5.1: every slot in PRD 10.1 is in the registry with its own switch, off by default. Placed on the farm page, the day and year summaries and the year end video break; the slots for the Community, Profile, Leaderboard and challenge pages, the feed and the home page are ready and wait for those pages. Video between days and the Daily Farm video are not placed: see the log. Proven on a test database; the Supabase Storage side is owed.)*
 - [ ] Build everything now (ads, Stripe, subscriptions, community) and turn each on from an admin back end when ready. The admin shows analytics, connects Stripe, sets subscriptions and manages ads.
 - [ ] Community: overall leaderboard, groups to compete with friends, profiles (photo, where from, years farming, education, what and how much they farm, real farm, links to socials and website), posts with photos, comments and likes, a feed of friends and others, friends' daily activity (daily mode only), a view of anyone's farm as it is now, and a live activity ticker like Ship or Die ("Tom1998 moved 4000 head into a 4ha paddock").
 - Later, not now: hiring workers or contractors to get more done in a day.
@@ -155,7 +155,7 @@ These came from planning the phone and PC rebuild. Full detail and open question
 - [ ] Phones can be flipped to landscape, "likely how it will be played". Farms stay wide rectangles; in portrait you move left to right. In landscape the panels go full screen "because they need to be tall enough to read".
 - [ ] Cattle and grass in a less pixelly style: with lots of grass and cows "it's really hard to tell and it's all blurry together".
 - [ ] Activity pop-ups on the website pages, not in the game view.
-- [ ] Ads in different spots on different pages "so it doesn't feel too spammy"; on the farm view, ads on the left.
+- [x] Ads in different spots on different pages "so it doesn't feel too spammy"; on the farm view, ads on the left. *(5.1: the farm rail is left of the map on wide PCs; the phone banner sits above the tool bar; never two ad units on one phone screen, enforced in the slot registry and tested for every screen.)*
 - [ ] On PC the game header sits at the top of the game and the website header at the top of the site; they must not blend together. Community and other pages get big headings and sensible spacing.
 - [ ] Light and dark versions.
 - [ ] Map style: the "clear map with detail on zoom" (S5 in the mockups). Clean paddocks and one marker per mob when zoomed out, individual cattle and grass when zoomed in.
@@ -346,4 +346,7 @@ Her words: "I think we're probably not going to pretest the mobs or need that an
 - [x] Site settings: announcement bar, districts available, community rules text, each checked on the server. *(PRD 11.8. Privacy and terms text and the market data upload come later.)*
 - [x] An audit log of every admin action, read only, newest first. *(PRD 11.8.)*
 - [x] A dashboard of the counts that are true today, with the time they were read. *(PRD 11.1. Active users, audience, income and ads say "Built in a later milestone".)*
-- [ ] Moderation, ads and sponsors, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5; each is built with its own milestone.)*
+- [ ] Moderation, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5; each is built with its own milestone.)*
+- [x] Ads and sponsors in admin: every slot with its switch and caps, sponsors, campaigns with dates, targeting, weight and budgets, house ads, creatives with upload and a preview at each slot size, views and clicks by day, and a sponsor report with a CSV. *(PRD 11.4, built in 5.1. The AdSense field is not built: see the log. "Spots left" for the Advertise card is a setting, not yet counted.)*
+- [x] No-ads owners see no banners, videos or sponsor cards anywhere. *(5.1: read through one function; the purchases milestone fills in what grants it.)*
+- [x] Nothing aimed by interest for an under-16 account, a guest or anyone with no profile. *(5.1: such viewers are shown only campaigns for everyone.)*

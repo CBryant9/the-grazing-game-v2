@@ -1,0 +1,254 @@
+/*
+ * Ads. Every ad is a cream card with dark text in both themes, as the mockups draw it, and carries
+ * a label (Ad or Sponsored). The size of the box is set from the registry before anything loads,
+ * so nothing moves when the picture arrives. Targets are 44 px.
+ */
+
+.box {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e9d7a8;
+  background: #fff6e0;
+  color: #2a2116;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.link {
+  display: flex;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+.link:focus-visible {
+  outline: 3px solid #1b5fb3;
+  outline-offset: -3px;
+}
+.tag {
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6e5c3a;
+}
+.chip {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #fff6e0;
+  color: #6e5c3a;
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A banner: the picture fills the strip, or a text banner. */
+.banner {
+  display: flex;
+  align-items: center;
+}
+.banner .link {
+  flex: 1;
+  align-items: center;
+  height: 100%;
+}
+.text {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  display: grid;
+  gap: 1px;
+}
+.text b {
+  font-size: 0.8125rem;
+}
+.clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: #6e5c3a;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.close:focus-visible {
+  outline: 3px solid #1b5fb3;
+  outline-offset: -3px;
+}
+
+/* A card: picture on top, then the name and one line. */
+.card .link {
+  flex-direction: column;
+}
+.card .pic {
+  width: 100%;
+  background: #f1e3bd;
+}
+.card .text {
+  padding: 8px 10px 10px;
+  gap: 2px;
+}
+
+/* A sponsored post in a feed. */
+.post .link {
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+.post .pic {
+  flex: none;
+  width: 42%;
+  height: 100%;
+}
+
+/* A logo. */
+.logo {
+  display: grid;
+  place-items: center;
+  background: #fffaf0;
+}
+.logo .img {
+  object-fit: contain;
+  padding: 4px;
+}
+
+/* The video break. */
+.video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: 480px;
+  margin-inline: auto;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e9d7a8;
+  background: #000;
+  color: #fff;
+}
+.video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.vbadge {
+  position: absolute;
+  top: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.75rem;
+}
+.vleft {
+  left: 8px;
+}
+.vright {
+  right: 8px;
+}
+.vbar {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+}
+.vbtn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.vbtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.vbtn:focus-visible {
+  outline: 3px solid #ffd54a;
+  outline-offset: 2px;
+}
+.vnote {
+  margin: 4px 0 0;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  text-align: center;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Where a slot sits. None of these move anything else: a slot takes its own reserved room. */
+
+/* The phone banner floats above the tool bar (mockup 4), over nothing but the map's empty corner. */
+.phoneBanner {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 6;
+  max-width: 336px;
+  margin-inline: auto;
+}
+.pcStrip {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 6px 8px;
+  background: var(--frame);
+  border-top: 1px solid var(--line);
+}
+.pcStrip > * {
+  width: 728px;
+  max-width: 100%;
+}
+.rail {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 10px;
+  width: 256px;
+  flex: none;
+  overflow-y: auto;
+  background: var(--frame);
+  border-right: 1px solid var(--line);
+}
+/* The farm rail is for wide screens only (PRD 10.1). Narrower, it is not drawn and counts no view. */
+@media (max-width: 1279px) {
+  .rail {
+    display: none;
+  }
+}
+.summarySlot {
+  margin-top: 4px;
+}

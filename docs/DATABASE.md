@@ -177,7 +177,7 @@ A ban or suspension still running when an account is deleted leaves a row in `ba
 | `group-photos` | No | The group's owner writes the group's folder (named for the group id). Others read only the checked file, when they may see the group |
 | `post-photos` | No | The author uploads to their own folder while in the community. Others read a file only when a `post_photos` or showcase row they may see was approved on that exact file (its storage id and change time) |
 | `snapshots` | No | Server only |
-| `ad-media` | Yes | Server writes. Read by its public address so ads load fast. No SVG (a public SVG can carry script) |
+| `ad-media` | Yes | Server writes, through the admin gate only. No SVG (a public SVG can carry script). The game does not link to the bucket's address: it serves each file from its own `/api/ads/media/<creative id>` with safe headers (see "What the server does for ads") |
 
 A player can not change an avatar file in place (no update rule): a new photo is delete then upload, so it has a new id. A trigger on `storage.objects` sends a photo row back to pending whenever a file at its path is added, changed or removed. If a project will not let the migration role add that trigger, the migration warns and goes on; the id and change-time match still keeps a swapped file hidden. Re-running the bucket setup brings an existing bucket's limits and file types up to date.
 
@@ -310,3 +310,22 @@ Routes (every file is walked by `routes.test.ts`): `/api/notify/state`, `inbox`,
 The unsubscribe token is AES-256-GCM with a key made from `NOTIFY_TOKEN_SECRET`. It reveals nothing, a change anywhere fails it, it expires after 60 days, and it can only turn off one type's email for one account. It changes the setting only if the player has not touched that setting since the email was made, so an old link can never undo a later choice. Opening the link (GET) changes nothing, because mail scanners open links. The button, or the one-click POST that mail providers send, does the change.
 
 Not proved by the tests, and owed against real services: Resend's own behaviour (delivery, DKIM, its limits), each real push service (Apple, Mozilla, Chrome and Edge) answering a real VAPID request, and a real phone showing the notification.
+
+## What the server does for ads (milestone 5.1)
+
+Migration `20261115000900_ads_events.sql`. Nothing here is reachable by the browser roles: every table is server only (admins can read), and the new columns sit on those tables.
+
+| Piece | What it is |
+|---|---|
+| New columns | `ad_creatives.active` (a creative can be off by itself), `alt` (read out for a picture), `media_mime` and `media_bytes` (what the server found in the bytes of the upload); `campaigns.max_views` (a budget); `ad_events.impression_id` with the unique index `ad_events_once (impression_id, kind)` |
+| Rate limits | Two rows in `rate_limit_rules`: `ad_view` (300 an hour) and `ad_click` (60 an hour). A subject is an account id, a guest session id or a hash of the address, worked out by the server (`take_rate_limit`) |
+| Choosing | `server/ads/serve.ts`. Reads `ad_slots`, `campaigns` (on, inside its dates, under its budget), `campaign_slots`, `ad_creatives` (on) and the viewer own last views from `ad_events`. It reads nothing about a farm (a test records the SQL and checks) |
+| Who | No-ads owners (`account_entitlements`, `no_ads`, not revoked) are shown nothing, through one function a test can replace. Targeting (farmers, a state) uses the profile only for a signed-in account aged 16 or over. A guest, an account with no profile and an under-16 account get only campaigns for everyone |
+| Views | The browser reports a view with a token the server signed when it chose the ad (slot, campaign, creative, a random impression id and the time, signed with a key made from `BAN_HASH_PEPPER`). The server refuses a forged, old or too-early token, a slot that is now off and a repeat (the unique index). A video end or skip needs its view first. `ad_events` holds the slot, campaign, creative, kind, time and the account or guest session (for caps): no address, no browser details |
+| Counts | `ad_daily` holds each finished Sydney day (the nightly `rollup_ad_events`). Every screen and the budget add the raw events of the days after the latest rolled-up day, so a day is counted once, from one place. Days are Sydney days |
+| Clicks | `GET /api/ads/click/<creative id>?s=<slot>`: looks the link up by creative id in the database (never from the request), needs the creative, campaign and slot on and the slot linked to the campaign, re-checks it is plain https, counts the click (within `ad_click`) and redirects with `Referrer-Policy: no-referrer`. Anything else is a plain 404 |
+| Media | Uploads are looked at byte by byte (`server/ads/media.ts`): JPEG, PNG, WebP up to 1 MB and 16 to 4,096 pixels a side, MP4 up to 3 MB and 30 seconds. SVG, HTML, script and anything else are refused whatever the file is called. The stored name is a random name with the extension found in the bytes. A file is served through `/api/ads/media/<creative id>` with the type found at upload, `nosniff`, `default-src none; sandbox`, `Cross-Origin-Resource-Policy: same-origin` and range support |
+| Every admin change | One transaction with its audit row: `ad_slot_set` (`slot_id`, `enabled`, `count` of caps changed), `ad_sponsor_save`, `ad_sponsor_delete`, `ad_campaign_save`, `ad_campaign_delete`, `ad_creative_save`, `ad_creative_delete` (each with `ids`, and `enabled` for a campaign or creative). No name or text goes in the log. A campaign with views or clicks can not be deleted (its report needs them); a sponsor with campaigns can not be deleted |
+| Sponsor report | Counts by day and slot only, as a page and a CSV, with no account id, guest id or name. The CSV has fixed columns and no free text |
+
+Still owed against a real project: `POST /storage/v1/object/ad-media/...` and the authenticated read with `Range` from the server with the secret key; that the bucket refuses a type that is not on its list; two server instances racing on one impression id (the index decides, proven on PGlite only).

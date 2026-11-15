@@ -100,6 +100,11 @@ describe('every admin page', () => {
       [
         '/',
         '/ads',
+        '/ads/campaigns',
+        '/ads/campaigns/[id]',
+        '/ads/campaigns/[id]/report',
+        '/ads/sponsors',
+        '/ads/stats',
         '/audit',
         '/challenges',
         '/moderation',
@@ -151,6 +156,12 @@ describe('every admin page', () => {
     state.cookie = cookies.admin!;
     for (const [path, load] of Object.entries(pageModules)) {
       const Page = ((await load()) as { default: (p: unknown) => Promise<unknown> }).default;
+      // A campaign page is given the admin's own id, which is not a campaign: not found. The ad
+      // pages are rendered with real campaigns in server/ads/adminads.test.ts.
+      if (path.includes('/ads/campaigns/[id]')) {
+        await expect(Page(props(ids.admin!)), path).rejects.toThrow('NEXT_NOT_FOUND');
+        continue;
+      }
       const out = await Page(props(ids.admin!));
       expect(out, path).toBeTruthy();
     }
@@ -172,7 +183,7 @@ describe('every admin page', () => {
 
   it('the placeholders say plainly that they are built in a later milestone', async () => {
     state.cookie = cookies.admin!;
-    for (const name of ['moderation', 'ads', 'purchases', 'challenges']) {
+    for (const name of ['moderation', 'purchases', 'challenges']) {
       const Page = (
         (await pageModules[`../../app/admin/${name}/page.tsx`]!()) as {
           default: () => Promise<unknown>;

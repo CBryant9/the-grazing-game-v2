@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BubbleWire, ChangeWire, SummaryWire } from '@/lib/game/types';
 import { dateText, delta, money, num, plural, shortDate } from '@/lib/game/format';
 import { useGame } from '@/lib/game/store';
+import { AdSlot } from '@/components/ads/AdSlot';
 import styles from './play.module.css';
 
 function Change({
@@ -274,6 +275,7 @@ export function SummaryCard({ summary }: { summary: SummaryWire }) {
                 </li>
               )}
             </ul>
+            <AdSlot id="summary_sponsor_card" screen="day_summary" />
             <div className={styles.sumbtns}>
               {summary.canRunAnyway && (
                 <button

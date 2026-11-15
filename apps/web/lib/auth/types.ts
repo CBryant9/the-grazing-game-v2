@@ -20,6 +20,12 @@ export interface MeResponse {
   community: boolean;
   /** Ads may be aimed by interest (not under 16). */
   interestAds: boolean;
+  /**
+   * The ad slots that are on, with something to show, for this player (m5.1). Empty with every
+   * ad switch off (the launch default), with no keys, and for an account that owns no-ads: then
+   * the screens draw no ad markup and ask for no ad.
+   */
+  ads: string[];
   /** A key for this player's offline copy: the account id, or null for a guest. */
   scope: string | null;
 }

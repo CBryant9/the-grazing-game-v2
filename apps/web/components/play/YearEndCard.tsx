@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { plural } from '@/lib/game/format';
 import { useGame, type YearEndState } from '@/lib/game/store';
 import { YearScore } from './YearBlocks';
@@ -18,16 +19,19 @@ export function YearEndCard({ end }: { end: YearEndState }) {
   const over = useGame((s) => s.snapshot?.over != null);
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // A video break (when the slot is on) holds the button until it ends or is skipped.
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
+    // Once the video break is over (or when there was none) the button takes focus.
+    if (!blocked) closeRef.current?.focus();
+  }, [blocked]);
 
   return (
     <div
       className={styles.scrim}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') dismiss();
+        if (e.key === 'Escape' && !blocked) dismiss();
         if (e.key === 'Tab') {
           // Keep focus in the card.
           const items = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled)');
@@ -61,8 +65,22 @@ export function YearEndCard({ end }: { end: YearEndState }) {
           </p>
         )}
         <YearScore view={end.view} />
+        <AdSlot id="video_between_years" screen="year_end" onBlock={setBlocked} />
+        <AdSlot id="summary_sponsor_card" screen="year_end" />
+        {blocked && (
+          <p id="yearend-wait" className={styles.sumwhen}>
+            The button works when the video ends or you skip it.
+          </p>
+        )}
         <div className={styles.sumbtns}>
-          <button ref={closeRef} type="button" className="btn coral" onClick={dismiss}>
+          <button
+            ref={closeRef}
+            type="button"
+            className="btn coral"
+            disabled={blocked}
+            aria-describedby={blocked ? 'yearend-wait' : undefined}
+            onClick={dismiss}
+          >
             {over ? 'Close' : `Start year ${end.view.n + 1}`}
           </button>
         </div>

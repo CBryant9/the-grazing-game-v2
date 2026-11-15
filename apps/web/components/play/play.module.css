@@ -307,6 +307,17 @@
 .screen[data-layout='pc'] .body {
   flex-direction: row;
 }
+/* The map's column. It has no box of its own, except on a PC, where a banner may sit under the map. */
+.stagecol {
+  display: contents;
+}
+.screen[data-layout='pc'] .stagecol {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .side {
   flex: none;
   width: 360px;

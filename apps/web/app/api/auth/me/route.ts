@@ -1,5 +1,6 @@
 import { accountOf, featureSwitches } from '@/server/auth/accounts';
 import { authRoute } from '@/server/auth/route';
+import { adSlotsFor } from '@/server/ads/serve';
 import type { MeResponse } from '@/lib/auth/types';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,7 @@ const NONE: MeResponse = {
   method: null,
   community: false,
   interestAds: true,
+  ads: [],
   scope: null,
 };
 
@@ -30,7 +32,13 @@ export const GET = authRoute(
   async (ctx): Promise<MeResponse> => {
     if (!ctx.deps) return NONE;
     const switches = await featureSwitches(ctx.deps.sql);
-    const base: MeResponse = { ...NONE, accounts: true, signupsOpen: switches.signups_open };
+    const base: MeResponse = {
+      ...NONE,
+      accounts: true,
+      signupsOpen: switches.signups_open,
+      // Empty unless ads are on (see server/ads): a guest is shown ads like a free player.
+      ads: await adSlotsFor(ctx.deps.sql, null),
+    };
     const user = await ctx.deps.provider.session(ctx.jar).catch(() => null);
     if (!user || user.anonymous) return base;
     const account = await accountOf(ctx.deps, user);
@@ -56,6 +64,7 @@ export const GET = authRoute(
       method: user.method,
       community: !under && switches.community,
       interestAds: !under,
+      ads: await adSlotsFor(ctx.deps.sql, { userId: user.id }),
       scope: user.id,
     };
   },
