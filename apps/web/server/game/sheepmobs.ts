@@ -268,6 +268,7 @@ export function sheepMobWires(farm: FarmState, sr: SheepReads, dateOf: DateOf): 
       intakePct: st && st.wt > 0 ? round((st.intake / st.wt) * 100, 1) : null,
       classes,
       why: whyLines(r, m, hasWater, r.area, sr.loss.get(r.id)),
+      details: [],
       ptic: 0,
       pticText: null,
       breeding: [],

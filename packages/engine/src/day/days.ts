@@ -23,12 +23,13 @@ import { GRID_N } from '../grid';
 import { netWorth } from '../money/worth';
 import { coverPct } from '../pasture/summary';
 import { lightLeft } from '../sim/clock';
-import { areaIdOf, dateOn, realSourcesOf, surveyOf } from '../sim/derived';
+import { areaIdOf, dateOn, realPlanOf, realSourcesOf, surveyOf } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState, GameOverReason, PlanWaitReason, YearTotals } from '../sim/state';
 import { mobSummaries, type MobSummary } from '../sim/summary';
 import { stepDay, type DayResult, type TickEnv } from '../sim/tick';
 import { dawn } from './dawn';
+import { pruneTodoOff } from './todo';
 
 /** What the working day can be given: the tick's sources. */
 export type DayEnv = TickEnv;
@@ -123,7 +124,30 @@ export type SkipStop =
       area: string;
       why: PlanWaitReason;
       step: number;
-    };
+    }
+  /**
+   * Cash went below zero (`level` 1) or past three quarters of the way to the
+   * bank's limit (`level` 2). `limit` is where the bank takes the farm; `head`
+   * is the head on hand that could be sold (engine 0.20.0).
+   */
+  | { type: 'bank'; level: 1 | 2; cash: number; limit: number; head: number }
+  /** The whole farm is eaten out with stock on it: the first day of the countdown to game over. */
+  | { type: 'out-of-feed'; daysLeft: number }
+  /**
+   * Stock died of something other than natural causes. Cattle: no water,
+   * poor condition, orphaned calves. Sheep: no water, starved, poor condition,
+   * flystrike (lambing, newborn and weaner losses are the flock's usual rates).
+   */
+  | {
+      type: 'deaths';
+      species: 'cattle' | 'sheep';
+      mob: number;
+      mobName: string;
+      cause: string;
+      count: number;
+    }
+  /** Calving started in a mob: its first calf of a new drop. */
+  | { type: 'calving'; mob: number; mobName: string };
 
 /** What "Next day" returns. */
 export interface DayEnd {
@@ -355,11 +379,17 @@ export function waterCheck(farm: FarmState): SkipStop[] {
   return stops;
 }
 
+/** Sheep deaths that stop a skip. The rest (lambing, newborn, weaner, natural) are the flock's usual rates. */
+const SHEEP_STOP_CAUSES = new Set(['noWater', 'starved', 'poorCondition', 'flystrike']);
+
 /**
  * What in a day's events stops a skip. These are the MVP's stops: a mob's
  * first day without water, a portable trough run dry, a crop ready to
  * harvest, the end of a year, and game over; and a plan that can not move
- * a mob because the next area has no water.
+ * a mob because the next area has no water. Engine 0.20.0 adds: the bank
+ * facts (cash below zero, then three quarters of the way to the limit), the
+ * first day the whole farm is eaten out, deaths from anything but natural
+ * causes, and calving starting in a mob.
  */
 export function stopsIn(day: DayResult): SkipStop[] {
   const stops: SkipStop[] = [];
@@ -395,6 +425,30 @@ export function stopsIn(day: DayResult): SkipStop[] {
         why: e.why,
         step: e.step,
       });
+    } else if (e.type === 'bank') {
+      stops.push({ type: 'bank', level: e.level, cash: e.cash, limit: e.limit, head: e.head });
+    } else if (e.type === 'out-of-feed') {
+      stops.push({ type: 'out-of-feed', daysLeft: e.daysLeft });
+    } else if (e.type === 'deaths' && e.cause !== 'natural') {
+      stops.push({
+        type: 'deaths',
+        species: 'cattle',
+        mob: e.mob,
+        mobName: e.mobName,
+        cause: e.cause,
+        count: e.count,
+      });
+    } else if (e.type === 'sheep-deaths' && SHEEP_STOP_CAUSES.has(e.cause)) {
+      stops.push({
+        type: 'deaths',
+        species: 'sheep',
+        mob: e.mob,
+        mobName: e.mobName,
+        cause: e.cause,
+        count: e.count,
+      });
+    } else if (e.type === 'cattle' && e.note.type === 'calvingStarted') {
+      stops.push({ type: 'calving', mob: e.mob, mobName: e.mobName });
     } else if (e.type === 'year-end') stops.push({ type: 'year-end', year: e.year.n });
     else if (e.type === 'game-over') stops.push({ type: 'game-over', reason: e.reason });
   }
@@ -419,6 +473,8 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
   const lightLeftMin = lightLeft(farm);
   // First light on the new day: cattle land, booked stock sells. Before the player can act.
   const atDawn = dawn(next, env);
+  // Things put away that are no longer true come off the list, so they show again if they come back.
+  pruneTodoOff(next, env);
   return {
     farm: next,
     day,
@@ -427,6 +483,21 @@ export function endDay(farm: FarmState, env: DayEnv = {}): DayEnd {
     stops: farm.over ? [{ type: 'game-over', reason: farm.over.reason }] : stopsIn(day),
     summary: summarise(before, next, [day], atDawn),
   };
+}
+
+/**
+ * Days from today to the farm's next year end: the day the year closes. On
+ * a farm with random seasons a year is 365 days from the first day. On a
+ * real-year farm it is the real year, so 366 days when it holds 29 February.
+ */
+export function daysToYearEnd(farm: FarmState): number {
+  const plan = realPlanOf(farm);
+  if (!plan) return SKIP_DAYS.year - (farm.day % SKIP_DAYS.year);
+  const now = plan.gameYearOn(farm.day);
+  for (let k = 1; k <= SKIP_DAYS.year + 1; k++) {
+    if (plan.gameYearOn(farm.day + k) !== now) return k;
+  }
+  return SKIP_DAYS.year + 1;
 }
 
 /**
@@ -445,7 +516,13 @@ export function skipDays(
   env: DayEnv = {},
   options: SkipOptions = {},
 ): SkipResult {
-  const asked = typeof length === 'number' ? length : SKIP_DAYS[length];
+  // A year runs to the farm's own year end: 366 days across a leap day on a real-year farm.
+  const asked =
+    typeof length === 'number'
+      ? length
+      : length === 'year'
+        ? daysToYearEnd(farm)
+        : SKIP_DAYS[length];
   if (!Number.isInteger(asked) || asked < 1) {
     throw new RangeError('A skip runs a whole number of days, 1 or more.');
   }
@@ -474,6 +551,7 @@ export function skipDays(
     const day = stepDay(cur, env);
     days.push(day);
     atDawn.push(...dawn(cur, env));
+    pruneTodoOff(cur, env);
     stops = stopsIn(day);
     if (stops.length) break;
   }

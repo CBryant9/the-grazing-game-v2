@@ -19,15 +19,15 @@ import {
 
 const none: TourObservation = {
   paddockOpen: false,
-  moved: false,
-  fenceBuilt: false,
+  mobOpen: false,
+  fenceSeen: false,
   marketOpen: false,
   day: 0,
 };
 
 const quiet: TourReadState = {
   paddockId: null,
-  move: null,
+  mobId: null,
   build: null,
   tab: 'farm',
   snapshot: { day: 0 },
@@ -35,10 +35,10 @@ const quiet: TourReadState = {
 
 describe('the steps a farm gets', () => {
   it('has five steps with cattle, in the order of the PRD', () => {
-    expect(tourSteps(true)).toEqual(['paddock', 'move', 'fence', 'market', 'day']);
+    expect(tourSteps(true)).toEqual(['paddock', 'mob', 'fence', 'market', 'day']);
   });
 
-  it('leaves the move step out of a farm with no cattle', () => {
+  it('leaves the mob step out of a farm with no cattle', () => {
     expect(tourSteps(false)).toEqual(['paddock', 'fence', 'market', 'day']);
   });
 
@@ -59,17 +59,24 @@ describe('reading what the player did', () => {
     expect(observe({ ...quiet, paddockId: 3 }).paddockOpen).toBe(true);
   });
 
-  it('sees a move that is done, and not one that is only picked', () => {
-    expect(observe({ ...quiet, move: { phase: 'confirm' } }).moved).toBe(false);
-    expect(observe({ ...quiet, move: { phase: 'done' } }).moved).toBe(true);
+  it('sees a mob card open', () => {
+    expect(observe(quiet).mobOpen).toBe(false);
+    expect(observe({ ...quiet, mobId: 2 }).mobOpen).toBe(true);
   });
 
-  it('sees a fence that is built, and not another tool or a fence still being drawn', () => {
-    expect(observe({ ...quiet, build: { tool: 'fence', phase: 'confirm' } }).fenceBuilt).toBe(
-      false,
-    );
-    expect(observe({ ...quiet, build: { tool: 'pipe', phase: 'done' } }).fenceBuilt).toBe(false);
-    expect(observe({ ...quiet, build: { tool: 'fence', phase: 'done' } }).fenceBuilt).toBe(true);
+  it('never asks the player to join mobs or spend money (m8 playtest)', () => {
+    const words = Object.values(TOUR_TEXT)
+      .map((t) => `${t.title} ${t.body}`)
+      .join(' ');
+    expect(words).not.toMatch(/Move|press Build|press Move|join/);
+  });
+
+  it('sees the fence card showing, and not another tool or a fence still being drawn', () => {
+    // The fence step ends when the card shows, before the confirm: nothing has to be built.
+    expect(observe({ ...quiet, build: { tool: 'fence', phase: 'edit' } }).fenceSeen).toBe(false);
+    expect(observe({ ...quiet, build: { tool: 'fence', phase: 'confirm' } }).fenceSeen).toBe(true);
+    expect(observe({ ...quiet, build: { tool: 'pipe', phase: 'confirm' } }).fenceSeen).toBe(false);
+    expect(observe({ ...quiet, build: { tool: 'fence', phase: 'done' } }).fenceSeen).toBe(true);
   });
 
   it('sees the market open', () => {
@@ -94,10 +101,10 @@ describe('walking through the tour', () => {
   it('moves on when the step is really done', () => {
     let p = startTour(0);
     p = noteProgress(p, { ...none, paddockOpen: true });
-    expect(currentStep(p, true)).toBe('move');
-    p = noteProgress(p, { ...none, moved: true });
+    expect(currentStep(p, true)).toBe('mob');
+    p = noteProgress(p, { ...none, mobOpen: true });
     expect(currentStep(p, true)).toBe('fence');
-    p = noteProgress(p, { ...none, fenceBuilt: true });
+    p = noteProgress(p, { ...none, fenceSeen: true });
     expect(currentStep(p, true)).toBe('market');
     p = noteProgress(p, { ...none, marketOpen: true });
     expect(currentStep(p, true)).toBe('day');
@@ -116,7 +123,7 @@ describe('walking through the tour', () => {
     p = noteProgress(p, { ...none, marketOpen: true });
     expect(currentStep(p, true)).toBe('paddock');
     p = noteProgress(p, { ...none, paddockOpen: true });
-    expect(currentStep(p, true)).toBe('move');
+    expect(currentStep(p, true)).toBe('mob');
   });
 
   it('does not count the day until the farm is past the day the tour began', () => {
@@ -133,17 +140,17 @@ describe('walking through the tour', () => {
     expect(c.done).toEqual(['paddock']);
   });
 
-  it('has no move step to wait for on a farm with no cattle', () => {
+  it('has no mob step to wait for on a farm with no cattle', () => {
     let p = startTour(0);
     p = noteProgress(p, { ...none, paddockOpen: true });
     expect(currentStep(p, false)).toBe('fence');
-    expect(currentStep(p, true)).toBe('move');
+    expect(currentStep(p, true)).toBe('mob');
   });
 
   it('skips one step and goes on to the next', () => {
     let p = startTour(0);
     p = skipStep(p, 'paddock');
-    expect(currentStep(p, true)).toBe('move');
+    expect(currentStep(p, true)).toBe('mob');
     expect(p.skipped).toEqual(['paddock']);
     expect(skipStep(p, 'paddock')).toBe(p);
   });
@@ -180,7 +187,7 @@ describe('walking through the tour', () => {
 
 describe('keeping the place in the browser', () => {
   it('round-trips', () => {
-    const p = skipStep(noteProgress(startTour(2), { ...none, paddockOpen: true }), 'move');
+    const p = skipStep(noteProgress(startTour(2), { ...none, paddockOpen: true }), 'mob');
     expect(parseTour(serializeTour(p))).toEqual(p);
   });
 

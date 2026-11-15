@@ -37,6 +37,7 @@ import { knockDownTape, type Survey } from '../farm/layout';
 import { EDGE, areaAcross, areaEdges } from '../farm/topology';
 import { drainPortables, waterNeedPerHead } from '../farm/water';
 import { GRID_N } from '../grid';
+import { bankLevel, headToSell } from '../money/bank';
 import { INTEREST, overheadsPerYear } from '../money/costs';
 import { closeYear, netWorth } from '../money/worth';
 import { growGrass } from '../pasture/grow';
@@ -562,6 +563,11 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
     events.push({ type: 'year-end', year: closeYear(farm) });
   }
 
+  // 10b. The bank facts (engine 0.20.0): told once when cash goes below
+  // zero, and once when it passes three quarters of the way to the limit.
+  // Facts only. Nothing about money changes.
+  noteBank(farm, events);
+
   // 11. Game over: the bank's limit, or the whole farm eaten out for 10
   // days with cattle still on it.
   if (farm.cash <= farm.broke) {
@@ -597,4 +603,28 @@ export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
   // The new day starts at first light, with all of the day's light left.
   startDay(farm);
   return result;
+}
+
+/**
+ * Tell the player, once, when cash goes below zero and when it passes three
+ * quarters of the way to the bank's limit. A farm the bank takes today is
+ * told that instead. When cash comes back up the mark falls back with it,
+ * so the next fall is told again.
+ */
+function noteBank(farm: FarmState, events: TickEvent[]): void {
+  const level = bankLevel(farm);
+  const told = farm.bankWarned ?? 0;
+  if (level > told && farm.cash > farm.broke) {
+    events.push({
+      type: 'bank',
+      level: level as 1 | 2,
+      cash: farm.cash,
+      limit: farm.broke,
+      head: headToSell(farm),
+    });
+  }
+  if (level !== told) {
+    if (level === 0) delete farm.bankWarned;
+    else farm.bankWarned = level;
+  }
 }

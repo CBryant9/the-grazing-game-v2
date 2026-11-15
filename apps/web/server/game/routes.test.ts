@@ -540,10 +540,16 @@ describe('the record route', () => {
 
   it('gives the year so far, the finished years and a page of the diary', async () => {
     const cookie = await started();
-    const version = (await getFarm(cookie)).snapshot!.farmVersion;
-    const sk = await skip.POST(post('skip', { length: 'year', anyway: false, version }, cookie));
-    expect(sk.status).toBe(200);
-    const body = await sk.json();
+    let version = (await getFarm(cookie)).snapshot!.farmVersion;
+    // A year skip stops for calving and other facts (m8): run on until the year closes.
+    let body: { yearsClosed: number; yearEnd: { n: number }; snapshot: { farmVersion: string } };
+    for (let i = 0; ; i++) {
+      const sk = await skip.POST(post('skip', { length: 'year', anyway: true, version }, cookie));
+      expect(sk.status).toBe(200);
+      body = await sk.json();
+      version = body.snapshot.farmVersion;
+      if (body.yearsClosed > 0 || i > 30) break;
+    }
     expect(body.yearsClosed).toBe(1);
     expect(body.yearEnd.n).toBe(1);
     const res = await get('', cookie);

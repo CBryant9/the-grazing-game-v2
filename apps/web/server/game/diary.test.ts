@@ -1,6 +1,6 @@
 import { createFarm, endDay, saveFarm, type YearScore, type YearTotals } from '@gg/engine';
 import { describe, expect, it } from 'vitest';
-import type { DateParts, SetupChoices } from '../../lib/game/types';
+import type { DateParts, DayResponse, SetupChoices } from '../../lib/game/types';
 import {
   DIARY_DAYS,
   DIARY_LINES,
@@ -28,6 +28,15 @@ const SETUP: SetupChoices = {
   difficulty: 'medium',
   name: 'Diary Test',
 };
+
+/** Skip by years, running on past early stops, until a year closes. */
+async function toYearEnd(game: GameServer): Promise<DayResponse> {
+  for (let i = 0; i < 40; i++) {
+    const r = await game.skip(A, 'year', true);
+    if (r.yearsClosed > 0 || r.snapshot.over) return r;
+  }
+  throw new Error('No year closed.');
+}
 
 const server = (store = new MemoryFarmStore()): GameServer =>
   new GameServer({ store, seed: () => 7 });
@@ -205,7 +214,8 @@ describe('the year end and the end of the game', () => {
   it('a year skip closes the year: its card, its parts and its facts', async () => {
     const game = server();
     await game.create(A, SETUP);
-    const r = await game.skip(A, 'year');
+    // A year skip stops for calving and other facts (m8), so it is run again until the year closes.
+    const r = await toYearEnd(game);
     expect(r.yearsClosed).toBe(1);
     const y = r.yearEnd!;
     expect(y.n).toBe(1);
@@ -242,7 +252,7 @@ describe('the year end and the end of the game', () => {
   it('a real-years farm names the real year', async () => {
     const game = server();
     await game.create(A, { ...SETUP, years: 'real-in-order' });
-    const r = await game.skip(A, 'year');
+    const r = await toYearEnd(game);
     expect(r.yearEnd!.title).toMatch(/^Year 1 · \d{4}$/);
   });
 

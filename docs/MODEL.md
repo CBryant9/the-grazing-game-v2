@@ -794,7 +794,7 @@ There are three kinds of job (`day/spec.ts`):
 
 **Next day** (`endDay`): the daily tick runs (section 8), the clock goes back to first light, and first light's work is done (cattle bought the day before land in the yards and booked stock sells: "Buying and selling on sale days" below). It is the daily tick and first light's work on a copy of the farm. Nothing is built: there is nothing to carry on.
 
-**A skip** (`skipDays`) runs a week (7 days), a month (30, as in the MVP) or a year (365), or a number of days. It is Next day that many times, and it stops after any day that held a reason to.
+**A skip** (`skipDays`) runs a week (7 days), a month (30, as in the MVP) or a year, or a number of days. It is Next day that many times, and it stops after any day that held a reason to. A year runs to the farm's own year end (`daysToYearEnd`, engine 0.20.0): 365 days from the first day on random seasons, and the real year on a real-year farm, so 366 days across 29 February. Before 0.20.0 a year was always 365 days, and a year skip after a leap day stopped one day short of the year end, with no year card.
 
 **What stops a skip.** Everything the MVP stopped its clock for (its `U.queue = 0` lines and its "Check the water first"):
 
@@ -807,6 +807,10 @@ There are three kinds of job (`day/spec.ts`):
 | A crop ready to harvest | After that day |
 | A year closing | After that day |
 | Game over (the bank, or the farm eaten out for 10 days) | After that day. Nothing runs on a farm that is over |
+| Cash going below zero, and passing three quarters of the way to the bank's limit (`bank` event, engine 0.20.0) | After that day. Each is told once until cash comes back above the mark |
+| The first day the whole farm is eaten out with stock on it (the start of the 10-day countdown, `out-of-feed`) | After that day |
+| Deaths from anything but natural causes: cattle no water, poor condition, orphaned; sheep no water, starved, poor condition, flystrike | After that day. Lambing, newborn and weaner sheep losses are the flock's usual rates and do not stop it |
+| Calving starting in a mob (the `calvingStarted` note) | After that day |
 
 The two checks before the first day can be passed with `anyway: true`, as the MVP's "Run time anyway". Next day is not checked, as in the MVP. A day's reasons are also given by `endDay`, and `stopsIn` reads them from any day's events. The MVP's seventh stop, a grazing plan whose next paddock has no water, is built with plans (section 10). A skip does not stop for an arrival or a booked sale either: cattle landing in the yards and booked stock selling at first light are reported in `dawn`, and the skip carries on.
 
@@ -814,19 +818,26 @@ The two checks before the first day can be passed with `anyway: true`, as the MV
 
 ### What needs doing, and evening
 
-**Things to do** (`thingsToDo(farm)`), for the banner and the mob card. A read-only list of what needs doing now, as plain facts with the mob or the place and a count. It uses only what the model already knows and adds no rule about when something should be done:
+**Things to do** (`thingsToDo(farm, env)`, `day/todo.ts`), for the banner and the mob card. A read-only list of what needs doing now, as plain facts with the mob or the place and a count. It uses only what the model already knows and the player can see, and adds no rule about when something should be done. Each item is there while it is true, as one item, under a stable key (`todoKey`); it is never raised again as a new line. The player can put one away (`dismissTodo`, free): it is left out while it stays true (`farm.todoOff`), and the list of things put away is cut back to what is still true at the end of every day, so a thing that stops and starts again shows again. A fact with no job of its own has `does: null`. The thresholds marked stand-in are listed for Claudia:
 
 | Item | The fact | The model's own rule it reads | The action |
 |---|---|---|---|
 | `no-water` | A mob on ground with no water, its head and its days dry so far | The mob's grazing area has no water point | `moveMob` (the player picks the paddock) |
 | `trough-low`, `trough-empty` | A portable trough under a quarter full, or empty, and the litres left | The trough's own low-water mark (1,500 L) | `refillPortable` |
-| `calves-to-mark` | Unmarked bull calves of 60 days or more (young bulls are counted on the item for information, but do not make it show) | The age at which the model notes calves for marking | `markCalves` |
+| `calves-to-mark` | The mob's bull calves to mark (all of them, as marking marks them all) and its young bulls, once most of the mob's calves are 60 days or older or 30 days after its calving started (`MARK_AFTER_CALVING_DAYS`, stand-in). One item for the drop | The age at which the model notes calves for marking, and the day calving started (`calvNote`) | `markCalves` |
+| `bank` | Cash below zero (level 1), or past three quarters of the way to the bank's limit (level 2, `BANK_NEAR_SHARE`, stand-in), with the limit and the head on hand that could be sold | `farm.cash`, `farm.broke` | none |
+| `sale-soon` | A cattle sale within 7 days (`SALE_SOON_DAYS`, stand-in), and the head not booked in the market classes past weaner weight (yearling and heavy steers, heifers), by class | The sale calendar and the market's own class weights (`MARKET_WEIGHTS`) | none |
+| `low-condition` | A mob whose average condition score is under 2.5 (`LOW_CS`, stand-in), with the figure | The mob's last day (`st.cs`), or its animals before its first day | none |
+| `calving` | Calving started in a mob, with the calves born so far, for 30 days (then marking takes over) | `calvNote` | none |
+| `feed-floor` | A mob grazing an area under the grazing floor, with the feed figure | `FEED_FLOOR_KG_HA` (800 kg DM/ha, the floor days of feed are counted above) | none |
 | `crop-ready` | A grain crop that has reached maturity, and its hectares | The crop's days to maturity | `harvest` |
 | `fence-down` | A segment of electric fence or tape that is knocked down | The fence code | `fixFence` |
 
 Weaning is not listed, because the model weans a drop by itself when it is due. Weaning earlier is the player's choice, offered on the mob card.
 
-Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, stock, crops, fences. It holds no words, so it can't nag or judge.
+Each item names the action that deals with it, and gives that action ready to send when it needs no further choice. The list is in the order water, money, the sale, stock, crops, fences. It holds no words, so it can't nag or judge.
+
+**The bank facts** (`money/bank.ts`, engine 0.20.0). At the end of each tick, before the game over check, the tick compares where cash stands (0 at or above zero, 1 below zero, 2 at or past three quarters of the way to `farm.broke`) with how far the player has been told (`farm.bankWarned`, saved, left out at 0). When cash has gone further, one `bank` event is sent with the cash, the limit and the head on hand that could be sold, unless the bank takes the farm that day. When cash comes back, the mark falls back with it. Nothing about money changes: it only reads cash. A fall caused by a job in the day (buying cattle on the overdraft) is told at that night's tick.
 
 **Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then only jobs shorter than that still fit (a few segments of tape, for example), so a screen can dim the farm and light up Next day. `canStartJobs` is false only when no light is left. The farm can still be looked at after dark.
 

@@ -270,6 +270,13 @@ export type TickEvent =
   | { type: 'year-end'; year: YearRecord }
   /** The whole farm is eaten out with cattle on it. The game ends after `daysLeft` more days of this. */
   | { type: 'out-of-feed'; daysLeft: number }
+  /**
+   * Cash went below zero (`level` 1), or past three quarters of the way to
+   * the bank's limit (`level` 2), for the first time since it was last
+   * above that mark. `limit` is where the bank takes the farm (negative
+   * dollars). `head` is the head on hand that could be sold.
+   */
+  | { type: 'bank'; level: 1 | 2; cash: number; limit: number; head: number }
   | { type: 'game-over'; reason: GameOverReason };
 
 /** Events from the player's actions. */
@@ -422,6 +429,8 @@ export type ActionEvent =
       /** Squares asked for that could not take it. */
       skipped: number;
     }
+  /** A thing to do was put away by the player. `key` is its `todoKey`. */
+  | { type: 'todo-dismissed'; key: string }
   | {
       type: 'harvested';
       sp: SpeciesId;

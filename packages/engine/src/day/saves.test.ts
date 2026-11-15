@@ -195,17 +195,30 @@ describe('older saves', () => {
     return old;
   }
 
-  it('the save format is 14 and the engine is 0.19.0', () => {
-    expect(SAVE_FORMAT_VERSION).toBe(14);
-    expect(ENGINE_VERSION).toBe('0.19.0');
-    expect(saveFarm(openFarm('nsw')).saveFormat).toBe(14);
+  it('the save format is 15 and the engine is 0.20.0', () => {
+    expect(SAVE_FORMAT_VERSION).toBe(15);
+    expect(ENGINE_VERSION).toBe('0.20.0');
+    expect(saveFarm(openFarm('nsw')).saveFormat).toBe(15);
+  });
+
+  it('a format 14 save loads unchanged, with nothing put away and no bank fact yet', () => {
+    const farm = skipDays(busyFarm().farm, 3).farm;
+    const old = saveFarm(farm) as Record<string, unknown>;
+    old.saveFormat = 14;
+    delete old.todoOff;
+    delete old.bankWarned;
+    const loaded = loadFarm(old as SavedFarm);
+    expect(loaded.saveFormat).toBe(15);
+    expect(loaded.todoOff).toBeUndefined();
+    expect(loaded.bankWarned).toBeUndefined();
+    expect(farmHash(loaded)).toBe(farmHash(farm));
   });
 
   it('a save from before the clock loads at first light, with the homestead dropped and the yards kept', () => {
     const farm = skipDays(busyFarm().farm, 9).farm;
     const loaded = loadFarm(format2(farm));
-    expect(loaded.saveFormat).toBe(14);
-    expect(loaded.engineVersion).toBe('0.19.0');
+    expect(loaded.saveFormat).toBe(15);
+    expect(loaded.engineVersion).toBe('0.20.0');
     const light = lightOn(farm);
     expect(loaded.clock).toEqual({
       firstLight: light.firstLight,
@@ -226,7 +239,7 @@ describe('older saves', () => {
     const b = busyFarm();
     const farm = work(b.farm, { type: 'refillPortable', port: b.port }).farm;
     const loaded = loadFarm(format3(farm));
-    expect(loaded.saveFormat).toBe(14);
+    expect(loaded.saveFormat).toBe(15);
     // The time of day is kept. The player's place, the switches, the job in
     // progress, the booking and the homestead are gone.
     expect(loaded.clock).toEqual(farm.clock);

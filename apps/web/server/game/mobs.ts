@@ -40,7 +40,7 @@ import type {
   SuppId,
   SuppOptionWire,
 } from '../../lib/game/types';
-import { GROUP_NAME, SUPP_LABEL, REASON, breedingLines, mobWhy, pticWords } from './mobwords';
+import { GROUP_NAME, SUPP_LABEL, REASON, breedingLines, mobLines, pticWords } from './mobwords';
 
 const round = (n: number, places = 0): number => {
   const k = 10 ** places;
@@ -154,7 +154,16 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
     // Grouped by the record, so the lines never move on the day a cow conceives.
     forecasts = predictGains(m, r.land, area, recordClassOf).filter((g) => g.why.length > 0);
   }
-  const why = mobWhy({
+  const cs = s.day
+    ? s.day.cs
+    : m.animals.some((a) => a.kind !== 'calf')
+      ? avg(
+          m.animals.filter((a) => a.kind !== 'calf'),
+          (a) => a.cond,
+        )
+      : null;
+  const { why, details } = mobLines({
+    cs,
     name: s.name,
     area: s.area,
     where: s.where.kind,
@@ -226,6 +235,7 @@ function mobWire(farm: FarmState, m: FarmMob, s: MobSummary, r: MobReads): MobWi
     intakePct: s.day && s.day.wt > 0 ? round((s.day.intake / s.day.wt) * 100, 1) : null,
     classes: classRows(m.animals),
     why,
+    details,
     ptic: report ? report.ptic.cows + report.ptic.heifers : 0,
     pticText: report ? pticWords(report.ptic, report.months) : null,
     breeding: breedingLines({

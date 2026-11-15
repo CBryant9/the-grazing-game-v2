@@ -131,8 +131,19 @@
  * added on top as `YearTotals.keepGoing`, which the year's profit and score leave out. No grass,
  * cattle, sheep, crop, season or price formula changed: every calibration row, comparison and
  * digest is 0.18.0's (docs/CALIBRATION.md, the m7.1 entry). Save format 14.
+ *
+ * 0.20.0 (m8, playability fixes from the 144-game playtest): the bank is told twice before it
+ * takes the farm (cash below zero, then three quarters of the way to the limit), as a `bank`
+ * tick event and a thing to do (`money/bank.ts`); skips also stop for the bank facts, the first
+ * day the whole farm is eaten out, deaths from anything but natural causes and calving starting
+ * in a mob; a year skip ends on the farm's own year end (366 days across a leap day); Things to
+ * do (`day/todo.ts`) gains facts for a sale within the week, a mob under CS 2.5, calving and feed
+ * under the floor, lists marking once per drop, and can be put away (`dismissTodo`). The floors
+ * the words quote are named, not changed (`FEED_FLOOR_KG_HA`, `FEED_SHORT_KG_HA`,
+ * `MARKET_WEIGHTS`). No grass, cattle, sheep, crop, season, price or score formula changed:
+ * every benchmark was re-run (docs/CALIBRATION.md, the m8 entry). Save format 15.
  */
-export const ENGINE_VERSION = '0.19.0';
+export const ENGINE_VERSION = '0.20.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.
@@ -209,5 +220,11 @@ export const ENGINE_VERSION = '0.19.0';
  * of its stock sale), and a rescue's terms may have `paidIn`. All are left out until used, so a
  * format 9 to 13 save loads unchanged. An engine that knows only format 13 refuses a format 14
  * save, which is right: it would count a rescue's cash as the year's profit.
+ *
+ * 15: m8 (engine 0.20.0). A farm may have `bankWarned` (how far the bank facts have gone) and
+ * `todoOff` (things to do put away). Both are left out until used, so a format 9 to 14 save
+ * loads unchanged; an older farm already overdrawn is told on its next night. An engine that
+ * knows only format 14 refuses a format 15 save, which is right: it would show things to do the
+ * player had put away.
  */
-export const SAVE_FORMAT_VERSION = 14;
+export const SAVE_FORMAT_VERSION = 15;
