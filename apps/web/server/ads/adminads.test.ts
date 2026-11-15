@@ -269,6 +269,7 @@ describe('with every switch off the screens draw nothing', () => {
       username: null,
       method: null,
       community: false,
+      leaderboards: false,
       interestAds: true,
       scope: null,
     };

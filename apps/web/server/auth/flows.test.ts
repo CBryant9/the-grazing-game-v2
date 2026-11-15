@@ -405,6 +405,18 @@ describe('finish sign-up', () => {
     expect(await db.query('select 1 from public.profiles')).toMatchObject({ rows: [] });
   });
 
+  it('the app shell is told to link the leaderboards only while their switch is on (m6, PRD 6.4)', async () => {
+    const adult = await signUp('boards@example.com', 'boards_one');
+    await db.exec(`update public.feature_switches set enabled = false where key = 'leaderboards'`);
+    resetSwitchCache();
+    expect(await adult.b.me()).toMatchObject({ leaderboards: false });
+    await db.exec(`update public.feature_switches set enabled = true where key = 'leaderboards'`);
+    resetSwitchCache();
+    expect(await adult.b.me()).toMatchObject({ leaderboards: true });
+    await db.exec(`update public.feature_switches set enabled = false where key = 'leaderboards'`);
+    resetSwitchCache();
+  });
+
   it('an account of 14 or 15 plays, but is told no community and no interest ads, whatever the switch says', async () => {
     await db.exec(`update public.feature_switches set enabled = true where key = 'community'`);
     const kid = await signUp('teen@example.com', 'teen_one', dobYearsAgo(15, 3));
@@ -924,6 +936,7 @@ describe('what the new replies send the browser', () => {
       'accounts',
       'ads',
       'community',
+      'leaderboards',
       'interestAds',
       'method',
       'needsSignUp',

@@ -108,8 +108,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     timed: false,
     video: false,
     publicPage: false,
-    placed: false,
-    notPlacedWhy: 'The Community page is not built yet.',
+    // m6 join: placed now the page exists (the community pages).
+    placed: true,
     priority: 5,
   },
   pc_profile_side: {
@@ -124,8 +124,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     timed: false,
     video: false,
     publicPage: false,
-    placed: false,
-    notPlacedWhy: 'The Profile page is not built yet.',
+    // m6 join: placed now the page exists (the community pages).
+    placed: true,
     priority: 5,
   },
   pc_leaderboard_banner: {
@@ -141,7 +141,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     video: false,
     publicPage: false,
     placed: false,
-    notPlacedWhy: 'The Leaderboard page is not built yet.',
+    notPlacedWhy:
+      'The leaderboard page is a public page that sends no script (PRD 14.10), and a slot needs script to choose and count. It needs a decision from Claudia.',
     priority: 5,
   },
   phone_banner: {
@@ -270,8 +271,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     timed: false,
     video: false,
     publicPage: false,
-    placed: false,
-    notPlacedWhy: 'The feed is not built yet.',
+    // m6 join: placed now the page exists (the community pages).
+    placed: true,
     priority: 3,
   },
   challenge_sponsor: {
@@ -290,8 +291,8 @@ export const SLOTS: Record<AdSlotId, SlotDef> = {
     timed: false,
     video: false,
     publicPage: false,
-    placed: false,
-    notPlacedWhy: 'Challenges are not built yet.',
+    // m6 join: placed now the page exists (the community pages).
+    placed: true,
     priority: 4,
   },
   landing_sponsors: {

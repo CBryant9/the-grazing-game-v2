@@ -1,4 +1,5 @@
 import { CommunityError, communityRoute } from '@/server/community/route';
+import { notifyLike } from '@/server/community/notices';
 import { likeAction } from '@/server/community/write';
 
 export const dynamic = 'force-dynamic';
@@ -10,5 +11,8 @@ export const POST = communityRoute({ name: 'like', max: 90, part: 'feed_posts' }
     throw new CommunityError(400, 'That was not sent properly.');
   }
   await ctx.run((tx) => likeAction(tx, ctx.me.userId, action, ctx.body.target, ctx.body.id));
+  if (action === 'like' && ctx.body.target === 'post') {
+    await notifyLike(ctx.deps, ctx.me, String(ctx.body.id));
+  }
   return { ok: true };
 });

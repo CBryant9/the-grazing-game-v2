@@ -120,8 +120,8 @@ describe('every switch off (the launch default): nothing, anywhere', () => {
   });
 
   it('a slot with a place that is not built yet is never told to the screen', async () => {
-    await campaign(kit, { house: true, slots: ['pc_community_side', 'landing_sponsors'] });
-    await slotOnDb(kit, 'pc_community_side', 'landing_sponsors');
+    await campaign(kit, { house: true, slots: ['pc_leaderboard_banner', 'landing_sponsors'] });
+    await slotOnDb(kit, 'pc_leaderboard_banner', 'landing_sponsors');
     await switches(kit, 'ads');
     expect((await me()).ads).toEqual([]);
   });

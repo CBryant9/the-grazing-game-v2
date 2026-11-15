@@ -101,7 +101,7 @@ export async function shareFarm(
 
 /**
  * One day card for one Daily Farm day (PRD 9.3): the day's diary lines as facts, made by the server
- * (at the farm's rollover, once that is wired: see the milestone log). Fast Farms make none. A card
+ * at the farm's rollover (m6 join: the night calls the Stage 4 hooks, which call this). Fast Farms make none. A card
  * is made only for an owner who is a community member (16 or over, in good standing) with a profile
  * that is not private, once per farm and day, and only when the diary has something to say. Followers
  * see it in Friends' days; a public profile's day card is public.

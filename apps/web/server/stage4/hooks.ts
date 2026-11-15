@@ -4,6 +4,7 @@ import type { SqlClient } from '../db/sql';
 import { toUuid } from '../db/dbstore';
 import type { BoardFarm } from '../boards/score';
 import { writeBoards } from '../boards/write';
+import { makeDayCard } from '../community/share';
 import { dayText, daysPassed, recordActivity, startedText, yearText } from '../ticker/write';
 
 /**
@@ -67,6 +68,11 @@ export function dbHooks(sql: SqlClient, now: () => Date = () => new Date()): Gam
         if (info.closed > 0) await writeBoards(sql, id, info.farm, now());
         for (const day of daysPassed(info.fromDay, info.toDay)) {
           await recordActivity(sql, f.owner_id, id, 'farm_day', dayText(day));
+        }
+        // A Daily Farm's day card for each day that ended (PRD 9.3, m6 join: called from the
+        // rollover's night). makeDayCard decides who gets one and makes each once.
+        if (f.mode === 'daily') {
+          for (let day = info.fromDay; day < info.toDay; day++) await makeDayCard(sql, id, day);
         }
         const years = info.farm.years;
         for (const y of years.slice(Math.max(0, years.length - info.closed))) {

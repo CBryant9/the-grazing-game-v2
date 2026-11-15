@@ -18,6 +18,8 @@ export interface MeResponse {
   method: string | null;
   /** The community may be shown (not under 16, and its switch is on). */
   community: boolean;
+  /** The leaderboards are open (their switch, m6 join): the app shell links them (PRD 6.4). */
+  leaderboards: boolean;
   /** Ads may be aimed by interest (not under 16). */
   interestAds: boolean;
   /**

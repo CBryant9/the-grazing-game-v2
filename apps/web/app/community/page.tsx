@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { Composer, ShareFarm } from '@/components/community/Composer';
 import { Empty, More, PostCard, SubNav, Tabs } from '@/components/community/Parts';
 import styles from '@/components/community/community.module.css';
@@ -48,12 +50,18 @@ export default async function Page({
         <Empty>{EMPTY[tab]}</Empty>
       ) : (
         <div className={styles.stack}>
-          {page.items.map((p) => (
-            <PostCard key={p.id} post={p} />
+          {page.items.map((p, i) => (
+            <Fragment key={p.id}>
+              <PostCard post={p} />
+              {/* One sponsored post after the third, marked as an ad (PRD 10.1). */}
+              {i === 2 && <AdSlot id="feed_sponsored" screen="community" />}
+            </Fragment>
           ))}
         </div>
       )}
       {page.next && <More href={`/community?tab=${tab}&cursor=${page.next}`} />}
+      {/* PC only (the slot has no phone size): the community side card. */}
+      <AdSlot id="pc_community_side" screen="community" />
     </>
   );
 }

@@ -1127,6 +1127,7 @@ export class GameServer {
         throw e instanceof FarmLimitError ? new GameError(409, NO_ROOM_MESSAGE) : e;
       }
       this.remember(id, held);
+      await this.hooks?.started(id);
       return snap;
     });
   }
@@ -1261,6 +1262,14 @@ export class GameServer {
         .noteFallback(farmDate, 'night_price_fallback', `district=${district}`)
         .catch(() => undefined);
     }
+    // Stage 4 hears of the night as of any day that passes: the boards, the ticker, and (a Daily
+    // Farm) the day card for the day that ended (m6 join: day cards are made at the rollover).
+    await this.afterDays(
+      farmId,
+      dayRan,
+      saved,
+      end.day.events.filter((e) => e.type === 'year-end').length,
+    );
     // The night's news, once it is saved, and only for the night that brings the farm to today.
     const notify = this.daily?.notify;
     if (notify && addDays(farmDate, 1) === localDate(this.now(), daily.timezone)) {
@@ -1294,6 +1303,26 @@ export class GameServer {
         waiting: Boolean(cur.waiting),
         over: cur.farm.over !== null,
       };
+    });
+  }
+
+  /**
+   * Someone else's look at a farm (PRD 9.5, the read-only farm view): its snapshot as it stands,
+   * read WITHOUT marking it opened (m6 join). Looking at a friend's farm must never count as the
+   * owner opening it: that would move its last-opened time and, on a Daily Farm, stop the owner's
+   * morning reminder. A Daily Farm is brought up to today first, as for any reader. Null if none.
+   */
+  async viewSnapshot(farmId: string): Promise<Snapshot | null> {
+    try {
+      this.sheepOn = await this.sheepSwitch();
+    } catch {
+      this.sheepOn = false;
+    }
+    return this.locked(farmId, async () => {
+      const raw = await this.loadRaw(farmId, false);
+      if (!raw) return null;
+      const held = raw.stored.daily ? await this.bringUp(farmId, raw) : raw;
+      return this.snapshotOf(held);
     });
   }
 

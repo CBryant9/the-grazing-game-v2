@@ -229,4 +229,41 @@ describe('Daily Farm calls the notifications', () => {
     r.clock.now = at('2026-11-15', '19:05:00');
     expect(await runReminders(nd, reader, r.clock.now)).toMatchObject({ morning: 0, nudge: 0 });
   }, 180_000);
+
+  it('day cards are made at the rollover, one for each night, for a member whose profile is not private', async () => {
+    const r = await rig({ date: '2026-11-13', time: '10:00:00' });
+    await keepThrough(r, '2026-11-16');
+    await r.db.query('delete from public.posts');
+    await r.db.query(
+      `insert into public.profiles (user_id, username, privacy_profile) values ($1, 'daily_one', 'public')
+       on conflict (user_id) do update set privacy_profile = 'public'`,
+      [USER],
+    );
+    await r.db.query(
+      `insert into public.account_private (user_id, date_of_birth, terms_accepted_at)
+       values ($1, date '1990-01-01', now()) on conflict do nothing`,
+      [USER],
+    );
+    await r.db.query(
+      `insert into public.account_status (user_id, role) values ($1, 'player') on conflict do nothing`,
+      [USER],
+    );
+    const farm = newFarm();
+    // The rig's own game server: a database store gets the Stage 4 hooks by default.
+    await r.game.create(farm.key, choices({ name: 'Kooringa' }), OWNER);
+    r.clock.now = at('2026-11-15', '00:10:00');
+    expect((await r.roll({ feed: false })).daysAdvanced).toBe(2);
+    const cards = await r.db.query<{ farm_day: number; visibility: string }>(
+      `select farm_day, visibility from public.posts where kind = 'day_card' order by farm_day`,
+    );
+    expect(cards.rows).toEqual([
+      { farm_day: 0, visibility: 'public' },
+      { farm_day: 1, visibility: 'public' },
+    ]);
+    // A second run makes none twice.
+    await r.roll({ feed: false });
+    expect((await r.db.query(`select 1 from public.posts where kind = 'day_card'`)).rowCount).toBe(
+      2,
+    );
+  }, 180_000);
 });

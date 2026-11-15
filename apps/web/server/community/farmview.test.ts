@@ -75,6 +75,31 @@ async function look(viewer: Person | null, farmId: string): Promise<string> {
   }
 }
 
+describe('looking is not opening (m6 join)', () => {
+  it("someone else's look never marks the owner's farm opened", async () => {
+    const owner = await kit.person('owner0', { farmView: 'public' });
+    const viewer = await kit.person('viewer0');
+    const id = await dailyFarm(owner, 'Quiet Downs');
+    await kit.db.query(
+      `update public.farms set last_opened_at = timestamptz '2026-01-01T00:00:00Z' where id = $1`,
+      [id],
+    );
+    expect(await look(viewer, id)).toContain('Quiet Downs');
+    const r = await kit.db.query<{ t: string }>(
+      `select to_char(last_opened_at at time zone 'UTC', 'YYYY-MM-DD') as t from public.farms where id = $1`,
+      [id],
+    );
+    expect(r.rows[0]!.t).toBe('2026-01-01');
+  });
+
+  it('a Fast Farm is never shown to others: PRD 9.5 says their Daily Farm', async () => {
+    const owner = await kit.person('owner00', { farmView: 'public' });
+    const viewer = await kit.person('viewer00');
+    const id = await kit.farmFor(owner, { name: 'Fast Acres' });
+    expect(await look(viewer, id)).toBe('NOT_FOUND');
+  });
+});
+
 describe('who may look at a farm (the refusals)', () => {
   it('a stranger with farm view on followers-only gets the plain not found', async () => {
     const owner = await kit.person('owner1', { farmView: 'followers' });

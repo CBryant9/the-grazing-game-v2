@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import styles from '@/components/community/community.module.css';
 import { Ticker } from '@/components/site/Ticker';
+import { MeLoader } from '@/components/ads/MeLoader';
 import { featureSwitches } from '@/server/auth/accounts';
 import { requireMember } from '@/server/community/page';
 
@@ -41,6 +42,8 @@ export default async function CommunityLayout({ children }: { children: ReactNod
         {children}
       </main>
       {tickerOn ? <Ticker place="strip" /> : null}
+      {/* The ad slots on these pages (m6 join) read the slot list from the server. */}
+      <MeLoader />
     </div>
   );
 }

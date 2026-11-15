@@ -2,7 +2,7 @@ import 'server-only';
 import { DISTRICTS, MODES, PADDOCK_LABELS, type DistrictId, type ModeId } from '@gg/shared';
 import type { AuthDeps } from '../auth/accounts';
 import type { SqlRunner } from '../db/sql';
-import { farmKey, gameServer } from '../game/game';
+import { gameServer } from '../game/game';
 import { logFailure } from '../logging';
 import { isUuid } from './data';
 import type { Snapshot } from '@/lib/game/types';
@@ -155,7 +155,8 @@ export async function loadFarmView(
   try {
     const may = await mayLook(deps, viewer, farmId);
     if (!may) return null;
-    const snap = await gameServer().snapshot(farmKey(farmId.replace(/-/g, '')));
+    // Read without marking the owner's farm opened (m6 join).
+    const snap = await gameServer().viewSnapshot(farmId.replace(/-/g, ''));
     if (!snap) return null;
     // The farm's name is free text the player chose. Read it through the word filter.
     const hit = await deps.sql.query<{ hit: boolean }>('select app.blocked_word_in($1) as hit', [

@@ -1,3 +1,4 @@
+import { AdSlot } from '@/components/ads/AdSlot';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BoardTable } from '@/components/boards/BoardTable';
@@ -162,6 +163,7 @@ export default async function Page({
           <h2 id="chal" className={`px ${styles.h2}`}>
             Challenges
           </h2>
+          {g.challenges.length > 0 && <AdSlot id="challenge_sponsor" screen="challenge" />}
           {g.challenges.length === 0 ? (
             <Empty>No challenges yet.</Empty>
           ) : (

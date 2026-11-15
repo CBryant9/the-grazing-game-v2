@@ -1,4 +1,5 @@
 import { CommunityError, communityRoute } from '@/server/community/route';
+import { idOfUsername, notifyFollow } from '@/server/community/notices';
 import { followAction, type FollowAction } from '@/server/community/write';
 
 export const dynamic = 'force-dynamic';
@@ -14,5 +15,9 @@ export const POST = communityRoute({ name: 'follow', max: 40 }, async (ctx) => {
   const status = await ctx.run((tx) =>
     followAction(tx, ctx.me.userId, action as FollowAction, ctx.body.username),
   );
+  if (action === 'follow' && status === 'accepted') {
+    const followee = await idOfUsername(ctx.deps, ctx.body.username);
+    if (followee) await notifyFollow(ctx.deps, ctx.me, followee);
+  }
   return { status };
 });

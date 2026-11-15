@@ -1,3 +1,4 @@
+import { AdSlot } from '@/components/ads/AdSlot';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DISTRICTS, type DistrictId } from '@gg/shared';
@@ -102,6 +103,8 @@ export default async function Page({
   return (
     <>
       <SubNav here={mine ? 'me' : 'people'} />
+      {/* PC only (the slot has no phone size). */}
+      <AdSlot id="pc_profile_side" screen="profile" />
       {asStranger && (
         <p className={styles.card} role="status">
           This is how your profile looks to other members.{' '}

@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
  * - `accounts`: false when sign-in is not set up. The screens then say so in a plain line.
  * - `community`: the community may be shown: the switch is on and the account is a member by the
  *   database's own test (16 or over, not banned, not suspended).
+ * - `leaderboards`: the leaderboards switch is on, so the app shell links the boards (PRD 6.4).
  * - `interestAds`: ads may be aimed by interest (not under 16).
  */
 const NONE: MeResponse = {
@@ -23,6 +24,7 @@ const NONE: MeResponse = {
   username: null,
   method: null,
   community: false,
+  leaderboards: false,
   interestAds: true,
   ads: [],
   scope: null,
@@ -37,6 +39,8 @@ export const GET = authRoute(
       ...NONE,
       accounts: true,
       signupsOpen: switches.signups_open,
+      // The boards are a public page: open to anyone once their switch is on (PRD 6.4, 9.8).
+      leaderboards: switches.leaderboards,
       // Empty unless ads are on (see server/ads): a guest is shown ads like a free player.
       ads: await adSlotsFor(ctx.deps.sql, null),
     };
