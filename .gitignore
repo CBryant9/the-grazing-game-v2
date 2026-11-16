@@ -35,3 +35,23 @@ desktop.ini
 
 # scratch
 tmp/
+
+# lighthouse reports
+.lighthouseci/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# raw responses fetched by scripts/data (re-runs read these instead of refetching)
+.data-cache/
+
+# Claude Code local settings and worktrees (machine-specific, never commit)
+.claude/settings.local.json
+.claude/worktrees/
+
+# written by next dev; the project does not use it
+apps/web/AGENTS.md
+
+# farms kept by the game server for now (apps/web/server/game/store.ts)
+.farms/

@@ -1,0 +1,283 @@
+/**
+ * Every colour the map uses, in one place.
+ *
+ * The country keeps its natural colours in both themes (PRD 6.3a): grass,
+ * soil, fences, water and cattle are the same in light and dark. Only the
+ * map's surround, its labels and its markers change with the theme.
+ *
+ * The natural colours are the ones in docs/VISUALS.md.
+ */
+
+import type { ViewCattleKind, ViewSheepKind } from '@gg/shared';
+import { rgb } from './colour';
+
+export type MapTheme = 'light' | 'dark';
+export type CattleBreed = 'british' | 'brahman';
+
+export interface CattleColours {
+  body: number;
+  head: number;
+  legs: number;
+  /** A pale band along the belly and brisket, or -1 for none. */
+  underline: number;
+  /** A light line along the back that lifts a dark beast off dark ground, or -1. */
+  topline: number;
+}
+
+export const NATURAL = {
+  // ---- Ground
+  /** Bare soil. */
+  soil: rgb(128, 94, 60),
+  /** Litter under dry grass: straw, never soil (LESSONS 4). */
+  litter: rgb(170, 144, 88),
+  /** Shaded ground under living grass. */
+  shaded: rgb(70, 88, 40),
+  /** Worked soil in fallow, and its lighter clods. */
+  fallow: rgb(112, 80, 52),
+  fallowClod: rgb(140, 100, 65),
+  /** Stubble: pale straw rows. */
+  stubble: rgb(170, 146, 92),
+
+  // ---- Grass
+  leafYoung: rgb(150, 216, 70),
+  leafOld: rgb(66, 138, 50),
+  strawFresh: rgb(224, 192, 104),
+  strawWeathered: rgb(180, 160, 108),
+  seedHead: 0xefdca4,
+  clover: 0xf4f1e6,
+  cropGreen: rgb(128, 212, 64),
+  cropGold: rgb(214, 186, 84),
+  cropSeed: 0xe6c35a,
+
+  // ---- Fences and gates
+  // Red on a line or a square means one thing: the part of a line that does
+  // not fit today (Claudia, 14 Nov 2026). Nothing else on the map is red.
+  /** The part of a line being drawn that does not fit in today's light. The only red. */
+  notToday: 0xff5032,
+  fencePermanent: 0xa06a38,
+  fenceElectric: 0xffe14a,
+  fenceTape: 0xffffff,
+  /** A fence that has been knocked down: amber, with its "!" marker. */
+  fenceDown: 0xffa62b,
+  /**
+   * Fence a contractor is building (built, and still to build): hot pink.
+   * Not red (red is only "does not fit today"), not purple (no water), not
+   * amber (a fence down), not any of the fence kinds' own colours.
+   */
+  fenceContract: 0xff5cc8,
+  /**
+   * Sheep netting: a deep sea-green (teal), darker than young leaf and straw so it stands out from them. Not red (only "does not fit today"), not
+   * purple (no water), not amber (a fence down), not the contractor's pink, not
+   * the brown, yellow or white of the other fences, not the blues of water. It
+   * is also told apart by its pattern, a fine zigzag mesh (linestyle.ts).
+   */
+  fenceNetting: 0x16b890,
+  /** A job to take something away: a lilac glow round a white line. */
+  removeMark: 0xc39bff,
+  fencePost: 0x3e2612,
+  fencePostBoundary: 0x2e1c0c,
+  fencePostElectric: 0x5a4a30,
+  fencePostTape: 0xff8a3a,
+  /** The dark line under every wire, so a fence reads on any ground. */
+  fenceCasing: 0x1c1208,
+  gateRail: 0xdfe5e8,
+  gatePost: 0x3b2c1c,
+  gateOpen: 0x5fd04a,
+  gateShut: 0x6f86a0,
+
+  // ---- Water
+  pipe: 0x5ab4f0,
+  pipeDry: 0x7e8a96,
+  troughBody: 0x8d969b,
+  troughRim: 0xc3cbcf,
+  water: 0x3f9fe0,
+  waterShine: 0xbfe4ff,
+  portableBody: 0x2f6fb8,
+  portableRim: 0x5a9be0,
+  portableTank: 0xe8e4da,
+  levelHigh: 0x7fe05a,
+  levelMid: 0xf0b43a,
+  levelLow: 0xff8c1a,
+  boreRing: 0xffd75a,
+  windmill: 0xd8d2c4,
+  windmillDark: 0x8e9196,
+  windmillVane: 0xc23b22,
+
+  // ---- Trees and buildings
+  treeTrunk: 0xe6e1d3,
+  treeLeaf: 0x8fa866,
+  treeLeafDark: 0x4d6236,
+  wall: 0xece2c8,
+  roof: 0xb84a3a,
+  iron: 0xb9c0c4,
+  ironDark: 0x7d868c,
+  timber: 0x8a6a44,
+  timberDark: 0x5e4528,
+  yardDirt: 0x9b7b53,
+
+  // ---- Cattle
+  /** The dark line round every beast. */
+  cattleOutline: 0x120d0a,
+  /** A thin pale rim outside the dark line, so a beast reads on dark ground too. */
+  cattleHalo: 0xfffaf0,
+
+  // ---- Sheep
+  /** The dark line round every sheep, the same as the cattle's. */
+  sheepOutline: 0x120d0a,
+  /** The thin pale rim outside it, so a sheep reads on dark ground too. */
+  sheepHalo: 0xfffaf0,
+
+  // ---- Layers
+  layerWaterNear: rgb(70, 160, 240),
+  layerWaterMid: rgb(240, 200, 60),
+  layerWaterFar: rgb(235, 140, 40),
+  layerWaterNone: rgb(120, 50, 170),
+  layerQualityLow: rgb(150, 70, 190),
+  layerQualityHigh: rgb(40, 210, 60),
+  layerGrazed: rgb(240, 130, 30),
+  layerArable: rgb(255, 240, 170),
+  layerArableCropped: rgb(255, 214, 90),
+
+  // ---- Light
+  // The daytime lights are kept bright enough that cattle still stand out at
+  // 3 to 1 in the dimmest of them, rain at first or last light (palette.test.ts).
+  lightNight: rgb(86, 104, 168),
+  lightFirst: rgb(255, 214, 176),
+  lightDay: rgb(255, 255, 255),
+  lightLast: rgb(255, 210, 170),
+  lightOvercast: rgb(222, 228, 238),
+  lightRain: rgb(205, 214, 230),
+  rain: 0xdfeaff,
+} as const;
+
+/**
+ * Cattle colours by breed style and kind. British-breed style: black cows,
+ * dark brown heifers, red-brown steers with white faces, heavy grey bulls,
+ * brown calves. Brahman style for the north: pale grey cows, cream heifers,
+ * red steers, dark grey bulls with a big hump, fawn calves.
+ */
+export const CATTLE: Record<CattleBreed, Record<ViewCattleKind, CattleColours>> = {
+  british: {
+    cow: { body: 0x2b2523, head: 0x2b2523, legs: 0x141010, underline: -1, topline: 0x8a8078 },
+    heifer: { body: 0x4a332a, head: 0x4a332a, legs: 0x241712, underline: -1, topline: 0x9a7a66 },
+    steer: { body: 0x8e3c1e, head: 0xefe5d2, legs: 0x5a2412, underline: 0xefe5d2, topline: -1 },
+    bull: { body: 0x77716a, head: 0x5c5751, legs: 0x3e3a36, underline: -1, topline: 0xb9b3a8 },
+    calf: { body: 0x77503a, head: 0x8a6044, legs: 0x3a2619, underline: -1, topline: -1 },
+  },
+  brahman: {
+    cow: { body: 0xbdb7aa, head: 0xa9a395, legs: 0x6d675c, underline: -1, topline: -1 },
+    heifer: { body: 0xd8cfbd, head: 0xc4baa6, legs: 0x857c6c, underline: -1, topline: -1 },
+    steer: { body: 0xb0603a, head: 0x9c5432, legs: 0x5f311c, underline: -1, topline: -1 },
+    bull: { body: 0x6f6a62, head: 0x55514b, legs: 0x35322e, underline: -1, topline: 0xa8a297 },
+    calf: { body: 0xc9a57a, head: 0xb8946a, legs: 0x7a6044, underline: -1, topline: -1 },
+  },
+};
+
+export interface SheepColours {
+  /** The wool. A thin sheep is drawn a little darker (see THIN_FLEECE). */
+  fleece: number;
+  /** A darker curl drawn in the wool, so the body reads as wool and not a smooth blob. */
+  curl: number;
+  /** The face: small and dark grey. */
+  head: number;
+  legs: number;
+}
+
+/**
+ * Sheep colours by kind (Merino style: cream wool, dark grey face and legs).
+ * Rams are a little darker in the wool and carry curled horns. Lambs are paler.
+ */
+export const SHEEP: Record<ViewSheepKind, SheepColours> = {
+  ewe: { fleece: 0xf1ead6, curl: 0xc9bfa2, head: 0x4a4642, legs: 0x37332f },
+  wether: { fleece: 0xece3cc, curl: 0xc4b99b, head: 0x4a4642, legs: 0x37332f },
+  ram: { fleece: 0xe6dcc2, curl: 0xbcb08e, head: 0x4f4640, legs: 0x37302a },
+  young: { fleece: 0xf3edda, curl: 0xccc3a6, head: 0x514c47, legs: 0x3a3631 },
+  lamb: { fleece: 0xf6f1e2, curl: 0xd2c9ad, head: 0x55504a, legs: 0x3e3a35 },
+};
+
+/** A thin sheep's wool is this much darker (lean, patchy and dull). */
+export const THIN_FLEECE = 0.84;
+
+/** The horn colour on a ram. */
+export const RAM_HORN = 0xb9a98a;
+
+/** The parts of the map that change with the theme. */
+export interface ThemeColours {
+  /** The country round the farm: bush (the mockup's `bush` tile). Also the colour behind the map before it draws. */
+  surround: number;
+  /** The bush clumps laid over the surround. */
+  surroundSpeck: readonly number[];
+  /** The rim round the farm. */
+  farmEdge: number;
+  labelBg: number;
+  labelBgAlpha: number;
+  labelText: number;
+  labelMuted: number;
+  /** "No water" on a label or a marker: the map's no-water purple (red inside the map is saved for "can't do this"). */
+  noWater: number;
+  /** The text on a paddock label chip. */
+  chipText: number;
+  markerBg: number;
+  markerText: number;
+  markerLine: number;
+  /** The line round a highlighted paddock. */
+  highlight: number;
+  /** The line round the paddock under the mouse. */
+  hover: number;
+}
+
+export const THEMES: Record<MapTheme, ThemeColours> = {
+  dark: {
+    surround: 0x55653a,
+    surroundSpeck: [0x4a5832, 0x66753f, 0x5d6b3a],
+    farmEdge: 0x05080c,
+    labelBg: 0x0b1220,
+    labelBgAlpha: 0.88,
+    labelText: 0xf3e7cf,
+    labelMuted: 0xc9c2b0,
+    noWater: 0xc9a2f5,
+    chipText: 0x111111,
+    markerBg: 0x0b1220,
+    markerText: 0xf3e7cf,
+    markerLine: 0xc6f432,
+    highlight: 0xc6f432,
+    hover: 0xffffff,
+  },
+  light: {
+    surround: 0x939f72,
+    surroundSpeck: [0x87936a, 0xa2ad80, 0x8d9a6c],
+    farmEdge: 0x6b5b3e,
+    labelBg: 0xfffaf0,
+    labelBgAlpha: 0.94,
+    labelText: 0x1b2438,
+    labelMuted: 0x4a5468,
+    noWater: 0x7832aa,
+    chipText: 0x111111,
+    markerBg: 0xfffaf0,
+    markerText: 0x1b2438,
+    markerLine: 0x557a08,
+    highlight: 0x557a08,
+    hover: 0x1b2438,
+  },
+};
+
+export interface MapPalette {
+  theme: MapTheme;
+  natural: typeof NATURAL;
+  cattle: typeof CATTLE;
+  sheep: typeof SHEEP;
+  ui: ThemeColours;
+}
+
+/** The whole palette for a theme. */
+export const paletteFor = (theme: MapTheme): MapPalette => ({
+  theme,
+  natural: NATURAL,
+  cattle: CATTLE,
+  sheep: SHEEP,
+  ui: THEMES[theme],
+});
+
+/** Central Queensland runs Brahman-style cattle. The southern districts run British breeds. */
+export const breedFor = (district: string): CattleBreed =>
+  district === 'cq' ? 'brahman' : 'british';

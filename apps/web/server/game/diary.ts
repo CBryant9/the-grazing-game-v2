@@ -1,0 +1,217 @@
+import 'server-only';
+import { dateOn, type FarmEvent, type FarmState } from '@gg/engine';
+import type { DateParts, DiaryDay, SummaryWire } from '../../lib/game/types';
+import { inboxMessage } from './inboxwords';
+import { DAWN_LABOUR, isLabourEvent, type DateOf } from './labourwords';
+
+/*
+ * The diary: a plain list of the days the player has lived, with a few lines
+ * for each. The lines are words the server already makes (a job's result, a
+ * day's inbox messages, the money for a day or skip). The server keeps the
+ * last `DIARY_DAYS` days in the farm's file, beside the engine's save.
+ */
+
+/** Days kept for each farm. The oldest go first. */
+export const DIARY_DAYS = 400;
+/** Lines kept for a day. Past these, the day says how many more there were. */
+export const DIARY_LINES = 12;
+/** Days in one page of the Diary. */
+export const DIARY_PAGE = 30;
+
+/** A day as it is kept: the lines, and how many more there were past the limit. */
+export interface StoredDiaryDay {
+  day: number;
+  date: DateParts;
+  lines: string[];
+  more: number;
+  /**
+   * The lines a day card may carry (PRD 9.3, m7.1): short job and farm facts, picked by the kind
+   * of line when it was filed, never by its words. Left out when there are none.
+   */
+  card?: string[];
+  /** The day's real rain, mm, when the farm plays real years. Left out otherwise. */
+  rainMm?: number;
+}
+
+/** Lines to add to a day. */
+export interface Filing {
+  day: number;
+  date: DateParts;
+  lines: string[];
+  /** Which of `lines` a day card may carry. Left out: none of them. */
+  card?: string[];
+  /** The day's real rain, mm. */
+  rainMm?: number;
+}
+
+/**
+ * Whether a day's event may go on a day card (PRD 9.3): moves, sales and purchases, births,
+ * deaths, weaning, marking, fencing and water work, and the rest of the farm's own facts. Wages
+ * and super are money lines, not job facts, so they stay in the diary only. The day's cash and
+ * running cost lines (`summaryLines`), data notes and the rescue line are never filed as card
+ * lines at all.
+ */
+export function cardEvent(e: FarmEvent): boolean {
+  return !CARD_LEAVES_OUT.has(e.type);
+}
+
+const CARD_LEAVES_OUT: ReadonlySet<FarmEvent['type']> = new Set<FarmEvent['type']>([
+  'wages-paid',
+  'wages-owed-paid',
+  'wages-missed',
+]);
+
+/**
+ * The diary with the lines filed under their days, as a new list. A day
+ * that is not there yet is added in its place by day number. A day takes
+ * `DIARY_LINES` lines and counts the rest. Past `DIARY_DAYS` days the oldest
+ * are dropped.
+ */
+export function fileLines(
+  diary: readonly StoredDiaryDay[],
+  filings: readonly Filing[],
+): StoredDiaryDay[] {
+  const out = diary.map((d) => ({ ...d, lines: d.lines.slice() }));
+  for (const f of filings) {
+    if (f.lines.length === 0) continue;
+    let at = out.length - 1;
+    while (at >= 0 && out[at]!.day > f.day) at--;
+    let entry = out[at];
+    if (!entry || entry.day !== f.day) {
+      entry = { day: f.day, date: f.date, lines: [], more: 0 };
+      out.splice(at + 1, 0, entry);
+    }
+    for (const line of f.lines) {
+      if (entry.lines.length < DIARY_LINES) entry.lines.push(line);
+      else entry.more++;
+    }
+    if (f.card?.length) {
+      entry.card = [...(entry.card ?? []), ...f.card].slice(0, DIARY_LINES);
+    }
+    if (f.rainMm !== undefined) entry.rainMm = f.rainMm;
+  }
+  if (out.length > DIARY_DAYS) out.splice(0, out.length - DIARY_DAYS);
+  return out;
+}
+
+/**
+ * One page of the diary, newest day first. `before` asks for days older
+ * than that day. `earlier` is the `before` to ask for the next page, or null
+ * when this page reaches the oldest day kept.
+ */
+export function diaryPage(
+  diary: readonly StoredDiaryDay[],
+  before?: number,
+): { diary: DiaryDay[]; earlier: number | null } {
+  const older = before === undefined ? diary : diary.filter((d) => d.day < before);
+  const page = older.slice(-DIARY_PAGE).reverse();
+  const out = page.map((d): DiaryDay => ({
+    day: d.day,
+    date: d.date,
+    lines: d.more > 0 ? [...d.lines, `and ${d.more.toLocaleString('en-AU')} more`] : d.lines,
+  }));
+  const hasEarlier = older.length > page.length;
+  return { diary: out, earlier: hasEarlier && page.length ? page[page.length - 1]!.day : null };
+}
+
+const money = (n: number): string => `$${Math.round(Math.abs(n)).toLocaleString('en-AU')}`;
+
+/**
+ * The money lines of a day or skip: cash, and what came in and went out. Born
+ * and dead cattle, sales and the rest are in the inbox messages, so they are
+ * not said twice. A skip says how many days the figures cover.
+ */
+export function summaryLines(s: SummaryWire): string[] {
+  if (s.daysRun === 0) return [];
+  const over = s.daysRun > 1 ? ` over ${s.daysRun.toLocaleString('en-AU')} days` : '';
+  const out: string[] = [];
+  if (s.cash.before !== s.cash.after) {
+    out.push(
+      `Cash went from ${s.cash.before < 0 ? '-' : ''}${money(s.cash.before)} to ${s.cash.after < 0 ? '-' : ''}${money(s.cash.after)}${over}.`,
+    );
+  }
+  const m = s.money;
+  if (m.wool > 0) out.push(`Wool sold at shearing: ${money(m.wool)}${over}.`);
+  if (m.sales > 0) out.push(`Sales: ${money(m.sales)}${over}.`);
+  if (m.buys > 0) out.push(`Cattle bought: ${money(m.buys)}${over}.`);
+  if (m.feed > 0) out.push(`Feed: ${money(m.feed)}${over}.`);
+  if (m.grain > 0) out.push(`Grain sold: ${money(m.grain)}${over}.`);
+  if (m.running > 0) out.push(`Running costs: ${money(m.running)}${over}.`);
+  if (m.wages > 0)
+    out.push(`Wages and super paid: ${money(m.wages)}${over}, in the running costs.`);
+  if (m.contract > 0) out.push(`Contract fencing: ${money(m.contract)}${over}.`);
+  if (m.interest > 0) out.push(`Interest earned: ${money(m.interest)}${over}.`);
+  if (m.interest < 0) out.push(`Interest paid: ${money(m.interest)}${over}.`);
+  return out;
+}
+
+/** A day the engine ran, with what its tick reported. */
+export interface RunDay {
+  day: number;
+  events: readonly FarmEvent[];
+  /** The day's real rain, mm (the engine's `DayResult.rainMm`). */
+  rainMm?: number;
+}
+
+/**
+ * What a day or skip files in the diary. Each day's own events (from the
+ * run itself, not the inbox, which keeps only 120 messages) go under that
+ * day. The events of first light carry no day, so those still come from the
+ * inbox made since `seq0`: cattle landing and booked stock selling. Messages
+ * made by the player's own jobs are older than `seq0`: the job's result line
+ * was filed when it was done. The money lines go under the last day that ran.
+ */
+export function periodFilings(
+  farm: FarmState,
+  seq0: number,
+  summary: SummaryWire,
+  days: readonly RunDay[],
+): Filing[] {
+  const byDay = new Map<number, string[]>();
+  const cards = new Map<number, string[]>();
+  const add = (day: number, lines: string[], card = false): void => {
+    if (lines.length === 0) return;
+    const there = byDay.get(day);
+    if (there) there.push(...lines);
+    else byDay.set(day, lines.slice());
+    if (card) cards.set(day, [...(cards.get(day) ?? []), ...lines]);
+  };
+  const dateOf: DateOf = (day) => {
+    const d = dateOn(farm, day);
+    return { year: d.year, month: d.month, date: d.date };
+  };
+  for (const d of days) {
+    for (const e of d.events) {
+      const words = inboxMessage(e, dateOf);
+      if (words) add(d.day, [words.text], cardEvent(e));
+    }
+  }
+  const rain = new Map(days.filter((d) => d.rainMm !== undefined).map((d) => [d.day, d.rainMm!]));
+  for (const m of farm.inbox) {
+    if (m.seq < seq0) continue;
+    // First light brings cattle in, sells booked stock and does the workforce's pay day, leavings and fencing.
+    const dawn =
+      m.event.type === 'cattle-arrived' ||
+      m.event.type === 'sheep-arrived' ||
+      m.event.type === 'cattle-sold' ||
+      (isLabourEvent(m.event) && DAWN_LABOUR.has(m.event.type));
+    if (!dawn) continue;
+    const words = inboxMessage(m.event, dateOf);
+    if (words) add(m.day, [words.text], cardEvent(m.event));
+  }
+  if (summary.daysRun > 0) add(Math.max(0, farm.day - 1), summaryLines(summary));
+  return [...byDay]
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, lines]) => {
+      const d = dateOn(farm, day);
+      const card = cards.get(day);
+      const rainMm = rain.get(day);
+      return {
+        day,
+        date: { year: d.year, month: d.month, date: d.date },
+        lines,
+        ...(card?.length ? { card } : {}),
+        ...(rainMm !== undefined ? { rainMm } : {}),
+      };
+    });
+}

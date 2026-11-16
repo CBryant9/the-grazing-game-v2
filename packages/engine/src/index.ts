@@ -1,0 +1,782 @@
+/**
+ * The Grazing Game engine.
+ *
+ * Pure TypeScript, seeded, no DOM. It runs on the server and in tests. It
+ * must never be shipped to the browser in anything public (CLAUDE.md, rule 14).
+ */
+
+export { ENGINE_VERSION, SAVE_FORMAT_VERSION } from './version';
+export { hash32, rngFromState, rngStream } from './rng';
+export type { Rng, RngState } from './rng';
+
+export { GRID_H, GRID_N, GRID_W, haPerSquare } from './grid';
+export { dateAt, monthIndex } from './calendar';
+export type { CalendarDate, FarmStart } from './calendar';
+
+// First light and last light for a place and a date (milestone 1.5).
+export { clockText, daylightFor, durationText, utcOffsetMinutes } from './daylight/daylight';
+export type { Daylight, Place } from './daylight/daylight';
+export { DISTRICT_PLACES } from './daylight/places';
+
+export { DISTRICTS } from './data/districts';
+export type { District } from './data/districts';
+
+export { LAND, NEVER_GRAZED, clonePastureState, createPastureState } from './pasture/state';
+export type { LandUse, PastureState } from './pasture/state';
+export { plantingAt } from './pasture/plantings';
+export type {
+  Planting,
+  PlantingKind,
+  PlantingNow,
+  PlantingStage,
+  Plantings,
+} from './pasture/plantings';
+export { districtPotential, interpMonth } from './pasture/potential';
+export { growGrass } from './pasture/grow';
+export type { GrowInputs } from './pasture/grow';
+export { cellQuality, meFromDmd } from './pasture/quality';
+export type { SquareQuality } from './pasture/quality';
+export { PHASE_LABELS, phaseOf } from './pasture/phase';
+export type { PhaseId } from './pasture/phase';
+export { FEED_FLOOR_KG_HA, areaSummary, coverPct, paddockSummary } from './pasture/summary';
+export type {
+  AreaSummary,
+  PaddockStock,
+  PaddockSummary,
+  PaddockSummaryInputs,
+} from './pasture/summary';
+
+export { averageYear } from './season/factors';
+export type { GrowthFactorSource, GrowthFactors } from './season/factors';
+export {
+  PLAY_WOBBLE,
+  RUN_UP_DAYS,
+  RUN_UP_SEASON_FLOOR,
+  RUN_UP_WOBBLE,
+  SEASON_OUTLOOKS,
+  drawSeason,
+  monthFactor,
+  randomSeasons,
+} from './season/randomSeasons';
+export type { MonthWobble, RandomSeasonsOptions, SeasonOutlook } from './season/randomSeasons';
+// Milestone 1.4: real years and growth from real weather. The weather
+// tables themselves are read by server code only (`@gg/engine/server`).
+export {
+  dateOfSerial,
+  daySerial,
+  isoDate,
+  parseWeatherTable,
+  tableDays,
+  tableIndex,
+  tableLast,
+} from './season/weatherTable';
+export type { WeatherTable } from './season/weatherTable';
+export {
+  SCALING_YEARS,
+  SOIL_WATER,
+  WEATHER_FACTOR_CEILING,
+  buildWeatherGrowth,
+  soilWaterDay,
+  soilWaterTally,
+  waterIndex,
+} from './season/weatherGrowth';
+export type { SoilWater, SoilWaterTally, WeatherGrowth } from './season/weatherGrowth';
+export { FIRST_REAL_YEAR, isLeapYear, planRealYears, playableYears } from './season/realYears';
+export type { RealYearPlan, RealYearPlanOptions, YearOrder } from './season/realYears';
+export {
+  SEASON_LABEL_EDGES,
+  SEASON_WINDOW_DAYS,
+  seasonLabel,
+  weatherSeasons,
+  weatherYears,
+} from './season/weatherSeasons';
+export type { WeatherSeasons, WeatherSeasonsOptions } from './season/weatherSeasons';
+
+export {
+  CALF_RATION_SHARE,
+  FEED_COST,
+  HAY,
+  LICK,
+  LOT_RATION,
+  PELLETS,
+  SUPPLEMENTS,
+} from './data/feed';
+export type { Supplement } from './data/feed';
+export {
+  BARREN_CHANCE,
+  BOUGHT_CALF,
+  CLASS_LABELS,
+  GROUPS,
+  HEALTH_COST_PER_HEAD_YEAR,
+  MARKET_CLASSES,
+  MARKET_WEIGHTS,
+  MARKING,
+  SALE_CLASSES,
+} from './data/cattle';
+export type {
+  CattleClassId,
+  GroupId,
+  MarketClassId,
+  Range,
+  SaleClass,
+  SaleClassId,
+} from './data/cattle';
+export { animalLookup, createCattleMob, emptyCattleTotals } from './cattle/types';
+export type {
+  Animal,
+  AnimalIds,
+  AnimalKind,
+  AnimalLookup,
+  CattleMob,
+  CattleRngs,
+  CattleTotals,
+  GrazingArea,
+  GrazingLand,
+  Joining,
+  MobDay,
+  Sex,
+} from './cattle/types';
+export {
+  DSE_PER_AE,
+  aeOf,
+  classOf,
+  groupKey,
+  label,
+  makeAnimal,
+  makeSaleBatch,
+  marketClass,
+  stockOn,
+  waterNeed,
+} from './cattle/animal';
+export { LOT_DIET, RESIDUAL, dietOf, feedAvailShare, grazeAlloc, intakeOf } from './cattle/graze';
+export type { Diet, DietResult, GrazeInputs, Intake, PlantingGraze } from './cattle/graze';
+export {
+  CYCLE_DAYS,
+  FEMALES_PER_BULL,
+  GESTATION_DAYS,
+  JOINING_DAYS,
+  JOINING_REPORT_DAYS,
+  LACTATING_CONCEPTION,
+  PUBERTY,
+  WEAN_MIN_AGE,
+  WEAN_TRIGGER_AGE,
+  YOUNG_BULL_SHARE,
+  anoDays,
+  breedingNotes,
+  bullCover,
+  calve,
+  condConc,
+  cycling,
+  expectedRate,
+  joinReport,
+  joiningFemales,
+  markCalves,
+  markable,
+  weanMob,
+  weanable,
+  weanOne,
+  weaningDue,
+} from './cattle/breeding';
+export type { CalveInputs, MarkResult } from './cattle/breeding';
+export {
+  FEED_SHORT_KG_HA,
+  NOT_ENOUGH_FEED_AVAIL,
+  gainOn,
+  gainWhy,
+  milkMJ,
+  predictGains,
+} from './cattle/gains';
+export type { CattleNote, GainForecast, GainReason } from './cattle/notes';
+export { dayDiet, settleDeaths, simMob } from './cattle/simMob';
+export type {
+  DayDiet,
+  Death,
+  DeathCause,
+  MobDayResult,
+  MobPlace,
+  SimMobInputs,
+} from './cattle/simMob';
+// Milestone 1.2b: the farm (paddocks, fences, water, crops and farm layout).
+export { FARM_SIZES, farmScale } from './data/farms';
+export type { FarmScale } from './data/farms';
+export {
+  BRASSICA_CURVE,
+  SPECIES,
+  SPECIES_IDS,
+  SUMMER_CURVE,
+  WINTER_CURVE,
+  speciesCurve,
+} from './data/species';
+export type { Species, SpeciesId, SpeciesType } from './data/species';
+export {
+  ARABLE_SHARES,
+  CONVERT_COST_PER_HA,
+  CROP_DISTRICT_FACTORS,
+  LAND_OPTIONS,
+  ROTATIONS,
+} from './data/crops';
+export type { ArableShare } from './data/crops';
+
+export {
+  EDGE,
+  PADDOCK_BLOCK,
+  STOCK_BLOCK,
+  areaChanges,
+  areaEdges,
+  buildTopology,
+  cloneFences,
+  createFences,
+  edgeOnFarm,
+  flood,
+  getEdge,
+  hEdge,
+  hIdx,
+  labelSquare,
+  vEdge,
+  vIdx,
+} from './farm/topology';
+export type {
+  AreaChanges,
+  EdgeCode,
+  EdgeRef,
+  FenceType,
+  Fences,
+  GrazingArea as TopologyArea,
+  Paddock,
+  Topology,
+} from './farm/topology';
+export {
+  NO_WATER_DISTANCE,
+  PORTABLE_CAPACITY_L,
+  PORTABLE_LOW_SHARE,
+  areaWatered,
+  cloneWater,
+  createWater,
+  drainPortables,
+  hubCells,
+  pipeReach,
+  vertexId,
+  waterNeedPerHead,
+  waterPoints,
+  waterSeasonFactor,
+} from './farm/water';
+export type { PortableDrain, PortableTrough, Water, WaterEvent, WaterPoints } from './farm/water';
+export {
+  buildFence,
+  canTrough,
+  fenceLine,
+  fixFence,
+  isSquareHub,
+  knockDownTape,
+  layPipe,
+  noFenceOnHand,
+  moveHub,
+  movePortable,
+  moveSquareHub,
+  moveTrough,
+  pipeLine,
+  placeFenceHub,
+  placeGate,
+  placePortable,
+  placeSquareHub,
+  placeTrough,
+  refillPortable,
+  removeFence,
+  removeGate,
+  removeHub,
+  removePortable,
+  removeSquareHub,
+  removeTrough,
+  setGate,
+  squareHubs,
+  surveyLayout,
+  tapeRun,
+  toggleGate,
+  touchesFence,
+  vertexOnFence,
+} from './farm/layout';
+export type {
+  Done,
+  EdgeTally,
+  FarmLayout,
+  FenceBuilt,
+  FenceEffect,
+  FenceFixed,
+  FenceHubPlaced,
+  FenceLine,
+  FenceOnHand,
+  FenceRemoved,
+  GatePlaced,
+  GateRemoved,
+  GateSet,
+  HubMoved,
+  HubRemoved,
+  Outcome,
+  PipeLaid,
+  PortableMoved,
+  PortablePlaced,
+  PortableRefilled,
+  PortableRemoved,
+  Refusal,
+  RefusalReason,
+  SquareHubMoved,
+  SquareHubPlaced,
+  SquareHubRemoved,
+  Survey,
+  TroughMoved,
+  TroughPlaced,
+  TroughRemoved,
+  Vertex,
+} from './farm/layout';
+export {
+  BUILDING_CLEAR_OF_BORE,
+  GENERATION_STREAMS,
+  genBore,
+  genFertility,
+  generateFarm,
+  layRunning,
+  layScratch,
+  placeBuildings,
+  runUpPasture,
+} from './farm/generate';
+export type {
+  FarmBuildings,
+  FarmOptions,
+  GeneratedFarm,
+  StartImprovements,
+  StartLayout,
+  StartType,
+} from './farm/generate';
+
+export {
+  addField,
+  cloneCropState,
+  createCropState,
+  cropGrazed,
+  cropRisks,
+  endField,
+  fieldAt,
+  fieldById,
+  fieldProgress,
+  fieldState,
+  fieldYield,
+  harvestField,
+  plantingsOn,
+  sow,
+  sowInfo,
+  squareGrazed,
+} from './crops/fields';
+export type {
+  AddFieldOptions,
+  CropContext,
+  CropRefusal,
+  CropRefusalReason,
+  CropRisk,
+  CropState,
+  Field,
+  FieldProgress,
+  FieldYield,
+  GrazeDamageEvent,
+  Harvested,
+  Regen,
+  SowInfo,
+  Sown,
+} from './crops/fields';
+export {
+  CROP_LOST_AFTER_DAYS,
+  FORAGE_ENDS_AFTER_DAYS,
+  LOCK_UP_WARNING_DAYS,
+  SHED_AFTER_DAYS,
+  fieldTick,
+} from './crops/tick';
+export type { CropEvent } from './crops/tick';
+export { blobGrow, genArable, startCropping } from './crops/arable';
+export type { ArableLand } from './crops/arable';
+
+// Milestone 1.2c: the whole farm (state, the daily tick, money, actions, saves).
+export {
+  COSTS,
+  COST_PER_M,
+  COW_CALF_FREIGHT,
+  DIFFICULTY,
+  HEAD_FEE,
+  HERD_CASH_SHARE,
+  INFRA_WORTH_SHARE,
+  INTEREST,
+  OVERHEADS,
+  PASTURE_ASSET_SHARE,
+  PORTABLE_RESALE_SHARE,
+  REUSED_FENCE_SHARE,
+  SELL_COMMISSION,
+  carryingCapacityAE,
+  cashBase,
+  overheadsPerYear,
+  portableResale,
+  reusedSegmentCost,
+  segmentCost,
+  startMoney,
+} from './money/costs';
+export type { Difficulty, PerMetreItem, StartMoney } from './money/costs';
+export {
+  SCORE,
+  closeYear,
+  infraInPlace,
+  liveYear,
+  netWorth,
+  netWorthParts,
+  newYear,
+  scoreYear,
+  spend,
+  stockWorth,
+  tapeOwned,
+} from './money/worth';
+// Paying to keep going (PRD 10.3, m6): the rescue of a farm whose game is over.
+export { rescueFarm, rescueTerms } from './money/rescue';
+export type { RescueRecord, RescueRefusal, RescueResult, RescueTerms } from './money/rescue';
+
+export {
+  BULL_PRICE,
+  PREG_PREMIUM,
+  bullPrice,
+  buyPrice,
+  centsPerKg,
+  estimateBuy,
+  netSaleValue,
+  saleValue,
+} from './market/prices';
+export type { PriceSource, Priced, Prices } from './market/prices';
+export {
+  CLASS_MULTIPLIERS,
+  STAND_IN_DAILY,
+  STAND_IN_FIRST_YEAR,
+  STAND_IN_SERIES,
+  STAND_IN_WALK,
+  asStandIn,
+  standInMarket,
+} from './market/standIn';
+export type { StandInMarket } from './market/standIn';
+// Milestone 1.4: real prices, inflation, real sale days and the real data
+// bundle. The tables themselves are read by server code only
+// (`@gg/engine/server`) and handed to the engine as `env.data`.
+export { DISTRICT_YARDS, YARDS } from './data/yards';
+export type { SaleSpecies, YardId } from './data/yards';
+export {
+  latestPriceRow,
+  parsePriceTable,
+  priceRowOn,
+  priceTableFirst,
+  priceTableLast,
+} from './market/priceTable';
+export type { PriceRow, PriceTable } from './market/priceTable';
+export {
+  TODAYS_DOLLARS,
+  cpiFor,
+  parseCpiTable,
+  quarterOf,
+  todaysDollarsFactor,
+} from './market/cpi';
+export type { CpiTable, Quarter } from './market/cpi';
+// m6: Daily Farm keeps the sheep and lamb indicators from day to day (`seriesFor`).
+export { SHEEP_INDICATOR_FILES } from './market/realSheepPrices';
+export type { SheepRealPrices } from './market/realSheepPrices';
+export {
+  CATTLE_INDICATORS,
+  CLASS_INDICATORS,
+  FEEDER_STAND_INS,
+  HEADLINE_INDICATOR,
+  REAL_PRICE_RULES,
+  buildDistrictPrices,
+  buildNationalPrices,
+} from './market/realPrices';
+export type {
+  CattleIndicatorId,
+  DistrictPrices,
+  IndicatorFigure,
+  IndicatorTables,
+  NationalPrices,
+  PriceOrigin,
+} from './market/realPrices';
+export { REAL_PRICE_DOLLARS, realMarket, realPricesOn } from './market/realMarket';
+export type { PriceDollars, RealMarket, RealMarketOptions } from './market/realMarket';
+export {
+  CATTLE_SALE_STAND_INS,
+  RANDOM_SEASON_SALE_WEEKDAY,
+  STAND_IN_BREAK,
+  buildSaleCalendar,
+  weekdayOf,
+  weeklySaleOn,
+} from './market/saleCalendar';
+export type { SaleCalendar, SaleDay, SaleType, StandInStretch } from './market/saleCalendar';
+export { RAW_TABLE_PATHS, buildRealData, districtTablePaths, tablesVersion } from './real/realData';
+export type { DistrictRealData, RawTableReader, RealData } from './real/realData';
+
+export { INBOX_LIMIT, PLAY_STREAMS, PRICE_HISTORY_DAYS, cloneFarm, emptyLedger } from './sim/state';
+export type {
+  Arrival,
+  FarmMob,
+  FarmState,
+  GameOverReason,
+  InboxMessage,
+  InfraLedger,
+  LoggedAction,
+  MarketState,
+  MobWhere,
+  PlanLeg,
+  PlanRule,
+  PlanRun,
+  PlanTemplate,
+  PlanWaitReason,
+  PlayStream,
+  PriceDay,
+  RealYearsSpec,
+  SaleBooking,
+  SeasonSpec,
+  YearRecord,
+  YearScore,
+  YearTotals,
+} from './sim/state';
+export type {
+  ActionEvent,
+  DawnEvent,
+  FarmEvent,
+  FarmStarted,
+  MobPlaceNote,
+  PlanReport,
+  StartHerd,
+  TickEvent,
+} from './sim/events';
+export { HERD_STREAM, START_HERD_SHARE, createFarm, startHerd } from './sim/create';
+export type { CreateFarmOptions, FarmSizeName } from './sim/create';
+export {
+  areaIdOf,
+  areaNameOf,
+  dateOn,
+  nextSaleDay,
+  placeAnchor,
+  plantingsNow,
+  pricesOf,
+  realPlanOf,
+  realSourcesOf,
+  saleDayOn,
+  seasonsOf,
+  surveyOf,
+} from './sim/derived';
+export type { FarmSaleDay, RealSources, SourceEnv } from './sim/derived';
+export { autoWeanDest, defaultSupplement, mergeShared, newMob, splitMobs } from './sim/mobs';
+// The herd record: PTIC from PTIC_DAYS in calf, the one rule for the player (14 Nov 2026).
+export { PTIC_DAYS, onRecordPtic, recordClassOf, recordGroupOf } from './sim/told';
+// Reads the web server needs, so it never copies a rule (14 Nov 2026).
+export { portableRefund, supplementCosts } from './sim/reads';
+export type { SupplementAdds, SupplementCost } from './sim/reads';
+// The stock book, the feed forecast and small facts for the screens (m8, engine 0.21.0).
+export { costIn, originOf, stockBook } from './sim/stockbook';
+export type { StockBookRow, StockOrigin } from './sim/stockbook';
+export { FORECAST_DAYS, FORECAST_POINTS, feedForecast } from './sim/forecast';
+export type { FeedForecast, FeedForecastPoint } from './sim/forecast';
+export { lastRainMm, paddockRestDays } from './sim/paddockfacts';
+export {
+  perDay,
+  planDueTonight,
+  plansView,
+  positionOf,
+  stepOf,
+  stepsIn,
+  stopsToday,
+} from './sim/plans';
+// Daily Farm with no hand (m7.1): the sheep plan moves due tonight, for the plan card.
+export { sheepPlansDue } from './sheep/moves';
+export type { SheepPlanDue } from './sheep/moves';
+export type { PlanLegView, PlanMobView, PlanNext, PlanStopView, PlanView } from './sim/plans';
+export { MIN_EVERY_DAYS, PLAN_FIGURES } from './data/plans';
+export type { PlanFigure, PlanFigureSource } from './data/plans';
+export {
+  BREAKOUT_CHANCE,
+  BREAKOUT_COOLDOWN_DAYS,
+  BREAKOUT_FEED_SHARE,
+  BREAKOUT_SIZE,
+  EATEN_OUT_DAYS,
+  EATEN_OUT_KG,
+  UNGRAZEABLE_KG,
+  stepDay,
+} from './sim/tick';
+export type { DayResult, TickEnv } from './sim/tick';
+export {
+  breedingReports,
+  calibrationView,
+  farmTotals,
+  materialsOnHand,
+  mobSummaries,
+  paddockSummaries,
+  pregTests,
+} from './sim/summary';
+export type {
+  CalibrationView,
+  FarmTotals,
+  MobBreedingReport,
+  MaterialsOnHand,
+  MobSummary,
+  PaddockView,
+  PregTestResult,
+} from './sim/summary';
+// Milestone 1.6: the farm view the map is drawn from (numbers only).
+export {
+  VIEW_BODY_SHAPE,
+  VIEW_OLD_LEAF_DAYS,
+  VIEW_SEED_HEADS,
+  VIEW_WEATHERED_KG,
+  farmView,
+} from './sim/view';
+
+export { MAX_BUY } from './actions/apply';
+export type { ActionEnv } from './actions/apply';
+export type {
+  Action,
+  ActionDone,
+  ActionRefusal,
+  ActionRefusalReason,
+  ActionResult,
+  ActionType,
+  FenceKind,
+  MoveTarget,
+  PlanLegSpec,
+  PlanSpec,
+} from './actions/types';
+
+export { farmHash, fromBase64, loadFarm, saveFarm, toBase64 } from './save/save';
+export type { SavedFarm } from './save/save';
+
+// Milestone 1.5a: the working day (the farm clock, job times, Next day and
+// skips, what needs doing).
+export { JOB_TIMES, SKIP_DAYS, metresPerMinute } from './data/jobTimes';
+export type { FigureStatus, JobFigure, Pace, SkipLength } from './data/jobTimes';
+export { dayMinutes, lightLeft, lightOn, timeNow } from './sim/clock';
+export type { ClockSpan, FarmClock } from './sim/state';
+export type { WorkEvent } from './sim/events';
+export type { JobCard, JobPiece, JobPreview, JobWorkPart } from './actions/types';
+export { NOT_TODAY, applyAction, previewAction } from './day/act';
+export { TROUGH_LOW_DAYS, daysToYearEnd, endDay, skipDays, stopsIn, waterCheck } from './day/days';
+export type {
+  Change,
+  DayEnd,
+  DayEnv,
+  PeriodSummary,
+  SkipOptions,
+  SkipResult,
+  SkipStop,
+} from './day/days';
+export { SHORTEST_JOB_MIN, clockView, husbandryNow, jobsToday, marketView } from './day/look';
+// Things to do (engine 0.20.0: facts for the bank, a sale coming up, a mob's
+// condition, calving and feed under the floor; marking once per drop; put away by `dismissTodo`).
+export {
+  CALVING_SHOWN_DAYS,
+  LOW_CS,
+  MARK_AFTER_CALVING_DAYS,
+  allThingsToDo,
+  thingsToDo,
+  todoKey,
+} from './day/todo';
+export { BANK_NEAR_SHARE, bankLevel, headOnFarm } from './money/bank';
+export type { BankLevel } from './money/bank';
+export type {
+  BookedView,
+  HusbandryJob,
+  MarketView,
+  MobHusbandry,
+  OnTheWayView,
+  SaleDayView,
+} from './day/look';
+export type { ClockView } from './day/look';
+export type { ThingToDo } from './day/todo';
+
+// Milestones 2.1 and 2.2: farm hands and contractor fencing (docs/MODEL.md,
+// section 11). Hiring, letting go and ordering or cancelling contract
+// fencing are actions (`hireHand`, `letHandGo`, `orderContractFence`,
+// `cancelContractFence`) sent through `applyAction`; `previewAction` gives
+// the job card, with `contract` for a quote and `hands` for a hand's share
+// of any job. The reads below never change the farm. A screen shows the
+// facts they give; it never shows a chance or a formula (rule 14), and its
+// words state facts only.
+// LABOUR and the rate helpers are for the server and tests only: never send them to the browser.
+export { LABOUR, awardHourly, casualDayRate, contractDayRate } from './data/labour';
+export type { AwardLevel, LabourFigureSource } from './data/labour';
+export { standingOf } from './labour/pool';
+// Milestone 3.3 (Daily Farm): does a hand work on a farm day? The same rule the worker report and the standing duties use.
+export { worksOn } from './labour/help';
+// The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
+export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
+export type {
+  ContractRunView,
+  HandStatus,
+  JobSeeker,
+  HandView,
+  WorkerReportItem,
+  WorkforceView,
+} from './labour/reads';
+export type { ContractRun, Hand, HandKind, HandSkills, LabourState, Person } from './labour/types';
+export type { ContractStopWhy, HandDuty, HandLeftWhy, LabourEvent } from './sim/events';
+
+// Milestone 2.3: the sheep model (docs/MODEL.md, the sheep section). A
+// farm's sheep live in `farm.sheep`, left out on a farm that has never had
+// sheep. The market, the setup choice, the shearing job and the wool sale
+// come in milestone 2.4: these are the helpers and reads they use. Screens
+// show the numbers and classes the reads give (each field says what may be
+// shown), never a chance, a formula or a table (rule 14).
+export { SHEEP_DISTRICTS, SHEEP_FEEDS, sheepDistrict, WATER_WELFARE_HOURS } from './data/sheep';
+export type { SheepBreed, SheepFeed } from './data/sheep';
+export { MVP_DSE_PER_AE } from './data/stocking';
+export {
+  addSheepMob,
+  ensureSheepState,
+  joinOnFor,
+  occupiedAreas,
+  sheepAreas,
+  sheepMobsOf,
+  sheepWaterLitres,
+} from './sheep/farm';
+export type { AddSheepResult, AddSheepSpec, SheepGroupSpec } from './sheep/farm';
+export { aeFromDse, dseOf, sheepClassOf } from './sheep/energy';
+export { crutchMob, fleeceMicron, greasyKg, shearMob } from './sheep/wool';
+export type { ShearResult } from './sheep/wool';
+export {
+  carcaseKg,
+  dressingShare,
+  fleeceOf,
+  fenceKindsRead,
+  nettingEdges,
+  sheepConditionFacts,
+  sheepFeedCosts,
+  sheepJoiningRecord,
+  sheepMarketRead,
+  sheepMobsRead,
+  sheepYearRead,
+  stockingRead,
+} from './sheep/reads';
+export { CS_FLOOR } from './sheep/reads';
+export type {
+  SheepConditionFact,
+  SheepFeedCost,
+  SheepStage,
+  FenceKindRead,
+  SheepBuyRead,
+  SheepClassRow,
+  SheepJoiningRecord,
+  SheepMarketRead,
+  SheepMobRead,
+  StockingRead,
+} from './sheep/reads';
+export { SHEEP_BUY_CLASSES } from './sheep/market';
+// Milestone 2.8: the contractors' price a head, for "Shearing on 14 November. About $9.81 a head."
+// Server only: the screen gets the sentence. MAX_SHEEP_BUY bounds the Buy card's number field.
+export { SHEEP_BUDGET_COSTS, MAX_SHEEP_BUY } from './data/sheepMarket';
+export type { SheepBuyClassId } from './sheep/market';
+export type { SheepDeathCause, SheepLossReason, SheepNote } from './sheep/notes';
+export type { StartFlock } from './sim/create';
+export type {
+  Sheep,
+  SheepClass,
+  SheepJoining,
+  SheepMob,
+  SheepMobDay,
+  SheepSex,
+  SheepState,
+} from './sheep/types';

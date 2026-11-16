@@ -57,13 +57,13 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 
 | Layer | Look |
 |---|---|
-| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; red = no water |
-| Pasture quality | red (ME 6.5) → green (ME 9.8) wash at 45% |
-| Recently grazed | red wash, stronger where more was eaten |
+| Water reach | blue fading out to 1.5 km; yellow 1.5–3 km; orange over 3 km; purple = no water *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Pasture quality | purple (ME 6.5) → green (ME 9.8) wash at 45% *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Recently grazed | orange wash, stronger where more was eaten *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Arable land | pale yellow wash (stronger on cropped squares). Also shown while using the Sow tool. |
 | Pipe | blue `#5ab4f0` lines when connected to the bore, grey `#7e8a96` when not |
-| Labels | paddock name (big paddocks in capitals), ha, "no water" in salmon or "water via gate"; planting name under crops |
-| Profit | small green/red marker over each beast |
+| Labels | paddock name (big paddocks in capitals), ha, "no water" in purple (the map's no-water colour, Claudia, 14 Nov 2026; the panels keep the site colour) or "water via gate"; planting name under crops |
+| Profit | small green/red marker over each beast. *(Not built yet. When it is, it must not use red on the map: red on the map is only for "can't do this" while drawing. Claudia, 14 Nov 2026.)* |
 
 ## Infrastructure
 
@@ -73,20 +73,22 @@ Never use "three-zone", "overgrazed" or any judging label. "Bare" only when grou
 | Electric fence | yellow wire `#ffe14a`, two strands |
 | Temporary tape | white dashed tape, one strand, orange posts, shorter |
 | Boundary | heavier brown wire |
-| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; red flag when shut, green when open |
-| Knocked-down fence | sagging, flashing red line with a "!" marker. Clicking it puts it back up. |
+| Contractor's fence under way | hot pink `#ff5cc8` on the dark casing: what the contractor has built is a solid line with cross ticks over the permanent fence, what is still to build is a dashed line with cross ticks, tagged "Team fence" when zoomed in. It is only drawn while the run is under way, then the fence is a normal permanent fence. Not red, not purple, not amber (milestone 2.2) |
+| Gate | strainer posts, a white 3-rail panel; swings open into the paddock; slate flag when shut, green when open *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
+| Knocked-down fence | sagging amber line with an amber "!" marker. Clicking it puts it back up. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Bore | a windmill about 3× a cow's height with a turning fan and red tail vane. A pulsing gold ring and a "BORE: PUT A TROUGH OR WATER HUB HERE" pointer until the first water is built. |
 | Trough | grey concrete with blue water |
 | Water hub | round trough straddling the fence line or corner |
-| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, red below) |
+| Portable trough | blue plastic trough with a white tank and a level bar (green > 50%, gold > 25%, orange below) *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* |
 | Trees | 16 dark green pixel trees |
 | Yards | feedlot and sale yards in a strip on the right of the map |
 
 Drawing aids:
 
-- Fence drag preview: a dashed line with the length and cost. For tape, white = off your roll and red = new tape you'll buy.
+- Fence drag preview: a dashed line with the length and cost. Tape is white and dashed, whether it comes off the roll or is new; the card says how much comes off the roll. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
 - Snap dots: green = joins an existing fence, white ring = open ground.
 - A hovered fence segment is highlighted white when it can be clicked.
+- While a tool asks for a paddock (moving a mob), every paddock that can be picked has a light tint and outline, and a paddock with no water is tinted and outlined purple (the water layer's no-water colour).*(Changed: Claudia, 14 Nov 2026. Red means only "does not fit today".)* The paddock sheet lists the same paddocks, with "No water" in words, so colour is never the only signal.
 
 ## Cattle sprites
 
@@ -119,7 +121,166 @@ Colour tokens (CSS `:root`):
 - The market chart shows the indicator as a gold line with a fill, and today's price as a cream square.
 - Setup cards have small pixel scenes: from scratch (bare ground, windmill), established (fences, trough, grass), mixed (crop rows beside pasture).
 
+### The game screens as the mockups (m8, 15 Nov 2026)
+
+The built screens follow `docs/mockups/index.html` (Claudia, 15 Nov 2026). What is drawn:
+
+- **Icons** are the mockups' 8 by 8 pixel grids (`ICONS`), drawn filled with crisp edges (`components/play/Icon.tsx`): hammer (Build), cow (Herd), grass (Paddocks), tag (Market), plan (Plans), dots (More), bell, house, trophy, book, user, lock. Drawn for the game in the same style: drop (water), help, close, back, chevron. The smooth line icons are gone.
+- **Phone held upright:** the top bar is a card floating over the map (inset 8 px, radius 12, the translucent `--hud` background, a 1 px `--line` border, no lime top border). The map fills the screen behind it. The card holds the farm button, the farm name, day, date and mode, cash (and "Bank limit $X" under it when cash is below zero), the bell with the unread count, Help, the daylight bar (12 px) with first light, a light note and last light under it, a line of facts (town, season, head, and last night's rain when the server sends it), and the time buttons. "N things to check" sits under it, open with the first three as short lines with square bullets (coral for urgent, amber for the rest).
+- **Daylight bar:** an open job card's slice of the day is a striped coral part from now. The note says "This job: about N h" while it is open. Time stays light: no countdown.
+- **Bottom tabs:** Build, Herd, Paddocks, Market, Plans, More, 10 px pixel labels, 24 px icons. Build opens the build tray, docked full width on the tabs with its grab handle. The job card is key and value rows (Takes, Cost, Fits in today's light, Daylight left after) and Cancel | Build it.
+- **Paddock sheet:** title, label chip and "ha · Water ✓/✗" on one row; six tiles in three columns (kg DM/ha, height, % green, ME, CP, AE/ha); "Mob: … about N days of feed at this rate" (or the server's feed words); the side-view picture; the comment line in italics when the server sends one; Move cattle in here (coral) beside Details (ghost) at 1.6 fr / 1 fr.
+- **Segmented controls:** a padded pill, pixel font 11 px, the chosen one coral with white words. **Sort chips:** the chosen one inverted.
+- **Market chart:** one colour per class, the series tokens `--s0` to `--s6` (both themes), still with a dash per line so colour is never the only signal.
+- **Scores:** each part's bar in its own series colour, 12 px, radius 2, no track. A part that took points off stays muted.
+- **Day summary:** the whole screen on a phone held upright, "Day N done" or "N days done", the lines, and a full-width Back to the farm.
+- **Phone on its side:** a slim bar with the date on one line and cash at the far right; panels full screen with ✕, the paddock sheet and the lists in two columns; the build tools bottom left and the job card on the right.
+- **The PC header at every PC width (900 px up):** one row of about 63 px from 1024 to 1920. The date block keeps 150 px and ends its lines in an ellipsis, never one word a line. As the window narrows the header drops, in order: the facts line (1365 px and under), the daylight labels and a shorter bar (1279), a 110 px bar with short skip chips +1w, +1m, +1y (1180), and below 1024 the time controls take a second row. The panel tabs stay on one row (smaller padding, "Scores" for "Scores · Diary" at 1180 and under, a scrolling row as a last resort) and the panel is at most 42% of the window. A tablet held upright (768 x 1024) gets the phone layout.
+- **Mounted in the second pass:** the stock book behind the "Mobs | Stock book" switch on Herd (it loads with the record the first time it opens), the Sell money line under each Sell picker (the Market's and the mob card's), the Feed panel as a More row on a phone and a tab between Paddocks and Market on a PC, the paddock comment line in italics in `--ok` under the picture, rain last night in the phone bar's facts line, a Rest days column on the PC paddocks table, and the weekly price change (▲ green, ▼ coral, "no change" muted) on the Buy rows and a Week column on the price table.
+- **Plan form (mockup F):** Leg 1 and "Add a leg" up to eight; each leg a card with its paddocks as chips joined by arrows (the first one inverted), "+ add" to tap paddocks into that leg, its own rule switch (Move every N days, Times a day, Move at kg DM/ha) and rounds; the last leg can keep going. Then Repeat | Stay, the water line ("✓ Water in every paddock" or "✗ No water in …"), Start from, and Save plan beside New plan. The map numbers the paddocks 1.1, 1.2, 2.1 when a plan has more than one leg.
+- **PC:** the website header (logo, Farm, and Community, Leaderboard and Groups when switched on, the bell and the account when signed in; no "Play free"), then the game header (farm box, "Year N · date" over district, ha and head, the 250 px daylight bar with labels, the time chips with Next day in coral, cash over net worth at the far right). The side panel's tabs: Build, Herd, Plans, Paddocks, Feed, Market, Scores · Diary, More; its width follows the tab (Paddocks 440 px, Herd 640 px, the rest 500 px). The sponsor rail, when on, is 180 px at the far left.
+
+### The Feed panel and the stock book (rebuild, m8 second pass)
+
+- **Feed forecast chart** (`FeedPanel`, plain SVG, no chart library): feed on offer as a filled area in `--ok` with a 2 px line, tonnes of DM over the farm, from "Now" and then the first of each month for a year (12 different months). The grazing floor is a dashed 2 px `--coral` line across it. Crops are bars in `--sky` stacked on the pasture at their month, so they read as spikes. The y axis has three ticks on a round top (1, 2 or 5 times a power of ten) in tonnes. A legend names all three. The chart is an image with a one-sentence summary for a screen reader, and the figures are in a table under "Forecast figures". The card under it says the facts and that it is an average-season forecast, and "How this is worked out" lists what it assumes.
+- **Supplements** (same panel): one card a mob, with what it is on, its cost a day, what it adds, and a button per supplement with its cost a day. The one it is on is pressed (`--btn`). In the yards or the feedlot the reason shows instead of buttons. The job card draws under the mob's card.
+- **Stock book** (`StockBook`): chips for All and each mob, a sort picker, then a table. Up to 560 px of panel it shows Tag, Class, kg, CS and Profit (the phone list in mockup 8); from 560 px it adds Age, PTIC, Bought, Spent and Value now (mockup D). Column heads sort, with `aria-sort`. Profit is `--ok` above zero and `--bad` below, with a + or a minus sign, so it never relies on colour. 50 rows, then "Show more". How the figures are worked out sits under a disclosure.
+- **Sell money line** (`SellProfitLine`): "Bought for $1,050, $40 spent since · profit +$266/head" in 12 px, the price muted.
+
 ## Narrow screens
 
 - No horizontal scroll at phone width. Info-bar items wrap, and the feed charts shrink.
 - Confirmations and results appear **inline next to the button you pressed** (saleyard buy/sell confirm and result rows), not off-screen.
+
+## The rebuild's map (milestone 1.6a)
+
+How the PixiJS map in `packages/render` draws each thing above. The rule is unchanged: the picture must match the model. The map is drawn from the farm view (`FarmView`, built by `farmView` in the engine), which carries figures only. Everything in this section marked **(builder)** was decided while building and is for Claudia to check. The rest is hers or the PRD's.
+
+### The farm view
+
+- The map never sees the farm. It sees a view: for each square its land use, standing height in cm, green share, ground cover, how old the leaf looks, how weathered the dry feed looks, whether seed heads show, the neutral label, the planting on it, diet energy, recent grazing, distance to water and whether it is arable. Then fences, gates, pipe, troughs, hubs, the bore, buildings, paddocks, grazing areas, plantings and mobs.
+- Every figure is read from the model's own summaries. A square's height is the paddock summary's height for that one square, so the map, the paddock sheet and the side-view picture all use one height figure. *(The MVP's map used a second height formula of its own. It gave nearly the same answer.)* **(builder)**
+- Where seed heads show, which cattle look thin or fat, and how weathered dry feed looks are worked out on the server and sent as plain flags and steps. The browser holds no thresholds for them, on the map or in the side-view picture.
+- The view holds no seed, no prices, no soil fertility, no grain yield in prospect and nothing about days to come. A test lists every field it may hold.
+- **The side-view figures are rounded to what a paddock sheet shows and no finer:** kg DM/ha to the nearest 10, height and leaf reach in whole cm, green share and cover in whole %, leaf age in ten steps, and seed heads as a share of stems in tenths (none at or under rankness 0.3, as in the MVP's picture). Sent any finer, the height and leaf-reach rules could be worked back out of the view. The realism check did exactly that with the first version. **(builder)**
+- A mob's cattle are counted by kind (with how many are thin and how many fat), not listed. The whole view for a farm with 4,141 head is 42 KB as JSON. The budget in the test is 64 KB.
+- Trees: the model has none, so the view's list of trees is empty and no trees are drawn. The tree sprite exists. *(The MVP's 16 trees were decoration.)* **(builder)**
+
+### Clear map zoomed out, detail zoomed in
+
+- **Switch point:** 26 screen pixels a square (PRD 7). At or below it each mob is one marker. Above it cattle and grass tufts are drawn.
+- **The hand-over is a fade in time** (about a fifth of a second), not a blend by zoom, so the map never sits half way between the two pictures. Each picture holds for one pixel a square past the switch point, so a pinch that hovers there does not flicker. With "reduce motion" the change is made at once. **(builder)**
+- **Zoom range:** from the whole farm in view to 96 pixels a square. *(v15 was 1 to 5 times.)* **(builder)**
+- **On a phone held upright** the farm fills the height and runs past the sides (PRD 6.1). On its side, and on a PC, the whole farm fits.
+- **Zoomed out:** each square is one clean colour **(builder: the mixing rule, the raise, the bands and the flecks)** worked out from its figures: soil, straw litter or shaded ground underneath, mixed with the colour of the tops by ground cover. Rank grass reads as straw, leafy grass as green, short grass shows soil. Each square is raised by its height (90 cm is half a square) and the front of a raised square shows where it stands taller than the square in front of it. Cropping country shows its rows.
+- **Zoomed out, green at the base and seed heads still read.** The front of a raised square is the sward in profile: a green band from the ground up as far as the green reaches, and a straw band above it. So rank grass with green at its base shows green under straw from a distance. A pasture square that carries seed heads has three pale flecks on it. *(The first build drew the front as a darker copy of the top and drew no seed heads zoomed out. The realism check found it.)* **(builder)**
+- **Zoomed in:** the ground is one soft picture, 9 pixels to a square. Squares blend into their neighbours inside a paddock but never across a fence line or a change of country, so a short paddock beside a rank one keeps a sharp fence-line contrast. Nine tufts stand on each square. **(builder)**
+- **Taps** open the paddock, never a cow. Zoomed out, the tap is tested against the raised squares as drawn (LESSONS 28).
+
+### Grass, square by square
+
+| Thing | How the rebuild draws it |
+|---|---|
+| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under cover × 1.05. Low cover shows soil between tufts. The cover figure is the model's paddock summary cover: feed ÷ 1,000 kg DM/ha, up to 1. *(The MVP's map used (feed − 50) ÷ 950 for the map and feed ÷ 1,000 for the sheet. The rebuild uses the sheet's figure for both.)* **(builder)** |
+| Bare soil, litter, shaded ground | The colours above, unchanged. Dry grass sits on straw litter, never soil |
+| Height | Tuft height follows the view's height in cm: 90 cm is 0.62 of a square, each tuft give or take a third. Grass is drawn tall against the cattle on purpose, as in the MVP and the mockups, so height reads **(builder)** |
+| Green leaf colour | Young to old leaf, the colours above, by the view's leaf age |
+| Dry colour | Light straw to grey, the colours above, by how weathered the view says the dry feed is |
+| Green at the base of rank grass | Each tuft is two pieces: dry stems at full height behind, green from the ground up in front, to height × green share × (0.65 to 1.35) × 1.25. A square that is all green is green to the tip on every tuft **(builder: the all-green case)** |
+| Seed heads | A pale head on tufts where the view says so, on tufts tall enough to carry one |
+| Sown pasture | Deeper green, with a white clover flower on some tufts |
+| Crops | Upright plants in three rows to a square, bright green while leafy, golden with seed heads once heading or done. Three furrows to a square in the ground. A crop's height is the paddock summary's height for the square, held to the crop's tallest. *(The MVP's map used feed ÷ 450.)* **(builder)** |
+| Fallow | Worked brown soil with furrows and a few lighter clods. No tufts |
+| Stubble | Pale straw ground with rows of very short stalks. No green, whatever its figures say |
+
+### Cattle
+
+- **Breeds:** Brahman style in Central Queensland (pale grey cows, cream heifers, red steers, dark grey bulls with a big hump, fawn calves, long ears). British-breed style elsewhere (black cows, dark brown heifers, red-brown steers with white faces, heavy grey bulls, brown calves). Colours for each kind **(builder)**.
+- **Body shape** follows condition: thin shows ribs and a hip bone, fat is deeper and rounder. Bulls are bigger, calves smaller.
+- **Never blurred into the grass:** every beast has a dark outline and, outside it, a thin pale rim. On pale ground the dark line carries it. On dark ground the pale rim does. A test holds the better of the two to 3 to 1 against every colour the ground or grass can be, at midday, first light, last light, under cloud and in rain. **(builder)** **Night is not in that test.** After last light the map goes dark blue and the contrast falls to about 2 to 1. Nothing is done at night in the game (the day ends at last light), but a player can look. To fix or to accept. **(builder)**
+- **Where they stand:** the farm does not store it. The map works it out from the view, the same way every time, so cattle do not jump about. A mob gathers round the square it was put on (usually water) and spreads out from there, about two to a square, without crossing a fence. Cattle stand back from fence lines and never on a square with a trough, the bore or a building. Calves stand beside cows. They move only when the mob, its numbers, or a fence, gate or trough changes. **(builder)**
+- **Big mobs do not hide the pasture.** On open country a mob stands on no more than four squares in ten of its grazing area, three to a square at most. Past that it draws a sample. On a small area (eight squares or fewer, a tape cell say) it uses every square, up to six to a square, so high density looks crowded. The marker and badge always carry the real head count. *(v15 drew up to about 120 a mob.)* **(builder)**
+- **Zoomed out:** one marker for each mob with a cow and the head count, on a soft footprint of the squares it stands on. A mob with no water has a purple border and says "no water".
+- **Zoomed in:** a small head-count badge above the mob.
+- A mob in the feedlot is not drawn. A mob in the stock yards is drawn at the yards, 14 beasts at most however many are held there **(builder)**.
+- Not yet: cattle walking and grazing, the selected mob, picked animals, and the profit marker over each beast.
+
+### Sheep (milestone 2.8)
+
+Sheep mobs (flocks) come in the view as `flocks`. A view with none draws exactly as before. **Sheep are drawn in code: there is no sheep art in the repo, and no `art/` folder yet.** Each sheep is registered by name (`sheep.ewe.normal`, `sheep.ewe.thin`, `sheep.lamb.normal`, `marker.sheep` and so on) and can be swapped for exported art like any other sprite. **(builder, for Claudia to check)**
+
+- **What a sheep looks like:** a round woolly body made of overlapping lobes, so the outline is bumpy like wool. A small dark grey face with a cap of wool on top, and thin dark legs. A few curls are drawn in the wool. Merino style: cream wool `#f1ead6` (ewe), `#ece3cc` (wether), `#e6dcc2` (ram), `#f3edda` (young), `#f6f1e2` (lamb). Faces `#4a4642` to `#55504a`, legs `#37332f` to `#3e3a35`.
+- **Kinds:** a ram is about a fifth bigger, a little darker in the wool, with curled horns. A young sheep (weaner or hogget) is about four fifths of a ewe. A lamb is half a ewe, paler, with longer legs for its size.
+- **Condition:** a thin sheep (under CS 2) is leaner, with longer-looking legs, wool 16% darker and duller, and a hip bone and backbone showing. Lambs have one shape. The thin share comes from the view, so the browser holds no threshold.
+- **Never mistaken for cattle:** a ewe's body is about a quarter of a square long, a cow's about four tenths. A sheep is round and bumpy where a cow is a long smooth box. Cattle never have cream wool and a dark face.
+- **Never blurred into the grass:** the same dark outline and thin pale rim as the cattle, drawn round the whole sheep as one shape. A test holds the better of the two to 3 to 1 against every ground and grass colour in every daytime light, and holds the outline to 3 to 1 against every fleece, thin ones too. The dark face and legs are carried by the pale rim. The same night caveat applies as for cattle.
+- **Where they stand:** worked out by the same rules as cattle (cattle section above): inside the grazing area, never across a fence (netting included), back from fence lines, never on a trough, the bore or the yards' square, gathered round the square the flock was put on. Sheep stand a little closer to a fence than cattle do, because they are low. A flock with room spreads to about four to a square. On open country a flock stands on no more than four squares in ten of its area and about five to a square, so the grass shows, and past that it draws a sample. On a small area (eight squares or fewer) it uses every square, up to eight to a square. A flock of 7,000 draws about a thousand sheep at the most, not 7,000. The sample keeps every kind in the flock and the share of thin sheep and lambs. Lambs stand beside a ewe.
+- **Zoomed out:** one marker for each flock, on the same soft footprint as a mob. The marker is a woolly cloud on thin legs (a cow marker is long and smooth), then the head count, then the word "sheep". A flock with no water has the purple border and says "no water". One flock to a paddock still shows clearly.
+- **Zoomed in:** the sheep, and a small badge above the flock with the woolly icon and the head count.
+- **In the stock yards:** the flock stands in the yards' square, 24 sheep at most however many are held there. A flock in a feedlot is not a thing: there is no feedlot.
+- **Taps:** tapping a sheep opens the paddock, never a sheep, as for cattle. Hit testing is of the ground only.
+- **Speed:** sheep go into the same one-batch layer as the cattle (a row at a time, sorted back to front with them), so there is no extra draw. Positions are worked out only when the flock, a fence, gate, trough or the yards change.
+- **Not yet:** sheep walking and grazing, shearing, and a selected flock.
+
+### Fences, gates and water
+
+- **Fences keep the colours above.** Every wire has a dark casing under it so it reads on any ground **(builder)**. Zoomed out they are bold lines. Zoomed in they have a ground shadow, posts every half square and wires standing above the ground. The boundary is heavier. Tape is white and dashed with orange posts.
+- **Contractor's fence under way (milestone 2.2):** `#ff5cc8`, a hot pink that is none of the other line colours: not the red of "does not fit today", not the purples of "no water", not the amber of a fence that is down, not the brown, yellow or white of the three fences, not the blues of water. Built segments are a solid line with the dark casing, over the permanent fence beneath. Segments still to build are dashed in the same pink. The player's own fence is drawn as before, in its own colour, so the two can be told apart while both are going up. A test holds the colour away from the others by hue and keeps it readable on the casing and on the grass. **Colour is never the only cue** (pink, lilac and blue run close under protanopia and deuteranopia, and the check on hue is not enough): the team's fence has a line pattern no other line has, short cross bars (ticks, like sleepers on a railway) every 13 screen pixels along it, 11 px long, at every zoom. Built is a solid line with the ticks; still to build is a dashed line with the ticks. Tape is dashed without ticks, a fence that is down sags, pipe and the other fences are solid. A test (`linestyle.test.ts`) holds the team's patterns different from every other line's, and the only ones with ticks. From 30 px a square the run also carries a small tag, "Team fence", at a steady size. There is no map key panel in the game. The key is in words and swatches: the Farm tab line ("Contract fence: 1,200 m left, done on Tuesday 3 March") has the pink swatch and the team buttons on the fence card each have it. The colour is the same in both themes, as the country is.
+- **Knocked-down fence:** a sagging amber line with an amber "!" marker. It is steady, not flashing **(builder)**. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
+- **Gates:** strainer posts and a white three-rail panel, swung into the paddock when open. A round flag above it is slate when shut and green when open, drawn large so it reads zoomed out. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
+- **Bore:** a windmill about 1.9 squares tall, which is about 7 cow heights. *(The spec above says about 3 times a cow. It is drawn bigger so the bore is easy to find zoomed out.)* **(builder)** A gold ring and "Bore: put a trough or water hub here" until the first trough or hub is built. The fan turns and the ring pulses only when ambient motion is switched on **(builder)**. A paddock label that would sit over the windmill steps to one side.
+- **Trough, water hub, portable trough:** as above. The portable trough's level bar is green over half, gold over a quarter, orange below. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)*
+- **Netting fence (sheep-proof), built (milestone 2.8, 15 Nov 2026).** It is the one fence that holds sheep, so it reads differently from the cattle fences at every zoom, by colour and by pattern. The view marks netting with the fence code `VIEW_FENCE.netting` (8). A view with no netting draws exactly as before. **(builder, for Claudia to check)**
+  - **Colour:** sea-green (teal) `#16b890`, the same in both themes, as the country is. It is none of the other line colours: not red (only "does not fit today"), not purple (no water), not amber (a fence down), not the contractor's pink, not the brown, yellow or white of the other fences, not the blues of water or the green of an open gate. It is darker than young leaf and straw. On a ground of its own brightness (weathered straw, say) the dark casing under it and the pattern carry it. A test holds the colour apart from the others by hue.
+  - **Pattern:** a fine zigzag mesh, which no other line has. It is not dashed (tape), not crossed by ticks (the contractor's fence) and does not sag (a fence down). `linestyle.test.ts` holds the pattern to itself.
+  - **Zoomed out:** a bold sea-green band, 3.4 pixels wide on a 5.2 pixel dark casing, with a fine dark zigzag worked along it (turns every 3.6 pixels). It reads as chain link and is bolder than the cattle fences' wires (1.7 pixels).
+  - **Zoomed in:** posts a little taller than a permanent fence's, two sea-green wires at 0.04 and 0.17 of a square high, and between them two zigzags that cross each other and make diamonds. A run down the map swings the zigzag sideways, so the mesh still shows.
+  - **Drawing it:** the draft is a sea-green line on the dark casing with the same fine zigzag, so a netting draft is not mistaken for a plain fence. Red for the part that does not fit today works as for every other line.
+  - **What it does:** it stops cattle and sheep as a permanent fence does, and it is drawn on the same line a tap, hover or Remove tool can reach. Netting cannot be knocked down.
+- **The stock yards** are drawn on their square (no homestead: REQUIREMENTS, 14 Nov 2026). The yards are timber pens with a race and a loading ramp. **No saleyard and no feedlot is drawn, and there is no sprite for either.**
+
+### The build tools on the map (milestone 1.7c)
+
+All of this is drawn on two layers above everything else on the farm, so a draft or a hover redraws only those and never the grass or the cattle. Line widths are set in screen pixels and follow the zoom.
+
+- **Draft line:** the fence's own colour on a dark casing (permanent brown, electric yellow, tape white and dashed, pipe blue). Pipe draws a tint on each square and a line through their middles. **The part that does not fit today is red**, solid, on the same casing. It is the only red on a line or square on the map (Claudia, 14 Nov 2026). The card beside it says the same in words, so colour is never the only signal. Red goes with the server's job card: the first pieces drawn that fit are the line's colour, the rest are red. If none fits, all of it is red.
+- **Snap dots:** at each end of a fence line, green and filled where it joins an existing fence, a gate or the boundary, a white ring on open ground. A dot also shows at the corner under the mouse in the Fence and Water hub tools.
+- **Hover (PC):** in a tool the thing under the pointer is highlighted: a fence segment or gate in white with a dark casing, a square outlined and tinted lightly, a corner as a dot.
+- **Remove:** what is about to go is marked with a lilac glow round a white core. *(Changed: Claudia, 14 Nov 2026. Inside the map, red means only "can't do this" while drawing.)* Tape marks the whole straight run that is rolled up.
+- **A knocked-down fence** is tapped in Look. It offers the card "Put this fence back up", marked on the map, and a tap anywhere else still opens the paddock.
+- **Panning in a tool:** a drag draws, so the map is moved with two fingers, the space bar held, or the middle mouse button. Wheel and pinch still zoom. In Look nothing changed: one finger pans, a tap opens the paddock.
+- **Builder's choices (not in the spec above):** the dashed white for draft tape, the 7 px dark casing, the 7 px dot, a trough or hub picked is marked with a white square or dot, and a tap in a tool reaches the nearest fence within 22 px (10 px counts as "right under the finger" in Remove, so a trough beside a fence can still be picked).
+
+### Layers, light and weather
+
+- **Layers:** water reach, pasture quality, recently grazed, arable land, pipe and labels, with the colours and strengths above. The profit layer is listed but not drawn yet: the view carries no figures for each beast.
+- **Labels:** the paddock's name and its neutral label chip, then hectares, then "no water" in purple (light and dark) or "water via gate". *(Changed: Claudia, 14 Nov 2026: inside the map red is saved for "can't do this" while drawing; the site's colours, red included, stay as designed outside the map.)* They hang under the paddock's top fence. Where the two lines do not fit, the paddock's name in full and a dot in the label's colour ("Paddock 1", never "P1" or a bare number: REQUIREMENTS). A paddock under 96 pixels wide on screen gets no label, and a tap still opens it. Big paddock names are not set in capitals. The planting's name sits on the crop. **(builder: placement and the short form)**
+- **Time of day:** one tint over the whole map. Warm and low at first light, white through the day, warm before last light, dark blue outside those hours. **Weather:** clear, overcast (dimmer) and rain (dimmer again, with falling streaks). The daytime tints are kept bright enough for the cattle contrast figure to hold. **(builder: the tint colours)**
+- **Reduce motion:** nothing moves. Rain is drawn still, and the change of detail is made at once.
+- **Themes:** the country keeps its natural colours in both. Only the surround, the labels and the markers change.
+- **The surround (round the farm):** bush country, so the farm never floats in an empty field. Dark: the mockup's bush, `#55653a` with clumps of `#4a5832`, `#66753f` and `#5d6b3a` (the mockup's map code, the `bush` tile). Light: a lighter sage bush, `#939f72` with `#87936a`, `#a2ad80` and `#8d9a6c`, greyer than any paddock so it never reads as pasture. It is one 64 pixel tile, repeated under the farm and moved with it. Zoomed out it keeps its screen size; zoomed in past about 11 pixels a square it grows with the farm. It takes the same time-of-day tint as the farm. The farm's dark rim still marks the boundary. Nothing on it can be tapped, and it carries no game figure. *(Changed: milestone 8, from the mockup. This replaces the builder's earlier near-black (dark) and beige (light) surround.)* **(builder: the light theme colours and the zoom at which it starts to grow)**
+
+### Not done yet in the rebuild's map, or not checked
+
+For Claudia to know before she looks at it. Each is from the spec above.
+
+- Trees. The profit layer. The selected mob and picked animals. (The farmer and the ute are gone: driving was reversed on 14 Nov 2026.)
+- Keyboard drawing on the map. The build tools can be picked and confirmed by keyboard, but a fence or a pipe is drawn with a finger or the mouse.
+- The "drag to see more" hint on a phone held upright.
+- Animation: cattle walking and grazing, time-lapse, the hand-over between days.
+- Half-built fence lines and pegs (they come with the working day, milestone 1.5).
+- The bore's gold ring and pointer are built but have not been seen, because every test farm has a trough on the bore.
+- "Then and now" pictures: the picture can be drawn twice, but nothing keeps the "then" figures yet.
+- Weather is clear, overcast and rain only.
+- Cattle contrast at night (above).
+- **Speed on a phone has not been measured.** On the build PC a frame takes well under a millisecond of processor time with 4,409 beasts drawn. That is not a measure of 60 frames a second on a mid-range phone (PRD 14.10).
+
+**For Claudia: the "Short" label colour.** The spec above gives "Short" the colour `#ec6a48`, which is the same colour the screens use for danger. On a small paddock the short label is the name and that red dot. It can read as a warning, which a neutral label should not be. Keep it, or pick another colour?
+
+### Art
+
+- Every sprite is drawn in code for now and registered by name (`cattle.british.cow.normal`, `trough.fixed`, `gate.across.open`, `tuft.leaf.0` and so on). Any one can be swapped for exported art without touching the map code. Grass pieces are drawn in greys and tinted with the colours worked out from the model, so one drawn piece serves every pasture state.
+
+### Side-view pictures
+
+- `drawSward` is kept as described above, drawn from the view's figures for the paddock: 0 to 80 cm frame, cm scale, litter layer, dry stems behind with seed heads past rankness 30, green leaf in front. A paddock that is part crop and part pasture gives two pictures, crop then pasture, each with its area. "Then vs now" is two calls with two views. It is plain canvas and loads without PixiJS.

@@ -1,0 +1,21 @@
+{
+  "name": "@gg/render",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./sward": "./src/sward.ts",
+    "./lines": "./src/lines.ts",
+    "./draft": "./src/draft.ts",
+    "./palette": "./src/palette.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@gg/shared": "workspace:*",
+    "pixi.js": "^8.23.0"
+  }
+}

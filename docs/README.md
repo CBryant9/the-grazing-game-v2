@@ -10,6 +10,7 @@ These files hold everything learned building The Grazing Game (v1 to v15), so a 
 | [DATA.md](DATA.md) | Every real-world figure: district curves, farm sizes, seasons, prices, costs, supplements, species, rotations, arable shares | Before changing any number |
 | [CALIBRATION.md](CALIBRATION.md) | The benchmarks that must hold, how to run `tests/calibrate.js`, and the results log | After any model or data change, and before publishing |
 | [LESSONS.md](LESSONS.md) | Mistakes made, their causes and fixes, and code gotchas | Before starting work, and when something breaks |
+| [DATABASE.md](DATABASE.md) | The Supabase tables, who can do what, guests, the under-16 rule, server functions, the tests and what is still owed on a real project | Before touching `supabase/` or anything that reads or writes the database |
 | [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) | Round-by-round history of requests and changes | For background |
 | [PRD.md](PRD.md) | Product requirements for the rebuild: game modes, phone and PC layouts, community, ads, admin, tech stack, data model. Mockups in [mockups/](mockups/), visual references in [reference/](reference/) | When planning or building the rebuild |
 

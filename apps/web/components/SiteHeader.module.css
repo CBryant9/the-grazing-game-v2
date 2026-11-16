@@ -1,0 +1,79 @@
+.header {
+  background: var(--webhdr);
+  border-bottom: 1px solid var(--line);
+}
+.inner {
+  max-width: 1500px;
+  margin: 0 auto;
+  min-height: 60px;
+  padding: 8px var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--accent-text);
+  flex: none;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.link {
+  display: none;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 8px;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  text-decoration: none;
+  color: var(--muted);
+}
+.link:hover,
+.link[aria-current='page'] {
+  color: var(--text);
+}
+.link[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-color: var(--accent-line);
+}
+@media (min-width: 760px) {
+  .link {
+    display: inline-flex;
+  }
+}
+
+/* The public pages' links: the mockup's small ghost buttons (mock K). Hidden on a phone, where the footer lists them. */
+.nav .ghostLink {
+  display: none;
+}
+.nav .ghostLink[aria-current='page'] {
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
+@media (min-width: 760px) {
+  .nav .ghostLink {
+    display: inline-flex;
+  }
+}

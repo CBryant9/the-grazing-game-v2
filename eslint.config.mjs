@@ -1,0 +1,118 @@
+import tseslint from 'typescript-eslint';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+
+const web = ['apps/web/**/*.{ts,tsx}'];
+
+export default tseslint.config(
+  {
+    ignores: [
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/next-env.d.ts',
+      'reference/**',
+      'docs/**',
+      'art/**',
+    ],
+  },
+  ...tseslint.configs.recommended,
+  ...nextVitals.map((config) => ({ ...config, files: web })),
+  { files: web, settings: { next: { rootDir: 'apps/web' } } },
+  {
+    // The rules stay hidden: the browser app must never import the engine.
+    // From Stage 3 the engine is reached only through server code.
+    files: [
+      'apps/web/components/**/*.{ts,tsx}',
+      'packages/render/**/*.ts',
+      'packages/shared/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@gg/engine', '@gg/engine/*'],
+              message: 'The engine must not be imported into browser code (CLAUDE.md, rule 14).',
+            },
+            {
+              // A relative path that reaches into the engine's code or its
+              // data tables, such as '../../engine/src/index' or
+              // '../../../packages/engine/data/costs'.
+              regex: '(^|/)engine/(src|data)(/|$)',
+              message:
+                'The engine must not be imported into browser code, by package name or by path (CLAUDE.md, rule 14).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The engine must be repeatable from a seed: no unseeded randomness, no clock.
+    files: ['packages/engine/src/**/*.ts'],
+    // Tests, and the timed speed benchmark (pnpm test:speed), are not engine code.
+    ignores: ['**/*.test.ts', '**/*.timed.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'Use a seeded stream from rng.ts.' },
+        { object: 'Date', property: 'now', message: 'The engine must not read the clock.' },
+      ],
+      'no-restricted-globals': ['error', 'window', 'document', 'navigator', 'localStorage'],
+      // The test support loads the MVP game. Only tests may use it.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/test-support/**'],
+              message: 'Engine code must not import test support. Only *.test.ts files may.',
+            },
+            {
+              regex: '^(node:.*|fs|fs/promises|path|url)$',
+              message:
+                'Engine model code must not read files. It takes its data as input. File reading lives in packages/engine/src/server only.',
+            },
+            {
+              group: ['**/server/**'],
+              message: 'Engine model code must not import the server-only file readers.',
+            },
+            {
+              // The instant path is for calibration and tests only.
+              group: ['**/actions/apply', './apply'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
+              message:
+                'Engine code must not use the instant path. Jobs go through applyAction in day/act.ts, on the farm clock.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The one place the engine package may read files: the server-only helpers.
+    files: ['packages/engine/src/server/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/test-support/**'],
+              message: 'Engine code must not import test support. Only *.test.ts files may.',
+            },
+            {
+              group: ['**/actions/apply'],
+              importNames: ['applyInstant', 'tryAction', 'recordAction'],
+              message:
+                'Server code must not use the instant path. Jobs go through applyAction, on the farm clock.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+);

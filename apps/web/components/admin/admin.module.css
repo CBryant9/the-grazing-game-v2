@@ -1,0 +1,487 @@
+/* The admin shell (milestone 3.5). Works on a PC first and on a phone: the menu runs along the top
+   on a narrow screen and down the side on a wide one. Every target is 44 px. Colours come from the
+   site's tokens, so both themes work. */
+
+.shell {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+.nav {
+  background: var(--webhdr);
+  border-bottom: 1px solid var(--line);
+  padding: 10px var(--gutter);
+  display: grid;
+  gap: 8px;
+}
+.brand {
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.who {
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+}
+.links {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+.links a:hover {
+  background: var(--panel2);
+}
+.links a:focus-visible,
+.btnrow button:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+.table a:focus-visible {
+  outline: 3px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.links a:hover,
+.links a[aria-current='page'] {
+  color: var(--text);
+}
+.links a[aria-current='page'] {
+  background: var(--panel2);
+  border-color: var(--line);
+}
+/* The logo and ADMIN at the top of the menu (mockup: admin nav). */
+.logo {
+  font-family: var(--font-px);
+  font-size: 1rem;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--accent-text);
+  flex: none;
+}
+.count {
+  margin-left: auto;
+}
+.later {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.main {
+  padding: 18px var(--gutter) 48px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+  max-width: 1100px;
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (min-width: 900px) {
+  .shell {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .nav {
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+    align-content: start;
+    min-height: 100dvh;
+    padding: 18px 12px;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    box-sizing: border-box;
+  }
+  .links {
+    flex-direction: column;
+    overflow: visible;
+  }
+}
+/* Page headings in the pixel font, as the mockup (Silkscreen 20 px). */
+.h1 {
+  margin: 0;
+  font-family: var(--font-px);
+  font-weight: 400;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+}
+.h2 {
+  margin: 0 0 6px;
+  font-size: 1.0625rem;
+}
+.lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  max-width: 70ch;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+/* PC: four tiles to a row, as the mockup. */
+@media (min-width: 900px) {
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+}
+.kpi span {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.kpi b {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.kpi small {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.asat {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.row {
+  display: grid;
+  gap: 8px;
+}
+.rowhead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.name {
+  font-weight: 700;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+  background: var(--panel2);
+}
+.chip.on {
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
+.chip.warn {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.btnrow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+/* The site's chunky bevelled buttons (.btn, and .btn.coral for the main one), in every button row. */
+.btnrow button {
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 2px solid #000;
+  background: var(--panel2);
+  color: var(--text);
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 #000;
+}
+.btnrow button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 #000;
+}
+.btnrow button.primary,
+.btnrow button:global(.primary) {
+  background: var(--btn);
+  color: #fff;
+  box-shadow:
+    inset -2px -2px 0 var(--btn-lo),
+    inset 2px 2px 0 var(--btn-hi),
+    0 3px 0 #000,
+    0 0 0 2px var(--btn-hi);
+}
+.btnrow button.danger {
+  color: var(--bad);
+}
+.btnrow button.danger.primary {
+  background: var(--btn);
+  color: #fff;
+}
+/*
+ * The switches screen: the button that opens the confirm step looks like the mockup's switch
+ * (.tog), with its words beside it. The confirm step is unchanged.
+ */
+.tog > div > .btnrow:first-child > button {
+  position: relative;
+  padding: 0 0 0 52px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  color: var(--text);
+  transform: none;
+}
+.tog > div > .btnrow:first-child > button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin-top: -11px;
+  width: 40px;
+  height: 22px;
+  border-radius: 12px;
+  background: var(--track);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+}
+.tog > div > .btnrow:first-child > button::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  margin-top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--knob);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+}
+.tog[data-on] > div > .btnrow:first-child > button::before {
+  background: var(--accent);
+}
+.tog[data-on] > div > .btnrow:first-child > button::after {
+  left: 21px;
+  background: #111;
+}
+.tog > div > .btnrow:first-child > button:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+.btnrow button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.confirm {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--panel2);
+}
+.confirm p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.status {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.status.bad {
+  color: var(--bad);
+}
+.status.ok {
+  color: var(--ok);
+}
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.field label,
+.field .label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.field input[type='text'],
+.field input[type='search'],
+.field input[type='date'],
+.field select,
+.field textarea {
+  min-height: var(--tap);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 520px;
+}
+.field textarea {
+  min-height: 160px;
+  max-width: 720px;
+}
+.choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: var(--tap);
+  padding: 6px 0;
+  font-size: 0.875rem;
+}
+.choice input {
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  flex: none;
+}
+.inline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.tablewrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.table th {
+  color: var(--muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.table a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  color: var(--accent-text);
+}
+.mono {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  gap: 8px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+.dl dt {
+  color: var(--muted);
+}
+.dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.pager {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pager a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+.pager a:focus-visible {
+  outline: 3px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.plain {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px var(--gutter);
+  display: grid;
+  gap: 12px;
+}

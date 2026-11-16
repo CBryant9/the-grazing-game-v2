@@ -1,0 +1,81 @@
+/* The store, the return pages, "Your purchases" and the keep-going card. 44 px targets, nothing wider than 360 px. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  box-sizing: border-box;
+}
+.name {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.price {
+  margin: 0;
+  font-weight: 700;
+}
+.gives {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.row .btn,
+.item .btn {
+  min-height: var(--tap);
+  min-width: var(--tap);
+}
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.bad {
+  margin: 0;
+  color: var(--bad);
+}
+.confirm {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel2);
+}
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.history li {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.history li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.link {
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+}

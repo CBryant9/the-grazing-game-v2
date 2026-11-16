@@ -1,0 +1,322 @@
+import 'server-only';
+import {
+  GRID_N,
+  MIN_EVERY_DAYS,
+  PLAN_FIGURES,
+  areaIdOf,
+  plansView,
+  positionOf,
+  stepOf,
+  surveyOf,
+  type Action,
+  type FarmState,
+  type JobCard,
+  type PlanLegSpec,
+  type PlanRule,
+  type PlanView,
+} from '@gg/engine';
+import type {
+  PlanFormWire,
+  PlanLegWire,
+  PlanMobWire,
+  PlanStopWire,
+  PlanWire,
+} from '../../lib/game/types';
+import {
+  afterText,
+  nextText,
+  pausedText,
+  reportLines,
+  roundText,
+  roundsText,
+  ruleText,
+  stepText,
+  waitingText,
+} from './planwords';
+
+const round = (n: number, places = 0): number => {
+  const k = 10 ** places;
+  return Math.round(n * k) / k;
+};
+
+/** The figures the plan form works within. They are the engine's own limits on a plan. */
+export function planForm(): PlanFormWire {
+  const F = PLAN_FIGURES;
+  return {
+    defaultEvery: F.defaultEvery.value,
+    defaultKg: F.defaultKg.value,
+    defaultRounds: F.defaultRounds.value,
+    everyMax: F.maxEveryDays.value,
+    kgMin: F.minKg.value,
+    kgMax: F.maxKg.value,
+    maxDaysMax: F.maxDaysLimit.value,
+    roundsMax: F.maxRounds.value,
+    maxStops: F.maxStops.value,
+    timesADayMax: F.maxMovesADay.value,
+  };
+}
+
+/** Why each paused mob is paused, from the farm's own messages: the newest "paused" for the mob. */
+function pauseReasons(farm: FarmState): Map<number, 'asked' | 'manual-move'> {
+  const out = new Map<number, 'asked' | 'manual-move'>();
+  for (let i = farm.inbox.length - 1; i >= 0; i--) {
+    const e = farm.inbox[i]!.event;
+    if (e.type === 'plan-paused' && !out.has(e.mob)) out.set(e.mob, e.because);
+    // A resume after a pause means the pause is over; the newest event for the mob wins.
+    if (e.type === 'plan-resumed' && !out.has(e.mob)) out.set(e.mob, 'asked');
+  }
+  return out;
+}
+
+function mobWire(farm: FarmState, p: PlanView, reasons: Map<number, 'asked' | 'manual-move'>) {
+  const stops = p.legs.flatMap((l) => l.stops);
+  return (m: PlanView['mobs'][number]): PlanMobWire => {
+    const here = stops[m.step]?.area ?? null;
+    const movedByHand = m.area !== null && here !== null && m.area !== here;
+    const leg = p.legs[m.leg];
+    return {
+      mob: m.mob,
+      mobName: m.mobName,
+      head: m.head,
+      area: m.area,
+      step: m.step,
+      stepText: stepText(m.step, p.steps, here ?? 'a paddock'),
+      roundText: roundText(m.roundInLeg, leg?.rounds ?? 0),
+      paused: m.paused,
+      pausedText: m.paused ? pausedText(reasons.get(m.mob) ?? null, movedByHand) : null,
+      waitingText: m.waiting ? waitingText(m.waiting.area, m.waiting.why) : null,
+      nextText: nextText(m.next, farm.day),
+      report: reportLines(m),
+    };
+  };
+}
+
+/** The farm's grazing plans for the Plans tab, in words, with the mobs on each. */
+export function plansWire(farm: FarmState): PlanWire[] {
+  const view = plansView(farm);
+  if (!view.length) return [];
+  const topo = surveyOf(farm).topology;
+  const reasons = pauseReasons(farm);
+  return view.map((p) => {
+    const legs: PlanLegWire[] = p.legs.map((l) => ({
+      stops: l.stops.map((s): PlanStopWire => ({
+        cell: s.cell,
+        paddock: topo.paddockOf[s.cell] ?? null,
+        name: s.area,
+        hasWater: s.hasWater,
+      })),
+      trigger:
+        // Rounded as everywhere else: days to two places (a plan can move more than once a day), kg DM/ha whole.
+        l.rule.mode === 'days'
+          ? { mode: 'days', every: round(l.rule.every, 2) }
+          : { mode: 'kg', kg: round(l.rule.kg), maxDays: round(l.rule.maxDays) },
+      ruleText: ruleText(l.rule),
+      rounds: l.rounds,
+      roundsText: roundsText(l.rounds),
+    }));
+    return {
+      id: p.id,
+      name: p.name,
+      legs,
+      after: p.after,
+      afterText: afterText(p.after),
+      editable: p.legs.length === 1,
+      mobs: [...p.mobs.map(mobWire(farm, p, reasons)), ...sheepOnPlan(farm, p)],
+    };
+  });
+}
+
+/**
+ * Sheep mobs on a plan (milestone 2.8). The engine's plan read covers cattle, so the sheep's
+ * place on the plan is put in words here from the mob's own run: the stop, the round, and
+ * whether it is paused or waiting.
+ */
+function sheepOnPlan(farm: FarmState, p: PlanView): PlanMobWire[] {
+  const tpl = farm.plans.find((t) => t.id === p.id);
+  if (!tpl) return [];
+  const survey = surveyOf(farm);
+  const topo = survey.topology;
+  const stops = p.legs.flatMap((l) => l.stops);
+  const out: PlanMobWire[] = [];
+  for (const m of farm.sheep?.mobs ?? []) {
+    const run = m.plan;
+    if (!run || run.template !== p.id) continue;
+    const step = stepOf(tpl, run.leg, run.idx);
+    const here = stops[step]?.area ?? 'a paddock';
+    const areaId = areaIdOf(survey, m);
+    const area = areaId >= 0 ? topo.areas[areaId]!.name : null;
+    const waitArea = run.waiting ? topo.areas[topo.areaOf[run.waiting.target]!]?.name : null;
+    const head = m.sheep.reduce((t, s) => t + (s.weaned ? s.n : 0), 0);
+    out.push({
+      mob: m.id,
+      mobName: m.name,
+      head,
+      area,
+      step,
+      stepText: stepText(step, p.steps, here),
+      roundText: roundText(run.round, tpl.legs[run.leg]?.rounds ?? 0),
+      paused: run.paused,
+      pausedText: run.paused ? pausedText(null, area !== null && area !== here) : null,
+      waitingText:
+        run.waiting && waitArea
+          ? run.waiting.why === 'no-water'
+            ? waitingText(waitArea)
+            : `The plan can not move the mob into ${waitArea}, because ${run.waiting.why === 'cattle-there' ? 'cattle' : 'other sheep'} are there. It tries again each day.`
+          : null,
+      nextText: run.paused ? 'Nothing, while it is paused.' : ruleText(tpl.legs[run.leg]!.rule),
+      report: [
+        `${run.moves} ${run.moves === 1 ? 'move' : 'moves'} and ${run.rounds} full ${run.rounds === 1 ? 'round' : 'rounds'} in ${Math.max(0, farm.day - run.start)} days.`,
+      ],
+    });
+  }
+  return out;
+}
+
+const int = (v: unknown, min: number, max: number): number | null =>
+  typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null;
+
+/** Check the rule the plan form sends. The engine checks the figures again and says why in words. */
+function parseTrigger(t: unknown): PlanRule | null {
+  if (typeof t !== 'object' || t === null) return null;
+  const r = t as Record<string, unknown>;
+  const F = PLAN_FIGURES;
+  if (r.mode === 'days') {
+    const every = r.every;
+    if (typeof every !== 'number' || !Number.isFinite(every)) return null;
+    if (every < MIN_EVERY_DAYS || every > F.maxEveryDays.value) return null;
+    return { mode: 'days', every };
+  }
+  if (r.mode === 'kg') {
+    const kg = r.kg;
+    if (typeof kg !== 'number' || !Number.isFinite(kg)) return null;
+    if (kg < F.minKg.value || kg > F.maxKg.value) return null;
+    const maxDays = int(r.maxDays, 0, F.maxDaysLimit.value);
+    return maxDays === null ? null : { mode: 'kg', kg, maxDays };
+  }
+  return null;
+}
+
+/** Check one leg: a short list of squares, a known rule and whole rounds in range. */
+function parseLeg(stopsIn: unknown, trigger: unknown, roundsIn: unknown): PlanLegSpec | null {
+  const F = PLAN_FIGURES;
+  if (!Array.isArray(stopsIn) || stopsIn.length < 1 || stopsIn.length > F.maxStops.value) {
+    return null;
+  }
+  const stops: number[] = [];
+  for (const c of stopsIn as unknown[]) {
+    const cell = int(c, 0, GRID_N - 1);
+    if (cell === null) return null;
+    stops.push(cell);
+  }
+  const rule = parseTrigger(trigger);
+  const rounds = int(roundsIn, 0, F.maxRounds.value);
+  if (!rule || rounds === null) return null;
+  return { stops, rule, rounds };
+}
+
+/**
+ * Check a setPlan or resumePlan request. Whole numbers in range, a short list of squares, a known
+ * rule. A plan of more than one leg sends its first leg as `stops`, `trigger` and `rounds`, and the
+ * rest as `moreLegs`; the engine takes up to `PLAN_FIGURES.maxLegs` legs and checks them again.
+ */
+export function parsePlanAction(a: Record<string, unknown>): Action | null {
+  const mob = int(a.mob, 1, 1e6);
+  if (mob === null) return null;
+  if (a.type === 'resumePlan') {
+    if (a.step === undefined) return { type: 'resumePlan', mob };
+    const step = int(a.step, 0, PLAN_FIGURES.maxStops.value * PLAN_FIGURES.maxLegs.value);
+    return step === null ? null : { type: 'resumePlan', mob, step };
+  }
+  if (a.type !== 'setPlan') return null;
+  const F = PLAN_FIGURES;
+  const first = parseLeg(a.stops, a.trigger, a.rounds);
+  if (!first) return null;
+  const legs: PlanLegSpec[] = [first];
+  if (a.moreLegs !== undefined) {
+    if (!Array.isArray(a.moreLegs) || a.moreLegs.length + 1 > F.maxLegs.value) return null;
+    for (const l of a.moreLegs as unknown[]) {
+      if (typeof l !== 'object' || l === null) return null;
+      const r = l as Record<string, unknown>;
+      const leg = parseLeg(r.stops, r.trigger, r.rounds);
+      if (!leg) return null;
+      legs.push(leg);
+    }
+  }
+  const stopsInAll = legs.reduce((t, l) => t + l.stops.length, 0);
+  const step = int(a.step, 0, stopsInAll - 1);
+  if (step === null) return null;
+  if (a.after !== 'repeat' && a.after !== 'stay') return null;
+  const id = a.planId === undefined ? undefined : int(a.planId, 1, 1e6);
+  if (id === null) return null;
+  return {
+    type: 'setPlan',
+    mob,
+    plan: {
+      ...(id === undefined ? {} : { id }),
+      legs,
+      after: a.after,
+    },
+    step,
+  };
+}
+
+/** The lines on the plan card: where the mob goes now, what the plan does after, and the time. */
+export function planLines(farm: FarmState, action: Action, card: JobCard): string[] {
+  if (action.type !== 'setPlan' && action.type !== 'resumePlan') return [];
+  // A sheep mob's card reads the same (milestone 2.8).
+  const m =
+    farm.mobs.find((x) => x.id === action.mob) ?? farm.sheep?.mobs.find((x) => x.id === action.mob);
+  if (!m) return [];
+  const survey = surveyOf(farm);
+  const topo = survey.topology;
+  const nameOf = (cell: number): string => topo.areas[topo.areaOf[cell]!]!.name;
+  let cell: number | undefined;
+  const lines: string[] = [];
+  if (action.type === 'setPlan') {
+    if (!('legs' in action.plan)) return [];
+    const legs = action.plan.legs;
+    cell = legs.flatMap((l) => l.stops)[action.step ?? 0];
+    if (legs.length === 1) {
+      const leg = legs[0]!;
+      lines.push(ruleText(leg.rule));
+      lines.push(`${roundsText(leg.rounds ?? 0)}. ${afterText(action.plan.after)}`);
+    } else {
+      legs.forEach((leg, n) => {
+        const names = leg.stops.map(nameOf).join(', ');
+        lines.push(`Leg ${n + 1}: ${names}. ${ruleText(leg.rule)} ${roundsText(leg.rounds ?? 0)}.`);
+      });
+      lines.push(afterText(action.plan.after));
+    }
+  } else if (m.plan) {
+    const tpl = farm.plans.find((t) => t.id === m.plan!.template);
+    if (tpl) {
+      const step = action.step ?? stepOf(tpl, m.plan.leg, m.plan.idx);
+      const pos = positionOf(tpl, step);
+      if (pos) cell = tpl.legs[pos.leg]!.stops[pos.idx];
+    }
+  }
+  const out: string[] = [];
+  const notes: string[] = [];
+  if (cell !== undefined) {
+    const to = nameOf(cell);
+    const at = m.where.kind === 'paddock' && areaIdOf(survey, m) === topo.areaOf[cell];
+    out.push(
+      at
+        ? `${m.name} is already in ${to}, so it does not move now.`
+        : `${m.name} moves into ${to} now.`,
+    );
+    out.push('Setting a plan takes none of the day.');
+    // What the engine found in the plan: stops with no water, and stops that hold another mob.
+    for (const area of card.plan?.dryAreas ?? []) {
+      notes.push(`${area} has no water. The plan waits there until it has water.`);
+    }
+    for (const j of card.plan?.joins ?? []) {
+      notes.push(
+        j.area === to
+          ? `${j.mobName} (${j.head} head) is in ${j.area}, so the two mobs join now.`
+          : `${j.mobName} (${j.head} head) is in ${j.area}. The two mobs will join when the plan gets there.`,
+      );
+    }
+  }
+  return [...out, ...lines, ...notes];
+}

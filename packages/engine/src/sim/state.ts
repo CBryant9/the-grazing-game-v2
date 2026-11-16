@@ -1,0 +1,574 @@
+/**
+ * A whole farm in one object that can be saved.
+ *
+ * Everything the simulation needs to carry a farm from one day to the next
+ * is here, as plain data and typed arrays: no functions, no clock, nothing
+ * drawn. The daily tick (tick.ts) and the actions (../actions) change it.
+ * What can be worked out from it (paddocks, grazing areas, watered squares)
+ * is never stored; see derived.ts.
+ */
+
+import type { DistrictId } from '@gg/shared';
+import type { FarmStart } from '../calendar';
+import type { Animal, AnimalIds, CattleMob } from '../cattle/types';
+import type { CropState } from '../crops/fields';
+import type { MarketClassId, SaleClassId } from '../data/cattle';
+import type { FarmBuildings, StartType } from '../farm/generate';
+import type { FarmLayout } from '../farm/layout';
+import type { RealMarket } from '../market/realMarket';
+import type { StandInMarket } from '../market/standIn';
+import type { Difficulty } from '../money/costs';
+import type { PastureState } from '../pasture/state';
+import type { RngState } from '../rng';
+import type { YearOrder } from '../season/realYears';
+import type { Action } from '../actions/types';
+import type { FarmEvent } from './events';
+import type { LabourState } from '../labour/types';
+import type { SheepState } from '../sheep/types';
+import type { RescueRecord } from '../money/rescue';
+
+/** Where a mob is. */
+export type MobWhere =
+  /** On pasture, in the grazing area that holds the anchor square. */
+  | { kind: 'paddock'; anchor: number }
+  /** In the feedlot, on the ration. */
+  | { kind: 'lot' }
+  /** In the stock yards, where bought cattle arrive. They have water. The player moves stock out to a paddock. */
+  | {
+      kind: 'yards';
+      /** The farm day the mob came to the yards. Left out on a mob put there before this was kept. */
+      since?: number;
+    };
+
+/**
+ * When a plan moves a mob on from a stop (docs/MODEL.md, section 10). The
+ * old game's two rules, with its options.
+ *
+ * `days`: move after `every` days on the stop. Under 1 it is several moves
+ * a day: 0.25 is four a day (the old game's lowest), and the day's stops
+ * are grazed in turn.
+ *
+ * `kg`: move when the area is grazed down to `kg` kg DM/ha, after at least
+ * a day on it, or after `maxDays` days if that is more than 0.
+ */
+export type PlanRule =
+  { mode: 'days'; every: number } | { mode: 'kg'; kg: number; maxDays: number };
+
+/** One leg of a plan: the squares to graze, in order, the rule for moving on, and how many rounds to do. */
+export interface PlanLeg {
+  /** One square in each grazing area to visit, in order. The mob is put on that square. */
+  stops: number[];
+  rule: PlanRule;
+  /** Rounds of this leg before the next leg. 0 keeps going round this leg for ever. */
+  rounds: number;
+}
+
+/**
+ * A grazing plan as a template (PRD 5.15): the paddocks in order, the rule
+ * for moving on and the rounds, in one or more legs. Any number of mobs
+ * can run it, each from its own step.
+ */
+export interface PlanTemplate {
+  id: number;
+  name: string;
+  legs: PlanLeg[];
+  /** When the last leg is done: start again, or stay where the mob is. */
+  after: 'repeat' | 'stay';
+}
+
+/** Why a plan can not move a mob today. */
+export type PlanWaitReason =
+  | 'no-water'
+  /** Sheep graze the next stop: cattle never go in with sheep. */
+  | 'sheep-there'
+  /** Cattle graze the next stop of a sheep plan: sheep never go in with cattle. */
+  | 'cattle-there';
+
+/** A mob running a template: where it is on it, and the counts so far. */
+export interface PlanRun {
+  /** The template's id. */
+  template: number;
+  /** The leg, and the stop in it, the mob is on. */
+  leg: number;
+  idx: number;
+  /** Rounds of this leg done so far. */
+  round: number;
+  /** The farm day the stop's count of days starts from. The old game's `moved`. */
+  moved: number;
+  /** The days on the stop at the last "staying" note (kg rule). The old game's `noted`. */
+  noted: number;
+  /** A move that could not be made: the square the plan wants next, and why not. Null when none. */
+  waiting: { target: number; why: PlanWaitReason } | null;
+  /** True after a manual move, or when the player pauses it. A paused plan moves nothing. */
+  paused: boolean;
+  /** The report: the farm day it was set, moves made, full rounds made, feed eaten (kg DM) and head-days. */
+  start: number;
+  moves: number;
+  rounds: number;
+  eatenKg: number;
+  headDays: number;
+  /** Live weight gained by the mob's animals while on the plan, kg. */
+  gainKg: number;
+  /**
+   * For a plan that moves the mob more than once a day: a square in each area the mob stood in
+   * today before each move made by hand through `planMove`, in order (save format 14). On a night
+   * when plan moves are left to the player, the day's grazing is shared across these and the area
+   * the mob is in. Cleared at the night. Left out when there are none.
+   */
+  handStops?: number[];
+}
+
+/** A mob on the farm: its cattle and the day's figures, plus who and where it is. */
+export interface FarmMob extends CattleMob {
+  /** Unique on the farm. Never reused. */
+  id: number;
+  name: string;
+  where: MobWhere;
+  /** The farm day the mob last pushed through tape, or null. */
+  lastBreak: number | null;
+  /** The grazing plan the mob is running. Left out when it has none. */
+  plan?: PlanRun;
+  /**
+   * The drop being counted for the weekly calving lines (engine 0.22.0): the day calving started
+   * (the mob's `calvNote` then), calves born in the drop and in the week so far, and whether
+   * calving has finished. Left out on a mob that has not calved. A record for the words only:
+   * no rule reads it.
+   */
+  calving?: { start: number; born: number; week: number; done?: true };
+}
+
+/**
+ * Cattle that were bought on a sale day and are on their way to the yards.
+ * They are paid for and on the farm's books at what was paid. They graze
+ * nothing and can not die. They land at first light on `arriveDay`.
+ */
+export interface Arrival {
+  /** The farm day they land in the yards. */
+  arriveDay: number;
+  cls: SaleClassId;
+  /** Dollars paid, freight included. */
+  cost: number;
+  /** The cattle, with their tag numbers already given. */
+  animals: Animal[];
+}
+
+/**
+ * Cattle booked onto a sale day, by tag number. At first light on
+ * `saleDay` those still alive and still on the farm are sold at that day's
+ * price. There is one booking for each sale day.
+ */
+export interface SaleBooking {
+  saleDay: number;
+  /** Tag numbers, smallest first. A whole-number array, so a save keeps it small. */
+  animalIds: Int32Array;
+}
+
+/** The running totals for a farm year. The first five are the cattle step's totals. */
+export interface YearTotals {
+  /** The farm day the year started. */
+  start: number;
+  /** Feed grown across the farm, kg DM. */
+  grown: number;
+  /** Pasture eaten, kg DM. */
+  eaten: number;
+  /** Live weight gained, kg, summed over every animal. Birth weights are added too. */
+  gain: number;
+  births: number;
+  deaths: number;
+  /** Dollars from cattle sales, after selling costs. */
+  sales: number;
+  /** Dollars spent buying cattle, freight included. */
+  buys: number;
+  /** Dollars spent on supplements and the feedlot (and on feeding sheep). */
+  feed: number;
+  /** Dollars from wool sold at shearing, after selling costs. Left out until a farm first sells wool. */
+  wool?: number;
+  /** Dollars from sheep sold, after selling costs, and spent buying sheep. Left out until the first. */
+  sheepSales?: number;
+  sheepBuys?: number;
+  /** Sheep that died (lambs included). Left out until a farm first has sheep die. */
+  sheepDeaths?: number;
+  /**
+   * The same deaths weighed by each animal's size, in AE ((kg ÷ 450)^0.75, the
+   * cattle AE rule): what the year score counts. Left out with `sheepDeaths`.
+   */
+  sheepDeathAe?: number;
+  /** Dollars from grain. */
+  grain: number;
+  /** Dollars spent on sowing forages and crops, and on harvesting. */
+  crops: number;
+  /** Dollars spent on infrastructure. */
+  infra: number;
+  /** Dollars of running costs: overheads, animal health, marking, repairs, carting water. */
+  running: number;
+  /** Interest: negative when paid on an overdraft, positive when earned. */
+  interest: number;
+  /**
+   * Cash a paid rescue added on top of its stock sale this year, dollars ("Paid to keep going",
+   * save format 14). Not earned by the farm, so the year's profit and score leave it out. Left out
+   * until a farm is first rescued.
+   */
+  keepGoing?: number;
+  /** Net worth when the year started. */
+  worth0: number;
+  /** Ground cover % on the 1st of each month. */
+  covers: number[];
+}
+
+/** The points a year scored, and the figures behind them. */
+export interface YearScore {
+  /** Change in net worth over the year, less any cash a paid rescue put in, dollars. */
+  profit: number;
+  /** Share of the feed grown that was eaten, %. */
+  util: number;
+  /** Average ground cover, %. */
+  cover: number;
+  profitPts: number;
+  gainPts: number;
+  utilPts: number;
+  coverPts: number;
+  deathPts: number;
+  total: number;
+}
+
+/** A finished year. */
+export interface YearRecord extends YearTotals {
+  /** Net worth when the year closed. */
+  worth1: number;
+  score: YearScore;
+  /** 1 for the farm's first year. */
+  n: number;
+  /** On a real-year farm, the real year this game year started in. */
+  realYear?: number;
+  /** The farm day the year closed. */
+  end: number;
+}
+
+/**
+ * What has been spent on infrastructure that is still in place, item by
+ * item, so net worth falls when something is pulled out. Improvements that
+ * came with the farm are not in here: nothing was spent on them. Tape is not
+ * in here either: all tape on a farm was bought, so its worth is counted
+ * from the tape standing, down and on the roll.
+ */
+export interface InfraLedger {
+  /** Dollars spent on the fence or gate on a line, by line ("h12", "v340"). */
+  edges: Record<string, number>;
+  /** Dollars spent on pipe. Pipe is never pulled up. */
+  pipe: number;
+  /** Dollars spent on each fixed trough, by square. */
+  troughs: Record<string, number>;
+  /** Dollars spent on each fence-line hub, by grid corner. */
+  hubs: Record<string, number>;
+  /** Dollars counted for each portable trough, by its id. */
+  ports: Record<string, number>;
+  /** Dollars spent on the energiser. */
+  energiser: number;
+  /** Sown pasture, by planting id: dollars counted for each square still in the planting. */
+  pasture: Record<string, number>;
+}
+
+export const emptyLedger = (): InfraLedger => ({
+  edges: {},
+  pipe: 0,
+  troughs: {},
+  hubs: {},
+  ports: {},
+  energiser: 0,
+  pasture: {},
+});
+
+/**
+ * The years a real-year farm plays (PRD 5.14). Enough to lay the years out
+ * again without the tables: the order, the first year and the years that
+ * could be played when the farm started. The start month is the farm's own.
+ */
+export interface RealYearsSpec {
+  kind: 'real';
+  /** The years as they happened, or shuffled from the farm's seed. */
+  order: YearOrder;
+  /** The real year the farm started in. */
+  firstYear: number;
+  /**
+   * The oldest and newest years that could be played when the farm
+   * started. Kept so a later data pull that adds a year does not change
+   * the order of the years to come.
+   */
+  years: { first: number; last: number };
+  /**
+   * The version of the district's real data the farm runs on (see
+   * `DistrictRealData.version`). The farm can only be stepped on data
+   * with this version.
+   */
+  dataVersion: string;
+}
+
+/**
+ * Where the growth factors, the prices and the date come from: the MVP's
+ * random seasons with the stand-in market, or real years with real weather
+ * and real prices.
+ */
+export type SeasonSpec = { kind: 'random' } | RealYearsSpec;
+
+/** The market's saved state: the stand-in's, or today's real prices. */
+export type MarketState = StandInMarket | RealMarket;
+
+/** One day of class prices, for the market chart. */
+export interface PriceDay {
+  day: number;
+  /** c/kg live weight for each class. */
+  c: Record<MarketClassId, number>;
+}
+
+/** The named random streams a farm draws from in play. Each has its own saved state. */
+export const PLAY_STREAMS = {
+  /** Conception, slipped calves, calving losses, the sex of a calf, barren females. */
+  breeding: 'cattle:breeding',
+  /** Daily deaths and orphaned calves. */
+  deaths: 'cattle:deaths',
+  /** Hungry or thirsty mobs pushing through tape. */
+  breakouts: 'breakouts',
+  /** Which side of a new fence each beast ends up on. */
+  strays: 'strays',
+  /** The market's daily moves. */
+  market: 'market',
+  /** The cattle that turn up when a class is bought. */
+  buying: 'buying',
+} as const;
+export type PlayStream = keyof typeof PLAY_STREAMS;
+
+/** A message for the player: something that happened, as data. The screens write the words. */
+export interface InboxMessage {
+  /** Messages are numbered in the order they were made. */
+  seq: number;
+  /** The farm day it happened. */
+  day: number;
+  /**
+   * The time of day it happened, in minutes after midnight on the district
+   * town's clock: for a job, the time it finished for the day. Left out for
+   * what the daily tick reports, which has no time of day.
+   */
+  at?: number;
+  event: FarmEvent;
+}
+
+/** The inbox keeps this many messages. Older ones drop off. */
+export const INBOX_LIMIT = 120;
+
+/** An action the player took, as it was asked for. */
+export interface LoggedAction {
+  /** The farm day it was done on. */
+  day: number;
+  action: Action;
+  /**
+   * When the job started and finished that day, in minutes after midnight
+   * on the district town's clock. Left out for an action done without the
+   * farm clock (calibration and tests).
+   */
+  at?: ClockSpan;
+}
+
+/** A start and a finish, in minutes after midnight on the district town's clock. */
+export interface ClockSpan {
+  start: number;
+  end: number;
+}
+
+/**
+ * The farm clock (PRD 5.1). Every day runs from first light to last light.
+ * Looking is free. Doing a job moves `used` on.
+ */
+export interface FarmClock {
+  /** First light today, in minutes after midnight on the district town's clock. */
+  firstLight: number;
+  /** Last light today, the same way. */
+  lastLight: number;
+  /** Minutes of today's light used so far. 0 at first light. */
+  used: number;
+}
+
+export type GameOverReason =
+  /** Cash reached the bank's limit. */
+  | 'bank'
+  /** The whole farm was eaten out for 10 days with cattle on it. */
+  | 'feed';
+
+export interface FarmState {
+  /** The engine version the farm was last run on. */
+  engineVersion: string;
+  /** The save format the farm was last saved in. */
+  saveFormat: number;
+  /** The farm's seed. The same seed, options and actions always give the same farm. */
+  seed: number;
+  district: DistrictId;
+  start: FarmStart;
+  startType: StartType;
+  /** True for a mixed farm (grazing and cropping). */
+  mixed: boolean;
+  /** Arable share of the farm that was asked for or drawn, %. */
+  arablePct: number;
+  /** The difficulty the money was set from, or 'custom' when the money was given. */
+  difficulty: Difficulty | 'custom';
+  /** Today's farm day. Day 0 is the farm's first day. */
+  day: number;
+
+  /** Dollars in the bank. Negative when overdrawn. */
+  cash: number;
+  /** Dollars the farm started with. */
+  startCash: number;
+  /** How far the bank will lend. A negative number. */
+  overdraft: number;
+  /** The bank takes the farm when cash reaches this. A negative number. */
+  broke: number;
+
+  pasture: PastureState;
+  crops: CropState;
+  /** Fences, water, the farm's scale and the tape on the roll. Replaced, never changed in place. */
+  layout: FarmLayout;
+  /** True once the farm has a solar energiser for electric fence. */
+  energiser: boolean;
+  buildings: FarmBuildings;
+
+  mobs: FarmMob[];
+  /** Hands out tag numbers. */
+  animalIds: AnimalIds;
+  /** The id the next mob gets. */
+  nextMobId: number;
+  /** Cattle bought on a sale day and not yet in the yards. Empty when none are on the way. */
+  arrivals: Arrival[];
+  /** Stock booked onto a sale day. Empty when none is booked. */
+  saleBookings: SaleBooking[];
+  /** Grazing plan templates (milestone 1.5c). Empty when none has been made. */
+  plans: PlanTemplate[];
+  /** The id the next plan template gets. */
+  nextPlanId: number;
+
+  seasons: SeasonSpec;
+  market: MarketState;
+  /** The last 31 days of class prices. */
+  priceHistory: PriceDay[];
+  /** The saved state of each random stream. */
+  rng: Record<PlayStream, RngState>;
+
+  /** The year under way. */
+  year: YearTotals;
+  /** Finished years, oldest first. */
+  years: YearRecord[];
+  ledger: InfraLedger;
+
+  inbox: InboxMessage[];
+  /** The number the next inbox message gets. */
+  inboxSeq: number;
+  /** Days in a row the whole farm has been eaten out with cattle on it. */
+  noFeedDays: number;
+  /** Set when the game is over. Nothing more can be done on the farm. */
+  over: { reason: GameOverReason; day: number } | null;
+  /**
+   * The furthest the bank facts have gone (save format 15): 1 once the
+   * player has been told cash went below zero, 2 once told it passed three
+   * quarters of the way to the bank's limit (`money/bank.ts`). It falls back
+   * when cash recovers, so a later fall is told again. Left out at 0.
+   */
+  bankWarned?: 1 | 2;
+  /**
+   * Things to do the player has put away (save format 15), by key. A key
+   * stays only while its thing is still true: the list is cut back to what
+   * is true at the end of each day, so a thing that stops and starts again
+   * shows again. Left out when empty.
+   */
+  todoOff?: string[];
+  /** Every action taken on the farm, in order. */
+  actionLog: LoggedAction[];
+
+  /** The farm clock: how far through today the player is. */
+  clock: FarmClock;
+
+  /**
+   * Farm hands and contractor fencing (milestones 2.1 and 2.2). Left out on
+   * a farm that has never hired a hand or ordered contract fencing, which
+   * then saves and plays exactly as it did before hands existed.
+   */
+  labour?: LabourState;
+
+  /**
+   * Sheep (milestone 2.3): the farm's sheep mobs and their random streams.
+   * Left out on a farm that has never had sheep, which then saves and plays
+   * exactly as it did before sheep existed.
+   */
+  sheep?: SheepState;
+
+  /**
+   * Paid rescues the farm has had, oldest first (PRD 10.3, save format 13). Left out on a farm
+   * that has never been rescued, which then saves and plays exactly as it did before.
+   */
+  rescues?: RescueRecord[];
+
+  /**
+   * The first tag number given out after the farm was set up (save format 16). Cattle with a
+   * lower tag came with the farm, so the stock book shows their value on the day it was taken
+   * over, not a purchase price. Left out on a farm saved before format 16: the stock book then
+   * says "bought or taken over" for any animal that was not bred on the farm.
+   */
+  startTags?: number;
+
+  /**
+   * What each head of cattle taken over would have put in the bank sold on the takeover day,
+   * dollars after selling costs and never below 0, by tag: entry `tag - 1` (save format 17). The
+   * stock book's cost for a taken-over head, on the same net basis as its value now, so the book
+   * starts at $0 profit. A record for the stock book only: no rule reads it. Left out on a farm
+   * with no herd at takeover and on a farm saved before format 17, whose stock book keeps the
+   * start value it had.
+   */
+  startNet?: Float64Array;
+
+  /**
+   * The last farm day cattle or sheep spent on each square's grazing area (save format 16), for
+   * the paddocks' rest days. A record only: no rule reads it. Made at the first night after
+   * format 16, from `PastureState.lastG`; left out until then.
+   */
+  stockedOn?: Int32Array;
+}
+
+/** The MVP's price chart kept 31 days. */
+export const PRICE_HISTORY_DAYS = 31;
+
+/**
+ * A separate copy of a farm, or of any part of one: plain objects, arrays
+ * and typed arrays, copied all the way down.
+ */
+export function deepCopy<T>(v: T): T {
+  if (ArrayBuffer.isView(v)) {
+    return (v as unknown as { slice(): unknown }).slice() as T;
+  }
+  if (Array.isArray(v)) {
+    const out = new Array(v.length);
+    for (let i = 0; i < v.length; i++) out[i] = deepCopy(v[i]);
+    return out as T;
+  }
+  if (v !== null && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v)) out[k] = deepCopy((v as Record<string, unknown>)[k]);
+    return out as T;
+  }
+  return v;
+}
+
+/** A separate copy of a farm, so one can change without the other. */
+export const cloneFarm = (farm: FarmState): FarmState => deepCopy(farm);
+
+/** Add events to the inbox, oldest dropped past the limit. `at` is the time of day, when there is one. */
+export function toInbox(
+  farm: FarmState,
+  day: number,
+  events: readonly FarmEvent[],
+  at?: number,
+): void {
+  for (const event of events) {
+    farm.inbox.push(
+      at === undefined
+        ? { seq: farm.inboxSeq++, day, event }
+        : { seq: farm.inboxSeq++, day, at, event },
+    );
+  }
+  if (farm.inbox.length > INBOX_LIMIT) farm.inbox.splice(0, farm.inbox.length - INBOX_LIMIT);
+}

@@ -1,0 +1,48 @@
+.grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.paddock {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.paddock summary {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.pname {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.plabel {
+  font-size: 0.875rem;
+}
+.pfacts {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.pbody {
+  margin: 0;
+  padding: 0 14px 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.pbody ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.back {
+  justify-self: start;
+}

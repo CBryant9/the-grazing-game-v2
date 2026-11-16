@@ -1,0 +1,245 @@
+import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
+
+/*
+ * The JavaScript budget check must fail when a page asks for too much and
+ * pass when it does not. This builds pretend pages with scripts of a known
+ * size (random bytes do not compress) and runs the check on them.
+ */
+
+const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'check-js-budget.mjs');
+const dirs: string[] = [];
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
+
+/** A pretend build. `homeKb` and `playKb` are the KB of script each page asks for. */
+function pretend(
+  homeKb: number,
+  playKb: number,
+  missing = false,
+  accountKb = 20,
+  adminKb = 20,
+  communityKb = 20,
+) {
+  const root = mkdtempSync(join(tmpdir(), 'gg-budget-'));
+  dirs.push(root);
+  const chunks = join(root, 'static', 'chunks');
+  const app = join(root, 'app');
+  const pages = join(root, 'pages');
+  mkdirSync(chunks, { recursive: true });
+  mkdirSync(app, { recursive: true });
+  mkdirSync(pages, { recursive: true });
+  writeFileSync(join(chunks, 'home.js'), randomBytes(homeKb * 1024));
+  writeFileSync(join(chunks, 'play.js'), randomBytes(playKb * 1024));
+  const page = (name: string) =>
+    `<html><script src="/_next/static/chunks/${name}.js" async></script></html>`;
+  writeFileSync(
+    join(pages, 'index.html'),
+    homeKb === 0 ? '<html><main>Home</main></html>' : page('home'),
+  );
+  writeFileSync(join(app, 'play.html'), missing ? page('gone') : page('play'));
+  // The sign-in and account pages each ask for a small script of their own.
+  writeFileSync(join(chunks, 'account.js'), randomBytes(accountKb * 1024));
+  mkdirSync(join(app, 'sign-in'), { recursive: true });
+  mkdirSync(join(app, 'sign-up'), { recursive: true });
+  mkdirSync(join(app, 'account'), { recursive: true });
+  mkdirSync(join(app, 'purchase'), { recursive: true });
+  for (const file of [
+    'sign-in.html',
+    'sign-in/check-email.html',
+    'sign-up/finish.html',
+    'account.html',
+    'account/notifications.html',
+    // The store and the Stripe return pages (milestone 5.2).
+    'store.html',
+    'purchase/success.html',
+    'purchase/cancelled.html',
+  ]) {
+    writeFileSync(join(app, file), page('account'));
+  }
+  // The admin pages are rendered on demand: their scripts are named in two manifests, not in HTML.
+  writeFileSync(join(chunks, 'admin.js'), randomBytes(adminKb * 1024));
+  for (const rel of [
+    'admin/notifications',
+    'admin/switches',
+    'admin/settings',
+    'admin/users/[id]',
+    'admin/users',
+    'admin',
+    'admin/ads',
+    'admin/ads/sponsors',
+    'admin/ads/campaigns',
+    'admin/ads/campaigns/[id]',
+    'admin/ads/campaigns/[id]/report',
+    'admin/ads/stats',
+    'admin/photos',
+    'admin/moderation',
+    'admin/words',
+    'admin/challenges',
+  ]) {
+    mkdirSync(join(app, rel, 'page'), { recursive: true });
+    writeFileSync(
+      join(app, rel, 'page', 'build-manifest.json'),
+      JSON.stringify({ rootMainFiles: ['static/chunks/admin.js'] }),
+    );
+    writeFileSync(
+      join(app, rel, 'page_client-reference-manifest.js'),
+      'globalThis.__RSC_MANIFEST = {"chunks":["/_next/static/chunks/admin.js"]};',
+    );
+  }
+  // The community pages (milestone 4.2 and 4.3) are measured the same way, each on its own line.
+  writeFileSync(join(chunks, 'community.js'), randomBytes(communityKb * 1024));
+  for (const rel of [
+    'community',
+    'community/people',
+    'community/requests',
+    'community/me',
+    'community/post/[id]',
+    'community/u/[username]',
+    'community/u/[username]/[list]',
+    'community/farm/[id]',
+    'community/groups',
+    'community/groups/[id]',
+  ]) {
+    mkdirSync(join(app, rel, 'page'), { recursive: true });
+    writeFileSync(
+      join(app, rel, 'page', 'build-manifest.json'),
+      JSON.stringify({ rootMainFiles: ['static/chunks/community.js'] }),
+    );
+    writeFileSync(
+      join(app, rel, 'page_client-reference-manifest.js'),
+      'globalThis.__RSC_MANIFEST = {"chunks":["/_next/static/chunks/community.js"]};',
+    );
+  }
+  return { stat: join(root, 'static'), app, pages };
+}
+
+const run = (b: { stat: string; app: string; pages: string }) =>
+  spawnSync(process.execPath, [SCRIPT, '--static', b.stat, '--app', b.app, '--pages', b.pages], {
+    encoding: 'utf8',
+  });
+
+describe('the JavaScript budget check', () => {
+  it('passes pages under their limits', () => {
+    const r = run(pretend(0, 200));
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/\/play/);
+  });
+
+  it('fails a website page that starts sending a script', () => {
+    const r = run(pretend(5, 100));
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/OVER\s+\/\s/);
+  });
+
+  it('fails the game page over 250 KB', () => {
+    const r = run(pretend(50, 280));
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/OVER\s+\/play/);
+  });
+
+  it('gives each sign-in and account page its own line, and fails one that grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20));
+    expect(ok.status).toBe(0);
+    for (const path of [
+      '/sign-in',
+      '/sign-in/check-email',
+      '/sign-up/finish',
+      '/account',
+      '/store',
+      '/purchase/success',
+      '/purchase/cancelled',
+    ]) {
+      expect(ok.stdout).toContain(path);
+    }
+    const over = run(pretend(0, 100, false, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/sign-in\s/);
+  });
+
+  it('measures an app page made for each request (no HTML) from its manifests, with the same limit (m5.5)', () => {
+    const asManifest = (b: ReturnType<typeof pretend>, kb: number) => {
+      rmSync(join(b.app, 'play.html'));
+      writeFileSync(join(dirname(b.stat), 'static', 'chunks', 'dyn.js'), randomBytes(kb * 1024));
+      mkdirSync(join(b.app, 'play', 'page'), { recursive: true });
+      writeFileSync(
+        join(b.app, 'play', 'page', 'build-manifest.json'),
+        JSON.stringify({ rootMainFiles: ['static/chunks/dyn.js'] }),
+      );
+      writeFileSync(join(b.app, 'play', 'page_client-reference-manifest.js'), '{}');
+      return b;
+    };
+    const ok = run(asManifest(pretend(0, 100), 200));
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/ok\s+\/play\s+200\.\d KB/);
+    const over = run(asManifest(pretend(0, 100), 260));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/play/);
+    // With neither the HTML nor a manifest, the check still refuses to pass.
+    const b = pretend(0, 100);
+    rmSync(join(b.app, 'play.html'));
+    expect(run(b).status).toBe(1);
+  });
+
+  it('gives /admin its own line, measured from its manifests, and fails it when it grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20, 20));
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/ok\s+\/admin\s/);
+    const over = run(pretend(0, 100, false, 20, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/admin\s/);
+  });
+
+  it('gives the ad screens their own /admin/ads line', () => {
+    const ok = run(pretend(0, 100, false, 20, 20));
+    expect(ok.stdout).toMatch(/ok\s+\/admin\/ads\s/);
+    const over = run(pretend(0, 100, false, 20, 200));
+    expect(over.stdout).toMatch(/OVER\s+\/admin\/ads\s/);
+  });
+
+  it('gives each community page its own line, measured from its manifests, and fails one that grows past it', () => {
+    const ok = run(pretend(0, 100, false, 20, 20, 20));
+    expect(ok.status).toBe(0);
+    for (const path of [
+      '/community ',
+      '/community/people',
+      '/community/me',
+      '/community/post/[id]',
+    ]) {
+      expect(ok.stdout).toContain(path);
+    }
+    const over = run(pretend(0, 100, false, 20, 20, 200));
+    expect(over.status).toBe(1);
+    expect(over.stdout).toMatch(/OVER\s+\/community\s/);
+  });
+
+  it("measures the ticker's own script and says what it sends when on", () => {
+    const r = run(pretend(0, 100));
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(
+      /ok\s+\/ticker\.js\s+\d+ bytes compressed in 1 script when the ticker is on, 0 when off/,
+    );
+  });
+
+  it('does not count the polyfills for old browsers (nomodule)', () => {
+    const b = pretend(0, 10);
+    writeFileSync(join(b.stat, 'chunks', 'old.js'), randomBytes(400 * 1024));
+    writeFileSync(
+      join(b.pages, 'index.html'),
+      '<html><main>Home</main><script src="/_next/static/chunks/old.js" noModule=""></script></html>',
+    );
+    expect(run(b).status).toBe(0);
+  });
+
+  it('fails when a script the page names is not in the build', () => {
+    const r = run(pretend(0, 10, true));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/not in the build/);
+  });
+});

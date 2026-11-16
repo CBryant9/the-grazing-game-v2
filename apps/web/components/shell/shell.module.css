@@ -1,0 +1,100 @@
+/*
+ * The pieces around the game page: the offline line, the install entry and the
+ * error screens. Colours are the design tokens in app/globals.css, so both
+ * themes work.
+ */
+
+/* ---- Offline ---------------------------------------------------------- */
+
+/* Online, the wrapper adds nothing to the layout. */
+.shell {
+  display: contents;
+}
+/* Offline, the line sits above the play screen, which gives up that much height. */
+.shell[data-offline='true'] {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+.shell[data-offline='true'] > .content {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.shell[data-offline='true'] > .content > * {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 0;
+}
+/* The "Working" bar means a request is under way. Offline holds the buttons off the same way, but nothing is being sent. */
+.shell[data-offline='true'] :global([role='status'][aria-label='Working']) {
+  display: none;
+}
+.offline {
+  flex: none;
+  padding: 6px var(--gutter);
+  background: var(--panel2);
+  border-bottom: 2px solid var(--line);
+  color: var(--text);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* ---- Install ---------------------------------------------------------- */
+
+.install {
+  display: grid;
+  gap: 8px;
+}
+.steps {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 4px;
+}
+
+/* ---- Error screens ---------------------------------------------------- */
+
+.errorpage {
+  min-height: calc(100dvh - 120px);
+  display: grid;
+  align-content: center;
+  padding-top: 24px;
+  padding-bottom: 32px;
+}
+.errorcard {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px var(--gutter);
+  display: grid;
+  gap: 12px;
+}
+.errorcard h1,
+.errorcard h2 {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.errorbtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/* The play screen's own error: centred in the page, with no site header above it. */
+.boundary {
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  padding: 16px var(--gutter);
+  background: var(--frame);
+}
+/* The page-level error, when the layout itself has failed and there is no header. */
+.bare {
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  padding: 16px var(--gutter);
+}

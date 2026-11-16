@@ -1,0 +1,2927 @@
+/*
+ * The play screen: one set of components, three layouts (PRD 6.1, 6.1a, 6.2).
+ * `data-layout` on .screen is phone (held upright), landscape (a phone on its
+ * side) or pc. Colours are the design tokens in globals.css, so both themes work.
+ */
+
+.screen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--frame);
+  position: relative;
+  overflow: hidden;
+}
+.webhdr {
+  flex: none;
+}
+
+/* ---- Top bar ---------------------------------------------------------- */
+
+.top {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 18px;
+  min-height: 54px;
+  background: var(--gamehdr);
+  border-top: 3px solid var(--accent);
+  border-bottom: 2px solid var(--gamehdr-line);
+}
+.topname {
+  min-width: 0;
+  line-height: 1.25;
+}
+.fname {
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.season {
+  color: var(--text);
+}
+.cash {
+  font-weight: 700;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.cashbox {
+  text-align: right;
+  line-height: 1.25;
+  flex: none;
+}
+.cashsub {
+  font-size: 0.625rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.topextra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.topdl {
+  width: 250px;
+  flex: none;
+}
+.toptimes {
+  margin-left: auto;
+  flex: none;
+}
+
+.daylight {
+  display: grid;
+  gap: 3px;
+}
+.dltrack {
+  position: relative;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid #000;
+  background: linear-gradient(
+    90deg,
+    #f2a25e 0%,
+    #f7d679 14%,
+    #a9d8f2 45%,
+    #a9d8f2 60%,
+    #f7d679 86%,
+    #e0675c 100%
+  );
+}
+.dlused {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(11, 18, 32, 0.7);
+}
+.dlmark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #000;
+}
+.dljob {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(201, 79, 68, 0.95) 0 4px,
+    rgba(201, 79, 68, 0.55) 4px 8px
+  );
+}
+.dlnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.625rem;
+  color: var(--muted);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.dlnote b {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.times {
+  display: flex;
+  gap: 6px;
+}
+/* The time controls as the mockup's flat chips; Next day is the coral main one. */
+.tb {
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  padding: 6px 9px;
+  min-height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.tb:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.tbpri {
+  background: var(--btn);
+  border-color: var(--btn-hi);
+  color: #fff;
+}
+/* Evening: Next day invites a click. No words, just a quiet pulse. */
+.invite {
+  animation: invite 1.8s ease-in-out infinite;
+}
+@keyframes invite {
+  0%,
+  100% {
+    box-shadow:
+      inset -2px -2px 0 var(--btn-lo),
+      inset 2px 2px 0 var(--btn-hi),
+      0 3px 0 #000,
+      0 0 0 2px var(--btn-hi);
+  }
+  50% {
+    box-shadow:
+      inset -2px -2px 0 var(--btn-lo),
+      inset 2px 2px 0 var(--btn-hi),
+      0 3px 0 #000,
+      0 0 0 5px var(--btn-hi);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invite {
+    animation: none;
+  }
+}
+
+.busybar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: busy 1.1s linear infinite;
+}
+@keyframes busy {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busybar {
+    animation: none;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+}
+
+/* ---- Body: map, side panel, tabs --------------------------------------- */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+.stage:focus {
+  outline: none;
+}
+.mapwrap,
+.maphost {
+  position: absolute;
+  inset: 0;
+}
+.maphost canvas {
+  width: 100%;
+  height: 100%;
+}
+.maploading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+.mapfail {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.nav {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  background: var(--hud);
+  border-top: 1px solid var(--line);
+}
+.navbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 4px 2px;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  font-family: var(--font-px);
+  font-size: 0.625rem;
+  color: var(--text);
+}
+.navon {
+  background: var(--panel2);
+  color: var(--accent-text);
+}
+
+/* Phone held upright: the bar sits along the bottom, the sheet slides up over the map. */
+.screen[data-layout='phone'] .nav {
+  padding: 4px 4px max(6px, env(safe-area-inset-bottom));
+}
+
+/* Phone on its side: slim one-row bar, tabs in a rail on the right, panels full screen. */
+.screen[data-layout='landscape'] .top {
+  min-height: 46px;
+  padding: 0 10px;
+  gap: 8px;
+  background: var(--hud);
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+.screen[data-layout='landscape'] .fname {
+  font-size: 0.75rem;
+}
+.screen[data-layout='landscape'] .sub {
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.screen[data-layout='landscape'] .topdl {
+  width: auto;
+  flex: 1 1 60px;
+  min-width: 40px;
+  max-width: 150px;
+}
+.screen[data-layout='landscape'] .times {
+  gap: 4px;
+}
+.screen[data-layout='landscape'] .cash {
+  font-size: 0.75rem;
+}
+.screen[data-layout='landscape'] .body {
+  flex-direction: row;
+}
+.screen[data-layout='landscape'] .nav {
+  grid-template-columns: none;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  width: 64px;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+  padding: 2px;
+}
+.screen[data-layout='landscape'] .navbtn {
+  min-height: 0;
+  font-size: 0.5rem;
+  gap: 1px;
+}
+
+/* PC and tablet: the website header, then the game header in one row, a side panel and the map. */
+.screen[data-layout='pc'] .body {
+  flex-direction: row;
+}
+/* The map's column. It has no box of its own, except on a PC, where a banner may sit under the map. */
+.stagecol {
+  display: contents;
+}
+.screen[data-layout='pc'] .stagecol {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.side {
+  flex: none;
+  width: 500px;
+  max-width: 45vw;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+  border-right: 1px solid var(--line);
+}
+.side .nav {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 4px;
+}
+.side .navbtn {
+  min-height: 52px;
+}
+.sidebody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+/* ---- Things to do ------------------------------------------------------ */
+
+.banner {
+  position: absolute;
+  z-index: 8;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.screen[data-layout='landscape'] .banner {
+  right: auto;
+  width: min(320px, 46%);
+}
+.bannerhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 6px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  width: 100%;
+}
+.bannertitle {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+.bannerpeek {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bannerhead > :last-child {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+}
+.flip {
+  transform: rotate(180deg);
+}
+.bannerbody {
+  overflow-y: auto;
+  padding: 2px 12px 12px;
+  display: grid;
+  gap: 8px;
+}
+.minihead {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.todolist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.todo {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.todourgent {
+  border-color: var(--coral);
+}
+.todotext {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.todostatus {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.jobcard,
+.jobresult {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--coral);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+.jobresult {
+  border-color: var(--accent-line);
+  justify-items: start;
+}
+.joblines {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.jobbtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chips {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.padchip {
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+
+/* ---- Notices and game over ---------------------------------------------- */
+
+.notice,
+.gameover {
+  position: absolute;
+  z-index: 30;
+  left: 8px;
+  right: 8px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 2px solid var(--coral);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+}
+.gameover {
+  z-index: 9;
+  border-color: var(--line);
+}
+.noticebtns {
+  display: flex;
+  gap: 8px;
+}
+@media (min-width: 600px) {
+  .notice,
+  .gameover {
+    left: 50%;
+    right: auto;
+    width: min(560px, calc(100% - 16px));
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- The sheet: bottom sheet, full screen, or side panel ----------------- */
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+}
+.sheet:focus {
+  outline: none;
+}
+.screen[data-layout='phone'] .sheet {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 58%;
+  padding: 8px 14px 14px;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.screen[data-layout='landscape'] .sheet {
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  padding: 8px 18px 12px;
+}
+.screen[data-layout='pc'] .sheet {
+  flex: 1;
+  padding: 10px 14px 14px;
+}
+.grab {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ghost);
+  margin: 0 auto 8px;
+}
+.screen[data-layout='landscape'] .grab,
+.screen[data-layout='pc'] .grab {
+  display: none;
+}
+.sheethead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.sheettitle {
+  font-size: 1.0625rem;
+}
+.sheetbody {
+  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.padline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.facts div {
+  padding: 6px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.facts dt {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+.mobs {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.mobs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+
+/* ---- Coming soon --------------------------------------------------------- */
+
+.soon {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  padding: 18px;
+  background: var(--frame);
+}
+.screen[data-layout='phone'] .stage > .soon,
+.screen[data-layout='landscape'] .stage > .soon {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+}
+.soontitle {
+  font-size: 1.125rem;
+}
+
+/* ---- The day summary ------------------------------------------------------ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  background: rgba(5, 9, 18, 0.62);
+}
+.summary {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px var(--shadow);
+}
+.sumtitle {
+  font-size: 1.125rem;
+}
+.sumwhen {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.sumstops {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 8px 26px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+.sumlist {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.sumrow {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) 2fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8125rem;
+}
+.sumrow dt {
+  color: var(--muted);
+}
+.sumrow dd {
+  margin: 0;
+}
+.sumdelta {
+  color: var(--muted);
+}
+.sumfacts {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+}
+.sumbtns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Loading and failure, before the screen is up --------------------------- */
+
+.plain {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--frame);
+}
+.plainhdr {
+  flex: none;
+}
+/* Phones: the game fills the screen, so the website header is left out there (PRD 6.4). */
+@media (max-width: 899px) {
+  .plainhdr {
+    display: none;
+  }
+}
+.plainmain {
+  flex: 1;
+  display: grid;
+  place-items: start center;
+  padding: var(--gutter);
+}
+.plainmain:focus {
+  outline: none;
+}
+.failcard {
+  max-width: 420px;
+  margin-top: 40px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+/* ---- The paddock sheet, the mob card and moving cattle -------------------- */
+
+.padfeed {
+  margin-left: auto;
+  font-weight: 700;
+}
+.waterline {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.nowater {
+  color: var(--bad);
+}
+.mobbtn {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tap);
+  align-items: center;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.mobs li:has(.mobbtn) {
+  padding: 0;
+}
+.mobbtn {
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel2);
+}
+.details {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+}
+.details > summary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+}
+.details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.details > :last-child {
+  margin-bottom: 10px;
+}
+.actions {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  font-size: 0.75rem;
+}
+
+/* The side-view picture */
+.swardwrap {
+  min-width: 0;
+}
+.swardrow {
+  display: flex;
+  gap: 8px;
+}
+.sward {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+.sward figcaption {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.swardcanvas {
+  display: block;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  max-width: 100%;
+}
+
+/* The mob card */
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.warntag,
+.holdtag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.warntag {
+  color: var(--bad);
+}
+.holdtag {
+  color: var(--muted);
+}
+.why {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--coral);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.hlist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.hrow {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.hbtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hhint,
+.hreason {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.hhint {
+  color: var(--muted);
+}
+.hreason {
+  color: var(--text);
+}
+.picker {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.field {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--ghost);
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+}
+.supp {
+  display: grid;
+  gap: 8px;
+}
+.supptitle {
+  font-size: 0.8125rem;
+}
+.suppopts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.suppbtn {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: var(--tap);
+  padding: 6px 10px;
+  border: 1px solid var(--ghost);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.suppbtn small {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.suppbtn[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+}
+.suppon span::after {
+  content: ' (on)';
+  font-weight: 400;
+}
+.booked {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+.classtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  margin-bottom: 10px;
+}
+.classtable th,
+.classtable td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.classtable th:first-child {
+  text-align: left;
+  font-weight: 400;
+}
+.classtable thead th {
+  color: var(--muted);
+  font-weight: 400;
+}
+.joinline {
+  margin-top: 10px;
+  font-size: 0.8125rem;
+}
+
+/* Moving cattle */
+.moveflow {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--frame);
+  padding: 10px 14px 14px;
+  font-size: 0.8125rem;
+}
+.moveflow:focus {
+  outline: none;
+}
+.screen[data-layout='phone'] .moveflow {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 52%;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.screen[data-layout='landscape'] .moveflow {
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(46%, 380px);
+  border-left: 1px solid var(--line);
+  box-shadow: -10px 0 30px var(--shadow);
+}
+.screen[data-layout='pc'] .moveflow {
+  flex: 1;
+}
+.movebody {
+  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.pickrows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.pickrow {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pickname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pickfacts {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.keylight,
+.keydry {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid var(--text);
+  border-radius: 2px;
+}
+.keydry {
+  border-top-color: var(--nowater-line);
+  margin-left: 6px;
+}
+.partset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+/* Segmented controls as the mockup: a padded pill, the chosen one coral with white words. */
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 3px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.seg button {
+  min-height: 38px;
+  padding: 6px 4px;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--btn);
+  color: #fff;
+}
+.partrows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.partrows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 8px;
+}
+.partrows li:last-child {
+  grid-template-columns: 1fr;
+}
+
+/* The Herd and Paddocks lists */
+.listpanel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  background: var(--frame);
+  overflow-y: auto;
+  min-height: 0;
+}
+.screen[data-layout='phone'] .stage > .listpanel,
+.screen[data-layout='landscape'] .stage > .listpanel {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+}
+.screen[data-layout='pc'] .side > .listpanel {
+  flex: 1;
+}
+.sortbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sortlabel {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* Sort chips as the mockup: the chosen one is inverted. */
+.sortbtn {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel2);
+  font-size: 0.6875rem;
+}
+.sortbtn[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--frame);
+  border-color: var(--text);
+}
+.rows {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rowtop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.rowsub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moveflow,
+  .sheet {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---- Build tools: the tool bar and the card beside the line -------------- */
+
+.toolclosed {
+  display: flex;
+  justify-content: flex-start;
+}
+.toolclosed :global(.btn) {
+  min-height: var(--tap);
+  background: var(--hud);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.toolbar {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.75rem;
+}
+.toolrow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.tool {
+  flex: none;
+  min-height: 40px;
+  min-width: var(--tap);
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-family: var(--font-px);
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.tool[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.fencechoice {
+  display: grid;
+  /* Three cattle fences, or four with netting on a farm that shows sheep. */
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px;
+}
+.fencebtn {
+  min-height: var(--tap);
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  font-size: 0.75rem;
+}
+.fencebtn small {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.fencebtn[aria-pressed='true'] {
+  background: var(--sel);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.toolhelp {
+  display: grid;
+  gap: 2px;
+  line-height: 1.4;
+}
+.toolbar > :global(.btn) {
+  justify-self: start;
+  min-height: var(--tap);
+}
+
+.buildcard {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--hud);
+  border: 1px solid var(--coral);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.buildcard :global(.btn) {
+  min-height: var(--tap);
+}
+.buildfloat {
+  position: absolute;
+  z-index: 9;
+  width: min(300px, calc(100% - 16px));
+  left: 8px;
+  top: 8px;
+}
+.cardhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  color: var(--accent-text);
+}
+.cardlength {
+  font-size: 0.75rem;
+  color: var(--text);
+}
+.cardlate {
+  color: var(--bad);
+  font-weight: 700;
+}
+.cardreason {
+  color: var(--bad);
+}
+.gatelist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.gatelist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.gatelist :global(.btn) {
+  min-height: var(--tap);
+}
+
+/* The bottom stack on a phone: the card, then the tool bar. */
+.buildstack {
+  position: absolute;
+  z-index: 8;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+.buildstack > * {
+  pointer-events: auto;
+}
+/* A phone on its side: the stack is a column on the right, so the map stays wide. */
+.screen[data-layout='landscape'] .buildstack {
+  left: auto;
+  width: min(300px, 46%);
+  top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buildcard,
+  .toolbar {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---- Market, plans, crops and the inbox ---------------------------------- */
+
+/* Buttons that sit in a job card or a row are 44 px tall, so a thumb finds them. */
+.jobbtns > :global(.btn),
+.hbtn > :global(.btn) {
+  min-height: var(--tap);
+}
+.stack {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.saleline {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.seg3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--ghost);
+  border-radius: 8px;
+  overflow: hidden;
+  /* A box that clips its edges can shrink to nothing in a scrolling grid. Keep it a finger tall. */
+  min-height: calc(var(--tap) + 2px);
+}
+.seg3 button {
+  min-height: var(--tap);
+  padding: 4px 8px;
+  background: var(--panel2);
+  font-size: 0.75rem;
+  border: 0;
+}
+.seg3 button[aria-pressed='true'] {
+  background: var(--sel);
+  font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.seg button {
+  border: 0;
+}
+.pickrow[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.pickrow:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.notes {
+  list-style: none;
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.75rem;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.credit {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.kgnote {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.qty {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.qtyrow {
+  display: grid;
+  grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap);
+  gap: 6px;
+  align-items: center;
+}
+.qtyrow :global(.btn) {
+  padding: 0;
+  min-height: var(--tap);
+  font-size: 1rem;
+}
+.qtyrow .field {
+  text-align: center;
+}
+
+/* The price chart. Colours pass 3:1 on the dark and the light panel, and each line has its own dash. */
+.chartbox {
+  /* One colour per class, the mockup's series tokens (both themes, globals.css). */
+  --chart-1: var(--s0);
+  --chart-2: var(--s1);
+  --chart-3: var(--s2);
+  --chart-4: var(--s3);
+  --chart-5: var(--s4);
+  --chart-6: var(--s5);
+  --chart-7: var(--s6);
+  --chart-8: var(--muted);
+  display: grid;
+  gap: 8px;
+}
+.chartchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chartchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.75rem;
+}
+.chartchip[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--sel);
+  font-weight: 700;
+}
+.chartchip[aria-pressed='false'] {
+  color: var(--muted);
+}
+.swatch {
+  flex: none;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.gridline {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.axis {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: var(--font-body);
+}
+
+/* Plans */
+.plancard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.leg {
+  display: grid;
+  gap: 2px;
+}
+.chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  align-items: baseline;
+  font-weight: 700;
+}
+.planmob {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+.planhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.statetag {
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  white-space: nowrap;
+}
+.statetag[data-kind='run'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.statetag[data-kind='paused'],
+.statetag[data-kind='wait'] {
+  border-color: var(--coral);
+}
+.stoplist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.stoplist li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.stopname {
+  flex: 1 1 90px;
+  min-width: 0;
+  font-weight: 700;
+}
+.stoplist :global(.btn) {
+  min-height: var(--tap);
+}
+.stopno {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  font-size: 0.8125rem;
+}
+.check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+/* The inbox and the count on the More tab */
+.inbox {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.msg {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.msg[data-new='true'] {
+  border-color: var(--accent-line);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+.msghead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.kind {
+  font-family: var(--font-px);
+  color: var(--text);
+}
+.newtag {
+  font-family: var(--font-px);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.navicon {
+  position: relative;
+  display: inline-flex;
+}
+.navbadge {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--btn);
+  color: #fff;
+  font-family: var(--font-px);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+/* The order of the paddocks, drawn over the map. It never takes a tap. */
+.badges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid #000;
+  font-family: var(--font-px);
+  font-size: 0.8125rem;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Touch screens: every tappable control at least 44 px high --------- */
+
+@media (pointer: coarse) {
+  .screen button,
+  .plain button,
+  .screen select,
+  .screen summary,
+  .padchip,
+  .linkbtn,
+  .sortbtn {
+    min-height: var(--tap);
+  }
+  .linkbtn {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ---- Year score, Scores and Diary ------------------------------------------ */
+
+.yearscore {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.yearscore b {
+  font-family: var(--font-px);
+  font-size: 1.5rem;
+}
+.parts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.part {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+.partname {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.parttrack {
+  display: block;
+  height: 12px;
+}
+/* Each part's bar in its own colour, as the mockup: 12 px, radius 2, no track. */
+.partbar {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--s0);
+}
+.part[data-key='gain'] .partbar {
+  background: var(--s1);
+}
+.part[data-key='util'] .partbar {
+  background: var(--s3);
+}
+.part[data-key='cover'] .partbar {
+  background: var(--s2);
+}
+.part[data-key='death'] .partbar {
+  background: var(--s6);
+}
+.part[data-negative='true'] .partbar {
+  background: var(--knob);
+  opacity: 0.6;
+}
+.part[data-negative='true'] .partpts {
+  color: var(--muted);
+}
+.partpts {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.yeardetails {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+}
+.yearsummary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.yeardetails[open] > .yearsummary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.yeardetails > :last-child {
+  margin-bottom: 12px;
+}
+.diaryhead {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  margin: 0;
+}
+.diarylines {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Farm hands and contract fencing (milestone 2.2) ------------------------ */
+
+/* The contractor's fence colour on the map, as a swatch beside the words. Kept equal to NATURAL.fenceContract by a test. */
+.contractswatch {
+  --contract-fence: #ff5cc8;
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  vertical-align: middle;
+  border-top: 4px solid var(--contract-fence);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #1c1208;
+}
+.teamchoice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.teambtn {
+  min-height: var(--tap);
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 1px;
+  font-size: 0.75rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.teambtn small {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.teambtn[aria-pressed='true'] {
+  background: var(--sel);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.teambtn:disabled {
+  opacity: 0.6;
+}
+.contractline {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 4px solid #ff5cc8;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.contractpeek {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.people {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.person {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.personhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.personhead b {
+  font-size: 0.9375rem;
+}
+.personfacts {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.recent {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.standing {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* The worker report: a worker and a speech bubble for each thing done while the player was away. */
+.report {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+  padding: 8px 0 4px;
+}
+.worker {
+  width: 56px;
+  height: 64px;
+  color: var(--accent-text);
+}
+.bubble {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.bubble::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  bottom: 16px;
+  width: 14px;
+  height: 14px;
+  background: var(--panel2);
+  border-left: 2px solid var(--line);
+  border-bottom: 2px solid var(--line);
+  transform: rotate(45deg);
+}
+.bubblewho {
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.awaybox {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.awaylist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.reportcount {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* ==== The mockups' look (m8, 15 Nov 2026) ================================== */
+
+/* ---- Phone held upright: the top bar floats over the map ---------------- */
+
+.hudstack {
+  position: absolute;
+  z-index: 10;
+  left: 8px;
+  right: 8px;
+  top: max(8px, env(safe-area-inset-top));
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.hudstack > * {
+  pointer-events: auto;
+  flex: none;
+}
+.screen[data-layout='phone'] .top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-height: 0;
+  padding: 8px 10px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.hudrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hudrow .topname {
+  flex: 1;
+}
+.screen[data-layout='phone'] .fname {
+  font-size: 0.875rem;
+}
+.screen[data-layout='phone'] .sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen[data-layout='phone'] .times > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.meta svg {
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--s2);
+}
+.hudstack .banner {
+  position: relative;
+  inset: auto;
+  max-height: none;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.hudstack > section[aria-label='First day tour'] {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.bell {
+  position: relative;
+}
+.bellcount {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 2px solid #000;
+  background: var(--btn);
+  color: #fff;
+  font-size: 0.625rem;
+  line-height: 1;
+}
+.farmbtn {
+  color: var(--accent-text);
+}
+
+/* ---- PC game header pieces ------------------------------------------------ */
+
+.farmbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  min-height: 44px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+  flex: none;
+}
+.farmicon {
+  color: var(--accent-text);
+  display: inline-flex;
+}
+.farmboxtext {
+  display: grid;
+  line-height: 1.2;
+  font-size: 0.625rem;
+}
+.farmboxtext .fname {
+  font-size: 0.8125rem;
+}
+.topdate {
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+.screen[data-layout='pc'] .sub {
+  font-size: 0.625rem;
+}
+
+/* The website header's game links on /play */
+.pcnav {
+  display: flex;
+  gap: 4px;
+  margin-left: 20px;
+  margin-right: auto;
+}
+.pcnavlink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-family: var(--font-px);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.pcnavlink[aria-current='page'] {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+.pcme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #000;
+  background: var(--text);
+  color: var(--frame);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-px);
+  text-decoration: none;
+}
+
+/* The side panel's tabs on a PC, as the mockup */
+.ptabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 10px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.ptab {
+  position: relative;
+  flex: none;
+  white-space: nowrap;
+  min-height: 34px;
+  padding: 7px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-px);
+  font-size: 0.6875rem;
+}
+.ptabon {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+.ptabbadge {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--btn);
+  color: #fff;
+  font-size: 0.625rem;
+}
+
+/* The panel's width follows the tab (mockup: Paddocks 440, Herd 640, the rest 500). */
+.screen[data-layout='pc'][data-panel='farm'] .side {
+  width: 420px;
+}
+.screen[data-layout='pc'][data-panel='paddocks'] .side {
+  width: 440px;
+}
+.screen[data-layout='pc'][data-panel='herd'] .side {
+  width: 640px;
+}
+.screen[data-layout='pc'] .side {
+  background: var(--panel);
+}
+
+/* The sponsor rail sits at the far left, 180 px (off by default). */
+.railslot {
+  display: contents;
+}
+.railslot > * {
+  width: 180px;
+}
+
+/* ---- Things to check --------------------------------------------------------- */
+
+.peeklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+.peeklist li {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+.peeklist i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 2px;
+}
+.bannerbody > .linkbtn {
+  justify-self: start;
+  font-size: 0.75rem;
+}
+.todohead {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.putaway {
+  flex: none;
+  min-height: 32px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+/* ---- The sheet head and the paddock sheet ------------------------------------- */
+
+.sheethead {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.sheetclose {
+  order: 2;
+  margin-left: auto;
+}
+.padmeta {
+  order: 3;
+  flex-basis: 100%;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* A phone on its side: ✕ first, and the whole head on one row. */
+.screen[data-layout='landscape'] .sheethead {
+  flex-wrap: nowrap;
+}
+.screen[data-layout='landscape'] .sheetclose {
+  order: 0;
+  margin-left: 0;
+}
+.screen[data-layout='landscape'] .padmeta {
+  flex-basis: auto;
+}
+.stat3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.stat3 div {
+  padding: 6px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.stat3 b {
+  display: block;
+  font-size: 0.875rem;
+}
+.stat3 span {
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+.mobline {
+  font-size: 0.75rem;
+}
+.sayline {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--ok);
+}
+.padbtns {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+}
+.padbtns :global(.btn) {
+  min-height: var(--tap);
+  white-space: normal;
+}
+/* A phone on its side: the sheet is the whole screen, in two columns. */
+.screen[data-layout='landscape'] .sheetbody {
+  display: block;
+  columns: 2;
+  column-gap: 16px;
+}
+.screen[data-layout='landscape'] .sheetbody > * {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+/* ---- The build tray on a phone, docked on the tabs --------------------------- */
+
+.screen[data-layout='phone'] .buildstack {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  gap: 8px;
+  max-height: 62%;
+}
+/* The card has its own Cancel, so the tool bar's is not drawn beside it. */
+.tray:has(.traycard .buildcard) .toolbar > :global(.btn) {
+  display: none;
+}
+.screen[data-layout='phone'] .buildstack > :not(.tray) {
+  margin: 0 8px;
+}
+.tray {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: var(--hud);
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px var(--shadow);
+  overflow-y: auto;
+  min-height: 0;
+}
+.tray .grab {
+  margin-bottom: 0;
+}
+.tray .toolbar {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.traycard:empty {
+  display: none;
+}
+.traycard .buildcard {
+  padding: 10px 0 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+/* A phone on its side: the tools bottom left, the card on the right, the map between. */
+.screen[data-layout='landscape'] .buildstack {
+  inset: 8px;
+  width: auto;
+  display: block;
+  max-height: none;
+  overflow: visible;
+}
+.screen[data-layout='landscape'] .tray {
+  display: contents;
+}
+.screen[data-layout='landscape'] .tray .grab {
+  display: none;
+}
+.screen[data-layout='landscape'] .tray .toolbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  max-width: 58%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  pointer-events: auto;
+}
+.screen[data-layout='landscape'] .traycard {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: min(280px, 38%);
+  max-height: 100%;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+.screen[data-layout='landscape'] .traycard .buildcard {
+  padding: 10px 12px;
+  background: var(--hud);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* The job card's key and value rows, and Cancel | Build it */
+.kvlist {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.cardbtns {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+.cardbtns :global(.btn) {
+  min-height: var(--tap);
+}
+
+/* ---- The day summary: the whole screen on a phone held upright --------------- */
+
+.sumlist {
+  padding: 4px 12px;
+}
+.screen[data-layout='phone'] .scrim {
+  padding: 0;
+  place-items: stretch;
+}
+.screen[data-layout='phone'] .summary {
+  width: 100%;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  align-content: start;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: linear-gradient(var(--panel2), var(--frame) 45%);
+}
+.screen[data-layout='phone'] .sumtitle {
+  font-size: 1.375rem;
+}
+.screen[data-layout='phone'] .sumbtns {
+  display: grid;
+  justify-content: stretch;
+}
+.screen[data-layout='phone'] .sumback {
+  width: 100%;
+}
+
+/* ---- Full-screen panels: the head with ✕, and More as a sheet ---------------- */
+
+.panelhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.paneltitle {
+  flex: 1;
+  min-width: 0;
+}
+.panelsub {
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.screen[data-layout='pc'] .panelclose {
+  display: none;
+}
+.screen[data-layout='phone'] .stage > .moresheet {
+  top: auto;
+  max-height: 78%;
+  padding: 10px 0 0;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px var(--shadow);
+}
+.moresheet .grab {
+  margin-bottom: 6px;
+}
+.moresheet .panelhead {
+  padding: 0 16px 6px;
+}
+.moresheet .panelhead .soontitle {
+  flex: 1;
+}
+.screen[data-layout='landscape'] .moresheet .grab,
+.screen[data-layout='pc'] .moresheet .grab {
+  display: none;
+}
+.morelist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.moreitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.moreicon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+.moretext {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.kindicon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+/* ---- Herd and Paddocks lists ------------------------------------------------- */
+
+.rowgain {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.padrows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.padrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 9px 4px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.padname {
+  width: 82px;
+  flex: none;
+}
+.padha {
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+.padkg {
+  margin-left: auto;
+  font-weight: 700;
+}
+.padrow > :last-child {
+  width: 14px;
+  text-align: center;
+}
+.padtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.padtable th,
+.padtable td {
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.padtable thead th {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+.padtable .r {
+  text-align: right;
+}
+.selrow th,
+.selrow td {
+  background: var(--sel);
+}
+.cellbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.screen[data-layout='landscape'] .rows,
+.screen[data-layout='landscape'] .padrows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+/* ---- Market: price rows that open in place ------------------------------------ */
+
+.prows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.prow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 4px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.prow[aria-expanded='true'] {
+  border-bottom: 0;
+}
+.pcl small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.625rem;
+}
+.ppr {
+  text-align: right;
+}
+.up,
+.dn,
+.flat {
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.up {
+  color: var(--ok);
+}
+.dn {
+  color: var(--bad);
+}
+.flat {
+  color: var(--muted);
+}
+.expand {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+/* ---- The plan form with legs (mockup F) --------------------------------------- */
+
+.legcard {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+.leghead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.leghead > .linkbtn {
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+.chainitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.fchipon {
+  background: var(--text);
+  color: var(--frame);
+  border-color: var(--text);
+}
+.afterrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+.afterrow .seg {
+  min-width: 180px;
+}
+.afterrow > :last-child:not(.seg) {
+  margin-left: auto;
+}
+.planclose {
+  margin-left: auto;
+}
+
+/* ---- The PC game header at every PC width (900 px up) ------------------------ */
+
+/* The date block never wraps word by word: it keeps a minimum width and its lines end in an ellipsis. */
+.screen[data-layout='pc'] .topname {
+  flex: 1 1 150px;
+  min-width: 150px;
+}
+.screen[data-layout='pc'] .topdate,
+.screen[data-layout='pc'] .sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen[data-layout='pc'] .farmboxtext .fname {
+  max-width: 150px;
+}
+.screen[data-layout='pc'] .top > * {
+  flex-shrink: 0;
+}
+.screen[data-layout='pc'] .top > .topname {
+  flex-shrink: 1;
+}
+/* The skip chips' short labels are drawn only where the bar is narrow. */
+.tbshort,
+.tbhide {
+  display: none;
+}
+/*
+ * Where the header is tight, parts go in this order: the facts line, then the daylight labels,
+ * then a shorter daylight bar with short skip chips, and last a second row for the time controls.
+ */
+@media (max-width: 1365px) {
+  .screen[data-layout='pc'] .sub {
+    display: none;
+  }
+}
+@media (max-width: 1279px) {
+  .screen[data-layout='pc'] .dlnote {
+    display: none;
+  }
+  .screen[data-layout='pc'] .topdl {
+    width: 170px;
+  }
+  .screen[data-layout='pc'] .top {
+    gap: 10px;
+  }
+  .ptab {
+    font-size: 0.625rem;
+    padding: 7px 6px;
+  }
+}
+@media (max-width: 1180px) {
+  .screen[data-layout='pc'] .topdl {
+    width: 110px;
+  }
+  /* The tabs stay on one row: "Scores · Diary" is "Scores" here, with smaller padding. */
+  .ptablong {
+    display: none;
+  }
+  .ptabs {
+    gap: 0;
+    padding: 10px 6px;
+  }
+  .ptab {
+    padding: 7px 5px;
+  }
+  .screen[data-layout='pc'] .tblong {
+    display: none;
+  }
+  .screen[data-layout='pc'] .tbshort {
+    display: inline;
+  }
+}
+@media (max-width: 1023px) {
+  .screen[data-layout='pc'] .top {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .screen[data-layout='pc'] .toptimes {
+    order: 9;
+    flex-basis: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+/* The panel never takes the map below a usable size: at most 42% of the window. */
+.screen[data-layout='pc'] .side {
+  max-width: 42vw;
+}

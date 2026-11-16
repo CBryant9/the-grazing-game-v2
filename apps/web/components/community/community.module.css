@@ -1,0 +1,492 @@
+/* Community pages (milestone 4.2 and 4.3). 44 px targets, nothing wider than the phone, both themes (tokens from globals.css). */
+
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+}
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px var(--gutter) 48px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.main:focus {
+  outline: none;
+}
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.h2 {
+  margin: 0;
+  font-size: 1rem;
+  padding: 0;
+}
+.stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+}
+fieldset.card {
+  border: 1px solid var(--line);
+}
+.sub {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.label {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+.input {
+  min-height: var(--tap);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--input);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+}
+textarea.input {
+  resize: vertical;
+}
+.input:focus-visible,
+.namelink:focus-visible,
+.tab:focus-visible,
+.subitem:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+}
+.check input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.card :global(.btn),
+.row :global(.btn),
+.acts :global(.btn),
+.inline :global(.btn),
+.more :global(.btn),
+.person :global(.btn) {
+  min-height: var(--tap);
+}
+.err {
+  margin: 0;
+  color: var(--bad);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.ok {
+  margin: 0;
+  color: var(--ok);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.danger {
+  background: transparent;
+  color: var(--bad);
+  border: 1px solid var(--bad);
+}
+.actwrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.confirmtext {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.inline {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 0;
+}
+.empty {
+  margin: 0;
+  padding: 18px 14px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.more {
+  margin: 0;
+  text-align: center;
+}
+
+/* Navigation inside the community */
+.subnav,
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.subitem,
+.tab {
+  flex: none;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--panel);
+  font-size: 0.875rem;
+}
+.subon,
+.taboon {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+  font-weight: 700;
+}
+
+/* Posts */
+.post {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.phead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.pwho {
+  display: grid;
+  min-width: 0;
+}
+.avatar {
+  position: relative;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: inline-grid;
+  place-items: center;
+}
+.letter {
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.avatarimg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.namelink {
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  min-height: 24px;
+}
+.namelink:hover {
+  text-decoration: underline;
+}
+.handle,
+.when {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.linkline {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.linkline a {
+  color: var(--sky);
+}
+.removed,
+.pending {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--panel2);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+.photos {
+  display: grid;
+  gap: 8px;
+}
+.photo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: var(--panel2);
+}
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+.menu {
+  min-width: 0;
+}
+.menu summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+.menubody {
+  padding-top: 8px;
+}
+.factcard {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+.facttitle {
+  overflow-wrap: anywhere;
+}
+.facts {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+.fact dt {
+  color: var(--muted);
+}
+.fact dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.fact .line {
+  text-align: left;
+}
+.comments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.comment {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.reply {
+  margin-left: 16px;
+}
+
+/* People */
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.person {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.person .pwho {
+  flex: 1 1 140px;
+}
+.profilehead {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+.pname {
+  margin: 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.kv {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.kv div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.searchform {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.photoqueue {
+  display: grid;
+  gap: 8px;
+}
+.queueimg {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: var(--panel2);
+}
+
+/* Page headings in Anton, as the website pages (mockup H: 64 px on PC, 40 px on a phone). */
+h1.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+/* The feed page: one column on a phone. On PC, with ads on, the feed and a 340 px right column. */
+.cols,
+.feed,
+.side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.side:empty {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .main:has(.cols[data-side]) {
+    max-width: 1160px;
+  }
+  .cols[data-side] {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+  }
+  .cols[data-side] .side:empty {
+    display: grid;
+  }
+}

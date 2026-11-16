@@ -1,0 +1,689 @@
+/**
+ * One day on the farm.
+ *
+ * This is the MVP's stepDay, in the MVP's order (docs/MODEL.md, the day's
+ * order):
+ *
+ *   1. season and month factor; ground cover is read on the 1st of a month
+ *   2. crop events
+ *   3. grass growth
+ *   4. each mob in turn: wean the drop if it is due, then the mob eats,
+ *      gains or loses, breeds and may die (a mob made today by weaning goes
+ *      on the end and has its day too)
+ *   5. deaths are settled
+ *   6. portable troughs drain, hungry or thirsty mobs may push through tape,
+ *      and mobs that share an area join
+ *   7. running costs and interest
+ *   8. grazing plans move mobs (plans.ts), or on a night the moves are
+ *      left to the player (`plansByHand`), wait for them
+ *   9. the market moves and the day ends
+ *  10. the year closes every 365 days
+ *  11. game-over checks
+ *  12. the farm clock goes back to first light for the new day
+ *
+ * The tick changes the farm in place and returns what happened as events.
+ * It never stops a clock or opens a dialog: the screens decide that.
+ */
+
+import { dateAt, type CalendarDate } from '../calendar';
+import { calvingFinished, weanMob, weaningDue } from '../cattle/breeding';
+import { settleDeaths, simMob, type Death, type DeathCause, type MobPlace } from '../cattle/simMob';
+import { animalLookup, type AnimalKind } from '../cattle/types';
+import { plantingsOn, squareGrazed } from '../crops/fields';
+import { fieldTick } from '../crops/tick';
+import { HEALTH_COST_PER_HEAD_YEAR } from '../data/cattle';
+import { DISTRICTS } from '../data/districts';
+import { knockDownTape, type Survey } from '../farm/layout';
+import { EDGE, areaAcross, areaEdges } from '../farm/topology';
+import { drainPortables, waterNeedPerHead } from '../farm/water';
+import { GRID_N } from '../grid';
+import { bankLevel, headOnFarm } from '../money/bank';
+import { INTEREST, overheadsPerYear } from '../money/costs';
+import { closeYear, netWorth } from '../money/worth';
+import { growGrass } from '../pasture/grow';
+import { coverPct } from '../pasture/summary';
+import { rngFromState, rngStream, type Rng } from '../rng';
+import {
+  areaNameOf,
+  cropContextOf,
+  grazingArea,
+  keepSurvey,
+  landOf,
+  placeAnchor,
+  pricesOf,
+  realSourcesOf,
+  refreshSheepPrices,
+  seasonsOf,
+  stepMarket,
+  surveyOf,
+  type SourceEnv,
+} from './derived';
+import type { TickEvent } from './events';
+import { startDay } from './clock';
+import { markStocked } from './paddockfacts';
+import { autoWeanDest, mergeShared, newMob } from './mobs';
+import { holdPlans, runPlans, stopsToday } from './plans';
+import {
+  mergeSheepShared,
+  sheepAreas,
+  sheepDay,
+  sheepMobsOf,
+  sheepWaterLitres,
+} from '../sheep/farm';
+import type { SheepDeathCause } from '../sheep/notes';
+import { holdSheepPlans, runSheepPlans } from '../sheep/moves';
+import {
+  PLAY_STREAMS,
+  PRICE_HISTORY_DAYS,
+  toInbox,
+  type FarmMob,
+  type FarmState,
+  type YearRecord,
+  type PlayStream,
+} from './state';
+
+/** A mob must get this share of the pasture it wants, or it may push through tape. */
+export const BREAKOUT_FEED_SHARE = 0.85;
+/** A mob pushes through tape at most once in this many days. */
+export const BREAKOUT_COOLDOWN_DAYS = 21;
+/** The chance a day that a hungry mob, or a thirsty one, pushes through tape. */
+export const BREAKOUT_CHANCE = { hungry: 0.035, thirsty: 0.25 } as const;
+/** The chance is scaled by the mob's size: head / 20 + 0.3, up to 1.5. */
+export const BREAKOUT_SIZE = { headDivisor: 20, base: 0.3, max: 1.5 } as const;
+
+/** The farm counts as eaten out when the feed cattle can reach averages under this, kg DM/ha. */
+export const EATEN_OUT_KG = 40;
+/** Feed under this on a square, kg DM/ha, can't be grazed. Exported for the words (engine 0.22.0). */
+export const UNGRAZEABLE_KG = 250;
+/** The game ends after this many days in a row eaten out with cattle on the farm. */
+export const EATEN_OUT_DAYS = 10;
+
+/** What the tick can be given in place of the farm's own sources. For tests and later milestones. */
+export interface TickEnv extends SourceEnv {
+  /** Random streams, in place of the farm's saved ones. A stream given here is not saved back. */
+  rng?: Partial<Record<PlayStream, Rng>>;
+  /**
+   * A night when grazing plan moves are left to the player (a Daily Farm with no hand at work,
+   * PRD 5.15). Every plan stays live and counts the night in its report, but the tick moves no
+   * mob: a plan whose move is due waits for the player's `planMove`. A plan that moves several
+   * times a day grazes the day across the areas the mob was really moved through by hand
+   * (`stopsToday`), or where it is if it was not moved. Left out, the plans move as always.
+   */
+  plansByHand?: boolean;
+}
+
+export interface DayResult {
+  /** The farm day that was run. */
+  day: number;
+  /** The date the game reports for the day. On a real-year farm it is the real date. */
+  date: CalendarDate;
+  /** False when the game was already over and nothing ran. */
+  ran: boolean;
+  /** Everything that happened, in order. */
+  events: TickEvent[];
+  /** Every animal that died today. */
+  deaths: { id: number; kind: AnimalKind; mob: number; cause: DeathCause }[];
+  /** Every calf born today. */
+  births: { id: number; mob: number }[];
+  /** Sheep that died today, head by record, mob and cause. Left out on a farm with no sheep. */
+  sheepDeaths?: { id: number; mob: number; cause: SheepDeathCause; count: number }[];
+  /** Lambs born today, by record and mob. Left out on a farm with no sheep. */
+  lambs?: { id: number; mob: number; count: number }[];
+  /** The day's real rain, mm, from the weather table. Left out on a farm with random seasons. */
+  rainMm?: number;
+}
+
+/**
+ * Fences that sheep get through: the cattle fences (permanent, electric,
+ * tape), standing or knocked down (S48: a plain-wire fence that suits cattle
+ * "will not be adequate for sheep"). Netting, gates and the boundary hold
+ * them.
+ */
+const SHEEP_GET_THROUGH = [
+  EDGE.permanent,
+  EDGE.electric,
+  EDGE.tape,
+  EDGE.electricDown,
+  EDGE.tapeDown,
+] as const;
+
+/**
+ * Hungry or thirsty sheep mobs (the cattle rule: under 85% of the feed they
+ * want, or no water; the cattle chance and the cattle 21-day wait) get
+ * through one fence that does not hold sheep into the next area, and the
+ * fence stays standing. They never go where cattle graze (call, 15 Nov
+ * 2026): they take another fence, or stay put. Draws from the sheep's own
+ * stream, so the cattle's draws never move.
+ */
+function sheepBreakouts(farm: FarmState, survey: Survey, day: number, events: TickEvent[]): void {
+  const state = farm.sheep!;
+  const rng = rngFromState(state.rng.breakouts ?? rngStream(farm.seed, 'sheep:breakouts').state());
+  const cattleAreas = new Set<number>();
+  for (const m of farm.mobs) {
+    if (m.where.kind === 'paddock' && m.animals.length) {
+      cattleAreas.add(survey.topology.areaOf[m.where.anchor]!);
+    }
+  }
+  let moved = false;
+  for (const m of state.mobs) {
+    if (m.where.kind !== 'paddock' || !m.st || !m.sheep.length) continue;
+    const hungry = m.st.f < BREAKOUT_FEED_SHARE || m.dry > 0;
+    if (!hungry || day - (m.lastBreak ?? -99) < BREAKOUT_COOLDOWN_DAYS) continue;
+    const head = m.sheep.reduce((t, s) => t + s.n, 0);
+    const chance =
+      (m.dry > 0 ? BREAKOUT_CHANCE.thirsty : BREAKOUT_CHANCE.hungry) *
+      Math.min(BREAKOUT_SIZE.max, head / BREAKOUT_SIZE.headDivisor + BREAKOUT_SIZE.base);
+    if (rng.next() > chance) continue;
+    const areaId = survey.topology.areaOf[m.where.anchor]!;
+    const edges = areaEdges(survey.topology, farm.layout.fences, areaId, [
+      ...SHEEP_GET_THROUGH,
+    ]).filter((e) => {
+      const to = areaAcross(survey.topology, e, areaId);
+      return to >= 0 && !cattleAreas.has(to);
+    });
+    if (!edges.length) continue;
+    const edge = rng.pick(edges);
+    const to = areaAcross(survey.topology, edge, areaId);
+    m.where = { kind: 'paddock', anchor: placeAnchor(survey, to) };
+    m.lastBreak = day;
+    moved = true;
+    events.push({
+      type: 'sheep-breakout',
+      mob: m.id,
+      mobName: m.name,
+      reason: m.dry > 0 ? 'thirsty' : 'hungry',
+      edge,
+      from: survey.topology.areas[areaId]!.name,
+      to: survey.topology.areas[to]!.name,
+    });
+  }
+  state.rng.breakouts = rng.state();
+  if (moved) mergeSheepShared(farm, survey, events);
+}
+
+/**
+ * Where a mob spends today, as the cattle step sees it: the feedlot, the yards' square, or its
+ * area and the day's stops. `byHand`: plan moves are left to the player tonight (`TickEnv`).
+ */
+export function placeFor(farm: FarmState, survey: Survey, m: FarmMob, byHand = false): MobPlace {
+  if (m.where.kind === 'lot') return { kind: 'lot' };
+  if (m.where.kind === 'yards') {
+    // A stand-in until yard work is built (milestone 1.5): the yards have
+    // water, and stock held there graze only the square the yards are on.
+    return {
+      kind: 'paddock',
+      area: {
+        cells: [farm.buildings.yards],
+        ha: farm.layout.scale.haPerSquare,
+        hasWater: true,
+      },
+    };
+  }
+  const areaOf = survey.topology.areaOf;
+  const stops = stopsToday(farm, m, byHand);
+  return {
+    kind: 'paddock',
+    area: grazingArea(survey, areaOf[m.where.anchor]!),
+    shifts: stops ? stops.map((c) => grazingArea(survey, areaOf[c]!)) : undefined,
+  };
+}
+
+/** What the start of a day worked out, for the rest of the day. */
+export interface DayStart {
+  /** The farm's own calendar date for the day. */
+  date: CalendarDate;
+  factors: ReturnType<ReturnType<typeof seasonsOf>['factorsOn']>;
+  /** Sown pastures and crops as they stand today, or null. */
+  plantings: ReturnType<typeof plantingsOn>;
+}
+
+/**
+ * Steps 1 to 3 of the day: the season and month factor (and the ground
+ * cover on the 1st of a month), crop events, and grass growth. Changes the
+ * farm in place and adds the day's events. The supplement price read runs
+ * this on a copy, so it prices the day on the feed the cattle will graze.
+ */
+export function startOfDay(farm: FarmState, env: SourceEnv, events: TickEvent[]): DayStart {
+  const day = farm.day;
+  const date = dateAt(farm.start, day);
+  const district = DISTRICTS[farm.district];
+
+  // 1. Season and month factor.
+  const factors = seasonsOf(farm, env).factorsOn(day);
+  if (date.date === 1) {
+    if (date.month === 6 && day > 0) {
+      events.push({ type: 'new-season', label: factors.label, factor: factors.seasonF });
+    }
+    farm.year.covers.push(coverPct(farm.pasture));
+  }
+
+  // 2. Crop events.
+  const ctx = cropContextOf(farm);
+  for (const event of fieldTick(
+    farm.crops,
+    farm.pasture,
+    ctx,
+    day,
+    factors.monthF,
+    factors.seasonF,
+  )) {
+    events.push({ type: 'crop', event });
+  }
+
+  // 3. Grass growth.
+  const plantings = plantingsOn(farm.crops, day, factors.monthF, ctx);
+  farm.year.grown += growGrass(farm.pasture, {
+    district,
+    date,
+    seasonF: factors.seasonF,
+    monthF: factors.monthF,
+    plantings,
+    haPerSquare: farm.layout.scale.haPerSquare,
+  });
+  return { date, factors, plantings };
+}
+
+/** Run one day. Changes the farm in place. */
+export function stepDay(farm: FarmState, env: TickEnv = {}): DayResult {
+  // A real-year farm needs its real data. Without it this stops here,
+  // before anything on the farm has changed.
+  const real = realSourcesOf(farm, env);
+  const day = farm.day;
+  // The farm's own calendar. The grass, the crops and the water read their
+  // month and day from it. On a real-year farm it has the real date's
+  // month and day (docs/MODEL.md, section 1A, "The calendar").
+  const date = dateAt(farm.start, day);
+  const events: TickEvent[] = [];
+  const result: DayResult = {
+    day,
+    date: real ? real.plan.realDateOn(day) : date,
+    ran: false,
+    events,
+    deaths: [],
+    births: [],
+  };
+  if (farm.over) return result;
+  if (real) result.rainMm = real.seasons.rainOn(day);
+  // Real-year sheep prices for today (sheep may have come since the last day).
+  refreshSheepPrices(farm, env);
+  result.ran = true;
+
+  const stream = (name: PlayStream): Rng => env.rng?.[name] ?? rngFromState(farm.rng[name]);
+  const rng = {
+    breeding: stream('breeding'),
+    deaths: stream('deaths'),
+    breakouts: stream('breakouts'),
+    market: stream('market'),
+  };
+  const scale = farm.layout.scale;
+
+  // 1 to 3. Season and month factor, crop events, grass growth.
+  const { plantings } = startOfDay(farm, env, events);
+
+  // 4. Each mob's day.
+  let survey = surveyOf(farm);
+  const land = landOf(farm, survey, plantings);
+  const byId = animalLookup(farm.mobs);
+  const deaths: Death[] = [];
+  const healthPerHeadYear = HEALTH_COST_PER_HEAD_YEAR[farm.district];
+  for (let i = 0; i < farm.mobs.length; i++) {
+    const m = farm.mobs[i]!;
+    if (weaningDue(m, byId)) {
+      const calves = weanMob(m, byId);
+      const avgKg = Math.round(calves.reduce((s, c) => s + c.wt, 0) / calves.length);
+      const dest = autoWeanDest(farm, survey, plantings, m);
+      if (dest === null) {
+        events.push({
+          type: 'weaned',
+          mob: m.id,
+          mobName: m.name,
+          count: calves.length,
+          avgKg,
+          into: null,
+        });
+      } else {
+        const gone = new Set(calves.map((c) => c.id));
+        m.animals = m.animals.filter((a) => !gone.has(a.id));
+        const t = newMob(
+          farm,
+          { kind: 'paddock', anchor: dest },
+          'Weaners ' + farm.nextMobId,
+          m.supp,
+        );
+        t.animals = calves;
+        events.push({
+          type: 'weaned',
+          mob: m.id,
+          mobName: m.name,
+          count: calves.length,
+          avgKg,
+          into: { mob: t.id, mobName: t.name, where: t.where, area: areaNameOf(survey, t) },
+        });
+      }
+    }
+    // A mob on a plan: its animals' weights before the day, to work out the plan's gain.
+    // The old game summed each animal's gain inside the cattle step. The rebuild
+    // leaves the cattle step alone and reads the change in each animal's weight.
+    let weights: Map<number, number> | null = null;
+    if (m.plan && !m.plan.paused && m.where.kind === 'paddock') {
+      weights = new Map();
+      for (const a of m.animals) if (!a.dead) weights.set(a.id, a.wt);
+    }
+    const place = placeFor(farm, survey, m, env.plansByHand === true);
+    // Where stock spent the day, for the paddocks' rest days (a record only: m8, engine 0.21.0).
+    if (place.kind === 'paddock' && m.where.kind === 'paddock' && m.animals.length) {
+      markStocked(farm, place.area.cells, day);
+      for (const r of place.shifts ?? []) markStocked(farm, r.cells, day);
+    }
+    const res = simMob(m, {
+      place,
+      land,
+      day,
+      byId,
+      ids: farm.animalIds,
+      rng,
+      healthPerHeadYear,
+      totals: farm.year,
+    });
+    if (res.feedCost > 0) farm.cash -= res.feedCost;
+    // What a mob on a plan ate today goes in the plan's report, as in the old game.
+    if (m.plan && !m.plan.paused && m.where.kind === 'paddock' && m.st) {
+      m.plan.eatenKg += m.st.demand * m.st.f;
+      m.plan.headDays += m.st.n;
+      if (weights) {
+        let gain = 0;
+        for (const a of m.animals) {
+          const was = weights.get(a.id);
+          if (was !== undefined) gain += a.wt - was;
+        }
+        m.plan.gainKg += gain;
+      }
+    }
+    const area = areaNameOf(survey, m);
+    for (const note of res.notes) {
+      events.push({ type: 'cattle', mob: m.id, mobName: m.name, area, note });
+    }
+    for (const g of res.plantingGrazes) {
+      const event = squareGrazed(farm.crops, g.square, g.eaten, g.greenEaten, g.greenBefore, day);
+      if (event) events.push({ type: 'crop-grazed', mob: m.id, mobName: m.name, event });
+    }
+    if (res.births.length) {
+      events.push({ type: 'births', mob: m.id, mobName: m.name, count: res.births.length });
+      for (const c of res.births) result.births.push({ id: c.id, mob: m.id });
+    }
+    countCalving(m, day, res.births.length, events);
+    if (res.deaths.length) {
+      const by = new Map<DeathCause, number>();
+      for (const d of res.deaths) {
+        deaths.push(d);
+        by.set(d.cause, (by.get(d.cause) ?? 0) + 1);
+        result.deaths.push({ id: d.animal.id, kind: d.animal.kind, mob: m.id, cause: d.cause });
+      }
+      for (const [cause, count] of by) {
+        events.push({ type: 'deaths', mob: m.id, mobName: m.name, cause, count });
+      }
+    }
+  }
+
+  // 5. Deaths are settled.
+  settleDeaths(farm.mobs, deaths, byId, farm.year);
+  // The areas a mob was moved through by hand today have been grazed: the record clears at the night.
+  for (const m of farm.mobs) if (m.plan?.handStops) delete m.plan.handStops;
+
+  // 4b and 5b. The sheep's day, on the same pasture, and their deaths settled.
+  // A farm that has never had sheep skips this and is unchanged.
+  if (farm.sheep) {
+    for (const sm of farm.sheep.mobs) {
+      if (sm.where.kind !== 'paddock' || !sm.sheep.length) continue;
+      const areaId = survey.topology.areaOf[sm.where.anchor]!;
+      markStocked(farm, survey.topology.areas[areaId]!.cells, day);
+    }
+    const sd = sheepDay(farm, survey, land, date, events);
+    result.sheepDeaths = sd.deaths;
+    result.lambs = sd.births;
+  }
+
+  // 6. Water use, breakouts and mobs joining.
+  if (farm.layout.water.ports.length) {
+    const areaOf = survey.topology.areaOf;
+    const need = (areaId: number): number => {
+      let litres = 0;
+      for (const mb of farm.mobs) {
+        if (mb.where.kind !== 'paddock' || areaOf[mb.where.anchor] !== areaId) continue;
+        for (const a of mb.animals) litres += waterNeedPerHead(a.wt, date.month);
+      }
+      for (const sm of sheepMobsOf(farm)) {
+        if (sm.where.kind === 'paddock' && areaOf[sm.where.anchor] === areaId) {
+          litres += sheepWaterLitres(sm, date.month);
+        }
+      }
+      return litres;
+    };
+    const drained = drainPortables(farm.layout.water, survey.topology, survey.points, need);
+    farm.layout = { ...farm.layout, water: drained.water };
+    for (const event of drained.events) {
+      events.push({
+        type: 'water',
+        event,
+        paddock: survey.topology.paddocks[survey.topology.paddockOf[event.cell]!]!.name,
+      });
+    }
+    if (drained.changed) {
+      survey = surveyOf(farm);
+      mergeShared(farm, survey, events);
+      mergeSheepShared(farm, survey, events);
+    } else keepSurvey(farm.layout, survey);
+  }
+
+  // Hungry or thirsty mobs push through temporary tape, one segment at a
+  // time. Permanent and electric fences hold. The areas are the ones from
+  // before today's breakouts.
+  let brokeOut = false;
+  for (const m of farm.mobs) {
+    if (m.where.kind !== 'paddock' || !m.st || !m.animals.length) continue;
+    const hungry = m.st.f < BREAKOUT_FEED_SHARE || m.dry > 0;
+    if (!hungry || day - (m.lastBreak ?? -99) < BREAKOUT_COOLDOWN_DAYS) continue;
+    const chance =
+      (m.dry > 0 ? BREAKOUT_CHANCE.thirsty : BREAKOUT_CHANCE.hungry) *
+      Math.min(
+        BREAKOUT_SIZE.max,
+        m.animals.length / BREAKOUT_SIZE.headDivisor + BREAKOUT_SIZE.base,
+      );
+    if (rng.breakouts.next() > chance) continue;
+    const areaId = survey.topology.areaOf[m.where.anchor]!;
+    let edges = areaEdges(survey.topology, farm.layout.fences, areaId, [EDGE.tape]);
+    // Cattle never push into a paddock that holds sheep: they take another
+    // tape, or stay put if every one leads to sheep (call, 15 Nov 2026). A
+    // farm with no sheep draws exactly as before.
+    if (farm.sheep && edges.length) {
+      const withSheep = sheepAreas(farm, survey);
+      if (withSheep.size) {
+        edges = edges.filter((e) => !withSheep.has(areaAcross(survey.topology, e, areaId)));
+      }
+    }
+    if (!edges.length) continue;
+    const edge = rng.breakouts.pick(edges);
+    const down = knockDownTape(farm.layout, edge);
+    if (!down.ok) continue;
+    farm.layout = down.layout;
+    brokeOut = true;
+    m.lastBreak = day;
+    events.push({
+      type: 'breakout',
+      mob: m.id,
+      mobName: m.name,
+      reason: m.dry > 0 ? 'thirsty' : 'hungry',
+      edge,
+      area: survey.topology.areas[areaId]!.name,
+    });
+  }
+  if (brokeOut) survey = surveyOf(farm);
+  // Hungry or thirsty sheep get through fences that do not hold sheep. A farm
+  // with no sheep skips this.
+  if (farm.sheep) sheepBreakouts(farm, survey, day, events);
+  mergeShared(farm, survey, events);
+  mergeSheepShared(farm, survey, events);
+
+  // 7. Running costs and interest.
+  let head = 0;
+  for (const m of farm.mobs) head += m.animals.length;
+  const run = overheadsPerYear(scale.farmHa) / 365 + (head * healthPerHeadYear) / 365;
+  const interest =
+    farm.cash < 0 ? (farm.cash * INTEREST.overdraft) / 365 : (farm.cash * INTEREST.credit) / 365;
+  farm.cash -= run;
+  farm.cash += interest;
+  farm.year.running += run;
+  farm.year.interest += interest;
+
+  // 8. Grazing plans move mobs here. Each move takes the move time off today's light.
+  // On a night when the moves are left to the player, nothing moves and the plans stay live.
+  if (env.plansByHand) {
+    holdPlans(farm, survey, events);
+    if (farm.sheep) holdSheepPlans(farm, survey, events);
+  } else {
+    runPlans(farm, survey, landOf(farm, survey, plantings), events);
+    // 8b. Sheep plans, on a farm with sheep.
+    if (farm.sheep) runSheepPlans(farm, survey, landOf(farm, survey, plantings), events);
+  }
+
+  // 9. The market moves and the day ends.
+  farm.day++;
+  farm.mobs = farm.mobs.filter((m) => m.animals.length);
+  // On a real-year farm the year closes when the game year ends, so each
+  // score year is one real year, 365 or 366 days long. It closes on its own
+  // last prices, before the market moves: the next day can belong to any
+  // real year (years at random, or back to 1997 after the newest), and its
+  // prices must not land in this year's score.
+  const realYearEnds =
+    real !== null && real.plan.gameYearOn(farm.day) !== real.plan.gameYearOn(day);
+  let closed: YearRecord | null = null;
+  if (real && realYearEnds) {
+    closed = closeYear(farm);
+    closed.realYear = real.plan.yearAt(real.plan.gameYearOn(day));
+  }
+  stepMarket(farm, env, farm.day, rng.market);
+  refreshSheepPrices(farm, env);
+  farm.priceHistory.push({ day: farm.day, c: { ...pricesOf(farm).classes } });
+  if (farm.priceHistory.length > PRICE_HISTORY_DAYS) farm.priceHistory.shift();
+  // The new real year opens on its own first day's prices, so the step in
+  // prices between two real years is in neither year's score.
+  if (closed) farm.year.worth0 = netWorth(farm);
+
+  // 10. The year closes. With random seasons that is every 365 days, on the
+  // new day's prices, as in the MVP.
+  if (closed) events.push({ type: 'year-end', year: closed });
+  else if (!real && farm.day % 365 === 0) {
+    events.push({ type: 'year-end', year: closeYear(farm) });
+  }
+
+  // 10b. The bank facts (engine 0.20.0): told once when cash goes below
+  // zero, and once when it passes three quarters of the way to the limit.
+  // Facts only. Nothing about money changes.
+  noteBank(farm, events);
+
+  // 11. Game over: the bank's limit, or the whole farm eaten out for 10
+  // days with cattle still on it.
+  if (farm.cash <= farm.broke) {
+    farm.over = { reason: 'bank', day: farm.day };
+    events.push({ type: 'game-over', reason: 'bank' });
+  }
+  let onPasture = 0;
+  for (const m of farm.mobs) if (m.where.kind === 'paddock') onPasture += m.animals.length;
+  for (const m of sheepMobsOf(farm)) if (m.where.kind === 'paddock') onPasture += m.sheep.length;
+  if (onPasture && !farm.over) {
+    const { G, D } = farm.pasture;
+    let av = 0;
+    for (let i = 0; i < GRID_N; i++) av += Math.max(0, G[i]! + D[i]! - UNGRAZEABLE_KG);
+    if (av / GRID_N < EATEN_OUT_KG) {
+      farm.noFeedDays++;
+      if (farm.noFeedDays === 1) {
+        events.push({ type: 'out-of-feed', daysLeft: EATEN_OUT_DAYS - 1 });
+      }
+    } else farm.noFeedDays = 0;
+    if (farm.noFeedDays >= EATEN_OUT_DAYS) {
+      farm.over = { reason: 'feed', day: farm.day };
+      events.push({ type: 'game-over', reason: 'feed' });
+    }
+  } else farm.noFeedDays = 0;
+
+  // Save the random streams the farm owns.
+  for (const name of Object.keys(PLAY_STREAMS) as PlayStream[]) {
+    if (name in rng && !env.rng?.[name]) {
+      farm.rng[name] = rng[name as keyof typeof rng].state();
+    }
+  }
+  // A day's births are told in the day's own summary and day card; the inbox has the weekly
+  // calving lines instead (engine 0.22.0), so a calving does not fill it one calf at a time.
+  toInbox(
+    farm,
+    day,
+    events.filter((e) => e.type !== 'births'),
+  );
+  // The new day starts at first light, with all of the day's light left.
+  startDay(farm);
+  return result;
+}
+
+/**
+ * Tell the player, once, when cash goes below zero and when it passes three
+ * quarters of the way to the bank's limit. A farm the bank takes today is
+ * told that instead. When cash comes back up the mark falls back with it,
+ * so the next fall is told again.
+ */
+function noteBank(farm: FarmState, events: TickEvent[]): void {
+  const level = bankLevel(farm);
+  const told = farm.bankWarned ?? 0;
+  if (level > told && farm.cash > farm.broke) {
+    events.push({
+      type: 'bank',
+      level: level as 1 | 2,
+      cash: farm.cash,
+      limit: farm.broke,
+      head: headOnFarm(farm),
+    });
+  }
+  if (level !== told) {
+    if (level === 0) delete farm.bankWarned;
+    else farm.bankWarned = level;
+  }
+}
+
+/** A week of calving, for the weekly line: days 0 to 6 of the drop, then 7 to 13, and so on. */
+export const CALVING_WEEK_DAYS = 7;
+
+/**
+ * Keep the count for the weekly calving lines and tell them (engine 0.22.0): once a week through
+ * a drop, the calves born in the week and so far, and once when calving has finished
+ * (`calvingFinished`). Calving starting is the mob's own `calvingStarted` note. A record for the
+ * words only: no rule reads it.
+ */
+function countCalving(m: FarmMob, day: number, born: number, events: TickEvent[]): void {
+  if (m.calvNote === null || m.calvNote === undefined) return;
+  let c = m.calving;
+  if (!c || c.start !== m.calvNote) {
+    // A new drop. On a farm saved mid-drop before this was kept, the drop's calves at foot so far.
+    const since = day - m.calvNote;
+    let atFoot = 0;
+    for (const a of m.animals) if (a.kind === 'calf' && !a.dead && a.age <= since) atFoot++;
+    const before = Math.max(0, atFoot - born);
+    c = m.calving = { start: m.calvNote, born: before, week: before };
+    // A drop that had already finished before the count was kept is not told again.
+    if (since > 0 && born === 0 && calvingFinished(m, day)) {
+      c.done = true;
+      c.week = 0;
+    }
+  }
+  c.born += born;
+  c.week += born;
+  if (c.done) return;
+  if (calvingFinished(m, day)) {
+    events.push({ type: 'calving-finished', mob: m.id, mobName: m.name, total: c.born });
+    c.done = true;
+    c.week = 0;
+    return;
+  }
+  if ((day - c.start + 1) % CALVING_WEEK_DAYS === 0 && c.week > 0) {
+    events.push({ type: 'calving-week', mob: m.id, mobName: m.name, born: c.week, total: c.born });
+    c.week = 0;
+  }
+}

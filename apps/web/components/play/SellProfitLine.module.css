@@ -1,0 +1,30 @@
+/* The money line on a Sell row (mockup C). Design tokens only. */
+
+.line {
+  margin: 3px 0;
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.up {
+  color: var(--ok);
+}
+
+.down {
+  color: var(--bad);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

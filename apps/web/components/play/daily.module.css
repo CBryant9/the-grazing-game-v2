@@ -1,0 +1,101 @@
+/* Daily Farm (milestone 3.3): the mode tag, the day's clock, the catch-up, the plan card and strip. */
+
+.mode {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 1.6;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.modedaily {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+.time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+}
+.ends {
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+.marked {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.awayday {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.waiting {
+  position: absolute;
+  z-index: 20;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  max-width: 360px;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.plancard,
+.planstrip {
+  position: absolute;
+  z-index: 25;
+  left: 8px;
+  bottom: 10px;
+  width: min(360px, calc(100% - 16px));
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 2px solid var(--accent-line);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.plancard p {
+  margin: 0;
+}
+.ask {
+  color: var(--muted);
+}
+.cardbtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.striprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

@@ -1,0 +1,651 @@
+/**
+ * What happened on a farm, as data.
+ *
+ * The engine never writes a diary line, opens a dialog or stops the clock.
+ * The daily tick and the actions return these events, in the order things
+ * happened, and the screens decide the wording and what stops a skip. Events
+ * state facts and figures only, never a judgement.
+ */
+
+import type { CattleNote, GainForecast } from '../cattle/notes';
+import type { DeathCause } from '../cattle/simMob';
+import type { CropRisk, GrazeDamageEvent } from '../crops/fields';
+import type { CropEvent } from '../crops/tick';
+import type { SaleClassId } from '../data/cattle';
+import type { Supplement } from '../data/feed';
+import type { SpeciesId } from '../data/species';
+import type { StartImprovements } from '../farm/generate';
+import type { EdgeRef } from '../farm/topology';
+import type { WaterEvent } from '../farm/water';
+import type { ActionType } from '../actions/types';
+import type { CalendarDate } from '../calendar';
+import type { SheepFeed } from '../data/sheep';
+import type { SheepDeathCause, SheepNote } from '../sheep/notes';
+import type { GameOverReason, MobWhere, PlanWaitReason, YearRecord } from './state';
+
+/** Where a mob is, with the grazing area's name when it is on pasture. */
+export interface MobPlaceNote {
+  where: MobWhere;
+  /** "Paddock 3", or "Paddocks 1 + 2" where open gates join them. Null off pasture. */
+  area: string | null;
+}
+
+/** What a plan has done so far: facts only. */
+export interface PlanReport {
+  /** Days since the plan was set. */
+  days: number;
+  moves: number;
+  /** Full rounds made. */
+  rounds: number;
+  /** Feed the mob ate in the paddock while on the plan, kg DM. */
+  eatenKg: number;
+  /** Live weight the mob's animals gained while on the plan, kg (the change in each animal's weight over the day, summed). */
+  gainKg: number;
+  /** Head-days on the plan: each day, the head in the mob (calves not counted). */
+  headDays: number;
+}
+
+/** Events from the daily tick. */
+export type TickEvent =
+  /** A new season was drawn (1 July). `factor` is growth as a multiple of a normal season. */
+  | { type: 'new-season'; label: string; factor: number }
+  /** A planting moved on: established, lock-up soon, harvest ready, shedding, finished, a sowing window. */
+  | { type: 'crop'; event: CropEvent }
+  /** Stock grazed a planting at a time that costs stand or grain. */
+  | { type: 'crop-grazed'; mob: number; mobName: string; event: GrazeDamageEvent }
+  /** A note from a mob's day: no water, short of feed, losing weight (with why), joining, preg test. */
+  | { type: 'cattle'; mob: number; mobName: string; area: string | null; note: CattleNote }
+  /**
+   * A drop of calves was weaned. `into` is the new mob they went to, or
+   * null when there was no other area with water and they stayed.
+   */
+  | {
+      type: 'weaned';
+      mob: number;
+      mobName: string;
+      count: number;
+      avgKg: number;
+      into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
+    }
+  | { type: 'births'; mob: number; mobName: string; count: number }
+  /**
+   * Calving in a mob, told once a week through the drop (engine 0.22.0): the calves born in the
+   * week just gone (`born`) and in the drop so far (`total`). A week with no births is not told.
+   * Calves lost at birth are their own facts (`calfLostAtBirth`) and are not counted here.
+   */
+  | { type: 'calving-week'; mob: number; mobName: string; born: number; total: number }
+  /** Calving in a mob's drop has finished: no cow or heifer in the mob is due before the drop ends. */
+  | { type: 'calving-finished'; mob: number; mobName: string; total: number }
+  /** Cattle that died today in one mob of one cause. */
+  | { type: 'deaths'; mob: number; mobName: string; cause: DeathCause; count: number }
+  /** A portable trough is low or empty. */
+  | { type: 'water'; event: WaterEvent; paddock: string }
+  /** A hungry or thirsty mob pushed through one segment of tape. */
+  | {
+      type: 'breakout';
+      mob: number;
+      mobName: string;
+      reason: 'hungry' | 'thirsty';
+      edge: EdgeRef;
+      area: string;
+    }
+  /** A note from a sheep mob's day: no water, short of feed, joining, scanning, lambing, marking, flystrike. */
+  | { type: 'sheep'; mob: number; mobName: string; area: string | null; note: SheepNote }
+  /** Lambs born today in one sheep mob. */
+  | { type: 'lambs-born'; mob: number; mobName: string; count: number }
+  /** Sheep that died today in one sheep mob of one cause. */
+  | { type: 'sheep-deaths'; mob: number; mobName: string; cause: SheepDeathCause; count: number }
+  /**
+   * A sheep mob's lambs were weaned. `into` is the new mob they went to, or
+   * null when there was no other empty area with water and they stayed.
+   */
+  | {
+      type: 'sheep-weaned';
+      mob: number;
+      mobName: string;
+      count: number;
+      avgKg: number;
+      into: ({ mob: number; mobName: string } & MobPlaceNote) | null;
+    }
+  /**
+   * Contractors shore a sheep mob (on its shearing day, by themselves): head
+   * shorn, the wool (clean and greasy kg, micron, months of wool), what it
+   * sold for at the stand-in price and the contractors' cost, dollars.
+   */
+  | {
+      type: 'sheep-shorn';
+      mob: number;
+      mobName: string;
+      head: number;
+      cleanKg: number;
+      greasyKg: number;
+      micron: number;
+      months: number;
+      woolIncome: number;
+      cost: number;
+    }
+  /** Contractors crutched a sheep mob: head and cost, dollars. */
+  | { type: 'sheep-crutched'; mob: number; mobName: string; head: number; cost: number }
+  /** Sheep bought (`buySheep`): the class, head, dollars paid with the head fee, and the mob. */
+  | {
+      type: 'sheep-bought';
+      cls: string;
+      qty: number;
+      total: number;
+      mob: number;
+      mobName: string;
+    }
+  /** Sheep sold (`sellSheep`): head, lambs at foot that went with their ewes, average kg, dollars banked. */
+  | {
+      type: 'sheep-sold';
+      mob: number;
+      mobName: string;
+      head: number;
+      lambsAtFoot: number;
+      avgKg: number;
+      net: number;
+    }
+  /**
+   * Hungry or thirsty sheep got through a fence that does not hold sheep
+   * into the next area (`edge`), from `from` to `to` (area names).
+   */
+  | {
+      type: 'sheep-breakout';
+      mob: number;
+      mobName: string;
+      reason: 'hungry' | 'thirsty';
+      edge: EdgeRef;
+      from: string;
+      to: string;
+    }
+  /** Sheep were moved by hand to an area: the mob they are in there, and the head moved. */
+  | { type: 'sheep-moved'; mob: number; mobName: string; head: number; area: string }
+  /**
+   * A sheep mob was put on a plan (with the stops that have no water, as the
+   * cattle `plan-set` gives them), or taken off one, or finished one; or
+   * its plan was paused (by asking) or resumed at a step.
+   */
+  | { type: 'sheep-plan-set'; mob: number; mobName: string; template: number; dryAreas: string[] }
+  | { type: 'sheep-plan-paused'; mob: number; mobName: string; template: number; step: number }
+  | {
+      type: 'sheep-plan-resumed';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      area: string;
+    }
+  | { type: 'sheep-plan-cleared'; mob: number; mobName: string }
+  | { type: 'sheep-plan-finished'; mob: number; mobName: string }
+  /** A sheep plan's next stop has no water, or cattle in it: the plan waits (told once a stop). */
+  | { type: 'sheep-plan-waiting'; mob: number; mobName: string; why: PlanWaitReason; area: string }
+  /** A sheep plan moved its mob on. */
+  | { type: 'sheep-plan-moved'; mob: number; mobName: string; from: string; to: string }
+  /** Sheep bought on a sale day, on their way to the yards (they land at first light on `arriveDay`). */
+  | { type: 'sheep-on-the-way'; cls: string; qty: number; total: number; arriveDay: number }
+  /** Sheep bought landed in the stock yards. */
+  | { type: 'sheep-arrived'; cls: string; head: number; cost: number; mob: number; mobName: string }
+  /** A sheep mob's feed was set. */
+  | { type: 'sheep-feed-set'; mob: number; mobName: string; feed: SheepFeed }
+  /** A sheep mob's joining, shearing and crutching days, as they now stand (null: not booked). */
+  | {
+      type: 'sheep-dates-set';
+      mob: number;
+      mobName: string;
+      joinOn: { month: number; date: number };
+      shearOn: { month: number; date: number } | null;
+      crutchOn: { month: number; date: number } | null;
+    }
+  /** Two mobs that share a grazing area, the feedlot or the yards now run as one. */
+  | {
+      type: 'mobs-joined';
+      from: number;
+      fromName: string;
+      into: number;
+      intoName: string;
+      area: string | null;
+    }
+  /**
+   * A grazing plan moved a mob on (docs/MODEL.md, section 10). `leg` and
+   * `stop` are where the mob is now, and `step` counts the stops from the
+   * first stop of the first leg. `because` is the rule that moved it: `days`
+   * (the days on the stop were up), `kg` (grazed down to the plan's figure,
+   * `massKgHa` is what was left) or `max-days` (the day limit, with
+   * `massKgHa` still there).
+   */
+  | {
+      type: 'plan-moved';
+      mob: number;
+      mobName: string;
+      template: number;
+      templateName: string;
+      from: string | null;
+      to: string;
+      cell: number;
+      leg: number;
+      stop: number;
+      step: number;
+      because: 'days' | 'kg' | 'max-days';
+      massKgHa: number | null;
+      /** How many moves the rule makes in a day: 1, or more for a rule under a day. */
+      movesADay: number;
+      head: number;
+      /** This move finished a round of its leg, started a leg, or went back to the start of the plan. */
+      roundDone: boolean;
+      legStarted: number | null;
+      restarted: boolean;
+      /** Full rounds and moves so far on this plan. */
+      rounds: number;
+      moves: number;
+      /** For a plan that moves once a day or less: the classes expected to lose weight in the new area, and why. */
+      losing: GainForecast[];
+    }
+  /**
+   * A plan could not move a mob. Said once for each stop the plan is
+   * waiting for. `why`: `no-water` (the area has no water). The mob stays where it is and the plan tries
+   * again each day.
+   */
+  | {
+      type: 'plan-waiting';
+      mob: number;
+      mobName: string;
+      template: number;
+      why: PlanWaitReason;
+      /** The area the plan wants the mob in. */
+      area: string;
+      cell: number;
+      step: number;
+    }
+  /** A mob on a "grazed down to" plan is still in its area. Said once a week. */
+  | {
+      type: 'plan-staying';
+      mob: number;
+      mobName: string;
+      area: string | null;
+      days: number;
+      massKgHa: number;
+      moveAtKg: number;
+    }
+  /** A plan finished its rounds. The mob stays where it is. */
+  | {
+      type: 'plan-finished';
+      mob: number;
+      mobName: string;
+      area: string | null;
+      report: PlanReport;
+    }
+  /** A year closed. */
+  | { type: 'year-end'; year: YearRecord }
+  /** The whole farm is eaten out with cattle on it. The game ends after `daysLeft` more days of this. */
+  | { type: 'out-of-feed'; daysLeft: number }
+  /**
+   * Cash went below zero (`level` 1), or past three quarters of the way to
+   * the bank's limit (`level` 2), for the first time since it was last
+   * above that mark. `limit` is where the bank takes the farm (negative
+   * dollars). `head` is the head on the farm (`headOnFarm`).
+   */
+  | { type: 'bank'; level: 1 | 2; cash: number; limit: number; head: number }
+  | { type: 'game-over'; reason: GameOverReason };
+
+/** Events from the player's actions. */
+export type ActionEvent =
+  | {
+      type: 'cattle-bought';
+      cls: SaleClassId;
+      qty: number;
+      /** Dollars, freight included. */
+      total: number;
+      /** The young cattle indicator on the day, c/kg. */
+      indicator: number;
+      mob: number;
+      mobName: string;
+    }
+  /**
+   * Cattle bought on a sale day. They are paid for and on their way. They
+   * land in the yards at first light on `arriveDay`.
+   */
+  | {
+      type: 'cattle-on-the-way';
+      cls: SaleClassId;
+      qty: number;
+      /** Dollars, freight included. */
+      total: number;
+      /** The young cattle indicator on the day, c/kg. */
+      indicator: number;
+      arriveDay: number;
+      arriveDate: CalendarDate;
+    }
+  /** Stock booked onto the next sale. Nothing is paid until that day. */
+  | {
+      type: 'sale-booked';
+      /** Head booked, not counting calves at foot. */
+      head: number;
+      calvesAtFoot: number;
+      saleDay: number;
+      saleDate: CalendarDate;
+      daysAway: number;
+    }
+  /** Stock taken off a sale. */
+  | { type: 'sale-cancelled'; head: number; saleDay: number; saleDate: CalendarDate }
+  | {
+      type: 'cattle-sold';
+      /** True for stock sold at first light on the sale day they were booked onto. */
+      booked?: true;
+      /** Head sold, not counting calves at foot. */
+      head: number;
+      /** Calves that went with their mothers. */
+      calvesAtFoot: number;
+      avgKg: number;
+      /** Dollars banked, after commission and freight. */
+      net: number;
+      /** `net` less what the cattle have cost. */
+      profit: number;
+    }
+  | ({
+      type: 'mob-moved';
+      mob: number;
+      mobName: string;
+      head: number;
+      /**
+       * The time of day the mob arrived, in minutes after midnight on the
+       * district town's clock. Left out for a move done without the farm
+       * clock (calibration and tests).
+       */
+      at?: number;
+    } & MobPlaceNote)
+  /** The area a mob was put in has no water. Everything dies on day 4 without water. */
+  | { type: 'no-water'; mob: number; mobName: string; area: string }
+  /** What stock will meet on the area they were put in: a crop not ready to graze, stubble, a mixed paddock. */
+  | { type: 'crop-risks'; mob: number; mobName: string; area: string; risks: CropRisk[] }
+  /** A new fence or a shut gate divided a mob. Each part is now its own mob. */
+  | {
+      type: 'mob-split';
+      mob: number;
+      mobName: string;
+      parts: { mob: number; mobName: string; area: string; head: number }[];
+    }
+  | { type: 'supplement-set'; mob: number; mobName: string; supp: Supplement }
+  /**
+   * A mob was put on a plan at a step. `dryAreas` are the areas in the plan
+   * that have no water now. `changed` is true when an existing template was
+   * changed rather than made.
+   */
+  | {
+      type: 'plan-set';
+      mob: number;
+      mobName: string;
+      template: number;
+      templateName: string;
+      changed: boolean;
+      step: number;
+      steps: number;
+      area: string | null;
+      dryAreas: string[];
+      /**
+       * Stops that hold another mob now: the area, and that mob's name and
+       * head. The plan will join the two mobs when it moves in, as the old
+       * game did. A screen can warn before the player commits.
+       */
+      joins: { area: string; mob: number; mobName: string; head: number }[];
+    }
+  /** A plan was paused, because the player asked or because they moved the mob by hand. */
+  | {
+      type: 'plan-paused';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      because: 'asked' | 'manual-move';
+    }
+  /** A paused plan was started again at a step. */
+  | {
+      type: 'plan-resumed';
+      mob: number;
+      mobName: string;
+      template: number;
+      step: number;
+      area: string | null;
+      /** Stops that hold another mob now, as for `plan-set`. */
+      joins: { area: string; mob: number; mobName: string; head: number }[];
+    }
+  /** A mob was taken off its plan. The template stays. */
+  | {
+      type: 'plan-cleared';
+      mob: number;
+      mobName: string;
+      template: number;
+      because: 'asked' | 'to-lot';
+      report: PlanReport;
+    }
+  | { type: 'calves-marked'; mob: number; mobName: string; count: number; cost: number }
+  /** A change to fences, gates or water. `detail` holds the lengths and counts. */
+  | {
+      type: 'layout-job';
+      job: string;
+      /** Dollars spent. Negative for money back. */
+      cost: number;
+      detail: Record<string, number | boolean | string>;
+    }
+  | {
+      type: 'sown';
+      sp: SpeciesId;
+      fieldId: number;
+      ha: number;
+      /** Pasture turned into cropping country first, ha. */
+      convHa: number;
+      cost: number;
+      /** Squares asked for that could not take it. */
+      skipped: number;
+    }
+  /** A thing to do was put away by the player. `key` is its `todoKey`. */
+  | { type: 'todo-dismissed'; key: string }
+  | {
+      type: 'harvested';
+      sp: SpeciesId;
+      fieldId: number;
+      /** Tonnes of grain, and tonnes per hectare. */
+      t: number;
+      tha: number;
+      value: number;
+      cost: number;
+    }
+  | WorkEvent;
+
+/**
+ * Events from the start of a farm day, before the player can act: cattle
+ * landing in the yards. A booked sale reports as a `cattle-sold` event with
+ * `booked: true`.
+ */
+export type DawnEvent = {
+  type: 'cattle-arrived';
+  cls: SaleClassId;
+  /** Head, not counting calves at foot. */
+  head: number;
+  calves: number;
+  /** Dollars paid, freight included. */
+  cost: number;
+  /** The mob in the yards they are in now. */
+  mob: number;
+  mobName: string;
+  /** True when they joined a mob that was already in the yards. */
+  joined: boolean;
+};
+
+/** Events from the working day. */
+export type WorkEvent =
+  /**
+   * Time was spent on a job. Times of day are minutes after midnight on the
+   * district town's clock. It comes first, ahead of the events for what
+   * the work did.
+   */
+  {
+    type: 'job-worked';
+    action: ActionType;
+    start: number;
+    end: number;
+    workMin: number;
+    /** True if all that was asked for was done. False for a line cut short by the light. */
+    finished: boolean;
+    /** For fence, tape and pipe: the pieces built, and the pieces that did not fit today. */
+    pieces?: { built: number; notBuilt: number };
+    /** Minutes of the job's work the farm's hands did from their own day. Left out when no hand helped. */
+    handsMin?: number;
+  };
+
+/** The herd a running farm starts with. */
+export interface StartHerd {
+  cows: number;
+  bulls: number;
+  weaners: number;
+  /** The herd's size, AE, and its share of the long-term carrying capacity (0 to 1). */
+  ae: number;
+  share: number;
+}
+
+/** What a new farm came with. The first message in every inbox. */
+export interface FarmStarted {
+  type: 'farm-started';
+  farmHa: number;
+  /** Metres along one side of a map square. */
+  sideM: number;
+  cash: number;
+  overdraft: number;
+  broke: number;
+  /** Fence, gates, troughs and pipe that came with the farm, in segments and counts. */
+  improvements: StartImprovements;
+  herd: StartHerd | null;
+  /** A running sheep or mixed farm's start flock (milestone 2.4). Left out otherwise. */
+  flock?: { ewes: number; rams: number; dse: number; share: number };
+  /** The season on day 0, and its growth as a multiple of a normal season. */
+  season: { label: string; factor: number };
+}
+
+/** Why a hand left the farm. */
+export type HandLeftWhy =
+  /** The player let them go. */
+  | 'let-go'
+  /** Their contract came to its end. */
+  | 'contract-finished'
+  /** Their wages could not be paid on pay day. */
+  | 'not-paid';
+
+/** What a hand did by themselves, as a standing duty, on a day they worked. */
+export type HandDuty =
+  /** Filled a portable trough that was under its low-water mark. */
+  | { type: 'refill-trough'; port: number; cell: number; cost: number }
+  /** Put a knocked-down electric fence or tape back up. */
+  | { type: 'fix-fence'; edge: EdgeRef; cost: number };
+
+/** Why contract fencing stopped before it was done. */
+export type ContractStopWhy =
+  /** The bank would not cover the day's work. */
+  | 'no-money'
+  /** A segment still to build has a different fence on it from when the run was ordered. */
+  | 'line-changed';
+
+/**
+ * The workforce: farm hands and contractor fencing (milestones 2.1 and
+ * 2.2). Facts only. People are described by what they do, their days and
+ * their pay, never by a judgement.
+ */
+export type LabourEvent =
+  | {
+      type: 'hand-hired';
+      hand: number;
+      name: string;
+      kind: 'casual' | 'contract' | 'salaried';
+      /** Dollars before super: a week for a salaried hand, a day worked otherwise. */
+      rate: number;
+      startDay: number;
+      /** The farm day a contract ends, or null. */
+      endDay: number | null;
+    }
+  | {
+      type: 'hand-left';
+      hand: number;
+      name: string;
+      why: HandLeftWhy;
+      /** Dollars paid to them as they left (what they were owed), 0 if it could not be paid. */
+      paid: number;
+      /** Dollars they are still owed, kept as wages owed on the farm. 0 when paid in full. */
+      stillOwed: number;
+    }
+  /** Pay day: wages and super paid to every hand who could be paid. */
+  | { type: 'wages-paid'; hands: number; wages: number; superannuation: number; total: number }
+  /** Wages owed from before (to hands who have left, or a claim's cost) were paid now the bank can cover them. */
+  | { type: 'wages-owed-paid'; amount: number }
+  /**
+   * A hand's wages could not be paid: the bank would not cover them. The
+   * farm's standing fell. What they are owed stays owed by the farm and is
+   * paid as soon as the bank can cover it.
+   */
+  | {
+      type: 'wages-missed';
+      hand: number;
+      name: string;
+      owed: number;
+      standingBefore: number;
+      standingAfter: number;
+    }
+  /**
+   * A hand was hurt at work. `fencing` is true if they were fencing that
+   * day. They are off until `backDay`, paid by workers compensation; the
+   * farm pays its share (`cost`): now if the bank can cover it
+   * (`paidNow`), otherwise it is owed and paid as soon as it can be.
+   */
+  | {
+      type: 'hand-injured';
+      hand: number;
+      name: string;
+      day: number;
+      fencing: boolean;
+      backDay: number;
+      cost: number;
+      paidNow: boolean;
+    }
+  /** A hand is back at work after an injury. */
+  | { type: 'hand-back'; hand: number; name: string }
+  /** A hand did a standing duty in their own time. */
+  | { type: 'hand-duty'; hand: number; name: string; duty: HandDuty }
+  /** Contract fencing was ordered. Nothing is charged until it is built. */
+  | {
+      type: 'contract-ordered';
+      run: number;
+      team: 1 | 2;
+      handsHelp: boolean;
+      metres: number;
+      materials: number;
+      labour: number;
+      cost: number;
+      ratePerM: number;
+      startDay: number;
+      doneDay: number;
+    }
+  /** A day of contract fencing: metres built today (by the team, and by the farm's hands helping), what is left and what it cost. */
+  | {
+      type: 'contract-built';
+      run: number;
+      metres: number;
+      byHandsM: number;
+      metresLeft: number;
+      cost: number;
+      doneDay: number;
+    }
+  | { type: 'contract-finished'; run: number; metres: number; spent: number }
+  | {
+      type: 'contract-stopped';
+      run: number;
+      why: ContractStopWhy;
+      metresBuilt: number;
+      metresLeft: number;
+      spent: number;
+    }
+  | {
+      type: 'contract-cancelled';
+      run: number;
+      metresBuilt: number;
+      metresLeft: number;
+      spent: number;
+    };
+
+export type FarmEvent = FarmStarted | TickEvent | ActionEvent | DawnEvent | LabourEvent;

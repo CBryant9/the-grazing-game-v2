@@ -1,0 +1,232 @@
+/* The Feed panel (mockup E). Design tokens only; the chart is plain SVG, no library. */
+
+.panel {
+  font-size: 12px;
+}
+
+.title {
+  font-family: var(--font-px);
+  font-size: 12px;
+  font-weight: 400;
+  margin: 10px 0 6px;
+}
+
+.figure {
+  margin: 0;
+}
+
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.axis {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: var(--font-body);
+}
+
+.area {
+  fill: var(--ok);
+  fill-opacity: 0.3;
+  stroke: none;
+}
+
+.line {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 2;
+}
+
+.crop {
+  fill: var(--sky);
+}
+
+.floor {
+  stroke: var(--coral);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.keyArea,
+.keyCrop,
+.keyFloor {
+  display: inline-block;
+  width: 10px;
+}
+
+.keyArea {
+  height: 10px;
+  background: var(--ok);
+  opacity: 0.6;
+}
+
+.keyCrop {
+  height: 10px;
+  background: var(--sky);
+}
+
+.keyFloor {
+  height: 0;
+  border-top: 2px dashed var(--coral);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.card p {
+  margin: 0 0 4px;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.figures {
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+
+.figures summary {
+  cursor: pointer;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+}
+
+.figures summary:focus-visible,
+.opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text);
+}
+
+.tbl th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 10px;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tbl td {
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tbl .r {
+  text-align: right;
+}
+
+.mobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mob {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.mobhead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.on {
+  margin: 4px 0 6px;
+}
+
+.adds {
+  color: var(--muted);
+}
+
+.opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 6px;
+}
+
+.opt {
+  font: inherit;
+  font-size: 11px;
+  min-height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.opt[aria-pressed='true'] {
+  background: var(--btn);
+  border-color: var(--btn);
+  color: #fff;
+}
+
+.opt:disabled:not([aria-pressed='true']) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.price {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

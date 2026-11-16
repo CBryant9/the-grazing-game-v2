@@ -30,14 +30,14 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] **Water:** every animal dies after 4 days without water, not just the poor ones. Warn before +1 week or +1 month if any mob has no water, and stop the clock.
 - [ ] **Warnings explain why.** Never just "losing weight". Give the cause: not enough feed, low ME, protein under 7%, milking for a calf, or late pregnancy. "We need to know why."
 - [ ] Supplements (lick, hay, pellets) and a feedlot are available, and they cost money.
-- [ ] Profit is shown per animal, and you can see which cattle are making money. The stock book is in Herd.
+- [x] Profit is shown per animal, and you can see which cattle are making money. The stock book is in Herd. *(Built m8 second pass, server and component: `RecordResponse.stockBook` (sent with the record, on request), every head with bought or taken-over value, spent since, value now after selling costs and profit, sortable and by mob. `StockBook` is ready for Herd's "Mobs | Stock book" switch and waits to be mounted.)*
 
 ## Breeding
 
 - [ ] Bulls join with cows. Condition score drives the chance each cow gets back in calf, on a realistic cycle and timeline, with some random dry cows.
 - [ ] Bull calves stay entire until marked. You are prompted to mark them. Unmarked young bulls get cows in calf ("you wouldn't have any dry cows").
 - [ ] With no bull: "Your cows are ready to get back in calf. You need a bull."
-- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect").
+- [ ] Joining reports every 3 weeks, then a preg test result compared with what you'd expect for their condition ("fewer getting in calf than you would expect"). *(Reversed 14 Nov 2026: no preg test; a cow shows as PTIC on the record by herself from 50 days in calf. See "pregnancy on the record".)*
 
 ## Water and fencing
 
@@ -58,7 +58,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 - [ ] The market moves over time following real yearly prices (2019–2025), then a realistic random path.
 - [ ] Each class has its own price, and an animal's price changes as it moves class (weaner to yearling and so on). Chart classes match the buy list exactly.
-- [ ] Buy: a modal with a price per class. Your own cattle and their profit sit beside it for selling.
+- [ ] Buy: a modal with a price per class. Your own cattle and their profit sit beside it for selling. *(m8 second pass: each Sell row carries `money`, bought for, spent and profit a head. `SellProfitLine` draws it and waits to be mounted.)*
 - [ ] **Confirm before spending, then show the result right where you clicked**: "You have bought these cows. You'll now see them on the map." No double buys into debt on a narrow screen.
 - [ ] Saleyard buttons: "Close" and "Keep shopping" / "Keep selling", not "Watch".
 - [ ] Net worth is explained (cash, plus stock at sale value after costs, plus 80% of what's been spent on infrastructure).
@@ -77,7 +77,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] **After harvest there is stubble:** a set amount of low-value feed that breaks down to fallow. *(Reversed: first "later", then wanted now.)* Message along the lines of "you're putting them on stubble that's not very nutritious, but go for it".
 - [ ] **A finished crop never regrows.** No warnings about a crop once it's harvested.
 - [ ] Sowing prompts when a window opens ("If you want to plant oats, now's the time").
-- [ ] A feed graph forecasts the rest of the year, with crops showing as spikes.
+- [x] A feed graph forecasts the rest of the year, with crops showing as spikes. *(Built m8 second pass: `snapshot.feed`, an average-season forecast from the engine's own growth, never the real weather to come, against what the stock on hand eat and the grazing floor. `FeedPanel` draws it in SVG with the supplements table and waits to be mounted as the PC Feed tab and More, Feed.)*
 - [ ] Mixed-farm setup: choose grazing or mixed, then % arable land (realistic per district, tiny in the NT), then % actively cropped. Warn that more cropping means more of the farm starts in fallow. Converting pasture to cropping costs extra and asks first. Plant only on arable land, and highlight it.
 - [ ] Arable land is a natural patch, "not just small bits everywhere". The rotation sits in square blocks, at a stage that suits the start month.
 
@@ -93,7 +93,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 ## Controls and screens
 
-- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen.
+- [ ] Help is hidden by default behind a help button, in an info section that can be reopened. It never covers the map on a small screen. *(Built in 1.7e: the Help button in the top bar and a Help part in More, ten topics and the terms. Review fix after 1.8: on a phone it opens in the same bottom sheet as the paddock, so the map stays above it; on a phone on its side it is the whole-screen sheet, as the paddock is; on a PC it is the side panel.)*
 - [ ] The Paddocks tab shows the quick list first (with water ✓/✗), and details and sorting on demand.
 - [ ] Tools snap back to Look after each build.
 - [ ] Clicking the map opens the paddock, never a cow ("I don't want to be able to click on the cows at this point").
@@ -123,7 +123,7 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 - [ ] "Paddock 1", not "P1", in anything a player reads first.
 - [ ] **Neutral paddock labels: Green, Mixed, Dry & rank, Short.** No "green zone / buffer / haystack" or any three-zone wording or commentary. *(Rejected: "that's kind of enforcing the three-zone adaptive grazing". "Buffer" was also wrong; it sat on short dry pasture.)*
 - [ ] **Don't say "overgrazed"** until rest history is modelled ("you can graze it short as long as it has a long rest"). Say short or very short. Say "bare" only when ground cover is actually being lost.
-- [ ] Commentary describes, it doesn't judge, and it only appears on paddocks with cattle in them. For example: "The grass is growing away from them", "They're having a high impact", grazing evenly or patchily, picking the best bits, down to eating what they'd normally leave, getting short.
+- [x] Commentary describes, it doesn't judge, and it only appears on paddocks with cattle in them. For example: "The grass is growing away from them", "They're having a high impact", grazing evenly or patchily, picking the best bits, down to eating what they'd normally leave, getting short. *(Built m8 second pass: `paddocks[].comment`, seven lines each tied to a stated condition (MODEL section 14). Grazing evenly or patchily is not built: the model keeps no measure of it that holds on a big paddock. The paddock sheet draws it once the restyle mounts it.)*
 
 ## Not built yet (raised by Claudia or offered)
 
@@ -138,24 +138,260 @@ Her own words are in quotes. The how-it-works detail is in [MODEL.md](MODEL.md),
 
 These came from planning the phone and PC rebuild. Full detail and open questions are in [PRD.md](PRD.md).
 
-- [ ] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going.
+- [x] Two ways to play: a real-time daily mode ("what you could achieve on a farm in the day") and the current self-paced game ("the fast version with a better name"), with up to 3 self-paced farms going. *(3.3: setup asks for the mode first, as the mockup shows, and the top bar says which mode the farm is. Daily Farm is behind its switch, and needs an account. The switch was off until Claudia asked for it on, 15 Nov 2026: see below. The limit is now 2 and 2, below.)*
 - [ ] Jobs take realistic time. The day starts at first light and "the time only moving as you did things". If you only look, it stays first light. You can only do what fits before dark, so "they can't just build all their fencing in one day". This applies to both modes.
-- [ ] Daily mode: at midnight in the player's time zone the day is simulated with the cattle where they were left. Daily dry matter, intake and gain must be "as dialed in as we can get it to reality", especially at high density and with several moves a day.
+- [x] Daily mode: at midnight in the player's time zone the day is simulated with the cattle where they were left. *(3.3: the engine's own night, run by the rollover job or by opening the farm, whichever comes first, with the same result. The time zone is the device's, locked when the farm starts. The sub-day grazing split is the engine's own. m7.1: on a night with no hand, a plan of several moves a day grazes the day across the paddocks the player really moved the mob through, split as the engine splits its own stops, or where the mob is if it was not moved.)* Daily dry matter, intake and gain must be "as dialed in as we can get it to reality", especially at high density and with several moves a day.
 - [ ] Self-paced mode keeps +1 day, +1 week, +1 month skips, with the time controls along the top and the paddock filling the screen.
 - [ ] Game over means starting again.
 - [ ] Visuals more polished: "that retro feel but not be so pixelly", like the Ship or Die art in docs/reference/.
 - [ ] Grass, saleyard, messages and paddock views must work well on every screen size.
-- [ ] Anyone can join; date of birth at sign-up; the social side is hidden for under 16s.
-- [ ] Ad slots (banners, videos between days and years, sponsor cards) are built in-house so Claudia can run her own business's ads or sell them. No Google game video ads for now.
+- [x] Anyone can join; date of birth at sign-up; the social side is hidden for under 16s. *(Built in 3.2: emailed link and Google, a finish page for username and date of birth, and the flags (`community`, `interestAds`) come from the server. Proven against a fake sign-in provider; a real project is still owed.)*
+- [x] Ad slots (banners, videos between days and years, sponsor cards) are built in-house so Claudia can run her own business's ads or sell them. No Google game video ads for now. *(Built in 5.1: every slot in PRD 10.1 is in the registry with its own switch, off by default. Placed on the farm page, the day and year summaries and the year end video break; the slots for the Community, Profile, Leaderboard and challenge pages, the feed and the home page are ready and wait for those pages. Video between days and the Daily Farm video are not placed: see the log. Proven on a test database; the Supabase Storage side is owed.)*
 - [ ] Build everything now (ads, Stripe, subscriptions, community) and turn each on from an admin back end when ready. The admin shows analytics, connects Stripe, sets subscriptions and manages ads.
-- [ ] Community: overall leaderboard, groups to compete with friends, profiles (photo, where from, years farming, education, what and how much they farm, real farm, links to socials and website), posts with photos, comments and likes, a feed of friends and others, friends' daily activity (daily mode only), a view of anyone's farm as it is now, and a live activity ticker like Ship or Die ("Tom1998 moved 4000 head into a 4ha paddock").
+- [ ] Community: overall leaderboard, groups to compete with friends, profiles (photo, where from, years farming, education, what and how much they farm, real farm, links to socials and website), posts with photos, comments and likes, a feed of friends and others, friends' daily activity (daily mode only), a view of anyone's farm as it is now, and a live activity ticker like Ship or Die ("Tom1998 moved 4000 head into a 4ha paddock"). *(Built in 4.2 and 4.3, behind the Community switch, off by default: profiles (photo, where from, years farming, education, what and how much they farm, real farm, links) with privacy settings; follow, follow requests, block and search; posts with up to 4 photos, comments, likes and reports; the three feed tabs; Share my farm and day cards as fixed facts. A photo never shows before it has been checked, and waits in an admin queue until an image-check service is set up. Stage 4 added the leaderboards (every filter, a board for each real year, a public page), groups with group boards and challenges, the live ticker on website pages only, and a read-only view of someone's farm. Still to come: the agreed Grazier Score (a stand-in ranks the headline board) and the Daily Farm parts (leagues, day cards made at rollover).)*
 - Later, not now: hiring workers or contractors to get more done in a day.
 - [ ] Fast and solid, "not glitchy", ideally a 100 Lighthouse score.
 - [ ] No saleyard or feedlot drawn on the map ("we don't need that").
 - [ ] Phones can be flipped to landscape, "likely how it will be played". Farms stay wide rectangles; in portrait you move left to right. In landscape the panels go full screen "because they need to be tall enough to read".
 - [ ] Cattle and grass in a less pixelly style: with lots of grass and cows "it's really hard to tell and it's all blurry together".
 - [ ] Activity pop-ups on the website pages, not in the game view.
-- [ ] Ads in different spots on different pages "so it doesn't feel too spammy"; on the farm view, ads on the left.
+- [x] Ads in different spots on different pages "so it doesn't feel too spammy"; on the farm view, ads on the left. *(5.1: the farm rail is left of the map on wide PCs; the phone banner sits above the tool bar; never two ad units on one phone screen, enforced in the slot registry and tested for every screen.)*
 - [ ] On PC the game header sits at the top of the game and the website header at the top of the site; they must not blend together. Community and other pages get big headings and sensible spacing.
 - [ ] Light and dark versions.
 - [ ] Map style: the "clear map with detail on zoom" (S5 in the mockups). Clean paddocks and one marker per mob when zoomed out, individual cattle and grass when zoomed in.
+
+## Rebuild requests, second round (13 Nov 2026, after the first build plan)
+
+Given while talking through `BUILD_PLAN.md`. Where these differ from the PRD or from rules above, these win, and the reversal is noted. Items marked *(details open)* still need figures or a decision; see BUILD_PLAN section 9.
+
+### How to treat the MVP
+
+- [ ] The rebuild is built "to our needs". The MVP "was a quick start", so its code and display can change, and "prices and things" can change to suit. Keep "the same data and lessons from v1".
+- [ ] "The grass, cows and all that should be as real as possible whilst maintaining good gameplay."
+
+### Markets, years and weather
+
+- [ ] Prices should be real market data for the years they stand for. *(The MVP series was approximate, written from memory. It must be replaced with real data, LESSONS 13.)*
+- [ ] Fast Farm uses real years. The player chooses to play the years in order or at random ("we might take 1997 and then do 2006 in the following year"), so regular players "can't predict what the market is going to do". The label shows the real year it represents, but it counts as year 2, year 3 and so on for their score.
+- [x] Leaderboards also rank by real year: "who came out the best of that year", taking the starting and ending position into account, because "someone who started with a lot vs nothing is different". *(Stage 4: a real-year board ranks on the change in net worth over that year, per ha.)*
+- [ ] Daily Farm: connect to real market and weather conditions for the player's chosen location if it can be done simply ("that would be cool"). Use the baked-in years until a live feed is ready. Record the wish for live data from real yards near the player, and later "today's prices". *(3.3: Daily Farm runs on the district's real weather and the district yard's real prices, one day at a time, from the baked tables on to yesterday. The feed that fetches each new day from SILO and MLA is written and tested on recorded answers only; it has not been run against the live services. Not ticked until it has been run on a preview. The player's own location and yards near them are still wishes.)*
+- [ ] Saleyards are called just "Saleyards" for now (generic name). Research the best real yard for each district, especially ones with data we can get automatically.
+- [ ] Freight in proportion to distance is not a priority.
+- [ ] The yards found for each district "work": Gracemere (Central Qld), Armidale (Northern Tablelands), Dubbo (Central West), Mortlake for cattle and Hamilton for sheep (Western Vic).
+- [ ] The Top End has no yard of its own: "find a northern equivalent somehow", possibly north Queensland or live export. *(Charters Towers is in the MLA service with current prices. Whether the district itself moves is still open.)*
+- [ ] "Just hook up to MLA and ask them later." Build on the MLA service now; the permission email comes before launch.
+- [x] Wool: "use a stand-in for now". *(The dated September 2026 stand-in by micron; sold by itself at shearing, its own money line, milestone 2.8.)*
+- [ ] Northern cattle are drawn Brahman style, not British cattle.
+- [x] Where sheep aren't appropriate, don't offer them. *(Milestone 2.8: never in Central Queensland, switch or not: no setup choice, no sheep market, no netting, sheep jobs refused.)*
+
+### Jobs, time and the farm's buildings
+
+- [ ] Permanent ("proper") fence: 500 m a day on your own. *(Changed: the PRD had about 250 m a day.)*
+- [ ] Permanent fence has a contractor option in the fencing tool: a 1-man team costs more and gets double done in a day; a 2-man team more again. Time and cost depend on the option chosen. *(details open)* *(Built in the engine, milestone 2.2: `orderContractFence`, a 1-man team 500 m a day or a 2-man team 1,000 m, materials plus a stand-in labour charge of $5 a metre for either team. MODEL section 11, DATA "Farm hands and contractor fencing".)*
+- [ ] Other fence types scale sensibly: rolling out tape and putting it on posts takes about as long as walking it; electric fence needs posts hit in, so it sits between tape and permanent.
+- [ ] Every farm has a house and yards. How long a job takes depends on "driving the cruiser out there and back". *(Reversed 14 Nov 2026: no house and no driving. The yards stay, for bought cattle. See "The working day made simpler".)*
+- [ ] Moving stock takes time by distance. The paddock next door "shouldn't take long at all". Cattle walk at about 1.5 km/h. *(Changed: the PRD had about 3 km/h.)* *(Reversed 14 Nov 2026: moving a mob is "pick the paddock, done". No walking time.)*
+- [ ] On a day a mob has "a bit of a walk", assume they didn't eat much for weight gain. Walking through other paddocks has no effect on those paddocks. *(Reversed 14 Nov 2026, for now: there is no walk.)*
+- [ ] Gates: consider doing gate types now so it is realistic (a cheap gate, a real gate, a pull-up tape gate). *(details open)* *(Reversed 14 Nov 2026, for now: one kind of gate.)*
+- [ ] Supplements are stock you hold. A lick block gets low and needs topping up; how fast it goes depends on the stock on it. A lick run takes time. *(Changed 14 Nov 2026: this holds for Daily Farm. In Fast Farm a supplement is switched on at a daily price with no daylight cost.)*
+- [ ] Feeding out means loading at a feed bin, shed or silo and driving out from there. Players can build sheds and silos closer to the stock, or build a feedlot and feed them there. *(Earlier rule: no feedlot drawn on the map. A feedlot the player builds on the farm is new; confirm how it shows.)* *(Reversed 14 Nov 2026: no sheds, silos or driving. A feeder or lick block in the paddock is filled where it is, and no feeder has to be bought.)*
+
+### Buying and selling
+
+- [ ] Sale days and delivery days apply in both modes. The Market tab shows days until the next sale. Clicking Sell books the stock onto the next sale.
+- [ ] Bought stock is generally delivered the following day, into the stock yards on the farm. On delivery day the player moves them out and chooses their paddock. *(Changed: the PRD default was a 2-day delivery.)*
+
+### Farm hands and the workforce
+
+- [x] Players can hire farm hands, on a salary or a contract. The people available change over time, and people leave. *(Built in the engine, milestone 2.1: a seeded labour pool that changes week by week, `hireHand` and `letHandGo`; casual, short contract and salaried. Hands leave when let go, when a contract ends or when they are not paid.)*
+- [ ] Workers have skills and stats that change how fast and how far jobs get: the days they work, their rate, what they improve, and "how hard you can work them before they quit". Some are good at fencing. Some have a team of dogs and make moving stock quick. Farm hands can do all tasks (fencing, moving stock, troughs, pipe). *(Built in the engine, milestone 2.1: days, rate, three skills from 1 to 5 (fencing, stock, water) and dogs; a hand takes the first part of any job by the skill it needs. "How hard you can work them" is not modelled: with no roster the player can't overwork a hand. Call for Claudia.)* *(Built as a call, awaiting Claudia: "how hard you can work them" is not modelled.)*
+- [ ] With a farm hand on, one-man fencing assumes the farmer and the worker are both there, so about 800 m a day instead of 500 m. *(Built in the engine, milestone 2.1: an average hand's day is 0.6 of the player's, so a whole day of permanent fence builds 800 m. Conflicts with "about 500 m for a worker" below; see DEVELOPMENT_LOG, m2.1, Calls, item 1.)* *(Built as a call, awaiting Claudia: 800 m a day, a 300 m share; she also said 500 m.)*
+- [x] Some only want short contracts (for example 3 months at a day rate). Salaried workers don't work weekends. Others on long terms might. *(Built in the engine, milestone 2.1: 91-day fixed-term contracts at the weekly rate over 5 days a day worked (no casual loading); salaried hands Monday to Friday, or some a Wednesday-to-Sunday week.)*
+- [x] Messages keep the player up to date ("John's contract finished, consider hiring someone else"). *(Built in the engine, milestone 2.1: the workforce's events go to the inbox and `workerReport`; the words are the screens'.)*
+- [x] Workers occasionally get hurt and go on workers comp (rare). *(Built in the engine, milestone 2.1: at Safe Work Australia's rate for agriculture, likelier on a fencing day; off 45 days.)*
+- [x] If the player can't pay them or treats them badly, their reputation in the workforce drops and the choice of workers gets worse. *(Built in the engine, milestone 2.1: missed wages lower the standing; a lower standing gives a shorter list, without the most skilled, at dearer rates. Paying on time brings it back.)*
+- *(Changed: the PRD listed workers and contractors as "later".)*
+- *(On screen, milestone 2.2: the Workforce panel in More lists the people looking for work (name, casual, short contract or salaried, rate, the days they work, skills as plain numbers, dogs yes or no and what they do) with Hire, and the farm's hands with what they did lately, pay due and Let go. Each confirms first. The standing in the district is a described level with the fact behind it ("Wages missed once in the last year."). Wages owed are a to-do line. The worker report is a worker with a speech bubble for each thing done while the player was away, one tap for the next or skip all. Every workforce event has inbox and diary words. A hand's share is a line on the job card. No rosters, no daily assigning, no clock-watching: hire or let go, and the rest happens by itself.)*
+
+### Sheep
+
+- [ ] Add sheep, with their own figures, and wool as income. *(Changed: the PRD had cattle only at launch.)* *(Engine in milestones 2.3 to 2.7; on screen in milestone 2.8 behind the `sheep` feature switch, OFF by default until Claudia rules on the model's open gaps: DEVELOPMENT_LOG, "m2.8 Sheep screens".)*
+- [x] At setup the player chooses cattle, sheep or a mix, so the markets shown aren't too busy. In play they can still buy either, "because they might change their minds". *(Milestone 2.8, with the switch on: the choice is a setup step on a running farm in a sheep district; a sheep farm still has the cattle market, and a cattle farm the sheep market.)*
+- *(On screen, milestone 2.8, switch on: the sheep mob card (head by class, lambs at foot, DSE and AE at the one figure, weight, CS, where the flock is up to, wool, the contractors' days, the joining record, reasons), moves and plans with the species and fence refusals in plain words, feeding (none, lick, grain, hay) with the cost a day, buying and selling on a sale day with the money first, shearing and crutching by themselves with a way to move the shearing day, the netting fence, sheep on the map, sheep words for every engine event. No new chores.)*
+
+### Protecting the rules
+
+- [ ] The code and rules of both modes should be hidden from everyone: "we don't want anything to be able to copy our rules". This is to become a business. *(If Fast Farm runs on the server to achieve this, it reverses offline Fast Farm in the PRD; confirm.)*
+
+### Farms, payments and game over
+
+- [x] Free accounts get 2 Daily Farms and 2 Fast Farms *(3.2: the two Fast Farm slots and the farm picker are built and enforced by the database. 3.3: the two Daily Farm slots work, for accounts only, behind the switch. A guest is told plainly why they can not start one.)* ("one where they start from 0 and one where they start with a lot"). *(Changed: the PRD had 1 Daily and 3 Fast.)*
+- [x] One-off payments, not a subscription: about $30 for 5 of each farm plus perks; about $50 for 5 of each farm, no ads and more perks. *(Changed: the PRD had a monthly or yearly subscription.)* *(5.2: built on Stripe Checkout, tested with a fake Stripe. Off until Claudia adds Stripe test keys and switches it on; the real Stripe call has not been run.)*
+- [x] Nothing in the game can be bought for an advantage: "they can't pay for perks in the game". *(5.2: what is sold is farm slots, no ads, a badge and the full diary only. The rescue is the one exception to look at: it is offered only at game over and does exactly what its card says.)*
+- [ ] On game over, a player can pay to keep going. *(5.2: the offer card, the purchase and the once-only application. m6: the engine's `rescueFarm` does it: all stock sold to pay the debt, cash set to the hard-difficulty starting cash for the farm (or what the sale left, if more), the farm open again, once per purchase. Proven end to end on a test database; the products stay off until Claudia switches them on, and the Open-priced tier can never be.)* It clears the debt and puts the farm back to "small modest funds", with a penalty that fits their situation (for example they may have had to sell all their stock). The offer shows exactly what they get for the money.
+- [ ] Price to keep going: $5 on a Fast Farm. On a Daily Farm it scales with how long the farm has run: about $25 at 6 months, $50 at 1 year, $100 over 2 years. *(details open: the price under 6 months, and whether $35 is a minimum.)*
+- [ ] A Daily Farm shouldn't reach game over within the first 3 to 6 months of ordinary play. *(To be tested with the engine.)*
+
+### Grazing plans in each mode
+
+*(Changed: the PRD default was no grazing plans in Daily Farm.)*
+
+- [ ] Fast Farm: the plan moves the stock around as set, "because we assume the farmer is doing it".
+- [x] Daily Farm with a worker: the worker does the planned moves, and it doesn't use the farmer's daylight. *(3.3: a plan move happens in the night when a hand works that day, and the worker report on opening says so. The catch-up sheet shows the hands' report beside the missed days.)* When the player comes in, a worker character pops up with a speech bubble, like a retro game ("like Pokemon"): "I moved the cows from here to here as planned", so they know a move already happened and may not need to do anything.
+- [ ] Daily Farm with no staff: setting up a plan says "you have no staff, so you will need to remember to move them. We will send you a notification." The player gets "Time to move your stock". *(3.3: with no hand working that day nothing moves in the night, and on opening a plan card says "Your grazing plan said today you would move X to Y" with Yes and Not yet, then a strip with a Move button. The notification is milestone 3.4, and the words on the plan setup screen were not changed. m7.1: the plan stays live on those nights and its report counts the grazing that really happened; sheep plans are held and offered the same way; a move that is blocked is not offered and the plan says the real reason, sheep or cattle there or no water; the move that ends a plan is offered for every kind of rule.)*
+- [ ] When they come in, a grazing plan card says: "Your grazing plan said today you would move from X to Y. Would you like to do that now?" Yes moves them. Not yet leaves a plan strip along the bottom with a quick Move button, "because they might want to have a look at the pastures first and then decide".
+- [ ] If they move stock and break the plan, they reset it themselves, or pick a template and resume from a step ("this is paddock 3 of the template", then on to 4, 5 and 6).
+- [ ] Several moves a day without staff are played in one sitting, not with several reminders: "less pressure". The card says "this was your plan, do it", and the player watches the day pass from sunrise to sunset, with the cows moving, stopping, then going again. A short run of moves leaves daylight over. *(m7.1: the card offers the day's moves one after another in one sitting, at most the plan's own moves a day, says which move of the day each is and when the next is due, and the night grazes the day across the paddocks the mob was moved through. Watching the day pass on the map is not built.)*
+- [x] Reminders (built in m3.4, `server/notify/reminders.ts`: one at the chosen time in the farm's zone and one 6 hours later, never after the farm was opened that day): one reminder at a time the player picks, then one more later if they haven't played, "so they don't miss a day". Notification settings let them change this.
+- [ ] Show time changing across the day on the map. "It would be cool to see how we could simulate that change of time across the day."
+
+### Answers given on the question list (13 Nov 2026)
+
+- [ ] **Remove the Top End for now.** "It's super hard and super large", and it is "better to build it out with specifics of northern in the future". Four districts at launch. *(Changed: the MVP and PRD v1.0 had five. The Top End figures stay in DATA.md for later.)*
+- [x] A Daily Farm runs on today's real date. *(3.3: the farm's first day is today in its own time zone, as Day 1, with the pasture run up to today and the herd placed today. Its weather and prices run 5 days behind the real date, so they are in when the night runs.)*
+- [ ] Sale days match the real yard's timing, including yards that sell fortnightly: "that adds to the reality of it".
+- [ ] "Electric fencing is really fast if it's just one wire or tape."
+- [x] Contractor fencing: a 1-man team does 500 m a day and a 2-man team 1,000 m a day, and neither takes the farmer's daylight. Any workers could be helping them. The farmer can draw their own extra fence as well, shown in a different colour from the team's. *(Built in the engine, milestone 2.2: neither takes the player's day; hands can help (`handsHelp`); `contractView` gives the contractor's segments apart from the player's own fence for the map's colour.)* *(On screen, milestone 2.2: the fence tool's card offers Yourself, a 1-man team and a 2-man team with what each costs and when it is done, and says a team uses none of the day. Ordering confirms "materials plus labour", the start day and the done day. The run under way is a line on the Farm tab ("Contract fence: 1,200 m left, done on Tuesday 3 March") with Cancel, which confirms what is kept and what is owed. On the map the team's fence is hot pink, solid where built and dashed where still to build, apart from the player's own fence.)*
+- [ ] Workers helping on a fence the farmer draws: the first part of the line is the workers' share and uses none of the farmer's daylight (about 500 m for a worker, more or less by their skills). Then the line continues and uses the farmer's daylight. *(Built in the engine, milestone 2.1, at about 300 m for an average hand, not 500 m. This conflicts with the 500 m here: the "about 800 m a day instead of 500 m" line above gives 300 m, and 500 m would make 1,000 m a day. See DEVELOPMENT_LOG, m2.1, Calls, item 1. One constant.)* *(On screen, milestone 2.2: the job card says "[name]: the first 139 m is the hand's share, done from their own day. It uses none of your light."; the part that does not fit today is still red, for the player's own share only.)* *(Built as a call, awaiting Claudia: 300 m for an average hand against the 500 m she said.)*
+- [ ] The line stops drawing when the day is used up, with a warning that this is the full day, and that to move cows as well they need to do less fence. *(Kept, and made firmer on 14 Nov 2026: the part that fits is built, the rest shows red and is drawn again another day.)*
+- [ ] Driving on the farm is faster than 25 km/h in real life, but 25 works for the game's scale. *(Reversed 14 Nov 2026: no driving.)*
+- [x] Nobody under 14 can make an account. No community under 16. *(Changed: PRD v1.0 had 13.)* *(Built in 3.2: the refusal is final for that sign-in, with no form and no hint. An account under 16 is told no community and no interest ads by the server.)*
+- [ ] For everything else on the list, Claudia accepted the suggested defaults "for now": "better to get this in and then scale and adapt as we go". They are listed in PRD section 21.
+
+### Security
+
+- [ ] Claudia is "worried about this security and stuff". The rules, players' data and payments must all be safe, and she wants it explained in plain words.
+
+## 14 Nov 2026: the working day made simpler
+
+Given after the first cut of the working day (milestone 1.5a) was built with driving, a homestead, contractor bookings and jobs that carried over. Where these differ from the PRD or from rules above, these win. The earlier lines they reverse are marked "Reversed 14 Nov 2026" where they stand.
+
+Her words: "Let's take the driving and all of that part out." "The drive home is just adding too much of an element into the time." "I don't think we want to be putting too much emphasis on them watching the time. Obviously, we want them to have little notes and be aware of it, but we don't want them thinking about it too much." "The yard stuff and the driving from the house and all of that really, really overcomplicates it."
+
+### Time and jobs
+
+- [ ] **No driving and no drive home.** A job's time is its work only. *(Reverses: travel at 25 km/h, "driving the cruiser out there and back", PRD 5.1 and 5.4.)*
+- [ ] **Time is shown lightly.** The player has "little notes" and is aware of the day, but is not made to watch the clock or think about it much.
+- [ ] **A fence or pipe line too long for today:** the part that fits is built. The rest shows red with "You don't have enough time to do this today" and is drawn again another day. A line that takes the whole day says so: "this would use up your full day". **No half-built jobs that carry on by themselves.** *(Reverses PRD 5.1 "job in progress".)*
+- [ ] Any other job is done if it fits in the light left, and is not done if it does not.
+- [ ] **At last light the farm goes dark but can still be looked at, and the Next day button invites a click.**
+- [ ] **Harvest and sowing happen at once:** "they can straight up just go and harvest." They cost money and take none of the day. *(Reverses the contractor's wait, PRD 5.4.)*
+
+### The farm
+
+- [ ] **No homestead.** "I think we don't need to have a cellar, yards, or a house", then, on the yards: "the yards can stay for buying them so they will place them but they don't have to come in for husbandry." *(Reverses: "Every farm has a house and yards".)*
+- [ ] **The stock yards stay** as the place bought cattle arrive. The player moves them out to a paddock. Stock never have to come to the yards for husbandry.
+- [ ] No sheds, silos or other buildings for now. *(Reverses: sheds and silos closer to the stock, and a feedlot the player builds.)*
+
+### Stock work
+
+- [ ] **Husbandry is a button on the mob, done where the mob is.** "The animal husbandry and stuff should happen, and they don't need to take them into the yards." "Make clicking the button easy. It would come up with the banner and say, 'You need to mark your calves,' and then they go and do it, or you look in the mob."
+- [ ] **A banner and the mob card say what needs doing** (calves to mark, calves to wean, a mob with no water, a crop ready). They state facts.
+- [ ] **Moving a mob is "pick the paddock, done".** No route through gates, no walking time, no gate needed on the way. *(Reverses: moving stock takes time by distance, cattle walk at 1.5 km/h, a long walk costs the day's gain, PRD 5.13 routes, and the three gate types, for now.)*
+
+### Feed
+
+- [ ] **Fast Farm:** "in the fast game they just turn it on", at a daily price that "doesn't cut their daylight".
+- [ ] **Daily Farm:** supplements are stock on hand. "Each supplement has a capacity like 100 animals for 5 days for lick (find realistic)", "they would feed grain each day as part of their tasks", with "a warning if things needed filling". There is "a lick block with an amount used or a feeder and we could see if it's empty", "you tap on it to replenish it on that day and it has a cost obviously and uses some of their daylight". A notification like "Paddock X is out of lick block or feed". Levels keep falling on days the player misses. The player can "put a different ration in the feeder" or put out a new lick block, and can "remove the feeder" to stop the empty warning. "I'm happy for them to not have to buy a feeder."
+- *(Changes: "supplements are stock you hold" now holds for Daily Farm only. Loading at a shed or silo and driving out is reversed.)*
+
+### Fences and water (after the screens review)
+
+- [ ] **Fence materials are kept, and reused fence is half price.** "If they remove a fence, they can have so many discounted fence fees because they would already have some of the materials, but they still don't get the full amount. They would get some discount on fencing for using stuff that they already had." On the figure: "half price is fine." *(Built in the engine: permanent and electric fence taken down is kept by the metre and by kind, and fence of that kind uses it first at half price. MODEL section 5 and 8, DATA "Fence materials kept and reused".)*
+- [ ] **Water hubs can be removed and moved.** "Water hub can be removed or moved." Both kinds: the hub on a fence line or corner, and the hub on a square. *(Built in the engine.)*
+- [ ] **The default fence is the permanent one.** "A normal fence is the one that they would go for. They have to specifically choose electrical." *(Built in milestone 1.7f: the fence tool starts on permanent fence.)*
+- [ ] **The pipe tool does not zoom the map.** "They should be able to zoom it to where they want and then draw the pipe." *(For the screens.)* *(Built in milestone 1.7f: no tool changes the zoom by itself; pinch and wheel zoom work in every tool.)*
+- [ ] **Red means one thing.** Her words: red "means doesn't fit today when building, so use other colours for other stuff". On the map and the cards, red on a line or a square is used only for the part of a line that does not fit today. A knocked-down fence is amber with its "!" marker. New tape is white and dashed, never red. The no-water salmon stays for words and markers, not as a red line. *(Built in milestone 1.7f. Reverses the red knocked-down fence, the red new tape and the red remove mark in VISUALS.)*
+  - *(Narrowed 14 Nov 2026, later the same day.)* Her words: "I still wanted the same colours across the site and all that to stay red. It was more just the red within the [map] where we're drawing stuff. That's what it would probably be saved for. Red is like an error, or a can't go any further, within the picture." So the rule is for the map picture only: there, red is saved for "can't do this" while drawing (the part of a line that does not fit today, a refused line). The site's colours stay as designed, red included: the panels, cards, tags, the Short chip and the main button. On the map, no water (the label text and the pickable outline) is purple; in the panels it keeps the site colour.
+- [ ] **A line where none of it fits today** says "You don't have enough time to do this today. Draw it again another day." It is drawn again on another day, not drawn a different way. *(Built in milestone 1.7f.)*
+
+## 15 Nov 2026: playability fixes from the playtest (m8)
+
+A playtest of 144 three-year games found the game hard to read and quick to run into trouble unseen. Decided (calls B141 to B150):
+
+- [x] The bank never takes the farm with no warning: when cash first goes below zero, and again at three quarters of the way to the bank's limit, an inbox fact and a Things to do fact name the cash, the limit and the head on the farm, and a skip stops at both. *(m8 realism 2: "head that could be sold" pointed at a remedy; it is now the fact only.)* The bank's limit is a display number beside Cash.
+- [x] A skip stops early and says why for: no water, a trough run dry, a crop ready, the year end, game over, the first day the whole farm is eaten out, the bank facts, deaths from anything but natural causes, and calving starting.
+- [x] +1 year ends on the farm's year end, also across a leap day.
+- [x] Things to do holds facts that come once and go when they stop being true or are put away, never repeated daily: stock at sale weight (one item for each market class, there while that class has head at sale weight that are not booked, with the head and the next sale date; breeding heifers are not sale stock; put away, it stays away until that class has no head at sale weight), a mob under CS 2.5 with what it gains or loses a day, calving started, a stocked paddock under the grazing floor, and marking with the count. Marking counts only this drop's calves: it is listed once when most of the drop's bull calves are old enough or 30 days after calving started; after the player marks, not again until calving in that mob has finished, then once more if unmarked calves remain. At most two a drop. *(m8 realism 2: the sale item was keyed by the sale day, so with weekly sales it was on the list almost all year; and marking counted last drop's marked calves, so a player who marked each time was asked 67 times in 330 days.)*
+- [x] Mob card reasons are warnings only when the mob is losing weight or in low condition. Otherwise the same facts are plain details.
+- [x] Words for feed under the floor state the fact and its effect with the real figures, never "0 days" or "not enough feed" on a herd that is growing.
+- [x] The tour never asks the player to join mobs or spend money.
+- [x] The year card names a part of the score that moved a lot, with both figures, and a cause only where it is a fact.
+- [x] The setup step can show each difficulty's starting cash and the bank's limit.
+- [ ] Doing nothing out-scores sensible play (A10): for Claudia to rule on after she has played. Nothing changed.
+
+## 14 Nov 2026: build it all, with a list of calls at the end
+
+Her words (as typed): "ok yeah hook in- I would like them all done and would prefer a list of clals at the ends that yu explain and i could say if i wnated something diffferent - let sjust focu son getting this done, maybe you should open some chats unde ryou to get it done faster pleas"
+
+- [ ] Every stage is built without stopping for decisions. Each call is logged with its reason. Claudia gets one explained list at the end, and can change any of them.
+
+## 14 Nov 2026: pregnancy on the record, no preg test
+
+Her words: "I think we're probably not going to pretest the mobs or need that animal husbandry, but we obviously do need to know in our mob lists that they would show as PTIC if they were X amount of time and how far along they were on the record. Whatever the kind of general time that is, I'm happy for that to show up as PTIC. They would just be cows before that, then they're PTIC, and before that, they're dry, I guess. I guess what they're considered is dry until they are progested. That's fine. What you pay in the calf sale premium is only for cows known to be... You only get PTIC price if that cow is confirmed to be pregnant. They would just be sold as cows. That's correct." (dictated; 'pretest' and 'progested' mean preg test and preg tested)
+
+- [ ] **No preg test job.** Not on the screens, the to-do list, the banner or the help.
+- [ ] **A cow or heifer is PTIC on the record by herself once she is a set number of days in calf** (the engine's `PTIC_DAYS`, 50: the day the price starts paying the in-calf premium; DATA "When a cow shows as PTIC"). Before that she is a cow or heifer (dry with no calf at foot), whether or not she is really in calf.
+- [ ] **PTIC price only for cows on the record as PTIC.** All others sell as cows.
+- [ ] **The mob lists show head PTIC and how far along**, in whole months ("31 PTIC, 2 to 4 months in calf"), the months for PTIC cows only. Nothing calls a cow "empty".
+- [ ] **Every class and group the player sees or picks from uses the one rule**: selling, booking a sale, moving part of a mob, the map, the herd list.
+- *(Reverses: earlier on 14 Nov 2026 the player was told only what a joining report or preg test had said, with the joining reports, the preg test and "known in calf" on the mob card. Built in engine 0.10.0 and 0.11.0; replaced by engine 0.12.0.)*
+
+### For the game screens milestone
+
+- [ ] An information panel explains how the day works. *(Built in 1.7e: the first help topic, "How the day works".)*
+- [ ] Onboarding and a tour show how things work, with help available at any time. *(Built in 1.7e: the guided first day, with Skip this step, Skip the tour and Show the tour again, and the Help button always in the top bar. Tour progress is kept in the browser, not yet per player.)*
+- [ ] A short guided first day: open a paddock, move cattle, build a short fence and watch the daylight bar, open the market, end the day. It can be skipped and replayed from More. *(Built in 1.7e.)*
+- [ ] Empty states with one clear next step. *(Built in 1.7e for Herd, Plans, Paddocks, the inbox and Sell. The no farms, no posts and no followers states come with accounts and the community.)*
+
+### Accounts and saves (milestone 3.2)
+
+- [x] A failed save retries, the player sees "Saving again", a job is never shown as done before it is stored, and if saving finally fails the player is told what was not saved. *(BUILD_PLAN 3.2, built and tested with injected failures and races.)*
+- [x] A guest plays one farm kept on this device; making an account moves the farm in, or says plainly there is no room. *(PRD 8.1.)*
+- [x] See the farm on a past day, read only, from the Diary, with "You are looking at Day N" and a way back. *(Closes the call deferred in 1.7g. The picture is kept for every day for 14 days, then weekly to 182 days (gzipped, about 180 KB a farm at most); the file store keeps the last 14.)*
+- [x] Download my data and delete my account, with a typed confirm that says what goes and what stays. *(PRD 21a "Your data".)*
+- [x] One player never sees another's farm on a shared device: the offline copy is kept per player and cleared on sign out. *(PRD 21a.)*
+
+### Admin shell (milestone 3.5)
+
+- [x] An admin back end at `/admin`, for admin accounts only, that works on a PC and on a phone. Anyone else gets the same plain "not found". *(PRD 11, 17. Built in 3.5.)*
+- [x] Every feature switch can be turned on or off from admin without a new release, with a confirm that says what it does to players, and shows who changed it last. *(PRD 11.7. The switches the public website pages read at build time say so on the screen.)*
+- [x] Maintenance mode: the game shows "The game is down for maintenance. Your farm is safe." while admins can still play. *(PRD 11.7, BUILD_PLAN 3.5. The wording is chosen from a fixed list.)*
+- [x] Users: search by username or id, view an account (status, role, join date, farms, last seen, under 16 yes or no, history), suspend, ban, lift, change role, clear a mistyped under-14 refusal, sign out everywhere. No email address and no date of birth are shown. *(PRD 11.2.)*
+- [x] Site settings: announcement bar, districts available, community rules text, each checked on the server. *(PRD 11.8. Privacy and terms text and the market data upload come later.)*
+- [x] An audit log of every admin action, read only, newest first. *(PRD 11.8.)*
+- [x] A dashboard of the counts that are true today, with the time they were read. *(PRD 11.1. Active users, audience, income and ads say "Built in a later milestone".)*
+- [ ] Moderation, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5; each is built with its own milestone.)*
+- [x] Ads and sponsors in admin: every slot with its switch and caps, sponsors, campaigns with dates, targeting, weight and budgets, house ads, creatives with upload and a preview at each slot size, views and clicks by day, and a sponsor report with a CSV. *(PRD 11.4, built in 5.1. The AdSense field is not built: see the log. "Spots left" for the Advertise card is a setting, not yet counted.)*
+- [x] No-ads owners see no banners, videos or sponsor cards anywhere. *(5.1: read through one function; the purchases milestone fills in what grants it.)*
+- [x] Nothing aimed by interest for an under-16 account, a guest or anyone with no profile. *(5.1: such viewers are shown only campaigns for everyone.)*
+- [x] Moderation, ads and sponsors, purchases, challenges and the analytics dashboard in admin. *(Placeholders in 3.5. Stage 4 built moderation (with the word filter editor) and challenges, 5.1 ads and sponsors, 5.2 purchases; all joined in m6. The analytics dashboard was built in 5.3.)*
+
+### Dashboard and analytics (milestone 5.3)
+
+- [x] The dashboard numbers match the database: every figure comes from the database through one server module, in a date range, and a test seeds rows and checks each one. *(BUILD_PLAN 5.3 "done when".)*
+- [x] Each dashboard table downloads as CSV, for admins only, written to the audit log, with no email or date of birth in it, and text a spreadsheet would run as a formula made safe.
+- [x] Game health: server timings and failures by route and reason code, save conflicts, rollover runs and how long they took, and queue depth, kept as small sums, not one row a request.
+- [x] No analytics script or library in the browser. The browser sends a small beacon to our own `/api/collect`; the server sends events on to PostHog only when its key is set. No JS budget was raised for it. *(Decided for 5.3.)*
+- [x] Nothing is counted for a person until they say yes. Default off. Under 16: off and can not be turned on. The choice is kept with the account (account page) or, for a guest, in a cookie. *(PRD 12, decided for 5.3.)*
+- [x] Events use a fixed list of names and property words from `packages/shared`: no free text, email, username or address; a random id per browser, or the account id hashed with a server secret.
+- [x] The public website pages still send no script. Their views are counted on the server with no cookie and no id.
+- [x] Web Vitals (LCP, CLS, INP) from the game and signed-in pages, with consent, shown as the 75th percentile by page against the PRD 14.10 targets.
+- [x] An `analytics` feature switch, off by default.
+- [ ] Average minutes a day, return rates, Daily Farm streaks, game overs by cause and replay check failures on the dashboard. *(Need data not kept yet; the dashboard lists them under "Built in a later milestone".)*
+
+## 15 Nov 2026: Daily Farm on
+
+Her words: "I would also like you to turn on the daily farm ... I want to be able to get on and try both rounds of gameplay." She will set up the database and other services later on another computer, so nothing may need keys on this one.
+
+- [x] **Daily Farm is on by default.** The shared switch list, a new seed migration (`20261120000100_daily_farm_on`) and the public pages agree. The admin can still switch it off. *(Built in m8. Reverses the 3.3 call that kept it off until she turned it on.)*
+- [x] **With no database, setup says what Daily Farm needs, never "coming".** It says Daily Farm needs the game database, which keeps each farm from day to day and runs its nights, and that Fast Farm is ready to play now. *(Built in m8.)*
+- [x] **She can try Daily Farm before the database exists.** In development only (`pnpm dev`, no database), `GG_DEV_LOCAL_DAILY=1` lets a guest start a Daily Farm kept in a farm file; the nights run when the farm is next opened. *(Built in m8. `docs/RUNBOOK.md` section 5.1.)*
+
+## 15 Nov 2026: the game screens match the mockups
+
+Claudia asked that the built game match the mockups (`docs/mockups/index.html`) and their feel. Where an earlier line here differs from the mock, the earlier line wins: Plans keeps its own tab, no preg test, purchases not subscriptions, 2 Daily and 2 Fast farms, five score parts, "Paddock 6" in full, the four paddock labels only (no Fallow chip), no ute, driving or house on the map, supplements at a daily price, next-day delivery, the Look tool and tools snapping back, a Help button in the top bar, the extra setup steps, red on the map only for "can't do this" while drawing, Workforce in More, and time shown lightly.
+
+- [x] **The game screens follow the mockups' layout and parts** on a phone held upright, a phone on its side and a PC, in both themes: the floating top bar, the pixel icons and the tab order (Build, Herd, Paddocks, Market, Plans, More), the things-to-check banner, the paddock sheet, the build tray and job card, the full-screen day summary, More as a sheet of rows, the segmented controls and sort chips, the market rows that open in place, the herd rows, the paddocks list and table, the score bars, the setup's step badges and recommended start, and the PC's website header, game header, panel tabs and sponsor rail. *(Built in m8, branch `m8-look-game`. VISUALS "The game screens as the mockups". The parts that need a figure the browser does not get yet show when the server sends it: see the log.)*
+- [x] **Setup has a recommended start picked on every step**, so a new player can tap straight through: Fast Farm, the first district, a small farm, grazing, random seasons, a running farm, medium. Only the farm name has to be typed. *(Built in m8.)*
+- [x] **Things to do can be put away**, one at a time, with a small "Put away" on each. *(The screen side of the m8 playability change.)*

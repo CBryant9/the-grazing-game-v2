@@ -1,0 +1,44 @@
+{
+  "name": "the-grazing-game",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @gg/web dev",
+    "build": "pnpm --filter @gg/web build",
+    "start": "pnpm --filter @gg/web start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:speed": "vitest run --config vitest.speed.config.ts",
+    "test:load": "node scripts/load-test.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lighthouse": "lhci autorun",
+    "data:mla": "node scripts/data/pull-mla.mjs",
+    "data:silo": "node scripts/data/pull-silo.mjs",
+    "data:cpi": "node scripts/data/pull-cpi.mjs",
+    "check:browser-bundle": "node scripts/check-browser-bundle.mjs",
+    "check:js-budget": "node scripts/check-js-budget.mjs",
+    "measure:cost": "node scripts/measure-cost.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "dev:map-fixtures": "node scripts/dev/make-map-fixtures.mjs",
+    "test:restore": "node scripts/restore-drill.mjs",
+    "farms:export": "node scripts/farms-export.mjs export",
+    "farms:import": "node scripts/farms-export.mjs import",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.16.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "eslint-config-next": "^16.4.6",
+    "prettier": "^3.10.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  },
+  "type": "module"
+}

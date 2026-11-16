@@ -1,0 +1,220 @@
+import { create } from 'zustand';
+import { MAINTENANCE_WORDINGS } from '@gg/shared';
+import { api, onMaintenance, UNREACHABLE } from './api';
+import { useMe } from '../auth/store';
+import {
+  GUEST,
+  clearLastFarm,
+  lastScope,
+  loadLastFarm,
+  rememberScope,
+  saveLastFarm,
+} from './offline';
+import { useGame } from './store';
+import type { Snapshot } from './types';
+
+/**
+ * Offline viewing, kept apart from the game store so the store stays small.
+ *
+ * - Every snapshot the server sends is kept in this browser (offline.ts).
+ * - When the game can not be reached on opening /play, the kept farm is
+ *   shown, read-only, with one plain line.
+ * - While offline, every action, Next day and skip is switched off. They
+ *   already switch off while a request is under way (the store's `busy`
+ *   count), so being offline holds that count up by one. Looking at the farm
+ *   (the map, paddocks, mobs, tabs) keeps working, as it does while busy.
+ * - A quiet check every 15 seconds, and one when the browser says it is back
+ *   online, brings the live farm back and releases the buttons.
+ */
+
+interface OfflineState {
+  offline: boolean;
+  /** The words shown while maintenance mode is on (one of the fixed wordings), else null. */
+  maintenance: string | null;
+}
+export const useOffline = create<OfflineState>()(() => ({ offline: false, maintenance: null }));
+
+const CHECK_EVERY_MS = 15_000;
+const SAVE_AFTER_MS = 400;
+
+let holding = false;
+let timer: ReturnType<typeof setInterval> | null = null;
+let checking = false;
+
+/** Hold the buttons off, or let them go. Counted once, so it can never run the count down by mistake. */
+function hold(on: boolean): void {
+  if (on === holding) return;
+  holding = on;
+  useGame.setState((s) => ({ busy: s.busy + (on ? 1 : -1) }));
+}
+
+/** Buttons are held off while offline or while maintenance mode is on. */
+function sync(): void {
+  const s = useOffline.getState();
+  hold(s.offline || s.maintenance !== null);
+}
+
+let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * The server marks every answer while maintenance mode is on (PRD 11.7: the game is read only and
+ * the message shows). Looking still works; the buttons are held off like offline, and a quiet read
+ * every 15 seconds finds out when it is over.
+ */
+export function setMaintenance(id: string | null): void {
+  const text =
+    id === null
+      ? null
+      : (MAINTENANCE_WORDINGS.find((w) => w.id === id) ?? MAINTENANCE_WORDINGS[0]).text;
+  if (useOffline.getState().maintenance === text) return;
+  useOffline.setState({ maintenance: text });
+  sync();
+  if (text !== null && !maintenanceTimer) {
+    maintenanceTimer = setInterval(() => void api.farm().catch(() => undefined), CHECK_EVERY_MS);
+  } else if (text === null && maintenanceTimer) {
+    clearInterval(maintenanceTimer);
+    maintenanceTimer = null;
+  }
+}
+
+function enter(): void {
+  useOffline.setState({ offline: true });
+  sync();
+  if (!timer) timer = setInterval(() => void check(), CHECK_EVERY_MS);
+}
+
+function leave(): void {
+  if (timer) clearInterval(timer);
+  timer = null;
+  useOffline.setState({ offline: false });
+  sync();
+}
+
+/** Show a farm that was kept, as the live one. Read-only until the game answers. */
+function showKept(kept: Snapshot): void {
+  useGame.setState({ phase: 'ready', snapshot: kept, notice: null });
+  enter();
+}
+
+/** Ask the server for the farm. If it answers, the live farm replaces the kept one. */
+async function check(): Promise<void> {
+  if (checking || !useOffline.getState().offline) return;
+  checking = true;
+  try {
+    const r = await api.farm();
+    if (!r.snapshot) {
+      // The farm is gone or can not be opened: let the normal screens say so.
+      leave();
+      void useGame.getState().load();
+      return;
+    }
+    const { paddockId, mobId } = useGame.getState();
+    const snapshot = r.snapshot;
+    leave();
+    useGame.setState({
+      snapshot,
+      phase: 'ready',
+      paddockId:
+        paddockId !== null && snapshot.view.paddocks.some((p) => p.id === paddockId)
+          ? paddockId
+          : null,
+      mobId: mobId !== null && snapshot.mobs.some((m) => m.id === mobId) ? mobId : null,
+    });
+  } catch {
+    // Still not reachable. Try again at the next check.
+  } finally {
+    checking = false;
+  }
+}
+
+/**
+ * Start watching. Call once when /play is on the screen. Returns the function
+ * that stops it.
+ */
+export function startOfflineWatch(): () => void {
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let pending: Snapshot | null = null;
+
+  const flush = (): void => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    // The copy is kept for one player. Until the server has said who that is, it waits.
+    const who = useMe.getState();
+    if (pending && !useOffline.getState().offline && who.settled && !who.unknown) {
+      saveLastFarm(pending, undefined, who.me?.scope ?? GUEST);
+      pending = null;
+    }
+  };
+
+  // The game could not be reached on opening, and a farm was kept: show it.
+  const reached = (): boolean => {
+    const s = useGame.getState();
+    if (s.phase !== 'failed') return false;
+    if (navigator.onLine !== false && s.notice?.message !== UNREACHABLE) return false;
+    // The server can not be asked who this is, so the player this browser last saw.
+    const kept = loadLastFarm(undefined, lastScope());
+    if (!kept) return false;
+    showKept(kept);
+    return true;
+  };
+
+  const unsubscribe = useGame.subscribe((s, prev) => {
+    if (s.phase === 'failed' && prev.phase !== 'failed') {
+      reached();
+      return;
+    }
+    if ((s.phase === 'setup' || s.phase === 'broken') && prev.phase !== s.phase) {
+      // No farm to keep: it was thrown away, or never started.
+      if (!useOffline.getState().offline)
+        clearLastFarm(undefined, useMe.getState().me?.scope ?? GUEST);
+      return;
+    }
+    if (s.snapshot && s.snapshot !== prev.snapshot && !useOffline.getState().offline) {
+      pending = s.snapshot;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(flush, SAVE_AFTER_MS);
+    }
+  });
+
+  // When the server says who the player is, remember it, and keep the copy that was waiting.
+  const unwatchMe = useMe.subscribe((m, prev) => {
+    if (!m.settled || prev.settled || m.unknown) return;
+    if (m.me) rememberScope(m.me.scope ?? GUEST);
+    if (pending) {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(flush, SAVE_AFTER_MS);
+    }
+  });
+
+  const onOffline = (): void => {
+    // Only a farm on the screen is held. The loading and failed screens have their own words.
+    if (useGame.getState().phase === 'ready') enter();
+  };
+  const onOnline = (): void => void check();
+  const onHide = (): void => {
+    if (document.visibilityState === 'hidden') flush();
+  };
+  onMaintenance(setMaintenance);
+  window.addEventListener('offline', onOffline);
+  window.addEventListener('online', onOnline);
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', onHide);
+
+  // The page may already be offline, or the load may already have failed.
+  if (!reached() && navigator.onLine === false && useGame.getState().phase === 'ready') enter();
+
+  return () => {
+    unsubscribe();
+    unwatchMe();
+    window.removeEventListener('offline', onOffline);
+    window.removeEventListener('online', onOnline);
+    window.removeEventListener('pagehide', flush);
+    document.removeEventListener('visibilitychange', onHide);
+    flush();
+    if (timer) clearInterval(timer);
+    timer = null;
+    onMaintenance(null);
+    setMaintenance(null);
+    if (useOffline.getState().offline) leave();
+  };
+}

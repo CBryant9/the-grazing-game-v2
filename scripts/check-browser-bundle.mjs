@@ -1,0 +1,299 @@
+// Proves the rules stay hidden (CLAUDE.md, rule 14).
+//
+//   pnpm build && pnpm check:browser-bundle
+//
+// Searches what the build sends to the browser for text that exists only in
+// the engine and its data: the JavaScript in apps/web/.next/static, and the
+// HTML and page data (React Server Component payloads) the server sends for
+// /play, from apps/web/.next/server/app. If any is found, the engine or its
+// tables have leaked into the browser, and this fails.
+//
+// The terms are ones a minifier can not rename: string literals, and property
+// names that are data (district figure keys). Each term is also looked for in
+// the engine's own source, so the list can not go stale: a term that has been
+// renamed away fails the check until someone picks a new one. And a term the
+// browser is meant to hold ("Next day") is looked for in the JavaScript, so a
+// scan that found no files can not pass.
+//
+// It also reads the built service worker (serwist/sw.js.body, in the same
+// folder) and every file in its precache list, since all of those are sent
+// to the browser too. If the service worker file is missing after a build,
+// that fails.
+//
+// For its own test (scripts/check-browser-bundle.test.ts) the folders can be
+// given: --static <dir> --app <dir> --public <dir>.
+
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ENGINE_SRC = join(ROOT, 'packages/engine/src');
+
+const arg = (name, fallback) => {
+  const i = process.argv.indexOf(name);
+  return i >= 0 && process.argv[i + 1] ? resolve(process.argv[i + 1]) : fallback;
+};
+const STATIC = arg('--static', join(ROOT, 'apps/web/.next/static'));
+const APP = arg('--app', join(ROOT, 'apps/web/.next/server/app'));
+const PUBLIC = arg('--public', join(ROOT, 'apps/web/public'));
+const SW = join(APP, 'serwist', 'sw.js.body');
+
+/**
+ * Text that exists only in the engine, chosen to survive minifying:
+ * - district figure keys, property names in the district table
+ *   (src/data/districts.ts), which a minifier leaves as they are;
+ * - the names of the farm's random streams (src/farm/generate.ts,
+ *   src/sim/create.ts), string literals;
+ * - messages the engine throws inside the server that a player never sees
+ *   (src/save/save.ts, src/season/weatherGrowth.ts, src/season/realYears.ts).
+ */
+const ENGINE_ONLY = [
+  'dmdMax',
+  'frostSen',
+  'dmdDead',
+  'cpMax',
+  'gen:herd',
+  'gen:fertility',
+  'gen:pasture',
+  'saveFarm: an array of a kind that cannot be saved',
+  'Soil water needs a capacity above 0 mm',
+  'The real years must be whole numbers, oldest first',
+  // The labour rules (milestones 2.1 and 2.2, src/data/labour.ts and src/labour/pool.ts): the figures
+  // table's key names, which a minifier leaves as they are, and the pool's random stream. A screen
+  // gets finished words and whole numbers, never an award table, an injury chance, a draw behind
+  // the list of people or a skill factor.
+  'labour:week:',
+  'awardWeekly',
+  'injuryPerHour',
+  'injuryDaysOff',
+  'injuryCostWeeks',
+  'fencingRisk',
+  'dearerAtZero',
+  'listShareAtZero',
+  'standingMissedPay',
+  'standingPaidOnTime',
+  'skillFactor',
+  'dogsFactor',
+  'handDayShare',
+  'labourPerMetre',
+  'teamMetresPerDay',
+  'newPerWeek',
+  'listedDays',
+  // The sheep model (milestones 2.3 and 2.4, src/data/sheep.ts, src/data/sheepMarket.ts,
+  // src/sheep/): its random streams and table keys. A screen gets finished words and rounded
+  // figures (milestone 2.8), never a lambing chance, a ram rule or a cost table.
+  'gen:flock',
+  'sheep:breeding',
+  'sheep:deaths',
+  'sheep:flies',
+  'eweYearDse',
+  'csAtLambing',
+  'ramYears',
+  'scanDays',
+  'lambRisk',
+];
+
+/**
+ * Names of the server's secrets (milestone 3.2). They are environment variable names, which the
+ * server code reads and nothing sent to the browser may hold: a bundle that carries one has
+ * pulled server code in (the secret key, the database connection or the ban pepper with it).
+ * Each is also looked for in apps/web/server, so the list can not go stale.
+ */
+const SERVER_ONLY = [
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_DB_POOLER_URL',
+  'BAN_HASH_PEPPER',
+  // Stripe (milestone 5.2): the secret key and the webhook signing secret, and the prefix of a
+  // signing secret, which nothing in the browser may ever hold.
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'whsec_',
+];
+const SERVER_SRC = join(ROOT, 'apps/web/server');
+
+/** Text the browser code does hold. Seeing it proves the scan read the right files. */
+const BROWSER_HAS = 'Next day';
+
+function files(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) files(path, out);
+    else out.push(path);
+  }
+  return out;
+}
+
+let engineText = '';
+for (const f of files(ENGINE_SRC)) {
+  if (f.endsWith('.ts') && !f.endsWith('.test.ts')) engineText += readFileSync(f, 'utf8');
+}
+const stale = ENGINE_ONLY.filter((t) => !engineText.includes(t));
+if (stale.length) {
+  console.error(`These search terms are not in the engine source any more: ${stale.join(', ')}.`);
+  console.error(
+    'Pick current names from packages/engine/src and update scripts/check-browser-bundle.mjs.',
+  );
+  process.exit(1);
+}
+
+let serverText = '';
+for (const f of files(SERVER_SRC)) {
+  if (f.endsWith('.ts') && !f.endsWith('.test.ts')) serverText += readFileSync(f, 'utf8');
+}
+const staleServer = SERVER_ONLY.filter((t) => !serverText.includes(t));
+if (staleServer.length) {
+  console.error(
+    `These search terms are not in apps/web/server any more: ${staleServer.join(', ')}.`,
+  );
+  process.exit(1);
+}
+
+let all;
+try {
+  all = files(STATIC);
+} catch {
+  console.error('There is no build to check. Run pnpm build first.');
+  process.exit(1);
+}
+const scripts = all.filter((f) => f.endsWith('.js'));
+const maps = all.filter((f) => f.endsWith('.map'));
+if (!scripts.length) {
+  console.error(`No JavaScript was found in ${relative(ROOT, STATIC)}.`);
+  process.exit(1);
+}
+
+// The HTML and page data the server sends for /play: play.html, play.rsc and
+// the segment payloads under play/ (whichever this Next.js version writes).
+const pages = [];
+if (existsSync(APP)) {
+  for (const f of files(APP)) {
+    const rel = relative(APP, f).replaceAll('\\', '/');
+    const isPlay = rel === 'play.html' || rel.startsWith('play.') || rel.startsWith('play/');
+    if (isPlay && /\.(html|rsc|body|txt|json|meta)$/.test(f)) pages.push(f);
+  }
+}
+// Since milestone 5.5 /play is made for each request (it gets its own nonce for the
+// Content-Security-Policy), so a build has no play.html to read. Then, on the real build only,
+// the built site is started on this machine with no keys and /play is asked for twice, as a page
+// and as page data, and both answers are searched: that is exactly what a browser is sent.
+let rendered = null;
+if (!existsSync(join(APP, 'play.html')) && !process.argv.includes('--app')) {
+  rendered = await renderPlay();
+  pages.push(...rendered.files);
+}
+if (!pages.length) {
+  console.error(
+    `No HTML or page data for /play was found in ${relative(ROOT, APP)}. Build the site first.`,
+  );
+  process.exit(1);
+}
+
+async function renderPlay() {
+  const { spawn } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { createServer } = await import('node:net');
+  const out = mkdtempSync(join(tmpdir(), 'gg-bundle-play-'));
+  const port = await new Promise((ok) => {
+    const s = createServer().listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => ok(p));
+    });
+  });
+  const child = spawn(process.execPath, [join(ROOT, 'scripts/load/server.mjs'), String(port)], {
+    env: { ...process.env, NODE_ENV: 'production', GG_FARMS_DIR: join(out, 'farms') },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  try {
+    await new Promise((ok, fail) => {
+      const timer = setTimeout(() => fail(new Error('The built site did not start.')), 60_000);
+      child.stdout.on('data', (d) => {
+        if (String(d).includes('READY')) {
+          clearTimeout(timer);
+          ok();
+        }
+      });
+      child.on('exit', () => fail(new Error('The built site stopped before it was ready.')));
+    });
+    const files = [];
+    for (const [name, headers] of [
+      ['play.html', {}],
+      ['play.rsc', { RSC: '1' }],
+    ]) {
+      const res = await fetch(`http://127.0.0.1:${port}/play`, { headers });
+      if (!res.ok) throw new Error(`/play answered ${res.status}.`);
+      const file = join(out, name);
+      writeFileSync(file, await res.text());
+      files.push(file);
+    }
+    return { files, html: files[0] };
+  } catch (e) {
+    console.error(`Could not render /play from the build: ${e.message}`);
+    process.exit(1);
+  } finally {
+    child.kill();
+  }
+}
+
+// The built service worker and everything in its precache list.
+if (!existsSync(SW)) {
+  console.error(
+    `The service worker was not found at ${relative(ROOT, SW)}. Build the site first, and check the /serwist route still builds it.`,
+  );
+  process.exit(1);
+}
+const swText = readFileSync(SW, 'utf8');
+const precacheUrls = [...swText.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]);
+if (!precacheUrls.length) {
+  console.error(`No precache list was found in ${relative(ROOT, SW)}, so it can not be trusted.`);
+  process.exit(1);
+}
+const swFiles = new Set([SW]);
+const missing = [];
+for (const url of precacheUrls) {
+  const path = url.split('?')[0];
+  let file;
+  // The home page is a pages-router page (apps/web/pages), built beside the app folder.
+  if (path === '/') {
+    const home = join(dirname(APP), 'pages', 'index.html');
+    file = existsSync(home) ? home : join(APP, 'index.html');
+  } else if (path === '/play') file = rendered ? rendered.html : join(APP, 'play.html');
+  else if (path.startsWith('/_next/static/'))
+    file = join(STATIC, path.slice('/_next/static/'.length));
+  else file = join(PUBLIC, path);
+  if (existsSync(file) && statSync(file).isFile()) swFiles.add(file);
+  else missing.push(url);
+}
+if (missing.length) {
+  console.error(
+    `These files are in the service worker's list but were not found: ${missing.join(', ')}.`,
+  );
+  process.exit(1);
+}
+
+const found = [];
+let sawBrowserText = false;
+for (const f of new Set([...scripts, ...pages, ...swFiles])) {
+  const text = readFileSync(f, 'utf8');
+  if (scripts.includes(f) && text.includes(BROWSER_HAS)) sawBrowserText = true;
+  for (const term of [...ENGINE_ONLY, ...SERVER_ONLY]) {
+    if (text.includes(term)) found.push(`${term}  in  ${relative(ROOT, f)}`);
+  }
+}
+
+if (maps.length) found.push(`source maps were published: ${relative(ROOT, maps[0])}`);
+if (!sawBrowserText) {
+  console.error(
+    `The scan did not find "${BROWSER_HAS}" in the browser JavaScript, so it can not be trusted.`,
+  );
+  process.exit(1);
+}
+if (found.length) {
+  console.error('What the browser is sent holds engine text or a server secret name:');
+  for (const line of found) console.error(`  ${line}`);
+  process.exit(1);
+}
+console.log(
+  `Browser bundle clean: ${scripts.length} script files, ${pages.length} /play page files and the service worker with ${swFiles.size - 1} files in its list searched for ${ENGINE_ONLY.length} engine-only terms and ${SERVER_ONLY.length} server secret names, none found.`,
+);
