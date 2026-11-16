@@ -2602,6 +2602,17 @@ Branch `m8-realism-2` from `m7-final` at ea8fa24. A read-only review of the day'
 - `apps/web/lib/game/types.ts` (two wire fields) and `components/play/stockfeed.test.ts` (the tests of the two components) were edited beside the two components.
 - The inbox's marking note (the engine's 45-day note, shown once a drop or again after marking) is unchanged.
 
+## 16 Nov 2026: go-live check
+
+Claudia asked where the game is up to and for steps to put it online with Infisical, Vercel (Pro) and Supabase (free).
+
+- Found: every milestone through m8 is on `m7-final`; `main` holds only the spec. The one branch not merged, `claude/m2-3a-sheep-benchmarks-99f42d`, is the first draft of `docs/SHEEP_BENCHMARKS.md`, already brought in and edited since.
+- Ran on this branch (`m7-final` plus this entry), Node 22.23: install, type check, lint, `pnpm test`, `pnpm test:speed` (2.96 ms a day with 4,890 head; sheep 1.39 ms with 6,865), `pnpm build`, `check:browser-bundle`, `check:js-budget`. All pass after one fix.
+- Fixed: the two digests in `labour/noHands.test.ts` failed on Node 22 and on Node 24 alike, and on every commit back to 0.21.0. The exact hash moved with last-bit Math differences between Node versions. The digest now rounds to 10 significant figures (LESSONS GL1). Rechecked the m8 realism 2 claim the same way: with the inbox, `inboxSeq` and the calving count left out, 0.21.0 and 0.22.0 give the same farm. No engine code changed.
+- Fixed: `apps/web/vercel.json` now pins the server to Sydney (`syd1`) beside the database (LESSONS GL2). The crons stay: Claudia's Vercel plan is Pro.
+- Added `docs/GO_LIVE.md`, the short path for her setup (Infisical sync to Vercel, Supabase free plan facts, Vercel spend limits).
+- Not done: CI has never run on this work (no pull request yet). The phone checks in `docs/LAUNCH_CHECK.md` rows 29 and 33 still need a real phone.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

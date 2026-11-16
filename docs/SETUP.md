@@ -86,7 +86,7 @@ Vercel is the company that hosts the website. Docs: <https://vercel.com/docs/mon
 1. Put the code on GitHub if it is not there already. This repo's remote is `https://github.com/CBryant9/the-grazing-game-v2.git`. Make sure the branch you want online (normally `main`) is pushed. The repo rule is that nothing goes to `main` without your go-ahead.
 2. Make a Vercel account at <https://vercel.com> and choose the plan you want (check the plan page in the dashboard).
 3. In the Vercel dashboard choose **Create New**, then **Project**, then **Import** next to this repository. If it is not listed, give Vercel access to the repository when it asks.
-4. Before you press Deploy, click **Edit** next to **Root Directory** and choose `apps/web`. This is a monorepo (several parts in one repo), and the website lives in that folder. That folder also holds `vercel.json`, which sets up the two scheduled jobs used in part 4.
+4. Before you press Deploy, click **Edit** next to **Root Directory** and choose `apps/web`. This is a monorepo (several parts in one repo), and the website lives in that folder. That folder also holds `vercel.json`, which sets up the two scheduled jobs used in part 4 and runs the server in Sydney (`syd1`), next to the database.
 5. Check that Vercel offers to include source files from outside the root directory. The website uses the shared packages in `packages/`. **Check this in the dashboard** (Settings, Build and Deployment, Root Directory). Docs: <https://vercel.com/docs/builds/configure-a-build#root-directory>.
 6. Leave the framework as Next.js and the build and install commands as they are. Vercel reads the package manager from the repo.
 7. Press **Deploy**.

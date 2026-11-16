@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { across, work } from '../../test-support/workingDay';
 import { endDay, skipDays } from '../day/days';
 import { hash32 } from '../rng';
-import { saveFarm } from '../save/save';
+import { fromBase64, saveFarm } from '../save/save';
 import { loadRealData } from '../server';
 import { createFarm } from '../sim/create';
 import type { FarmState } from '../sim/state';
@@ -31,15 +31,29 @@ function digest(farm: FarmState): string {
   delete saved.startTags;
   delete saved.startNet;
   delete saved.stockedOn;
-  const canonical = (v: unknown): string => {
-    if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  // Numbers are rounded to 10 significant figures, so the digest holds on every Node version.
+  // Node 22 and Node 24 give the same farm, but Math functions can differ in the last bit
+  // (about 1 part in 10^16), and an exact hash of the bits then differs (LESSONS).
+  const num = (x: number): string =>
+    Number.isFinite(x) ? String(Number(x.toPrecision(10)) + 0) : String(x);
+  const floats = (b64: string, C: Float32ArrayConstructor | Float64ArrayConstructor): string => {
+    const bytes = fromBase64(b64);
+    const a = new C(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    return '[' + Array.from(a, num).join(',') + ']';
+  };
+  const canonical = (v: unknown, key = ''): string => {
+    if (typeof v === 'number') return num(v);
+    if (key === 'nums' && typeof v === 'string') return floats(v, Float64Array);
+    if (Array.isArray(v)) return '[' + v.map((x) => canonical(x)).join(',') + ']';
     if (v !== null && typeof v === 'object') {
       const o = v as Record<string, unknown>;
+      if (o.$ === 'f64' && typeof o.b === 'string') return floats(o.b, Float64Array);
+      if (o.$ === 'f32' && typeof o.b === 'string') return floats(o.b, Float32Array);
       return (
         '{' +
         Object.keys(o)
           .sort()
-          .map((k) => JSON.stringify(k) + ':' + canonical(o[k]))
+          .map((k) => JSON.stringify(k) + ':' + canonical(o[k], k))
           .join(',') +
         '}'
       );
@@ -123,5 +137,13 @@ describe('a farm with no hands and no contractors is unchanged', () => {
 // count left out, both farms give the same digest on 0.21.0 (m7-final) and on 0.22.0
 // ('e6c82c766149285f' random, '3cef38dcebdd3891' real; docs/CALIBRATION.md, the m8 realism 2
 // entry). Before: '154b92c7a442c890' and 'a9d5034a80529087'.
-const NO_HANDS_RANDOM = '8add17c3f8661742';
-const NO_HANDS_REAL = '849512f4fe7357eb';
+//
+// Taken again on 16 Nov 2026 with every number rounded to 10 significant figures before hashing.
+// The 0.22.0 digests above failed on this machine on both Node 22 and Node 24, and on every
+// earlier commit back to 0.21.0: an exact hash of the bits moves with the Node version (the
+// last-bit Math differences, about 1 part in 10^16). Rounded, Node 22.23 and Node 24.22 give the
+// same digest. Checked the same way: with the inbox, `inboxSeq` and the calving count left out,
+// 0.21.0 (a8ae3bf) and 0.22.0 both give '0961a06107117090' random and '48e1e0e4cbc59ca7' real,
+// so the farm itself did not move. Before: '8add17c3f8661742' and '849512f4fe7357eb'.
+const NO_HANDS_RANDOM = 'e817683353562dd8';
+const NO_HANDS_REAL = '70a8179390429cfc';
