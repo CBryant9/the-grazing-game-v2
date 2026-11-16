@@ -145,7 +145,7 @@ For the local file, `GG_SITE_URL` can stay empty. On a developer's computer the 
 
 You should see: all of these in Vercel's Environment Variables list.
 
-If not: accounts will stay off. The server writes the reason in the Vercel logs at start-up.
+If not: accounts will stay off. A missing or misspelled Supabase key or `BAN_HASH_PEPPER` (which must be 32 characters or more) writes nothing to the logs: sign-in is just not offered. Only when all five of those are set does the server write a start-up line in the Vercel logs naming a missing `GG_SITE_URL` or `GG_TRUSTED_IP_HEADER`.
 
 ### 3.2 Apply the migrations (build the database)
 
@@ -155,8 +155,8 @@ The migrations are the files in `supabase/migrations`. They build every table an
 2. In the repo folder run `supabase login` and follow the browser steps.
 3. Run `supabase init` once. It adds a `supabase/config.toml` file. Answer no to anything about editor settings. You can leave this new file uncommitted.
 4. Run `supabase link --project-ref <ref>`. The ref is the part of the project URL before `.supabase.co`. It asks for the database password.
-5. Preview: `supabase db push --dry-run --remote`. It lists the files it would apply, in name order.
-6. Apply: `supabase db push --remote`.
+5. Preview: `supabase db push --dry-run`. It lists the files it would apply, in name order.
+6. Apply: `supabase db push`. Once linked, it pushes to the linked project.
 7. **Never** run `supabase db reset` and never use `supabase/seed.sql` on this project. The seed is test data.
 
 You should see: every file in `supabase/migrations` applied, with no error. In the Supabase dashboard, **Table Editor** lists many tables (`profiles`, `farms`, `feature_switches` and more).

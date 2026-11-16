@@ -1505,6 +1505,10 @@ Unmanaged figures swing on stock values and overheads year to year and are not m
 
 **Speed** (each alone): see the DEVELOPMENT_LOG entry.
 
+### 16 Nov 2026, go-live check: no-hands digests rounded, no model change
+
+No engine code, model or data changed, so no benchmark was rerun. The two digests in `labour/noHands.test.ts` failed on a fresh machine on Node 22.23 and Node 24.22, and on every commit back to 0.21.0: the exact hash moved with last-bit Math differences between Node versions. The digest now rounds every number, packed float arrays included, to 10 significant figures; Node 22 and 24 give the same values, `e817683353562dd8` (random) and `70a8179390429cfc` (real). With the inbox, `inboxSeq` and the calving count left out, 0.21.0 (a8ae3bf) and 0.22.0 both give `0961a06107117090` and `48e1e0e4cbc59ca7`, so the m8 realism 2 claim that only the inbox moved still holds. The exact-bit values quoted in the m8 realism 2 entry below no longer reproduce off the machine they were taken on. The rounded digest still moves for a 1 cent change in cash, 1 g on one animal or one float32 step in one grid cell (realism-guardian check).
+
 ### 15 Nov 2026, m7.1 realism fixes: engine 0.19.0, save format 14
 
 What changed (no grass, cattle, sheep, crop, season or price formula): a night can leave grazing plan moves to the player (`plansByHand`, Daily Farm with no hand at work), with the plan live and its report counting the night, and a plan of several moves a day grazing the day across the areas the mob was moved through by hand; `planMove` works for sheep and gives the real reason a move is blocked; `createFarm` refuses a start date that is not a day of the month; a rescue values sheep as a normal sale pays and keeps the cash it adds out of the year's profit and score (`YearTotals.keepGoing`). Engine 0.18.0 had no calibration entry of its own: it changed no rule or number (version.ts).

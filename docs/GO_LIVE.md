@@ -14,7 +14,7 @@ Where this guide says **check the screen**, the step could not be confirmed agai
 
 - The game is built. All the work is on the branch `m7-final`. `main` still holds only the spec, so a deploy from `main` today would show nothing.
 - This session's branch, `claude/blissful-ride-f85ugc`, is `m7-final` plus the fixes from 16 Nov (see the end of this file).
-- Checks on 16 Nov, on this branch: type check, lint, all 4,351 tests (22 expected fails are marked as such), the speed test (2.96 ms a day with 4,890 head), the production build, the hidden-rules check and the script size budget all pass.
+- Checks on 16 Nov, on this branch: type check, lint, the full test suite (4,351 tests pass and 4 are skipped; 22 more are known fails, marked as expected), the speed test (2.96 ms a day with 4,890 head), the production build, the hidden-rules check and the script size budget all pass.
 - With no keys the game already plays as a guest. The keys turn on accounts, saved farms online, Daily Farm and the admin area.
 
 What you need before you start: a computer with Git, Node.js 24 and pnpm (`docs/SETUP.md` part 0), about two hours, and your password manager.
@@ -53,7 +53,7 @@ Detail: `docs/SETUP.md` part 3.1.
 
    The first is `BAN_HASH_PEPPER`. Keep it for good: changing it voids every ban. The second is `CRON_SECRET`.
 
-Check: you have seven values in your password manager.
+Check: you have eight values in your password manager (the password, five from step 3 and the two secrets).
 
 ### Free plan facts that matter
 
@@ -182,9 +182,11 @@ Everything else (Stripe, push keys, Resend, Sentry, PostHog, the live weather fe
 3. **Destination:** the connection from 6.3, the project `the-grazing-game-v2`, Vercel environment **Production**.
 4. **Initial sync behaviour:** choose the option that overwrites the destination with Infisical's values. Vercel has none of these keys yet, so nothing is lost.
 5. Leave **Auto-sync** on, so a change in Infisical reaches Vercel by itself.
-6. Save. Then make a second sync the same way with Vercel environment **Preview**, so preview deploys also have the database.
+6. Save.
 
-Check: in Vercel, project **Settings**, **Environment Variables** now lists the nine names for Production (and Preview).
+Sync **Production only** for now. A preview deploy (a test copy Vercel makes for a pull request) then runs as a guest game with no database. If you later sync the same values into **Preview**, previews would write to the live database, and their sign-in links would go to the live site. Make a separate Supabase project for previews before you do that.
+
+Check: in Vercel, project **Settings**, **Environment Variables** now lists the nine names for Production.
 
 ### 6.5 Redeploy
 
@@ -227,7 +229,7 @@ Check: `/admin` opens. `/admin/switches` shows Fast Farm, Daily Farm, sign-ups, 
 Check that Daily Farm moves on by itself: after 15 to 30 minutes, run this in the SQL Editor:
 
 ```sql
-select * from public.daily_counts order by day desc limit 5;
+select * from public.daily_counts where metric like 'rollover%' order by day desc limit 20;
 ```
 
 `rollover_runs` should be going up and `rollover_failed` should stay at 0. If nothing moves, check `CRON_SECRET` is in Vercel's variables and that you redeployed after the sync.
@@ -237,7 +239,7 @@ select * from public.daily_counts order by day desc limit 5;
 ## If something goes wrong
 
 - **Build fails on Vercel:** read the build log from the top. A missing package in `packages/` means the Root Directory or "include files outside the root" setting is wrong (step 5).
-- **Sign-in is not offered:** one of the nine Production variables is missing or misspelled, or the site was not redeployed after the sync. Vercel's runtime logs say which at start-up.
+- **Sign-in is not offered:** one of the seven sign-in variables is missing or misspelled, or the site was not redeployed after the sync. The seven are the five Supabase and pepper keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_POOLER_URL`, `BAN_HASH_PEPPER`) plus `GG_SITE_URL` and `GG_TRUSTED_IP_HEADER`. `BAN_HASH_PEPPER` must be at least 32 characters (the command in step 2 makes 64). A missing Supabase key or pepper writes **nothing** to the logs; sign-in is just not offered. Only when all five are there does Vercel's runtime log name a missing `GG_SITE_URL` or `GG_TRUSTED_IP_HEADER`. So check the names in Vercel one by one.
 - **The sign-in email never comes:** check spam, check the redirect URL (step 7), and remember the free sender's hourly limit.
 - **`/admin` refuses you:** run the SQL in step 8 again, open `/play`, then `/admin`.
 - More: `docs/SETUP.md` part 11 and `docs/RUNBOOK.md`.
@@ -258,4 +260,5 @@ These are in `docs/CALLS_FOR_CLAUDIA.md`. The ones you will notice first when yo
 - **A1 and A2:** winter feed on the Tablelands, steer gains, calf weights.
 - **Sheep** stay off until you rule on A4 to A6.
 - **Before real players:** the legal pages (privacy, terms, community rules) are drafts with no lawyer's review, and purchases stay off until the Consumer Law and GST advice (`docs/LAUNCH_CHECK.md` rows 39 to 42).
+- In landscape on a phone, the "Nothing to check now" pill sits over the first paddock's name label. Small, but worth a look.
 - Not proven yet, because they need a real phone: 60 fps with 4,000 head on a mid-range Android, and every flow in portrait and landscape, light and dark.

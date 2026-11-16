@@ -10,7 +10,8 @@
  * `stockedOn`, the days stock were on each square, for the stock book and
  * rest days; engine 0.22.0: `startNet`, the stock book's cost in for a head
  * taken over) are left out too. Every other figure, the inbox and the action
- * log must be what they were.
+ * log must be what they were. Numbers are rounded to 10 significant figures
+ * before hashing (16 Nov 2026), so the digest is the same on every Node version.
  */
 
 import { describe, expect, it } from 'vitest';
