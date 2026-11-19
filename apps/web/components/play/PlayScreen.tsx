@@ -12,6 +12,8 @@ import type { Snapshot } from '@/lib/game/types';
 import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
 import { DailyOverlay } from './DailyBits';
+import { DayClockRunner } from './DayClock';
+import { mapClock } from '@/lib/game/dayclock';
 import { FarmMap } from './FarmMap';
 import { HelpPanel } from './HelpPanel';
 import { HerdList, PaddockList } from './Lists';
@@ -146,10 +148,12 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
-  // Evening: nothing more can start today, so the farm is lit for dusk. It can still be looked at.
+  // Evening (Daily Farm): nothing more can start today, so the farm is lit for dusk. It can still
+  // be looked at. A Fast Farm is never evening: its light follows the moving day (`mapClock`).
   const minutes = clock.evening
     ? Math.max(clock.now, clock.lastLight + DUSK_AFTER_LAST_LIGHT)
     : clock.now;
+  const moving = !clock.daylightLimit;
 
   // The page itself does not scroll: the map takes the room.
   useEffect(() => {
@@ -271,6 +275,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
               view={snapshot.view}
               theme={theme}
               minutes={minutes}
+              liveClock={moving ? mapClock : null}
               selected={move ? move.target : paddockId}
               pickable={pickables}
               reduceMotion={reduceMotion}
@@ -345,6 +350,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         </div>
         {!pc && <Nav />}
       </div>
+      {moving && <DayClockRunner snapshot={snapshot} />}
       {yearEnd && <YearEndCard end={yearEnd} />}
       {summary && !yearEnd && <SummaryCard summary={summary} />}
       {snapshot.over && !overHidden && !yearEnd && !summary && (

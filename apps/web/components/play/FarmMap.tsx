@@ -53,6 +53,7 @@ export function FarmMap({
   view,
   theme,
   minutes,
+  liveClock,
   selected,
   pickable,
   reduceMotion,
@@ -74,6 +75,14 @@ export function FarmMap({
   theme: ThemeName;
   /** The time of day to light the map for, minutes after midnight. */
   minutes: number;
+  /**
+   * Fast Farm's moving day: the light follows this every frame instead of `minutes`, straight
+   * to the renderer, with no React redraw. Null for the farm's own clock (Daily Farm).
+   */
+  liveClock?: {
+    now: number | null;
+    subscribe: (fn: (minutes: number | null) => void) => () => void;
+  } | null;
   selected: number | null;
   /** Paddocks a tool can pick (the move tool), outlined lightly, purple where there is no water. Null when none. */
   pickable: readonly PickablePaddock[] | null;
@@ -159,8 +168,15 @@ export function FarmMap({
     if (ready) mapRef.current?.setTheme(theme);
   }, [ready, theme]);
   useEffect(() => {
-    if (ready) mapRef.current?.setTimeOfDay(minutes);
-  }, [ready, minutes]);
+    if (ready && !liveClock) mapRef.current?.setTimeOfDay(minutes);
+  }, [ready, minutes, liveClock]);
+  useEffect(() => {
+    if (!ready || !liveClock) return;
+    mapRef.current?.setTimeOfDay(liveClock.now ?? minutes);
+    return liveClock.subscribe((m) => mapRef.current?.setTimeOfDay(m));
+    // `minutes` is only the first light until the clock publishes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, liveClock]);
   useEffect(() => {
     if (ready) mapRef.current?.setHighlight(selected);
   }, [ready, selected]);

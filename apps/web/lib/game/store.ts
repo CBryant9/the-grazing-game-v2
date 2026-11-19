@@ -9,6 +9,7 @@ import {
   type BuildTool,
   type HubOn,
 } from './build';
+import { dayLine } from './dayclock';
 import { latestOnly } from './latest';
 import { movePicks } from './lists';
 import {
@@ -85,6 +86,9 @@ export interface JobState {
   ticket?: number;
 }
 
+/** What the moving day does after asking for the next day (see `autoDay`). */
+export type AutoDayOutcome = 'next' | 'pause' | 'stale' | 'failed' | 'busy';
+
 /** A one-use id for a Confirm. */
 export function newRequestId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
@@ -146,7 +150,7 @@ export interface Notice {
   retry?: () => void;
 }
 
-interface GameState {
+export interface GameState {
   /** 'broken': the farm is there and can't be opened. 'pick': a signed-in player with more than one farm chooses one. */
   phase: 'loading' | 'setup' | 'ready' | 'failed' | 'broken' | 'pick';
   /** The signed-in player's farms, while the picker is showing. */
@@ -166,6 +170,11 @@ interface GameState {
   /** The mob card that is open. It is never opened by tapping a cow on the map. */
   mobId: number | null;
   summary: SummaryWire | null;
+  /**
+   * Fast Farm, while the day moves by itself: one line of facts about the night that just
+   * passed, shown in the top bar in place of the full summary. Null after a Next day or skip.
+   */
+  dayNote: string | null;
   /** The year that closed in the last day or skip. Shown before its summary. */
   yearEnd: YearEndState | null;
   /** True when the player chose to look around a finished farm: the game over card is hidden. */
@@ -195,6 +204,14 @@ interface GameState {
   created: (choices: SetupChoices) => Promise<void>;
   restart: () => Promise<void>;
   nextDay: () => Promise<void>;
+  /**
+   * Fast Farm: the day that moves by itself has reached the night. One call to the same day
+   * endpoint as Next day. The full summary shows only when the day should stop for the player
+   * (anything a skip stops for, or a report that needs their eye); otherwise one line of facts.
+   * Says what the clock does next: carry on, pause, start the day again (stale), or stop (failed
+   * or busy).
+   */
+  autoDay: () => Promise<AutoDayOutcome>;
   skip: (length: SkipRequestLength, anyway?: boolean) => Promise<void>;
   startJob: (key: string) => Promise<void>;
   confirmJob: (key: string) => Promise<void>;
@@ -283,6 +300,8 @@ const messageOf = (e: unknown): string =>
   e instanceof ApiError ? e.message : 'Something went wrong. Try again in a moment.';
 
 let recordTickets = 0;
+/** True while the moving day's own request for tomorrow is on its way (Fast Farm). */
+let autoDayOn = false;
 let tickets = 0;
 /** A number for each preview asked, so only the answer to the newest is used. */
 const nextTicket = (): number => ++tickets;
@@ -331,6 +350,7 @@ export const useGame = create<GameState>()((set, get) => {
     sow: null,
     build: null,
     summary: null,
+    dayNote: null,
     yearEnd: null,
     overHidden: false,
     morePage: 'menu',
@@ -559,6 +579,7 @@ export const useGame = create<GameState>()((set, get) => {
     paddockId: null,
     mobId: null,
     summary: null,
+    dayNote: null,
     yearEnd: null,
     overHidden: false,
     morePage: 'menu',
@@ -670,6 +691,7 @@ export const useGame = create<GameState>()((set, get) => {
         sow: null,
         build: null,
         summary: null,
+        dayNote: null,
         yearEnd: null,
         overHidden: false,
         morePage: 'menu',
@@ -692,6 +714,7 @@ export const useGame = create<GameState>()((set, get) => {
             sow: null,
             build: null,
             summary: null,
+            dayNote: null,
             yearEnd: null,
             overHidden: false,
             morePage: 'menu',
@@ -705,7 +728,7 @@ export const useGame = create<GameState>()((set, get) => {
     },
 
     async nextDay() {
-      if (get().busy > 0) return;
+      if (get().busy > 0 || autoDayOn) return;
       await run(
         () => void get().nextDay(),
         async () => {
@@ -719,6 +742,7 @@ export const useGame = create<GameState>()((set, get) => {
           set({
             ...adopt(snapshot),
             summary,
+            dayNote: null,
             yearEnd: yearEndOf(r),
             jobs: {},
             acts: {},
@@ -732,8 +756,54 @@ export const useGame = create<GameState>()((set, get) => {
       );
     },
 
+    async autoDay() {
+      if (get().busy > 0 || autoDayOn) return 'busy';
+      let outcome: AutoDayOutcome = 'failed';
+      // Not through `run`: the day's own request does not grey out the time buttons or show the
+      // working bar every day. Next day and the skips wait for it (`autoDayOn`).
+      autoDayOn = true;
+      try {
+        const r = await api.day(versionNow());
+        lineChecker.cancel();
+        if (!r.ok) {
+          // Someone else moved the farm on (another tab): show it as it is and carry on from there.
+          staleNotice(r);
+          outcome = 'stale';
+        } else {
+          const { snapshot, summary } = r;
+          const yearEnd = yearEndOf(r);
+          const stop =
+            summary.stops.length > 0 || summary.reportFirst || yearEnd !== null || !!snapshot.over;
+          set({
+            ...adopt(snapshot),
+            summary: stop ? summary : null,
+            dayNote: stop ? null : dayLine(summary, snapshot.totals.rainMm),
+            yearEnd,
+            jobs: {},
+            acts: {},
+            // A result being read stays until it is closed. Nothing else is open: the day held for it.
+            move: get().move?.phase === 'done' ? get().move : null,
+            plan: null,
+            sow: null,
+            build: get().build?.phase === 'done' ? get().build : null,
+          });
+          refreshRecord();
+          outcome = stop ? 'pause' : 'next';
+        }
+      } catch (e) {
+        // The farm was refused as it stands (over, seen from an old tab): load it again.
+        if (e instanceof ApiError && e.status === 409) void get().load();
+        // A failed day stops the clock: the notice's Try again is a plain Next day.
+        else set({ notice: { message: messageOf(e), retry: () => void get().nextDay() } });
+        outcome = 'failed';
+      } finally {
+        autoDayOn = false;
+      }
+      return outcome;
+    },
+
     async skip(length, anyway = false) {
-      if (get().busy > 0) return;
+      if (get().busy > 0 || autoDayOn) return;
       await run(
         () => void get().skip(length, anyway),
         async () => {
@@ -748,6 +818,7 @@ export const useGame = create<GameState>()((set, get) => {
           set({
             ...adopt(snapshot),
             summary,
+            dayNote: ran ? null : get().dayNote,
             yearEnd: yearEndOf(r),
             jobs: ran ? {} : get().jobs,
             acts: ran ? {} : get().acts,

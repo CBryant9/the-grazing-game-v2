@@ -19,6 +19,7 @@ import { HelpSection } from './HelpPanel';
 import { Icon, type IconName } from './Icon';
 import { ScoresPanel } from './ScoresPanel';
 import { WorkforcePanel } from './WorkforcePanel';
+import { useHoldDay } from './DayClock';
 import { useUi, type MoreExtra } from './ui';
 import styles from './play.module.css';
 
@@ -81,6 +82,8 @@ function Farm({ snapshot }: { snapshot: Snapshot }) {
   const restart = useGame((s) => s.restart);
   const busy = useGame((s) => s.busy > 0);
   const [asking, setAsking] = useState(false);
+  // The day must not end under the "start a new farm" confirm.
+  useHoldDay('more:new-farm', asking);
   const facts = setupFacts(snapshot.farm.setup);
   return (
     <section aria-labelledby="farm-title" className={styles.stack}>

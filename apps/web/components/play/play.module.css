@@ -168,6 +168,41 @@
   border-color: var(--btn-hi);
   color: #fff;
 }
+/* Fast Farm's Play or Pause and the speed: square chips beside Next day. */
+.tbicon {
+  min-width: 34px;
+  padding: 6px 7px;
+  flex: none;
+}
+.screen[data-layout='phone'] .times > .tbicon {
+  flex: none;
+}
+/* With Play and the speed in the row, Next day keeps the room for its words. */
+.screen[data-layout='phone'] .times > .tbicon ~ .tbpri {
+  flex: 2.2 1 0;
+}
+/* Fast Farm's day bar: the daylight bar's track with the sun moving along it (milestone 9). */
+.suntrack {
+  overflow: hidden;
+  height: 8px;
+}
+.suncar {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  pointer-events: none;
+}
+.suncar::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff6c8;
+  box-shadow: 0 0 0 1px #000;
+}
 /* Evening: Next day invites a click. No words, just a quiet pulse. */
 .invite {
   animation: invite 1.8s ease-in-out infinite;
@@ -319,7 +354,7 @@
 .screen[data-layout='landscape'] .topdl {
   width: auto;
   flex: 1 1 60px;
-  min-width: 40px;
+  min-width: 0;
   max-width: 150px;
 }
 .screen[data-layout='landscape'] .times {
