@@ -58,6 +58,7 @@ import {
   type Camera,
   type FitMode,
   type Point,
+  type ScreenInset,
   type Viewport,
 } from './camera';
 import { placeCattle, placementKey, type MobPlacement } from './cattle';
@@ -278,6 +279,12 @@ export interface FarmMap {
   /** Draw a draft on top of the map (a line about to be built), or null to clear it. Only the overlay is redrawn. */
   setDraft(draft: MapDraft | null): void;
   /**
+   * How much of the top and bottom of the map the page covers, in CSS pixels
+   * (a phone's floating top bar and build tray). The map can then be dragged
+   * that much further, so every part of the farm can be brought into the clear.
+   */
+  setInsets(top: number, bottom: number, left?: number, right?: number): void;
+  /**
    * Contract fencing under way: the segments the contractor has built and
    * the ones still to build, drawn in the contractor's colour. Null clears it.
    */
@@ -471,6 +478,8 @@ class PixiFarmMap implements FarmMap {
   /** The grid near the pointer or finger, stronger. Redrawn only when the corner under it changes. */
   private gridNearG = new Graphics();
   private gridFocus: Corner | null = null;
+  /** Screen covered by the page's bars (a phone's top bar and build tray): the farm may be pulled out from under them. */
+  private inset: Required<ScreenInset> = { top: 0, bottom: 0, left: 0, right: 0 };
   /** The zoom step the grid was last drawn for. NaN when it is not drawn. */
   private gridBucket = NaN;
   /** The live length at the end of a line being drawn. */
@@ -620,6 +629,7 @@ class PixiFarmMap implements FarmMap {
       moveTo: (cam) => this.setCamera(cam),
       tap: (x, y) => this.onTap(x, y),
       hover: (p) => this.onHover(p),
+      inset: () => this.inset,
       // A finger has no hover: in a tool, pressing shows what is under it, as the mouse does.
       press: (p) => {
         if (this.tool !== 'look') this.onHover(p);
@@ -862,7 +872,7 @@ class PixiFarmMap implements FarmMap {
   // -------------------------------------------------------------------------
 
   private setCamera(cam: Camera): void {
-    const next = clampCamera(cam, this.vp);
+    const next = clampCamera(cam, this.vp, this.inset);
     if (next.zoom === this.cam.zoom && next.x === this.cam.x && next.y === this.cam.y) return;
     this.cam = next;
     this.applyCamera();
@@ -2108,6 +2118,23 @@ class PixiFarmMap implements FarmMap {
     this.input?.refreshCursor();
   }
 
+  setInsets(top: number, bottom: number, left = 0, right = 0): void {
+    const r = (v: number): number => Math.max(0, Math.round(v));
+    const next = { top: r(top), bottom: r(bottom), left: r(left), right: r(right) };
+    const was = this.inset;
+    if (
+      next.top === was.top &&
+      next.bottom === was.bottom &&
+      next.left === was.left &&
+      next.right === was.right
+    ) {
+      return;
+    }
+    this.inset = next;
+    // Pull the camera back into range if a bar went away.
+    this.setCamera(this.cam);
+  }
+
   setDraft(draft: MapDraft | null): void {
     // Nothing to clear, nothing to draw: leave the overlay alone.
     if (!draft && !this.draft) return;
@@ -2349,14 +2376,16 @@ class PixiFarmMap implements FarmMap {
     const d = this.draft;
     const view = this.view;
     if (!d || !view || d.kind === 'mark') return;
-    const side = view.scale.sideM;
+    // Whole metres a side, as the job card counts them, so the two always agree.
+    const side = Math.round(view.scale.sideM);
     let metres = 0;
     if (d.segments.length) {
       metres = d.segments.length * side;
       const end = d.dots[d.dots.length - 1];
       if (end) this.lengthTagAt = { wx: end.vx, wy: end.vy * K };
     } else if (d.squares.length) {
-      metres = d.squares.length * side;
+      // Pipe runs from the middle of one square to the next, as the job card counts it.
+      metres = (d.squares.length - 1) * side;
       const end = d.squares[d.squares.length - 1]!.cell;
       this.lengthTagAt = { wx: colOf(end) + 0.5, wy: (rowOf(end) + 0.5) * K };
     }
@@ -2566,18 +2595,24 @@ class PixiFarmMap implements FarmMap {
 
   zoomTo(pxPerSquare: number, square?: number): void {
     if (square === undefined) {
-      this.setCamera(zoomAt(this.cam, this.vp, pxPerSquare, this.vp.width / 2, this.vp.height / 2));
+      this.setCamera(
+        zoomAt(this.cam, this.vp, pxPerSquare, this.vp.width / 2, this.vp.height / 2, this.inset),
+      );
     } else {
-      this.setCamera(lookAt(this.vp, pxPerSquare, colOf(square) + 0.5, (rowOf(square) + 0.5) * K));
+      this.setCamera(
+        lookAt(this.vp, pxPerSquare, colOf(square) + 0.5, (rowOf(square) + 0.5) * K, this.inset),
+      );
     }
   }
 
   panBy(dx: number, dy: number): void {
-    this.setCamera(panCamera(this.cam, this.vp, dx, dy));
+    this.setCamera(panCamera(this.cam, this.vp, dx, dy, this.inset));
   }
 
   centreOn(square: number): void {
-    this.setCamera(lookAt(this.vp, this.cam.zoom, colOf(square) + 0.5, (rowOf(square) + 0.5) * K));
+    this.setCamera(
+      lookAt(this.vp, this.cam.zoom, colOf(square) + 0.5, (rowOf(square) + 0.5) * K, this.inset),
+    );
   }
 
   getCamera(): Camera {
@@ -2596,7 +2631,7 @@ class PixiFarmMap implements FarmMap {
     this.vp = { width: w, height: h };
     this.app.renderer.resize(w, h, this.pixelRatio);
     // The same middle and zoom, so turning a phone keeps your place (PRD 6.1a).
-    this.cam = clampCamera(this.cam, this.vp);
+    this.cam = clampCamera(this.cam, this.vp, this.inset);
     if (this.weather.kind === 'rain') this.buildRain();
     this.applyCamera();
     for (const fn of this.handlers.camera) fn({ ...this.cam });

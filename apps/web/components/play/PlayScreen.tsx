@@ -11,8 +11,9 @@ import { useGame, type Tab } from '@/lib/game/store';
 import type { Snapshot } from '@/lib/game/types';
 import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
+import { BuildGuide } from './BuildGuide';
 import { DailyOverlay } from './DailyBits';
-import { FarmMap } from './FarmMap';
+import { FarmMap, type MapCovers } from './FarmMap';
 import { HelpPanel } from './HelpPanel';
 import { HerdList, PaddockList } from './Lists';
 import { MarketPanel } from './MarketPanel';
@@ -143,7 +144,12 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const startFix = useGame((s) => s.startFix);
   const helpOpen = useHelp((s) => s.helpOpen);
   const trayOpen = useUi((s) => s.trayOpen);
+  const focus = useUi((s) => s.focus);
   const cardRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
+  const toolColRef = useRef<HTMLDivElement>(null);
+  const trayCardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
   // Evening: nothing more can start today, so the farm is lit for dusk. It can still be looked at.
@@ -229,6 +235,16 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const showBuild = tab === 'farm' && !sheetOpen && !(helpOpen && !pc);
 
   const phone = layout === 'phone';
+  // What lies over the map: a phone's top bar and tray, or on its side the tool column and the card.
+  const covers = useMemo<MapCovers>(
+    () =>
+      phone
+        ? { top: hudRef, bottom: stackRef }
+        : pc
+          ? {}
+          : { left: toolColRef, right: trayCardRef },
+    [phone, pc],
+  );
   const banner = !pc && tab === 'farm' && !sheetOpen && !build && !helpOpen;
   // The panel's width on a PC follows the tab, as the mockup (Herd is the widest).
   const panel = tab === 'more' && (morePage === 'scores' || morePage === 'diary') ? 'scores' : tab;
@@ -246,7 +262,11 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         </div>
       )}
       {!phone && <TopBar snapshot={snapshot} />}
-      {!phone && <TourStrip hasCattle={snapshot.mobs.length > 0} />}
+      {/* A phone on its side has little height: the tour is one line, and waits while building. */}
+      {pc && <TourStrip hasCattle={snapshot.mobs.length > 0} />}
+      {!pc && !phone && !(showBuild && build) && (
+        <TourStrip hasCattle={snapshot.mobs.length > 0} compact />
+      )}
       <div className={styles.body}>
         {pc && (
           <div className={styles.railslot}>
@@ -292,6 +312,15 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
               anchor={anchor}
               anchorEl={cardRef}
               floating={pc}
+              focus={focus}
+              focusLiftPx={phone ? 110 : 0}
+              covers={covers}
+              reveal={
+                !pc &&
+                !!build &&
+                !build.drawing &&
+                (build.phase === 'confirm' || build.phase === 'blocked')
+              }
               onDrag={(e) =>
                 sowing
                   ? sowDrag({ phase: e.phase, square: e.square })
@@ -315,23 +344,38 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
             {snapshot.over && overHidden && <OverStrip />}
             {phone && (
               // The top bar floats over the map on a phone held upright, with the things to check under it.
-              <div className={styles.hudstack}>
+              <div ref={hudRef} className={styles.hudstack}>
                 <TopBar snapshot={snapshot} />
-                <TourStrip hasCattle={snapshot.mobs.length > 0} />
+                {/* While building, the step chip says what to do; the tour waits. */}
+                {showBuild && build ? (
+                  <BuildGuide build={snapshot.build} />
+                ) : (
+                  <TourStrip hasCattle={snapshot.mobs.length > 0} compact />
+                )}
                 {banner && <TodoBanner snapshot={snapshot} />}
               </div>
             )}
+            {pc && showBuild && <BuildGuide build={snapshot.build} />}
             {!pc && !phone && banner && <TodoBanner snapshot={snapshot} />}
             {sheetOpen && <Opened snapshot={snapshot} />}
             {pc && showBuild && <BuildCard build={snapshot.build} innerRef={cardRef} floating />}
             {!pc && showBuild && (
-              <div className={`${styles.buildstack} ${trayOpen || build ? styles.trayon : ''}`}>
+              <div
+                ref={stackRef}
+                className={`${styles.buildstack} ${trayOpen || build ? styles.trayon : ''} ${
+                  build?.drawing ? styles.drawing : ''
+                }`}
+              >
                 <AdSlot id="phone_banner" hold={adHold} />
                 {(trayOpen || build) && (
                   <div className={styles.tray}>
                     <div className={styles.grab} aria-hidden="true" />
-                    <BuildBar build={snapshot.build} docked={false} />
-                    <div className={styles.traycard}>
+                    <div ref={toolColRef} className={styles.trayleft}>
+                      {/* On its side the chip heads the tool column, clear of the card on the right. */}
+                      {!phone && <BuildGuide build={snapshot.build} />}
+                      <BuildBar build={snapshot.build} docked={false} />
+                    </div>
+                    <div ref={trayCardRef} className={styles.traycard}>
                       <BuildCard build={snapshot.build} innerRef={cardRef} floating={false} />
                     </div>
                   </div>

@@ -72,7 +72,7 @@ export function buildWire(onHand?: MaterialsOnHand, sheep = false): BuildWire {
       {
         id: 'fence',
         name: 'Fence',
-        help: 'Drag along the paddock lines to draw a fence.',
+        help: 'Drag along the grid from a fence or a corner to draw a fence.',
         price: `${perMetre(COST_PER_M.tape)} to ${perMetre(COST_PER_M.permanent)}`,
       },
       {

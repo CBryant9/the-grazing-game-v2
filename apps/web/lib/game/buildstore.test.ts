@@ -18,6 +18,7 @@ vi.mock('./api', () => {
 });
 
 import { buildAnchor, buildDraft, mapToolFor } from './build';
+import { LINE_START, buildGuide } from './buildguide';
 import { useGame } from './store';
 
 const W = 40;
@@ -541,5 +542,69 @@ describe('a tap in a tool', () => {
     expect(build().picked?.title).toBe('Put this fence back up');
     expect(mapToolFor(build())).toBe('look');
     expect(buildDraft(build(), view)!.segments).toHaveLength(1);
+    // A fallen fence's card needs no tool, so no step chip.
+    expect(buildGuide(build(), '')).toBeNull();
+  });
+});
+
+describe('the step chip says what to do next (19 Nov 2026)', () => {
+  const guide = () => buildGuide(useGame.getState().build, 'Tap a fence to put a gate in it.');
+
+  it('a fence: drag, let go, check the card, build; Look clears it', async () => {
+    useGame.getState().selectTool('fence');
+    expect(guide()).toMatchObject({
+      at: 0,
+      text: LINE_START.fence,
+      steps: ['Draw', 'Check', 'Build'],
+    });
+    api.preview.mockResolvedValue(okPreview(card()));
+    useGame.getState().buildDrag({ phase: 'start', corner: corner(2, 3), square: -1 });
+    useGame.getState().buildDrag({ phase: 'move', corner: corner(4, 3), square: -1 });
+    expect(build().drawing).toBe(true);
+    expect(guide()).toMatchObject({ at: 0, text: 'Let go to see the cost.' });
+    useGame.getState().buildDrag({ phase: 'end', corner: corner(4, 3), square: -1 });
+    expect(build().drawing).toBe(false);
+    expect(guide()).toMatchObject({ at: 1, text: 'Checking the cost.' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(guide()).toMatchObject({ at: 2 });
+    expect(guide()!.text).toMatch(/^Check the card, then press Build it\./);
+    useGame.getState().selectTool('look');
+    expect(guide()).toBeNull();
+  });
+
+  it('a tap tool: the help line first, then the card, and a miss says what to tap', async () => {
+    useGame.getState().selectTool('gate');
+    expect(guide()).toMatchObject({
+      at: 0,
+      steps: ['Tap', 'Check', 'Confirm'],
+      text: 'Tap a fence to put a gate in it.',
+    });
+    await useGame.getState().buildTap({
+      square: 3,
+      edge: null,
+      edgeCode: 0,
+      edgeDistPx: Infinity,
+      corner: null,
+      hub: false,
+      squareHub: false,
+    });
+    expect(guide()!.text).toMatch(/fence line/);
+    api.preview.mockResolvedValue(
+      okPreview(card({ action: 'placeGate', cost: 450, costToday: 450 })),
+    );
+    await useGame.getState().buildTap({
+      square: 10,
+      edge: { line: 'h', index: 100 },
+      edgeCode: 2,
+      edgeDistPx: 5,
+      corner: null,
+      hub: false,
+      squareHub: false,
+    });
+    expect(guide()).toMatchObject({ at: 2, text: 'Check the card, then press Put in a gate.' });
+  });
+
+  it('never praises or blames: plain instructions, no exclamation marks', () => {
+    for (const t of Object.values(LINE_START)) expect(t).not.toMatch(/!|great|well done|bad/i);
   });
 });

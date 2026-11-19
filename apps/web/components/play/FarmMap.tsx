@@ -15,9 +15,61 @@ import type {
 } from '@gg/render';
 import type { MapToolName } from '@/lib/game/build';
 import type { ThemeName } from '@/lib/game/hooks';
+import { insetsOf, revealMove, type Box, type CoverEdge } from '@/lib/game/covers';
+import type { MapFocus } from './ui';
 import styles from './play.module.css';
 
 const NO_BADGES: readonly { cell: number; text: string }[] = [];
+
+type Cover = RefObject<HTMLElement | null>;
+
+/** What lies over each edge of the map. Top and bottom sit on those edges; left and right are columns. */
+export interface MapCovers {
+  top?: Cover;
+  bottom?: Cover;
+  left?: Cover;
+  right?: Cover;
+}
+
+const NO_COVERS: MapCovers = {};
+
+/**
+ * The boxes each cover takes up on the map, in map pixels. A cover that only
+ * lays out its children (a column of a chip and a tool bar) is measured by
+ * its children, so the map between them counts as clear. The bottom tray is
+ * measured by its layout height, not where it is drawn: sliding away while a
+ * line is drawn must not move the map.
+ */
+function coverBoxes(wrap: HTMLElement, c: MapCovers): Partial<Record<CoverEdge, Box[]>> {
+  const at = wrap.getBoundingClientRect();
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  const boxes = (el: HTMLElement | null | undefined): Box[] => {
+    if (!el) return [];
+    const kids = [...el.children].map((k) => k.getBoundingClientRect());
+    const list = kids.length ? kids : [el.getBoundingClientRect()];
+    return list
+      .filter((r) => r.width > 0 && r.height > 0)
+      .map((r) => ({
+        x0: r.left - at.left,
+        y0: r.top - at.top,
+        x1: r.right - at.left,
+        y1: r.bottom - at.top,
+      }));
+  };
+  const bottom = c.bottom?.current;
+  return {
+    top: boxes(c.top?.current),
+    bottom: bottom?.offsetHeight
+      ? [{ x0: 0, y0: H - Math.min(bottom.offsetHeight, H), x1: W, y1: H }]
+      : [],
+    left: boxes(c.left?.current),
+    right: boxes(c.right?.current),
+  };
+}
+
+/** How close the map comes when a button asks it to frame a spot: near enough to build there, screen pixels a square. */
+export const FOCUS_PX_PER_SQUARE = 30;
 
 /** Put the build card beside a point on the ground, inside the map. With no anchor it goes back to the stylesheet's place. */
 function placeCard(
@@ -32,6 +84,7 @@ function placeCard(
     return;
   }
   const p = map.groundToScreen(anchor.gx, anchor.gy);
+  el.style.removeProperty('max-height');
   const W = wrap.clientWidth;
   const H = wrap.clientHeight;
   const w = el.offsetWidth;
@@ -39,7 +92,23 @@ function placeCard(
   let left = p.x + 18;
   if (left + w > W - 8) left = p.x - 18 - w;
   left = Math.min(Math.max(left, 8), Math.max(8, W - w - 8));
-  const top = Math.min(Math.max(p.y - h / 2, 8), Math.max(8, H - h - 8));
+  let top = Math.min(Math.max(p.y - h / 2, 8), Math.max(8, H - h - 8));
+  // Keep clear of the step chip over the map (19 Nov 2026): below it if the card fits there.
+  const chip = wrap.parentElement?.querySelector<HTMLElement>('[data-guide]');
+  if (chip) {
+    const at = wrap.getBoundingClientRect();
+    const c = chip.getBoundingClientRect();
+    const cx0 = c.left - at.left;
+    const cx1 = c.right - at.left;
+    const cy1 = c.bottom - at.top;
+    const overlaps = left < cx1 && left + w > cx0 && top < cy1;
+    if (overlaps) {
+      // Below the chip, shortened to fit if need be (the card scrolls).
+      top = cy1 + 8;
+      const room = H - 8 - top;
+      if (h > room) el.style.maxHeight = `${Math.max(160, Math.round(room))}px`;
+    }
+  }
   el.style.left = `${Math.round(left)}px`;
   el.style.top = `${Math.round(top)}px`;
 }
@@ -67,7 +136,23 @@ export function FarmMap({
   onToolTap,
   onFenceTap,
   badges = NO_BADGES,
+  focus = null,
+  focusLiftPx = 0,
+  covers = NO_COVERS,
+  reveal = false,
 }: {
+  /**
+   * What the page lays over the map: on a phone, the top bar and the build
+   * tray; on its side, the tool column and the card. The farm can be dragged
+   * out from under them, and a line's end is moved clear when its card comes up.
+   */
+  covers?: MapCovers;
+  /** True when the card has come up: move the map so the end of the line is not under a cover. */
+  reveal?: boolean;
+  /** A spot to frame (from a Things to do button or a first step). Each new ask moves the map once. */
+  focus?: MapFocus | null;
+  /** Put the framed spot this many pixels above the middle, clear of a tray at the bottom. */
+  focusLiftPx?: number;
   /** Numbers to show on paddocks, such as the order of a grazing plan. */
   badges?: readonly { cell: number; text: string }[];
   view: FarmView;
@@ -179,6 +264,17 @@ export function FarmMap({
   useEffect(() => {
     if (ready) mapRef.current?.setContractor(contractor);
   }, [ready, contractor]);
+  // Frame the spot a button asked for: closer if need be, never further out than the player had it.
+  const lift = useRef(focusLiftPx);
+  useEffect(() => {
+    lift.current = focusLiftPx;
+  }, [focusLiftPx]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !focus) return;
+    map.zoomTo(Math.max(map.getCamera().zoom, FOCUS_PX_PER_SQUARE), focus.square);
+    if (lift.current) map.panBy(0, -lift.current);
+  }, [ready, focus]);
 
   // Numbers on paddocks follow the map as it moves. They never take a tap.
   const [badgePos, setBadgePos] = useState<{ text: string; x: number; y: number }[]>([]);
@@ -229,6 +325,26 @@ export function FarmMap({
     return mapRef.current?.on('camera', placeNow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // The page's bars and columns cover parts of the map: tell the map, so the farm can be pulled clear of them.
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    const wrap = wrapRef.current;
+    if (!ready || !map || !wrap) return;
+    const i = insetsOf(coverBoxes(wrap, covers), wrap.clientWidth, wrap.clientHeight);
+    map.setInsets(i.top, i.bottom, i.left, i.right);
+  });
+
+  // When the card comes up, the end of the line is moved out from under the tray, column or card.
+  useEffect(() => {
+    const map = mapRef.current;
+    const wrap = wrapRef.current;
+    if (!ready || !reveal || !anchor || !map || !wrap) return;
+    const all = Object.values(coverBoxes(wrap, covers)).flat();
+    const p = map.groundToScreen(anchor.gx, anchor.gy);
+    const [dx, dy] = revealMove(p, all, wrap.clientWidth, wrap.clientHeight);
+    if (dx || dy) map.panBy(dx, dy);
+  }, [ready, reveal, anchor, covers]);
 
   return (
     <div ref={wrapRef} className={styles.mapwrap}>

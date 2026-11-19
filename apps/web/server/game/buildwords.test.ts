@@ -50,7 +50,7 @@ describe('the tool bar words', () => {
       expect(t.price).toMatch(/\$|card/);
     }
     expect(w.tools.find((t) => t.id === 'fence')!.help).toBe(
-      'Drag along the paddock lines to draw a fence.',
+      'Drag along the grid from a fence or a corner to draw a fence.',
     );
     expect(w.tools.find((t) => t.id === 'gate')!.price).toBe(`$${COSTS.gate} a gate`);
     for (const f of w.fences) PLAIN(f.text);

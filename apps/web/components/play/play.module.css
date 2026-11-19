@@ -1278,29 +1278,158 @@
   box-shadow: 0 4px 16px var(--shadow);
   font-size: 0.75rem;
 }
+/* Every tool in sight at once, an icon over a word, four to a row (19 Nov 2026). */
 .toolrow {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: thin;
 }
 .tool {
-  flex: none;
-  min-height: 40px;
-  min-width: var(--tap);
-  padding: 0 9px;
+  min-height: 48px;
+  min-width: 0;
+  padding: 4px 4px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   font-family: var(--font-px);
   font-size: 0.625rem;
-  white-space: nowrap;
+  line-height: 1.1;
+  text-align: center;
+}
+.tool svg {
+  flex: none;
 }
 .tool[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-line);
+}
+
+/* ---- The step chip over the map while building (19 Nov 2026) ---------------- */
+
+.guide {
+  position: absolute;
+  z-index: 10;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(560px, calc(100% - 16px));
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--hud);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.hudstack > .guide {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: auto;
+  max-width: none;
+}
+.screen[data-layout='landscape'] .guide {
+  left: 8px;
+  transform: none;
+  max-width: min(420px, 56%);
+}
+.guidetop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.guidesteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--font-px);
+  font-size: 0.625rem;
+}
+.guidesteps li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.guidesteps li b {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--panel2);
+  font-size: 0.5625rem;
+}
+.guidesteps li[data-done] {
+  color: var(--text);
+}
+.guidesteps li[aria-current='step'] {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+.guidesteps li[aria-current='step'] b {
+  background: var(--accent-ink);
+  color: var(--accent);
+}
+/* Narrow: only the step the player is on keeps its word; the others are their number or tick. */
+@media (max-width: 480px) {
+  .guidesteps li:not([aria-current='step']) span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .guidesteps li:not([aria-current='step']) {
+    padding-right: 2px;
+  }
+}
+.screen[data-layout='landscape'] .guidesteps li:not([aria-current='step']) span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.screen[data-layout='landscape'] .guidesteps li:not([aria-current='step']) {
+  padding-right: 2px;
+}
+.guideback {
+  flex: none;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.guidetext {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+/* A first step: the same row as a thing to do, marked as a next step. */
+.todofirst {
+  border-left: 4px solid var(--accent-line);
 }
 .fencechoice {
   display: grid;
@@ -1357,6 +1486,9 @@
   width: min(300px, calc(100% - 16px));
   left: 8px;
   top: 8px;
+  /* Room for the step chip above it, so the card can always sit clear of the chip and scroll. */
+  max-height: calc(100% - 104px);
+  overflow-y: auto;
 }
 .cardhead {
   display: flex;
@@ -2420,9 +2552,33 @@
   bottom: 0;
   gap: 8px;
   max-height: 62%;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
 }
-/* The card has its own Cancel, so the tool bar's is not drawn beside it. */
-.tray:has(.traycard .buildcard) .toolbar > :global(.btn) {
+/* While a line is being drawn the tray steps out of the way, so the whole map is there to draw on. */
+.screen[data-layout='phone'] .buildstack.drawing {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.screen[data-layout='landscape'] .buildstack.drawing .toolbar,
+.screen[data-layout='landscape'] .buildstack.drawing .traycard {
+  opacity: 0.25;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen[data-layout='phone'] .buildstack {
+    transition: none;
+  }
+}
+/*
+ * Once the card is up on a phone, the tray shrinks to the kind of fence and the card, so the
+ * line just drawn stays in sight. Look and the other tools come back
+ * with Back to Look or Cancel.
+ */
+.tray:has(.traycard .buildcard) .toolrow,
+.tray:has(.traycard .buildcard) .toolhelp {
   display: none;
 }
 .screen[data-layout='phone'] .buildstack > :not(.tray) {
@@ -2473,18 +2629,51 @@
 .screen[data-layout='landscape'] .tray .grab {
   display: none;
 }
-.screen[data-layout='landscape'] .tray .toolbar {
+.trayleft {
+  display: contents;
+}
+/* On its side: the step chip, then the tools, in one column at the left. */
+.screen[data-layout='landscape'] .trayleft {
   position: absolute;
   left: 0;
+  top: 0;
   bottom: 0;
-  max-width: 58%;
-  max-height: 100%;
+  width: min(440px, 58%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.screen[data-layout='landscape'] .trayleft > * {
+  pointer-events: auto;
+}
+.screen[data-layout='landscape'] .trayleft > .guide {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: auto;
+  max-width: none;
+  flex: none;
+}
+.screen[data-layout='landscape'] .tray .toolbar {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   background: var(--hud);
   border: 1px solid var(--line);
   border-radius: 12px;
-  pointer-events: auto;
+}
+/* All eight tools in one row, so the column stays short. */
+.screen[data-layout='landscape'] .toolrow {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.screen[data-layout='landscape'] .tool {
+  min-height: 44px;
+  font-size: 0.5rem;
 }
 .screen[data-layout='landscape'] .traycard {
   position: absolute;

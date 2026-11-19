@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
 import { useGame } from '@/lib/game/store';
 import { currentStep, stepLabel, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
+import { Icon } from './Icon';
 import styles from './help.module.css';
 
 /**
@@ -11,8 +12,18 @@ import styles from './help.module.css';
  * It sits in the page's flow between the top bar and the map, so it never
  * covers the map. Each step finishes when the player does it. Skipping and
  * replaying are always there.
+ *
+ * On a phone held upright (`compact`) it floats over the map under the top
+ * bar, so it is one line: the step and its title. A tap opens the rest.
  */
-export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
+export function TourStrip({
+  hasCattle,
+  compact = false,
+}: {
+  hasCattle: boolean;
+  compact?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
   const tour = useHelp((s) => s.tour);
   const skipStep = useHelp((s) => s.tourSkipStep);
   const endTour = useHelp((s) => s.tourEnd);
@@ -55,12 +66,45 @@ export function TourStrip({ hasCattle }: { hasCattle: boolean }) {
           body: 'The day ends at midnight. Press Done for today when you have finished. A summary of the night shows next time you open the farm.',
         }
       : TOUR_TEXT[step];
+  if (compact && !open) {
+    return (
+      <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">
+        <button
+          type="button"
+          className={styles.sline}
+          aria-expanded={false}
+          onClick={() => setOpen(true)}
+        >
+          <span className={styles.sstep}>
+            {stepLabel(tour, hasCattle)}: {text.title}
+          </span>
+          <Icon name="chevron" size={14} />
+        </button>
+      </section>
+    );
+  }
   return (
     <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">
       <div className={styles.stext} role="status">
-        <p className={styles.sstep}>
-          {stepLabel(tour, hasCattle)}: {text.title}
-        </p>
+        {compact ? (
+          <button
+            type="button"
+            className={styles.sline}
+            aria-expanded={true}
+            onClick={() => setOpen(false)}
+          >
+            <span className={styles.sstep}>
+              {stepLabel(tour, hasCattle)}: {text.title}
+            </span>
+            <span className={styles.sflip}>
+              <Icon name="chevron" size={14} />
+            </span>
+          </button>
+        ) : (
+          <p className={styles.sstep}>
+            {stepLabel(tour, hasCattle)}: {text.title}
+          </p>
+        )}
         <p className={styles.sbody}>{text.body}</p>
       </div>
       <div className={styles.sbtns}>

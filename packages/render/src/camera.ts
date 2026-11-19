@@ -59,23 +59,54 @@ export function clampZoom(zoom: number, vp: Viewport): number {
   return zoom < lo ? lo : zoom > MAX_ZOOM ? MAX_ZOOM : zoom;
 }
 
-/** One axis: centre the farm if it is smaller than the screen, otherwise keep the screen inside it. */
-function clampAxis(centre: number, span: number, lo: number, hi: number): number {
-  if (span >= hi - lo) return (lo + hi) / 2;
-  const min = lo + span / 2;
-  const max = hi - span / 2;
+/**
+ * One axis: centre the farm if it is smaller than the screen, otherwise keep
+ * the screen inside it. Then widen that by what covers each end of the
+ * screen (screen pixels), so nothing is stuck under it.
+ */
+function insetAxis(
+  centre: number,
+  span: number,
+  lo: number,
+  hi: number,
+  before: number,
+  after: number,
+  zoom: number,
+): number {
+  const min = (span >= hi - lo ? (lo + hi) / 2 : lo + span / 2) - Math.max(0, before) / zoom;
+  const max = (span >= hi - lo ? (lo + hi) / 2 : hi - span / 2) + Math.max(0, after) / zoom;
   return centre < min ? min : centre > max ? max : centre;
 }
 
-/** A camera held in range: zoom between the limits, and the screen never off the farm. */
-export function clampCamera(cam: Camera, vp: Viewport): Camera {
+/**
+ * Parts of the screen covered by the page, in screen pixels: on a phone, the
+ * floating top bar and the build tray; on its side, the tool column and the
+ * job card. The farm may be pulled this much further, so every part of it
+ * can come out from under them.
+ */
+export interface ScreenInset {
+  top: number;
+  bottom: number;
+  left?: number;
+  right?: number;
+}
+
+export const NO_INSET: ScreenInset = { top: 0, bottom: 0, left: 0, right: 0 };
+
+/**
+ * A camera held in range: zoom between the limits, and the screen never off
+ * the farm. With an inset the camera may go that much further up or down, so
+ * nothing is stuck under a bar (19 Nov 2026). Every camera that was in range
+ * without the inset still is, so setting one never moves the map.
+ */
+export function clampCamera(cam: Camera, vp: Viewport, inset: ScreenInset = NO_INSET): Camera {
   const zoom = clampZoom(cam.zoom, vp);
   const x = Number.isFinite(cam.x) ? cam.x : WORLD_W / 2;
   const y = Number.isFinite(cam.y) ? cam.y : WORLD_H / 2;
   return {
     zoom,
-    x: clampAxis(x, vp.width / zoom, BOX.x0, BOX.x1),
-    y: clampAxis(y, vp.height / zoom, BOX.y0, BOX.y1),
+    x: insetAxis(x, vp.width / zoom, BOX.x0, BOX.x1, inset.left ?? 0, inset.right ?? 0, zoom),
+    y: insetAxis(y, vp.height / zoom, BOX.y0, BOX.y1, inset.top, inset.bottom, zoom),
   };
 }
 
@@ -132,15 +163,32 @@ export function fitFarm(vp: Viewport, mode: FitMode = 'auto'): Camera {
 }
 
 /** Move the camera by a drag of (dx, dy) screen pixels. The farm follows the finger. */
-export function panBy(cam: Camera, vp: Viewport, dx: number, dy: number): Camera {
-  return clampCamera({ zoom: cam.zoom, x: cam.x - dx / cam.zoom, y: cam.y - dy / cam.zoom }, vp);
+export function panBy(
+  cam: Camera,
+  vp: Viewport,
+  dx: number,
+  dy: number,
+  inset: ScreenInset = NO_INSET,
+): Camera {
+  return clampCamera(
+    { zoom: cam.zoom, x: cam.x - dx / cam.zoom, y: cam.y - dy / cam.zoom },
+    vp,
+    inset,
+  );
 }
 
 /**
  * Zoom to a new level, keeping the world point under a screen point where
  * it is (the mouse pointer, or the middle of a pinch).
  */
-export function zoomAt(cam: Camera, vp: Viewport, zoom: number, sx: number, sy: number): Camera {
+export function zoomAt(
+  cam: Camera,
+  vp: Viewport,
+  zoom: number,
+  sx: number,
+  sy: number,
+  inset: ScreenInset = NO_INSET,
+): Camera {
   const z = clampZoom(zoom, vp);
   const anchor = screenToWorld(cam, vp, sx, sy);
   return clampCamera(
@@ -150,6 +198,7 @@ export function zoomAt(cam: Camera, vp: Viewport, zoom: number, sx: number, sy: 
       y: anchor.y - (sy - vp.height / 2) / z,
     },
     vp,
+    inset,
   );
 }
 
@@ -170,6 +219,7 @@ export function pinch(
   b0: Point,
   a1: Point,
   b1: Point,
+  inset: ScreenInset = NO_INSET,
 ): Camera {
   const d0 = Math.hypot(a0.x - b0.x, a0.y - b0.y);
   const d1 = Math.hypot(a1.x - b1.x, a1.y - b1.y);
@@ -186,12 +236,19 @@ export function pinch(
       y: anchor.y - (m1.y - vp.height / 2) / z,
     },
     vp,
+    inset,
   );
 }
 
 /** A camera centred on a world point at a zoom. */
-export function lookAt(vp: Viewport, zoom: number, wx: number, wy: number): Camera {
-  return clampCamera({ zoom, x: wx, y: wy }, vp);
+export function lookAt(
+  vp: Viewport,
+  zoom: number,
+  wx: number,
+  wy: number,
+  inset: ScreenInset = NO_INSET,
+): Camera {
+  return clampCamera({ zoom, x: wx, y: wy }, vp, inset);
 }
 
 /** After the screen changes size or turns: the same middle and zoom, held in range. */

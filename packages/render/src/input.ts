@@ -11,7 +11,15 @@
  * the space bar or use the middle button to pan.
  */
 
-import { panBy, pinch, zoomAt, type Camera, type Point, type Viewport } from './camera';
+import {
+  panBy,
+  pinch,
+  zoomAt,
+  type Camera,
+  type Point,
+  type ScreenInset,
+  type Viewport,
+} from './camera';
 
 /** `pan`: a drag moves the map. `draw`: a drag draws, and the map is moved another way. */
 export type InputMode = 'pan' | 'draw';
@@ -32,6 +40,8 @@ export interface InputTarget {
   hover(point: Point | null): void;
   /** A finger (not a mouse) went down on a point. Touch has no hover, so this stands in for it. */
   press?(point: Point): void;
+  /** What the page covers at the top and bottom of the map, so a drag can pull the farm out from under it. */
+  inset?(): ScreenInset;
   fit(): void;
 }
 
@@ -131,13 +141,13 @@ export function attachInput(el: HTMLElement, target: InputTarget): InputHandle {
         pointers.set(e.pointerId, p);
         return;
       }
-      target.moveTo(panBy(target.camera(), vp, p.x - prev.x, p.y - prev.y));
+      target.moveTo(panBy(target.camera(), vp, p.x - prev.x, p.y - prev.y, target.inset?.()));
       pointers.set(e.pointerId, p);
     } else if (pointers.size === 2) {
       const ids = [...pointers.keys()];
       const otherId = ids[0] === e.pointerId ? ids[1]! : ids[0]!;
       const other = pointers.get(otherId)!;
-      target.moveTo(pinch(target.camera(), vp, prev, other, p, other));
+      target.moveTo(pinch(target.camera(), vp, prev, other, p, other, target.inset?.()));
       pointers.set(e.pointerId, p);
       moved = true;
     } else {
@@ -195,7 +205,7 @@ export function attachInput(el: HTMLElement, target: InputTarget): InputHandle {
     const step = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
     const factor = Math.exp(-step * (e.ctrlKey ? 0.01 : 0.0016));
     const cam = target.camera();
-    target.moveTo(zoomAt(cam, target.viewport(), cam.zoom * factor, p.x, p.y));
+    target.moveTo(zoomAt(cam, target.viewport(), cam.zoom * factor, p.x, p.y, target.inset?.()));
   };
 
   const onKey = (e: KeyboardEvent): void => {
@@ -203,26 +213,27 @@ export function attachInput(el: HTMLElement, target: InputTarget): InputHandle {
     const cam = target.camera();
     const step = 64;
     const mid = { x: vp.width / 2, y: vp.height / 2 };
+    const inset = target.inset?.();
     switch (e.key) {
       case 'ArrowLeft':
-        target.moveTo(panBy(cam, vp, step, 0));
+        target.moveTo(panBy(cam, vp, step, 0, inset));
         break;
       case 'ArrowRight':
-        target.moveTo(panBy(cam, vp, -step, 0));
+        target.moveTo(panBy(cam, vp, -step, 0, inset));
         break;
       case 'ArrowUp':
-        target.moveTo(panBy(cam, vp, 0, step));
+        target.moveTo(panBy(cam, vp, 0, step, inset));
         break;
       case 'ArrowDown':
-        target.moveTo(panBy(cam, vp, 0, -step));
+        target.moveTo(panBy(cam, vp, 0, -step, inset));
         break;
       case '+':
       case '=':
-        target.moveTo(zoomAt(cam, vp, cam.zoom * 1.25, mid.x, mid.y));
+        target.moveTo(zoomAt(cam, vp, cam.zoom * 1.25, mid.x, mid.y, inset));
         break;
       case '-':
       case '_':
-        target.moveTo(zoomAt(cam, vp, cam.zoom / 1.25, mid.x, mid.y));
+        target.moveTo(zoomAt(cam, vp, cam.zoom / 1.25, mid.x, mid.y, inset));
         break;
       case '0':
         target.fit();

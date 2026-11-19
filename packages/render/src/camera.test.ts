@@ -140,6 +140,26 @@ describe('the farm cannot be lost off screen', () => {
     expect(y0).toBeLessThan(WORLD_H);
   });
 
+  it('a bar over the map (a phone top bar or build tray) lets the farm be pulled out from under it, and never moves a camera that was in range', () => {
+    const vp = PHONE_UPRIGHT;
+    const inset = { top: 200, bottom: 240 };
+    const zoom = fillHeightZoom(vp);
+    // The farm fills the height: with no bars it cannot move up or down at all.
+    const fit = clampCamera({ zoom, x: 20, y: 0 }, vp);
+    expect(clampCamera({ ...fit, y: fit.y + 5 }, vp).y).toBeCloseTo(fit.y, 9);
+    // With the bars it can go as far as they cover, and no further.
+    const down = clampCamera({ ...fit, y: fit.y + 100 }, vp, inset);
+    expect(down.y).toBeCloseTo(fit.y + inset.bottom / zoom, 9);
+    const up = clampCamera({ ...fit, y: fit.y - 100 }, vp, inset);
+    expect(up.y).toBeCloseTo(fit.y - inset.top / zoom, 9);
+    // In range without the bars is in range with them.
+    const next = scatter(7);
+    for (let k = 0; k < 200; k++) {
+      const cam = clampCamera({ zoom: 5 + next() * 90, x: next() * 40, y: next() * 20 }, vp);
+      expect(clampCamera(cam, vp, inset)).toEqual(cam);
+    }
+  });
+
   it('a camera with a broken number in it comes back to the farm', () => {
     const cam = clampCamera({ zoom: Number.NaN, x: Number.NaN, y: Infinity }, PC);
     expect(Number.isFinite(cam.zoom)).toBe(true);

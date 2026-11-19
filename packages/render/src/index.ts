@@ -42,7 +42,7 @@ export {
   worldToScreen,
   zoomAt,
 } from './camera';
-export type { Camera, FitMode, Point, Viewport } from './camera';
+export type { Camera, FitMode, Point, ScreenInset, Viewport } from './camera';
 
 export { GRID_H, GRID_N, GRID_W, GROUND_SQUASH, WORLD_H, WORLD_W } from './grid';
 export { LOD_FADE_MS, LOD_SLACK, LOD_SWITCH_PX_PER_SQUARE, fadeStep, lodMode } from './lod';

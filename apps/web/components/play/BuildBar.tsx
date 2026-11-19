@@ -3,15 +3,28 @@
 import { useId } from 'react';
 import { useGame } from '@/lib/game/store';
 import type { BuildToolId, BuildWire } from '@/lib/game/types';
+import { Icon, type IconName } from './Icon';
 import { useUi } from './ui';
 import styles from './play.module.css';
 
+/** Each tool's pixel icon. The word always shows beside it. */
+const TOOL_ICON: Record<BuildToolId, IconName> = {
+  fence: 'fence',
+  gate: 'gate',
+  pipe: 'pipe',
+  trough: 'trough',
+  portable: 'portable',
+  hub: 'hub',
+  remove: 'remove',
+};
+
 /**
- * The tool bar: Look (the default) and the build tools. On a phone it is the
- * tray the Build tab opens. On a PC it sits at the top of the side panel.
- * Each tool shows one short line of help and its price when picked. The
- * prices and the help lines come from the server (the snapshot's `build`).
- * Cancel, Look and Escape all go back to Look.
+ * The tool bar: Look (the default) and the build tools, each an icon and a
+ * word, the one in use filled in. On a phone it is the tray the Build tab
+ * opens. On a PC it sits at the top of the side panel. What to do next is on
+ * the step chip over the map (BuildGuide); the bar keeps the price. The
+ * prices come from the server (the snapshot's `build`). Look, the chip's
+ * Back to Look and Escape all go back to Look.
  */
 export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean }) {
   const state = useGame((s) => s.build);
@@ -46,7 +59,8 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
             if (!docked) setOpened(false);
           }}
         >
-          Look
+          <Icon name="look" size={18} />
+          <span>Look</span>
         </button>
         {build.tools.map((t) => (
           <button
@@ -56,7 +70,8 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
             aria-pressed={tool === t.id}
             onClick={() => pick(t.id)}
           >
-            {t.name}
+            <Icon name={TOOL_ICON[t.id]} size={18} />
+            <span>{t.name}</span>
           </button>
         ))}
       </div>
@@ -94,24 +109,21 @@ export function BuildBar({ build, docked }: { build: BuildWire; docked: boolean 
           </button>
         </div>
       )}
-      <div className={styles.toolhelp} aria-live="polite">
+      <div className={styles.toolhelp}>
         {info ? (
           <>
-            <p>{state?.message && state.phase === 'pick' ? state.message : info.help}</p>
             <p className="muted">
               {tool === 'fence' && fence ? `${fence.name}: ${fence.text}` : info.price}
             </p>
             {tool === 'fence' && build.onHand && <p className="muted">{build.onHand}</p>}
           </>
         ) : (
-          <p className="muted">Look: drag to move the map. Tap a paddock to open it.</p>
+          <p className="muted">
+            Pick a tool. The map then shows a grid of where it can go. In Look, drag to move the map
+            and tap a paddock to open it.
+          </p>
         )}
       </div>
-      {tool !== null && (
-        <button type="button" className="btn sm ghost" onClick={() => select('look')}>
-          Cancel
-        </button>
-      )}
     </section>
   );
 }
