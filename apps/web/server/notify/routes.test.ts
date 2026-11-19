@@ -663,6 +663,13 @@ describe('the unsubscribe link in an email', () => {
     kind: 'farm_alert' | 'social' = 'farm_alert',
   ) => makeUnsubToken(TOKEN_SECRET, { userId: p.id, kind, issuedAt });
 
+  // The database stamps a settings change with its own (real) clock, and a link only acts on
+  // settings made before it was sent. So these tests run the fake clock a minute ahead of the
+  // real time; with the fixed NOON every link looked older than the settings once that date passed.
+  beforeEach(() => {
+    w.clock.t = Date.now() + 60_000;
+  });
+
   it('opening it changes nothing; the button (a POST with no sign-in and no cookie) turns that one email off', async () => {
     const p = await addPerson(w, 'ann');
     await emailOn(p);
