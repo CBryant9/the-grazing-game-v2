@@ -402,6 +402,9 @@ const PADDOCK_LABEL_FULL_PX = 130;
 /** A paddock narrower than this on screen gets no label. Its name in full does not fit. */
 const PADDOCK_LABEL_MIN_PX = 96;
 
+/** Screen pixels a mob's zoomed-out marker sits above the top edge of its herd, so the herd shows. */
+const FAR_MARKER_LIFT = 12;
+
 interface PadLabel {
   root: Container;
   full: Container;
@@ -1463,7 +1466,7 @@ class PixiFarmMap implements FarmMap {
       const pins = this.herdPins.get(m.id);
       if (!pins || pins.length < 2) continue;
       pins[0]!.wx = m.centre.x;
-      pins[0]!.wy = m.centre.y * K;
+      pins[0]!.wy = (m.centre.y - m.spread.y) * K;
       pins[1]!.wx = m.centre.x;
       pins[1]!.wy = (m.centre.y - m.spread.y) * K - 0.5;
     }
@@ -2010,8 +2013,9 @@ class PixiFarmMap implements FarmMap {
       pin(
         this.pill(big, { line: dry ? ui.noWater : ui.markerLine, pad: 8 }),
         at.centre.x,
-        at.centre.y * K,
-        { when: 'far' },
+        (at.centre.y - at.spread.y) * K,
+        // It sits on the top edge of the herd, so the dots or the patch show under it.
+        { when: 'far', lift: FAR_MARKER_LIFT },
       );
       const small: Container[] = [icon(9), this.text(count, 10, ui.markerText)];
       if (dry) small.push(this.text('no water', 10, ui.noWater));

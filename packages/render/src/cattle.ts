@@ -100,7 +100,7 @@ export function herdSquares(head: number, sideM: number, areaSquares: number, m2
  * deeper because a beast is drawn standing up from its feet: any closer to
  * a fence above it and its back would show over the wire.
  */
-export const STAND_BACK = { side: 0.3, top: 0.55, bottom: 0.06, open: 0.08 } as const;
+export const STAND_BACK = { side: 0.2, top: 0.35, bottom: 0.03, open: 0.03 } as const;
 
 export type BodyShape = 'thin' | 'normal' | 'fat';
 
@@ -429,7 +429,7 @@ export function herdGround(
   const n = herdSquares(mob.head, sideM, order.length);
   const herdM2 = Math.min(Math.max(1, mob.head) * HERD_M2_PER_HEAD, order.length * squareM2);
   // Less ground than the squares it is given: stand in the middle part of each.
-  const boxScale = Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / (n * squareM2))));
+  const boxScale = n > 1 ? 1 : Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / squareM2)));
   return { cells: order.slice(0, n), herdM2, boxScale };
 }
 

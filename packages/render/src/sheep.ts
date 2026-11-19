@@ -53,7 +53,7 @@ export const SHEEP_LENGTH_M: Readonly<Record<ViewSheepKind, number>> = {
  * How far sheep stand back inside a square, as a share of the square. A
  * sheep is low, so it stands closer to a fence than a beast does.
  */
-export const SHEEP_STAND_BACK = { side: 0.2, top: 0.3, bottom: 0.06, open: 0.06 } as const;
+export const SHEEP_STAND_BACK = { side: 0.14, top: 0.22, bottom: 0.03, open: 0.03 } as const;
 
 export interface Sheep {
   /** Where its feet are, in ground coordinates. */
@@ -158,7 +158,7 @@ export function placeFlock(
       const n = herdSquares(flock.head, sideM, order.length, SHEEP_M2_PER_HEAD);
       cells = order.slice(0, n);
       herdM2 = Math.min(Math.max(1, flock.head) * SHEEP_M2_PER_HEAD, order.length * squareM2);
-      boxScale = Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / (n * squareM2))));
+      boxScale = n > 1 ? 1 : Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / squareM2)));
       cap = FLOCK_DRAWN_MAX;
     }
   }

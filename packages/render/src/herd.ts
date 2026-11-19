@@ -49,7 +49,7 @@ import {
 import { scatter } from './random';
 
 /** A grazing walk, in the beast's own (drawn) lengths a second, at 1x game speed. */
-export const WALK_LENGTHS_PER_S = 1.2;
+export const WALK_LENGTHS_PER_S = 1.8;
 /** A moved mob trots this many lengths a second... */
 export const TROT_LENGTHS_PER_S = 9;
 /** ...but takes at least the first and at most the second of these seconds to get there. */

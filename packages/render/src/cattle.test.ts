@@ -177,16 +177,16 @@ describe('cattle stay inside their grazing area', () => {
     expect(taken.has(cell(4, 5)) || taken.has(cell(6, 5))).toBe(true);
   });
 
-  it('they stand back from fence lines: 0.3 of a square at the sides, 0.55 under a fence above', () => {
+  it('they stand back from fence lines: 0.2 of a square at the sides, 0.35 under a fence above', () => {
     const view = sampleView();
     const box = fenceBox(view, 10, 10, 10, 10, VIEW_FENCE.electric);
     view.mobs = [mob({ area: box, anchor: cell(10, 10), head: 6 })];
-    expect(standingBox(view, cell(10, 10))).toEqual([10.3, 10.55, 10.7, 10.94]);
+    expect(standingBox(view, cell(10, 10))).toEqual([10.2, 10.35, 10.8, 10.97]);
     for (const b of only(view).beasts) {
-      expect(b.x).toBeGreaterThanOrEqual(10 + 0.3);
-      expect(b.x).toBeLessThanOrEqual(11 - 0.3);
-      expect(b.y).toBeGreaterThanOrEqual(10 + 0.55);
-      expect(b.y).toBeLessThanOrEqual(11 - 0.06);
+      expect(b.x).toBeGreaterThanOrEqual(10 + 0.2);
+      expect(b.x).toBeLessThanOrEqual(11 - 0.2);
+      expect(b.y).toBeGreaterThanOrEqual(10 + 0.35);
+      expect(b.y).toBeLessThanOrEqual(11 - 0.03);
     }
     // In open country they can use nearly the whole square.
     expect(standingBox(sampleView(), cell(10, 10))).toEqual([

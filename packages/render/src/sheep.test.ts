@@ -116,7 +116,7 @@ describe('sheep stand where a flock can stand', () => {
     // The fence is on the right side of column 19.
     expect(x1).toBeCloseTo(20 - SHEEP_STAND_BACK.side, 9);
     expect(x0).toBeCloseTo(19 + SHEEP_STAND_BACK.open, 9);
-    expect(SHEEP_STAND_BACK.side).toBeLessThan(0.3);
+    expect(SHEEP_STAND_BACK.side).toBeLessThan(0.2);
   });
 
   it('never stand on a square with a trough, the bore or the yards', () => {
