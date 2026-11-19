@@ -7,7 +7,7 @@
  * Nothing here is a game rule. These are drawing rules only.
  */
 
-import { VIEW_LAND, type FarmView } from '@gg/shared';
+import { VIEW_FORM, VIEW_LAND, type DistrictId, type FarmView, type ViewForm } from '@gg/shared';
 import { blue, green, mix, red, rgb, shade } from './colour';
 import { GRID_N, GRID_W } from './grid';
 import { NATURAL } from './palette';
@@ -32,12 +32,73 @@ export const TUFT_WIDTH = 0.3;
 
 export type SquareKind = 'pasture' | 'sown' | 'crop' | 'fallow' | 'stubble';
 
+/**
+ * The form a district's native pasture takes, for a view sent before the
+ * view carried `squares.form` (a past day's picture). The server's own
+ * table is the one that counts (docs/VISUALS.md, "The base of a paddock").
+ */
+const NATIVE_FORM_FALLBACK: Record<DistrictId, ViewForm> = {
+  cq: VIEW_FORM.tropicalTussock,
+  nsw: VIEW_FORM.lowTufts,
+  cw: VIEW_FORM.openTussock,
+  wv: VIEW_FORM.openTussock,
+};
+
+/** True for the forms whose plants stand as tussocks or clumps. */
+export const tussocky = (form: number): boolean =>
+  form === VIEW_FORM.tropicalTussock ||
+  form === VIEW_FORM.openTussock ||
+  form === VIEW_FORM.bunch ||
+  form === VIEW_FORM.hedgerow;
+
+/** True for the forms with a clover through them, which shows white flowers. */
+export const clovery = (form: number): boolean =>
+  form === VIEW_FORM.carpet || form === VIEW_FORM.tussockClover;
+
+/**
+ * How much of the sward's own top colour shows where it hides the ground,
+ * seen from above, by form. A carpet is leaf all over; between tussocks
+ * the lower layer of leaf and litter shows. Drawing figures (builder).
+ */
+const BASE_TOPS: Record<ViewForm, number> = {
+  [VIEW_FORM.tropicalTussock]: 0.4,
+  [VIEW_FORM.lowTufts]: 0.5,
+  [VIEW_FORM.openTussock]: 0.35,
+  [VIEW_FORM.bunch]: 0.35,
+  [VIEW_FORM.hedgerow]: 0.35,
+  [VIEW_FORM.carpet]: 0.65,
+  [VIEW_FORM.tussockClover]: 0.55,
+  [VIEW_FORM.crowns]: 0.5,
+  [VIEW_FORM.rows]: 0.55,
+  [VIEW_FORM.bare]: 0,
+};
+
+/** A tuft's width by form: tussocks are broad clumps, a carpet's tufts fine. Drawing figures (builder). */
+const TUFT_WIDE: Record<ViewForm, number> = {
+  [VIEW_FORM.tropicalTussock]: 1.1,
+  [VIEW_FORM.lowTufts]: 0.85,
+  [VIEW_FORM.openTussock]: 1.1,
+  [VIEW_FORM.bunch]: 1.2,
+  [VIEW_FORM.hedgerow]: 1.15,
+  [VIEW_FORM.carpet]: 0.8,
+  [VIEW_FORM.tussockClover]: 1,
+  [VIEW_FORM.crowns]: 0.95,
+  [VIEW_FORM.rows]: 1,
+  [VIEW_FORM.bare]: 1,
+};
+
 /** One square's pasture, as drawing figures. */
 export interface SquareLook {
   kind: SquareKind;
+  /** How the plants sit on the ground (a VIEW_FORM code). */
+  form: ViewForm;
   /** True where tufts sit in cultivated rows. */
   rows: boolean;
-  /** Share of the tuft spots that stand, 0 to 1. Low cover shows soil between tufts. */
+  /**
+   * Share of the ground the sward and its litter hide, seen from above, 0
+   * to 1 (the view's `hidden`). It is also the share of the tuft spots that
+   * stand. Low cover shows soil between the plants.
+   */
   cover: number;
   /** Tuft height before each tuft's own variation, world units. */
   height: number;
@@ -53,9 +114,14 @@ export interface SquareLook {
   seed: number;
   /** Colour of the ground itself: soil, straw litter or shaded ground (docs/VISUALS.md). */
   ground: number;
+  /** Colour of the open ground between plants: soil, with a little litter where dry feed lies about. */
+  bare: number;
+  /** Colour of the sward at ground level, where it hides the ground: low leaf and litter. */
+  base: number;
   /**
-   * What shows between the tufts, zoomed in: the ground with the sward over
-   * it. A short green sward covers its ground, so this is mostly the field colour.
+   * What shows between the tufts, zoomed in, on average: the open ground and
+   * the sward's base, by how much of the ground is hidden. The ground
+   * picture draws the two in the pattern of the pasture's form.
    */
   floor: number;
   /** One colour for the whole square, for the zoomed-out map. */
@@ -79,6 +145,7 @@ export function squareLook(view: FarmView, i: number): SquareLook {
     // Worked brown soil. No tufts.
     return {
       kind: 'fallow',
+      form: VIEW_FORM.bare,
       rows: true,
       cover: 0,
       height: 0,
@@ -88,6 +155,8 @@ export function squareLook(view: FarmView, i: number): SquareLook {
       straw: N.fallow,
       seed: -1,
       ground: N.fallow,
+      bare: N.fallow,
+      base: N.fallow,
       floor: N.fallow,
       field: N.fallow,
       raise: 0,
@@ -97,6 +166,7 @@ export function squareLook(view: FarmView, i: number): SquareLook {
     // Pale straw rows, very short, full cover, no green. A finished crop does not regrow.
     return {
       kind: 'stubble',
+      form: VIEW_FORM.rows,
       rows: true,
       cover: 1,
       height: STUBBLE_HEIGHT,
@@ -106,6 +176,8 @@ export function squareLook(view: FarmView, i: number): SquareLook {
       straw: shade(N.stubble, 1.12),
       seed: -1,
       ground: N.stubble,
+      bare: N.stubble,
+      base: N.stubble,
       floor: N.stubble,
       field: N.stubble,
       raise: (STUBBLE_HEIGHT / TUFT_MAX_HEIGHT) * RAISE_MAX,
@@ -113,9 +185,23 @@ export function squareLook(view: FarmView, i: number): SquareLook {
   }
 
   const greenShare = (s.green[i] ?? 0) / 20;
-  const cover = (s.cover[i] ?? 0) / 10;
   const seeded = (s.seedHeads[i] ?? 0) === 1;
   const cropping = land === VIEW_LAND.annual || land === VIEW_LAND.crop;
+  // How the plants sit on the ground, and how much of it they hide. A view
+  // from before these were sent (a past day) falls back to the district's
+  // native form and the model's ground cover.
+  const sentForm = s.form?.[i];
+  const form: ViewForm =
+    sentForm !== undefined && sentForm >= 0 && sentForm <= VIEW_FORM.bare
+      ? (sentForm as ViewForm)
+      : cropping
+        ? VIEW_FORM.rows
+        : land === VIEW_LAND.sown
+          ? VIEW_FORM.carpet
+          : (NATIVE_FORM_FALLBACK[view.district] ?? VIEW_FORM.openTussock);
+  const sentHidden = s.hidden?.[i];
+  const cover =
+    sentHidden !== undefined ? Math.min(1, Math.max(0, sentHidden / 20)) : (s.cover[i] ?? 0) / 10;
 
   let leaf = mix(N.leafYoung, N.leafOld, (s.leafAge[i] ?? 0) / 10);
   let kind: SquareKind = 'pasture';
@@ -138,13 +224,21 @@ export function squareLook(view: FarmView, i: number): SquareLook {
   // rank tussock has green only at the base.
   const greenReach = Math.min(1, greenShare * 1.25);
   // Under dry grass the ground is straw litter, not soil. Under green, shaded.
-  const ground = mix(N.soil, mix(N.shaded, N.litter, 1 - greenShare), cover);
+  const under = mix(N.shaded, N.litter, 1 - greenShare);
+  const ground = mix(N.soil, under, cover);
   // From a distance the tops are what shows, so rank grass reads as straw.
   const tops = mix(straw, leaf, greenReach ** 1.5);
-  const field = mix(ground, tops, cover * (cropping ? 0.7 : 0.85));
+  // The open ground between plants is soil. Where plenty of dry feed
+  // stands, some litter lies about on it too (builder).
+  const bare = mix(N.soil, N.litter, 0.3 * cover * (1 - greenShare));
+  // Where the sward hides the ground: its low leaf over litter or shade.
+  const base = mix(under, tops, BASE_TOPS[form]);
+  const floor = mix(bare, base, cover);
+  const field = mix(floor, tops, cover * (cropping ? 0.7 : 0.85));
 
   return {
     kind,
+    form,
     rows: cropping,
     cover,
     height,
@@ -154,7 +248,9 @@ export function squareLook(view: FarmView, i: number): SquareLook {
     straw,
     seed,
     ground,
-    floor: shade(mix(ground, field, 0.72), 0.93),
+    bare,
+    base,
+    floor,
     field,
     raise: (Math.min(cm, FULL_HEIGHT_CM) / FULL_HEIGHT_CM) * RAISE_MAX,
   };
@@ -209,13 +305,16 @@ export function allLooks(view: FarmView): SquareLook[] {
 export function sameLook(a: SquareLook, b: SquareLook): boolean {
   return (
     a.kind === b.kind &&
+    a.form === b.form &&
     a.cover === b.cover &&
     a.height === b.height &&
     a.greenReach === b.greenReach &&
     a.leaf === b.leaf &&
     a.straw === b.straw &&
     a.seed === b.seed &&
-    a.ground === b.ground
+    a.ground === b.ground &&
+    a.bare === b.bare &&
+    a.base === b.base
   );
 }
 
@@ -250,7 +349,7 @@ let spots: Float32Array | null = null;
  * The fixed scatter for every tuft spot on the farm, worked out once. It
  * never changes, so a new view costs no scatter at all.
  */
-function spotTable(): Float32Array {
+export function spotTable(): Float32Array {
   if (!spots) {
     spots = new Float32Array(GRID_N * TUFTS_PER_SQUARE * SPOT);
     for (let i = 0; i < GRID_N; i++) {
@@ -262,6 +361,28 @@ function spotTable(): Float32Array {
     }
   }
   return spots;
+}
+
+/** Numbers kept for each tuft spot, for the ground picture's clumps. */
+export const SPOT_STRIDE = SPOT;
+
+/**
+ * Where tuft spot `k` of square `i` sits inside its square (0 to 1 across
+ * and down), when the plants are not in rows, and the number that says how
+ * soon it stands (it stands while that number is under the cover). The
+ * ground picture grows its clumps round these same spots, so the tussocks
+ * zoomed in stand on their own clumps.
+ */
+export function spotPlace(i: number, k: number): [fx: number, fy: number, stand: number] {
+  const table = spotTable();
+  const o = (i * TUFTS_PER_SQUARE + k) * SPOT;
+  const gx = k % 3;
+  const gy = Math.floor(k / 3);
+  return [
+    (gx + 0.12 + 0.76 * table[o + 3]!) / 3,
+    (gy + 0.12 + 0.76 * table[o + 4]!) / 3,
+    table[o]!,
+  ];
 }
 
 /**
@@ -314,14 +435,16 @@ export function squareTufts(i: number, look: SquareLook, out: Tuft[] = []): Tuft
       y: row + fy,
       h,
       // A short tuft is narrow too, so it reads as a tuft and not a dash.
-      w: Math.min(TUFT_WIDTH, Math.max(0.13, h * 1.5)) * (0.85 + 0.3 * vary),
+      // Tussocks are broad clumps, a carpet's tufts fine.
+      w: Math.min(TUFT_WIDTH, Math.max(0.13, h * 1.5)) * (0.85 + 0.3 * vary) * TUFT_WIDE[look.form],
       greenH,
       shape,
       variant: table[o + 6]!,
       leaf: shade(look.leaf, tone),
       straw: shade(look.straw, tone),
       seed: look.seed >= 0 && h > seedMin ? look.seed : -1,
-      clover: look.kind === 'sown' && vary > 0.94 && look.greenShare > 0.4,
+      // White flowers where a clover runs through the sward.
+      clover: clovery(look.form) && vary > 0.94 && look.greenShare > 0.4,
     });
   }
   return out;

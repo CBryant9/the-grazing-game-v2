@@ -44,6 +44,10 @@ export interface SquareSpec {
   leafAge?: number;
   weathered?: number;
   seedHeads?: number;
+  /** How the pasture sits on the ground (VIEW_FORM). Left out, the view carries no forms. */
+  form?: number;
+  /** Ground hidden from above, in twentieths. Left out, the view carries no hidden figures. */
+  hidden?: number;
 }
 
 export const LEAFY: SquareSpec = { heightCm: 14, green: 18, cover: 10, leafAge: 2, weathered: 1 };
@@ -224,6 +228,15 @@ export function setSquare(view: FarmView, i: number, spec: SquareSpec): void {
   if (spec.leafAge !== undefined) s.leafAge[i] = spec.leafAge;
   if (spec.weathered !== undefined) s.weathered[i] = spec.weathered;
   if (spec.seedHeads !== undefined) s.seedHeads[i] = spec.seedHeads;
+  if (spec.form !== undefined) {
+    s.form ??= new Array<number>(N).fill(-1);
+    s.form[i] = spec.form;
+  }
+  if (spec.hidden !== undefined) {
+    // Squares not given a figure take the model's cover, as an older view would.
+    s.hidden ??= s.cover.map((c) => c * 2);
+    s.hidden[i] = spec.hidden;
+  }
 }
 
 /** Fence a box of squares off as its own paddock and grazing area. Returns the new id. */
