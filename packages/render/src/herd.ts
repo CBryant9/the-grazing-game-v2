@@ -288,8 +288,7 @@ export class Herd {
       let boxScale = 1;
       if (p.where === 'paddock') {
         // A herd that has drifted keeps its patch, unless it was moved or a fence cut it off.
-        const kept =
-          o && !moved && view.squares.area[o.start] === p.area && !g.blocked[o.start];
+        const kept = o && !moved && view.squares.area[o.start] === p.area && !g.blocked[o.start];
         start = kept ? o.start : p.start;
         const hg = herdGround(g, vm, start);
         cells = hg.cells;
@@ -344,9 +343,7 @@ export class Herd {
         }
         const c = cellAt(this.x[i]!, this.y[i]!);
         const inside =
-          p.where === 'yards'
-            ? c === yardsCell
-            : view.squares.area[c] === p.area && !g.blocked[c];
+          p.where === 'yards' ? c === yardsCell : view.squares.area[c] === p.area && !g.blocked[c];
         if (inside) {
           this.tx[i] = this.x[i]!;
           this.ty[i] = this.y[i]!;

@@ -163,7 +163,12 @@ describe('sheep stand where a flock can stand', () => {
     view.squares.area.fill(0);
     // 6,000 sheep at 60 m² a head take 36 ha: more than the 25 squares of the pen.
     view.flocks = [
-      flock({ area: 0, anchor: cell(28, 10), head: 6000, sheep: [{ kind: 'ewe', n: 6000, thin: 0 }] }),
+      flock({
+        area: 0,
+        anchor: cell(28, 10),
+        head: 6000,
+        sheep: [{ kind: 'ewe', n: 6000, thin: 0 }],
+      }),
     ];
     const outside = only(view).sheep.filter((s) => {
       const col = Math.floor(s.x);

@@ -407,9 +407,9 @@ After playing the rebuild, Claudia said it "lost a bit of the whimsy and ease" o
 
 ### Cattle on the map
 
-- [ ] **The cows move like they did in the MVP**, which "is fun".
-- [ ] **Cows can be seen zoomed out**, unless the numbers are too large to draw.
-- [ ] **Cow size is closer to true scale against the paddock**, so density is easy to read. "Right now 900 fills like a quarter of the area on 3000 ha."
+- [x] **The cows move like they did in the MVP**, which "is fun". **Built (m9-cattle):** each beast stands, takes a short walk, faces the way it walks, goes to feed, water and its mob-mates by the MVP's rules, calves follow their mothers, and a moved mob trots to its new paddock; walking quickens with the day speed (VISUALS, Cattle; CALLS B195, B196).
+- [x] **Cows can be seen zoomed out**, unless the numbers are too large to draw. **Built (m9-cattle):** zoomed out each beast is a dot; a mob too dense to read as dots is a filled patch over its ground, with the head count (CALLS B194).
+- [x] **Cow size is closer to true scale against the paddock**, so density is easy to read. "Right now 900 fills like a quarter of the area on 3000 ha." **Built (m9-cattle):** a beast is drawn at 4 times its real length (5 to 18 px) and a mob takes 400 m² a head: 900 head on 3,000 ha now take about 36 ha (CALLS B190 to B193).
 
 ### Daily Farm
 

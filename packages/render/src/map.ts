@@ -1405,9 +1405,7 @@ class PixiFarmMap implements FarmMap {
     const sideM = view.scale.sideM;
     const herd = this.herd;
     const mobDots = herd.mobs.map(
-      (m) =>
-        m.where === 'paddock' &&
-        (m.rushing > 0 || herdAsDots(m.herdM2, m.total, zoom, sideM)),
+      (m) => m.where === 'paddock' && (m.rushing > 0 || herdAsDots(m.herdM2, m.total, zoom, sideM)),
     );
     const flockDots = this.flockPlacements.map(
       (f) => f.cells.length > 0 && herdAsDots(f.herdM2, f.total, zoom, sideM),
@@ -1472,7 +1470,7 @@ class PixiFarmMap implements FarmMap {
       pins[0]!.wx = m.centre.x;
       pins[0]!.wy = (m.centre.y - m.spread.y) * K;
       pins[1]!.wx = m.centre.x;
-      pins[1]!.wy = (m.centre.y - m.spread.y) * K - 0.5;
+      pins[1]!.wy = (m.centre.y - m.spread.y) * K - 0.1;
     }
     this.placeLabels();
   }
@@ -2026,7 +2024,7 @@ class PixiFarmMap implements FarmMap {
       pin(
         this.pill(small, { line: dry ? ui.noWater : ui.markerLine, pad: 6, gap: 4 }),
         at.centre.x,
-        (at.centre.y - at.spread.y) * K - 0.5,
+        (at.centre.y - at.spread.y) * K - 0.1,
         { when: 'near', lift: 8 },
       );
       this.herdPins.set(p.mob, this.pinned.slice(pinsBefore));

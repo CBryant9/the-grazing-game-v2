@@ -78,11 +78,20 @@ export const DOT_MIN_SPACING_PX = 4.5;
  * density: `herdM2` square metres for `head` head, at `pxPerSquare` on
  * squares `sideM` metres a side.
  */
-export function herdSpacingPx(herdM2: number, head: number, pxPerSquare: number, sideM: number): number {
+export function herdSpacingPx(
+  herdM2: number,
+  head: number,
+  pxPerSquare: number,
+  sideM: number,
+): number {
   if (head <= 0) return Infinity;
   return (Math.sqrt(herdM2 / head) * pxPerSquare) / Math.max(1, sideM);
 }
 
 /** Zoomed out: draw this mob as dots (true) or as a filled herd patch (false). */
-export const herdAsDots = (herdM2: number, head: number, pxPerSquare: number, sideM: number): boolean =>
-  herdSpacingPx(herdM2, head, pxPerSquare, sideM) >= DOT_MIN_SPACING_PX;
+export const herdAsDots = (
+  herdM2: number,
+  head: number,
+  pxPerSquare: number,
+  sideM: number,
+): boolean => herdSpacingPx(herdM2, head, pxPerSquare, sideM) >= DOT_MIN_SPACING_PX;

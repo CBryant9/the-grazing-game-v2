@@ -291,7 +291,8 @@ describe('the herd moves about a big paddock', () => {
     const cut = structuredClone(view);
     // Rows 0 to 4 of the left paddock become their own area.
     for (let x = 0; x < 20; x++) cut.fences.h[hEdge(5, x)] = VIEW_FENCE.electric;
-    for (let i = 0; i < 1040; i++) if (cut.squares.area[i] === 0 && i < 5 * 40) cut.squares.area[i] = 7;
+    for (let i = 0; i < 1040; i++)
+      if (cut.squares.area[i] === 0 && i < 5 * 40) cut.squares.area[i] = 7;
     cut.mobs[0]!.anchor = cell(5, 8);
     h.sync(cut, placeCattle(cut));
     run(h, 8);
