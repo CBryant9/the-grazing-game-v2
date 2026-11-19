@@ -421,5 +421,5 @@ After playing the rebuild, Claudia said it "lost a bit of the whimsy and ease" o
 
 ### Building and finding your way
 
-- [ ] **A grid showing where fences can go while building**, "making it more visual so I know what to select."
-- [ ] **What to do next is obvious and visual.** "I'm finding the navigation really hard when I go into build and stuff."
+- [x] **A grid showing where fences can go while building**, "making it more visual so I know what to select." *(Built 19 Nov 2026, branch `m9-build-nav`. A faint lattice of fence lines and corners while a tool is picked, stronger round the finger, thinned when zoomed out; fences and the boundary glow as the things to join to; tap tools light what they can pick with a target ring; a live length at the end of a line. Gone in Look. VISUALS "The grid while building".)*
+- [x] **What to do next is obvious and visual.** "I'm finding the navigation really hard when I go into build and stuff." *(Built 19 Nov 2026, branch `m9-build-nav`. A step chip over the map (Draw, Check, Build, or Tap, Check, Confirm) with one plain line on what to do next and a big Back to Look; tool buttons are an icon and a word; the phone tray steps aside while drawing and the map can be pulled out from under the bars; first steps for a farm with no water, one paddock or no stock, and Things to do buttons that go straight to the tool and the spot; the tour is one line on a phone. Calls B180 to B188.)*
