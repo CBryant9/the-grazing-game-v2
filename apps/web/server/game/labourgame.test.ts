@@ -429,6 +429,17 @@ describe("the hand's share on a job card", () => {
     return null;
   };
 
+  /**
+   * The hand has used most of today already. A day of fence grows with the farm (`fenceScale`,
+   * 19 Nov 2026), so on a fresh day even a skill-1 hand's share covers a whole piece; what is
+   * left of a used day is under one.
+   */
+  const tired = (farm: FarmState): FarmState => {
+    const id = String(farm.labour!.hands[0]!.id);
+    farm.labour!.help = { day: farm.day, used: { [id]: 0.95 }, fenced: {} };
+    return farm;
+  };
+
   const noteFor = (farm: FarmState, n: number): { text: string; card: JobCard } | null => {
     const edges = freeLine(farm, n);
     if (!edges) return null;
@@ -448,8 +459,9 @@ describe("the hand's share on a job card", () => {
   it('says the metres when the share covers whole pieces, all of it when the line is inside the share, and the time when the share is under a piece: never 0 m', () => {
     const seen = new Set<string>();
     for (const size of sizes) {
-      for (const skill of [1, 3, 5]) {
-        const farm = withHand(size, skill);
+      for (const skill of [1, 3, 5, 0]) {
+        // 0: a skill-1 hand with most of the day used.
+        const farm = skill === 0 ? tired(withHand(size, 1)) : withHand(size, skill);
         for (const n of [1, 3, 20]) {
           const got = noteFor(farm, n);
           if (!got) continue;
@@ -475,8 +487,8 @@ describe("the hand's share on a job card", () => {
     expect([...seen].sort()).toEqual(['all', 'metres', 'time']);
   });
 
-  it('says it in time on the largest farm for a skill-1 hand and a one-piece line', () => {
-    const farm = withHand('large', 1);
+  it('says it in time on the largest farm for a skill-1 hand with little of the day left and a one-piece line', () => {
+    const farm = tired(withHand('large', 1));
     const side = farm.layout.scale.sideM;
     expect(side).toBeGreaterThanOrEqual(200);
     const got = noteFor(farm, 1);
@@ -555,7 +567,9 @@ describe('hiring, fencing by a team and the worker report, through the game serv
       expect(t.price).toMatch(/^\$[\d,]+$/);
       expect(t.lines.join(' ')).toMatch(/Materials \$[\d,]+ plus labour \$[\d,]+\./);
       expect(t.lines.join(' ')).toMatch(/Done on [A-Z][a-z]+day \d+ [A-Z][a-z]+\./);
-      expect(t.lines).toContain('Uses none of your day.');
+      // A Fast Farm has no daylight limit, so nothing is said about your day (19 Nov 2026).
+      expect(t.lines).not.toContain('Uses none of your day.');
+      expect(t.lines.join(' ')).toMatch(/Builds about [\d,]+ m a working day/);
     }
     // Tape is not built by a team.
     const tape = await game.preview(A, { action: { type: 'buildFence', edges, fence: 'tape' } });
@@ -570,7 +584,9 @@ describe('hiring, fencing by a team and the worker report, through the game serv
     expect(lines).toMatch(/^A 1-man team builds [\d,]+ m of permanent fence\./);
     expect(lines).toMatch(/Materials \$[\d,]+ plus labour \$[\d,]+: \$[\d,]+ in all\./);
     expect(lines).toMatch(/It starts on [A-Z][a-z]+day \d+ [A-Z][a-z]+ and is done on [A-Z]/);
-    expect(lines).toContain('It uses none of your day.');
+    // A Fast Farm has no daylight limit: nothing about your day, and the team's pace (19 Nov 2026).
+    expect(lines).toContain('It carries on by itself, day by day and over skips.');
+    expect(lines).toMatch(/Builds about [\d,]+ m a working day/);
     expect(lines).toContain('Your hands help the team on the days they work');
     expect(lines).toMatch(/That leaves -?\$[\d,]+ in the bank once it is all built\./);
     const ordered = await game.act(A, order, { version: quote.version, requestId: 'order-1' });

@@ -122,7 +122,7 @@ async function playsADay(store: FarmStore, id: string, before: number): Promise<
   expect((await again.snapshot(key))!.day).toBe(before + 1);
   const raw = (await store.get(id)) as StoredFarm;
   expect(raw.saved.saveFormat).toBe(17);
-  expect(raw.saved.engineVersion).toBe('0.22.0');
+  expect(raw.saved.engineVersion).toBe('0.23.0');
 }
 
 describe('old farms through the file store', () => {
