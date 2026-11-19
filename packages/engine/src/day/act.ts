@@ -30,6 +30,14 @@
  * job that needs work is the hands' share, done from their own day. It uses
  * none of the player's light. The rest of the job is the player's, and
  * fits today or not by the rules above.
+ *
+ * With the clock off (`env.noClock`, Fast Farm, Claudia 19 Nov 2026) steps
+ * 3 and 4 fall away: every job is done whole, none is refused for light,
+ * and the clock stays at first light. The time a job takes is still worked
+ * out and shown as a fact. The hands take no share of the player's jobs
+ * then: with no light to save there is nothing for that share to do, so
+ * their day is kept for their own duties (refilling troughs, putting tape
+ * back up) and for helping a fencing team.
  */
 
 // The one place that may use the unclocked pieces: it puts them behind the farm clock.
@@ -79,15 +87,18 @@ interface Light {
   used: number;
   left: number;
   now: number;
+  /** False with the clock off (Fast Farm): no job is held to the light. */
+  on: boolean;
 }
 
-function lightNow(farm: FarmState): Light {
+function lightNow(farm: FarmState, env: ActionEnv): Light {
   const dayMin = dayMinutes(farm);
   return {
     dayMin,
     used: farm.clock.used,
     left: Math.max(0, dayMin - farm.clock.used),
     now: timeNow(farm),
+    on: !env.noClock,
   };
 }
 
@@ -113,9 +124,10 @@ interface HandsShare {
 }
 
 /** Minutes of a job's work the hands can take today. 0 with no hand at work, or for a job they do not help on. */
-function handsMinutes(farm: FarmState, skill: HelpSkill | null, dayMin: number): number {
-  if (!skill || !farm.labour) return 0;
-  return handsCan(farm, skill, dayMin).reduce((t, p) => t + p.minutes, 0);
+function handsMinutes(farm: FarmState, skill: HelpSkill | null, light: Light): number {
+  // With the clock off there is no light to save: the hands keep their day for their own duties.
+  if (!skill || !farm.labour || !light.on) return 0;
+  return handsCan(farm, skill, light.dayMin).reduce((t, p) => t + p.minutes, 0);
 }
 
 /** Finish a job: move the clock, record it with its times, and make the card. */
@@ -195,7 +207,8 @@ function finish(
   }
   const start = light.now;
   const end = start + workMin;
-  spendLight(next, workMin);
+  // With the clock off the job takes its time as a fact, but none of the day's light.
+  if (light.on) spendLight(next, workMin);
   stampMoves(did, end);
   const events: FarmEvent[] = [];
   if (card.outcome !== 'free') {
@@ -232,9 +245,11 @@ function finish(
       usedBeforeMin: light.used,
       leftAfterMin: leftAfter,
       fitsToday: card.outcome !== 'part',
+      onClock: light.on,
       // A line cut short has taken all the light it can use: what is left
       // is less than its next piece needs.
-      usesRestOfDay: card.outcome === 'part' || (card.outcome === 'done' && leftAfter <= NO_TIME),
+      usesRestOfDay:
+        light.on && (card.outcome === 'part' || (card.outcome === 'done' && leftAfter <= NO_TIME)),
       costToday: before.cash - next.cash,
       ...extra,
       ...card,
@@ -249,18 +264,21 @@ function finish(
 function doWhole(
   farm: FarmState,
   action: Action,
+  env: ActionEnv,
   trial: ActionDone,
   spec: Extract<JobSpec, { kind: 'whole' }>,
   skill: HelpSkill | null,
 ): Worked | ActionRefusal {
-  const light = lightNow(farm);
-  if (light.left <= NO_TIME) return noDaylight();
+  const light = lightNow(farm, env);
+  if (light.on && light.left <= NO_TIME) return noDaylight();
   const all = spec.parts.reduce((t, p) => t + p.minutes, 0);
   // The hands' share first, from their own day. The rest is the player's.
-  const byHands = Math.min(all, handsMinutes(farm, skill, light.dayMin));
+  const byHands = Math.min(all, handsMinutes(farm, skill, light));
   const total = all - byHands;
   let workMin = total;
-  if (total > light.dayMin + NO_TIME) {
+  if (!light.on) {
+    // The clock is off (Fast Farm): the job is done whole, whatever its length.
+  } else if (total > light.dayMin + NO_TIME) {
     // Builder's rule, so no job is impossible: a job that needs more than a
     // whole day's light can be done at first light, before anything else
     // that day, and it uses the whole day.
@@ -355,18 +373,22 @@ function doLine(
   spec: Extract<JobSpec, { kind: 'line' }>,
   skill: HelpSkill | null,
 ): Worked | ActionRefusal {
-  const light = lightNow(farm);
-  if (light.left <= NO_TIME) return noDaylight();
+  const light = lightNow(farm, env);
+  if (light.on && light.left <= NO_TIME) return noDaylight();
   const sideM = farm.layout.scale.sideM;
-  const minutes = spec.pieces.map((p) => pieceMinutes(p.work, light.dayMin));
+  const minutes = spec.pieces.map((p) =>
+    pieceMinutes(p.work, light.dayMin, farm.layout.scale.farmHa),
+  );
   const total = minutes.reduce((t, m) => t + m, 0);
   // The first part of the line is the hands' share, from their own day.
-  const handsHave = handsMinutes(farm, skill, light.dayMin);
+  const handsHave = handsMinutes(farm, skill, light);
+  // With the clock off (Fast Farm) the whole line is built.
+  const room = light.on ? handsHave + light.left : Infinity;
   // The whole pieces that fit in the hands' share and the light left, in the order drawn.
   let fits = 0;
   let work = 0;
   let byHandsPieces = 0;
-  while (fits < minutes.length && work + minutes[fits]! <= handsHave + light.left + NO_TIME) {
+  while (fits < minutes.length && work + minutes[fits]! <= room + NO_TIME) {
     work += minutes[fits]!;
     fits++;
     if (work <= handsHave + NO_TIME) byHandsPieces = fits;
@@ -453,14 +475,14 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
   switch (spec.kind) {
     case 'free':
       // It takes none of the day, so it can be done after last light too.
-      return finish(farm, trial.farm, action, trial.events, lightNow(farm), 0, {
+      return finish(farm, trial.farm, action, trial.events, lightNow(farm, env), 0, {
         outcome: 'free',
         totalWorkMin: 0,
         parts: [],
         cost: farm.cash - trial.farm.cash,
       });
     case 'whole':
-      return doWhole(farm, action, trial, spec, skill);
+      return doWhole(farm, action, env, trial, spec, skill);
     case 'line':
       return doLine(farm, action, env, trial, spec, skill);
   }
@@ -470,9 +492,9 @@ function work(farm: FarmState, action: Action, env: ActionEnv): Worked | ActionR
  * Do an action. Returns the farm after it, what happened and the job card,
  * or a refusal with the reason. The farm passed in is never changed.
  *
- * Every job takes its time off today's light. There is no way to switch
- * the clock off from here: whatever is in `env`, the job is done on the
- * clock.
+ * Every job takes its time off today's light, unless `env.noClock` is on.
+ * That one switch is the only way to turn the clock off: the server sets it
+ * for a Fast Farm (Claudia, 19 Nov 2026) and never for a Daily Farm.
  */
 export function applyAction(farm: FarmState, action: Action, env: ActionEnv = {}): ActionResult {
   const done = work(farm, action, env);

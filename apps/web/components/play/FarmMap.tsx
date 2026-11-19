@@ -122,6 +122,8 @@ export function FarmMap({
   view,
   theme,
   minutes,
+  liveClock,
+  cattlePace = 1,
   selected,
   pickable,
   reduceMotion,
@@ -159,6 +161,16 @@ export function FarmMap({
   theme: ThemeName;
   /** The time of day to light the map for, minutes after midnight. */
   minutes: number;
+  /**
+   * Fast Farm's moving day: the light follows this every frame instead of `minutes`, straight
+   * to the renderer, with no React redraw. Null for the farm's own clock (Daily Farm).
+   */
+  liveClock?: {
+    now: number | null;
+    subscribe: (fn: (minutes: number | null) => void) => () => void;
+  } | null;
+  /** How fast the cattle walk and graze: 1 normal, 2 or 4 with a faster day, 0 standing still. */
+  cattlePace?: number;
   selected: number | null;
   /** Paddocks a tool can pick (the move tool), outlined lightly, purple where there is no water. Null when none. */
   pickable: readonly PickablePaddock[] | null;
@@ -244,8 +256,15 @@ export function FarmMap({
     if (ready) mapRef.current?.setTheme(theme);
   }, [ready, theme]);
   useEffect(() => {
-    if (ready) mapRef.current?.setTimeOfDay(minutes);
-  }, [ready, minutes]);
+    if (ready && !liveClock) mapRef.current?.setTimeOfDay(minutes);
+  }, [ready, minutes, liveClock]);
+  useEffect(() => {
+    if (!ready || !liveClock) return;
+    mapRef.current?.setTimeOfDay(liveClock.now ?? minutes);
+    return liveClock.subscribe((m) => mapRef.current?.setTimeOfDay(m));
+    // `minutes` is only the first light until the clock publishes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, liveClock]);
   useEffect(() => {
     if (ready) mapRef.current?.setHighlight(selected);
   }, [ready, selected]);
@@ -255,6 +274,9 @@ export function FarmMap({
   useEffect(() => {
     if (ready) mapRef.current?.setReduceMotion(reduceMotion);
   }, [ready, reduceMotion]);
+  useEffect(() => {
+    if (ready) mapRef.current?.setCattlePace(cattlePace);
+  }, [ready, cattlePace]);
   useEffect(() => {
     if (ready) mapRef.current?.setTool(tool);
   }, [ready, tool]);

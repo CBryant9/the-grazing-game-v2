@@ -25,6 +25,8 @@ function TeamChoice({
   disabled: boolean;
   onPick: (team: 0 | 1 | 2) => void;
 }) {
+  // A Fast Farm has no daylight limit: nothing here talks about the player's day.
+  const lit = useGame((s) => s.snapshot?.clock.daylightLimit !== false);
   return (
     <>
       <div className={styles.teamchoice} role="group" aria-label="Who builds it">
@@ -36,7 +38,7 @@ function TeamChoice({
           onClick={() => onPick(0)}
         >
           <b>Yourself</b>
-          <small>Uses your day</small>
+          <small>{lit ? 'Uses your day' : 'Built now'}</small>
         </button>
         {teams.map((o) => (
           <button
@@ -63,7 +65,9 @@ function TeamChoice({
             </p>
           ),
       )}
-      <p className="muted">A team uses none of your day.</p>
+      <p className="muted">
+        {lit ? 'A team uses none of your day.' : 'A team builds it over the coming working days.'}
+      </p>
     </>
   );
 }
@@ -281,15 +285,20 @@ export function BuildCard({
           <dl className={styles.kvlist}>
             <Kv k="Takes" v={aboutTime(card.workMin)} />
             <Kv k="Cost" v={costWords(card, facts.lateM > 0)} />
-            <Kv
-              k="Fits in today's light"
-              v={facts.lateM > 0 ? `${num(facts.fitsM)} m of ${facts.length}` : '✓'}
-              cls={facts.lateM > 0 ? styles.cardlate : 'ok'}
-            />
-            <Kv
-              k="Daylight left after"
-              v={card.usesRestOfDay ? 'None' : aboutTime(card.leftAfterMin)}
-            />
+            {/* A Fast Farm has no daylight limit: no light rows (Claudia, 19 Nov 2026). */}
+            {card.onClock && (
+              <>
+                <Kv
+                  k="Fits in today's light"
+                  v={facts.lateM > 0 ? `${num(facts.fitsM)} m of ${facts.length}` : '✓'}
+                  cls={facts.lateM > 0 ? styles.cardlate : 'ok'}
+                />
+                <Kv
+                  k="Daylight left after"
+                  v={card.usesRestOfDay ? 'None' : aboutTime(card.leftAfterMin)}
+                />
+              </>
+            )}
           </dl>
           <ul className={styles.joblines}>
             {facts.notFit.map((w) => (

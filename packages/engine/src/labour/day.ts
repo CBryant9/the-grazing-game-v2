@@ -29,7 +29,7 @@ import { rngFromState } from '../rng';
 import { dayMinutes } from '../sim/clock';
 import type { FarmEvent, HandDuty } from '../sim/events';
 import type { FarmState } from '../sim/state';
-import { contractDone, contractorWorks, runMetresLeft } from './contract';
+import { contractDone, contractorWorks, runMetresLeft, teamMetresPerDay } from './contract';
 import { earnedOn, handsCan, useHands, weeklyWage, worksOn } from './help';
 import type { ContractRun, Hand, LabourState } from './types';
 
@@ -329,14 +329,14 @@ function runDay(
 ): void {
   const side = farm.layout.scale.sideM;
   const dayMin = dayMinutes(farm);
-  const teamM = LABOUR.teamMetresPerDay.value[run.team];
+  const teamM = teamMetresPerDay(farm, run.team);
   let handsM = 0;
   let handsMin = 0;
   if (run.handsHelp && handsFree) {
     // The hands' fencing day, in metres of permanent fence at the player's pace. It is used only
     // if something is built today.
     handsMin = handsCan(farm, 'fencing', dayMin).reduce((t, p) => t + p.minutes, 0);
-    handsM = handsMin * metresPerMinute('permanent', dayMin);
+    handsM = handsMin * metresPerMinute('permanent', dayMin, farm.layout.scale.farmHa);
   }
   let progress = run.progressM + teamM + handsM;
   const left = [...run.left];

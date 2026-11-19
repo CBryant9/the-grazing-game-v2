@@ -112,18 +112,44 @@ export const JOB_TIMES = {
 export type Pace = 'permanent' | 'electric' | 'tape' | 'pipe';
 
 /**
- * Metres a minute at a pace, on a day with `dayMin` minutes of light.
+ * Permanent fencing scales with the size of the place (Claudia, 19 Nov 2026: "so that it doesn't
+ * take forever for the larger properties to get a fence in"). A bigger place runs a bigger
+ * fencing plant: a post driver on the tractor, a wire spinner, more gear on the ute. So a day on
+ * the fence, and a contract team's day, builds more on a big place. The farm's squares grow with
+ * the square root of its area, so the pace does too: a farm of FENCE_SCALE_BASE_HA or less builds
+ * at the table's pace, and a bigger one at sqrt(ha / FENCE_SCALE_BASE_HA) times it, up to
+ * FENCE_SCALE_MAX. The cost a metre is unchanged. A game-balance call, not a sourced figure
+ * (docs/DATA.md, "Fence pace and farm size").
+ */
+export const FENCE_SCALE_BASE_HA = 300;
+/** The most a big place's fencing plant multiplies the pace by. */
+export const FENCE_SCALE_MAX = 5;
+
+/** How many times the table's permanent fence pace a farm of `farmHa` builds at: 1 to FENCE_SCALE_MAX. */
+export function fenceScale(farmHa: number): number {
+  if (!(farmHa > 0)) return 1;
+  return Math.min(FENCE_SCALE_MAX, Math.max(1, Math.sqrt(farmHa / FENCE_SCALE_BASE_HA)));
+}
+
+/** Metres of permanent fence a whole day builds on your own, on a farm of `farmHa`. */
+export const permanentMetresPerDay = (farmHa: number): number =>
+  JOB_TIMES.permanentFenceMPerDay.value * fenceScale(farmHa);
+
+/**
+ * Metres a minute at a pace, on a day with `dayMin` minutes of light, on a
+ * farm of `farmHa` hectares.
  *
  * Permanent fence is 500 m "a working day". The builder's reading: a
  * working day is that day's light, first light to last light, whatever its
  * length. So a whole day on the fence builds 500 m in any season, half a
- * day builds 250 m, and time spent on other jobs comes off it. The other
- * paces are by the hour.
+ * day builds 250 m, and time spent on other jobs comes off it. On a big
+ * place that is scaled by `fenceScale`. The other paces are by the hour,
+ * and fast already: they do not scale.
  */
-export function metresPerMinute(pace: Pace, dayMin: number): number {
+export function metresPerMinute(pace: Pace, dayMin: number, farmHa = 0): number {
   switch (pace) {
     case 'permanent':
-      return JOB_TIMES.permanentFenceMPerDay.value / dayMin;
+      return permanentMetresPerDay(farmHa) / dayMin;
     case 'electric':
       return JOB_TIMES.electricFenceMPerHour.value / 60;
     case 'tape':

@@ -195,9 +195,9 @@ describe('older saves', () => {
     return old;
   }
 
-  it('the save format is 17 and the engine is 0.22.0', () => {
+  it('the save format is 17 and the engine is 0.23.0', () => {
     expect(SAVE_FORMAT_VERSION).toBe(17);
-    expect(ENGINE_VERSION).toBe('0.22.0');
+    expect(ENGINE_VERSION).toBe('0.23.0');
     expect(saveFarm(openFarm('nsw')).saveFormat).toBe(17);
   });
 
@@ -218,7 +218,7 @@ describe('older saves', () => {
     const farm = skipDays(busyFarm().farm, 9).farm;
     const loaded = loadFarm(format2(farm));
     expect(loaded.saveFormat).toBe(17);
-    expect(loaded.engineVersion).toBe('0.22.0');
+    expect(loaded.engineVersion).toBe('0.23.0');
     const light = lightOn(farm);
     expect(loaded.clock).toEqual({
       firstLight: light.firstLight,

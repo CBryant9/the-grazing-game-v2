@@ -316,6 +316,12 @@ export interface JobCard {
   /** True if all of it is done today. */
   fitsToday: boolean;
   /**
+   * True when the job ran on the daylight clock (Daily Farm). False with
+   * the clock off (Fast Farm, `ActionEnv.noClock`): the job took none of
+   * the day's light, and a screen leaves out every line about light.
+   */
+  onClock: boolean;
+  /**
    * True if this job uses up the rest of today's light: it finishes with
    * none to spare, or it is a line cut short (what is left is less than
    * its next piece needs). The screen says "this would use up your full

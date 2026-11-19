@@ -2670,6 +2670,43 @@ Branch `m9-build-nav` from `m9-fun-and-flow` at b8338a3. Claudia, after playing:
 - Pinch-zooming with a tool picked still pans with two fingers; one-finger drag draws (unchanged).
 - The landscape length pill can sit under the card when the line ends at the card's edge.
 
+## m9 time: Fast Farm's moving day, no daylight limit, fence pace and farm size (engine 0.23.0, save format 17)
+
+Branch `m9-time` from `m9-fun-and-flow` at b8338a3. Claudia's 19 Nov 2026 requests under "Time" and the Daily Farm fence line (REQUIREMENTS.md, "19 Nov 2026: more fun and easier to play").
+
+### 20 Nov 2026: no daylight limit in Fast Farm
+
+- The engine gets one switch, `ActionEnv.noClock`. The server sets it for every Fast Farm (`envFor` in `server/game/game.ts`) and never for a Daily Farm. With it on, no job is refused for light, a line is built whole, the clock is not used up, and the hands take no share of the player's jobs (CALLS B200). The job card says `onClock`; the clock view says `daylightLimit` and is never evening.
+- The screen: no daylight bar, no "Fits in today's light" or "Daylight left after" rows, no all-red line, no "full day" line, no "Uses your day" on the team choice on a Fast Farm. Help's day and build topics, the setup card and the tour's fence and last steps no longer mention daylight on a Fast Farm (`helpTopicsFor`, `DAILY_TOUR_TEXT` keeps the Daily Farm's words). A job card still says how long the work takes (CALLS B206).
+- The instant-path test that passed `noClock: true` as a forbidden switch now passes only `instant` and `clock: 'off'`: `noClock` is the one real switch, set by the server only.
+
+### 20 Nov 2026: Fast Farm's day moves by itself
+
+- `lib/game/dayclock.ts` (pure, tested) and `components/play/DayClock.tsx`. A day is 16 s at 1× (12 s of light, then dusk, night and dawn), 2× and 4×. The next day is asked for once, in the dark, with the existing `/api/game/day` call (`autoDay` in the store): one server call a day and no other. A stale answer shows the latest farm and the day starts again; a failure pauses the clock with the usual notice and Try again.
+- Holds and pauses as CALLS B202. One line of facts for a day passed while playing; the full summary on a stop, Next day and skips (B203). Controls as B204. Pause and speed are kept on the device in localStorage, read and written in try/catch.
+- The light moves at 60 fps without React: the clock hands the time straight to the renderer (`liveClock` on `FarmMap`), and the renderer now draws a frame only when the light's colour changes (`applyLight` in `packages/render/src/map.ts`). The frame loop stops whenever the sun stands still. Reduce motion: days still pass; the map stays in plain daylight and the sun on the bar is not drawn. VISUALS, "The moving day".
+
+### 20 Nov 2026: fence pace and farm size (Daily Farm request; holds on both)
+
+- `fenceScale(ha) = clamp(sqrt(ha / 300), 1, 5)` on permanent fence (your own day and a hand's help to a team) and a contract team's metres a day. Cost a metre unchanged. The fence card says the pace on your own ("about 910 m ... a place this size runs a bigger fencing plant") and each team card its metres a working day. MODEL.md section 9, DATA.md "Fence pace and farm size", CALLS B205. Engine 0.23.0; no save format change (nothing is added to a farm).
+
+### Tests
+
+- Engine: Fast Farm clock-off tests (`day/clock.test.ts`), hands with the clock off (`labour/labour.test.ts`), fence scale and the 6,000 ha day (`day/jobTimes.test.ts`), a team on 1,200 ha (`labour.test.ts`); `day/jobs.test.ts` line tests reworked for the scaled pace on 1,040 ha (same rules: whole squares, the refusal reason). Web: `lib/game/dayclock.test.ts`, `lib/game/autoday.test.ts`, `components/play/dayhold.test.ts`, Fast Farm cases in `format.test.ts`, `linecard.test.ts`, `buildstore.test.ts`, `helptopics.test.ts`; server tests now check a Fast Farm builds a long fence whole and never refuses for light (`build.test.ts`, `game.test.ts`), and a Daily Farm still cuts a long fence short (`daily/start.test.ts`).
+
+### Seen in the browser (dev server on port 3101, a new Fast Farm, Central Queensland small, 1,000 ha)
+
+- Phone upright (375 x 812), light: the day bar with the sun moving, "The day moves by itself", then "Overnight: cash -$57" after each day; Pause, 1×/2×/4×, Next day, +1w, +1m, +1y on one row. The map warms at dusk and goes dark blue at night, then the next day starts at first light. With the fence tool open the note says the sun waits at dusk and the day did not end. A 784 m permanent fence (about 11 h 45 min of work on this farm) was built whole in one go, with no light rows on the card, "Built now" and "A team builds it over the coming working days". +1 week showed the full summary. Calving starting paused the day and showed the full summary.
+- Phone upright, dark: the same, fitting at 375 px.
+- Phone on its side (812 x 375): one row; the day bar is small, its words read out and shown on hover. A first try overlapped the bar and the buttons; fixed (`.topdl` min-width 0, no words in that layout).
+- PC (1280 x 800 dark, 1024 x 700 light): one header row with the day bar, "Paused", Play, speed, Next day and the three skips.
+- The preview pane was in the background, so its frames came at about 1 a second and the sun moved slower than on a real screen (the clock takes at most a quarter of a second a frame, so a slow tab never jumps).
+
+### Not done
+
+- The `realism-guardian` agent was not run on this branch. Lighthouse was not run.
+- Other m9 builders may also bump the engine to 0.23.0: check the version at the join. The cattle pace on the map (`FarmMap.setCattlePace`, from the cattle builder) is not on this branch, so the day clock's speed and pause are not yet wired to it.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

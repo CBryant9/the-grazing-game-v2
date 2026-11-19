@@ -88,7 +88,11 @@ export const LABOUR = {
    */
   dogsFactor: fig(2.5 / 1.5, 'Proposed', 'PRD 21 row 17: 2.5 km/h with dogs against 1.5'),
 
-  /** Contractor fencing, metres a day: a 1-man team and a 2-man team. PRD 5.4 and 5.11. */
+  /**
+   * Contractor fencing, metres a day: a 1-man team and a 2-man team, on a place of 300 ha or
+   * less. PRD 5.4 and 5.11. A bigger place gets a bigger plant: `teamMetresPerDay` (below)
+   * scales these by `fenceScale` (Claudia, 19 Nov 2026). The charge a metre is unchanged.
+   */
   teamMetresPerDay: fig({ 1: 500, 2: 1000 } as const, 'Decided', 'PRD 5.4: 500 m and 1,000 m'),
   /**
    * The contractor's labour charge, dollars a metre, the same for either

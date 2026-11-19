@@ -22,6 +22,7 @@ import {
   type FarmState,
   type PeriodSummary,
   type SkipStop,
+  type ActionEnv,
   type SourceEnv,
   type TickEvent,
 } from '@gg/engine';
@@ -153,7 +154,7 @@ export function buildSnapshot(
     /** The farm days wages were missed, for the standing's fact line. */
     missedWages?: readonly number[];
   },
-  env: SourceEnv,
+  env: ActionEnv,
   /** The sheep switch. Sheep show where it is on (or the farm already has sheep), never in Central Queensland. */
   sheepOn = false,
 ): Snapshot {
@@ -161,7 +162,7 @@ export function buildSnapshot(
   const sr = shown ? sheepReads(farm, env) : null;
   const view = viewWithSheep(farmView(farm, env), farm, sr);
   const totals = farmTotals(farm, env);
-  const clock = clockView(farm);
+  const clock = clockView(farm, env);
   const market = marketView(farm, env);
   const dateOfDay = (day: number): DateParts => dateParts(dateOn(farm, day));
 
@@ -273,6 +274,7 @@ export function buildSnapshot(
       leftMin: round(clock.leftMin, 1),
       canStartJobs: clock.canStartJobs,
       evening: clock.evening,
+      daylightLimit: clock.daylightLimit,
     },
     view,
     todo: [

@@ -9,6 +9,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   leftAfterMin: 300,
   usesRestOfDay: false,
   fitsToday: true,
+  onClock: true,
   cost: 2340,
   costToday: 2340,
   perDay: null,
@@ -79,5 +80,9 @@ describe('the facts beside a line', () => {
 
   it('a free line says no cost', () => {
     expect(lineFacts(card({ cost: 0, costToday: 0 }))!.cost).toBe('No cost.');
+  });
+
+  it('a Fast Farm line card never says it uses the full day', () => {
+    expect(lineFacts(card({ onClock: false, usesRestOfDay: true }))!.fullDay).toBeNull();
   });
 });

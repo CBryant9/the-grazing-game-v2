@@ -18,18 +18,43 @@ export interface HelpTerm {
   means: string;
 }
 
+/** The day on a Daily Farm, which keeps the daylight budget. */
+const DAILY_DAY_LINES: readonly string[] = [
+  'Each day runs from first light to last light. The daylight bar at the top shows how much of the light is used.',
+  'Jobs use light. Before you confirm a job, its card says how long it takes and how much light is left after it. A job that fits in the light left is done. A job that does not fit is not done.',
+  'Some jobs, like sowing, take none of the day.',
+  'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
+  'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. +1 year runs to the end of the farm year.',
+  'A skip stops early and says why if something needs you: a mob with no water, a trough run dry, a crop ready, stock dying of anything but natural causes, calving starting, the whole farm eaten out, or cash going below zero and then three quarters of the way to where the bank takes the farm.',
+];
+
+/** The day on a Fast Farm: no daylight limit, and the day moves by itself (Claudia, 19 Nov 2026). */
+const FAST_DAY_LINES: readonly string[] = [
+  'On a Fast Farm the day moves by itself. The sun comes up, crosses the sky and sets, then the next day starts. A line at the top says what changed overnight.',
+  'Pause stops the day and Play starts it again. The speed button runs the days at 1×, 2× or 4×.',
+  'Jobs cost money only. There is no daylight limit, so you can do as many jobs in a day as the bank allows. A job card still says how long the work takes.',
+  'While a job card, a move or a confirm is open, the sun waits at dusk until you finish.',
+  'Next day jumps to tomorrow and shows what changed. +1 week, +1 month and +1 year run the days one after another. +1 year runs to the end of the farm year.',
+  'The day pauses, and a skip stops early, if something needs you: a mob with no water, a trough run dry, a crop ready, stock dying of anything but natural causes, calving starting, the whole farm eaten out, or cash going below zero and then three quarters of the way to where the bank takes the farm.',
+];
+
+/** The last two build lines on a Daily Farm: a line can be too long for the light left. */
+const DAILY_BUILD_LINES: readonly string[] = [
+  'Every job shows a card first, with its cost and the light it uses. You confirm, and the tool goes back to Look.',
+  'Red on the map while you draw means one thing: this can not be done. The part of a line that does not fit in today shows red and is not built. Only the part that fits is built. Draw the rest again another day. A line the game can not build at all shows red too.',
+];
+
+/** The same on a Fast Farm, where every line is built whole. */
+const FAST_BUILD_LINES: readonly string[] = [
+  'Every job shows a card first, with its cost. You confirm, and the tool goes back to Look.',
+  'Red on the map while you draw means one thing: this can not be done. A line the game can not build at all shows red. Anything else you draw is built whole.',
+];
+
 export const HELP_TOPICS: readonly HelpTopic[] = [
   {
     id: 'day',
     title: 'How the day works',
-    lines: [
-      'Each day runs from first light to last light. The daylight bar at the top shows how much of the light is used.',
-      'Jobs use light. Before you confirm a job, its card says how long it takes and how much light is left after it. A job that fits in the light left is done. A job that does not fit is not done.',
-      'Some jobs, like sowing, take none of the day.',
-      'When there is not enough light left for a job, the farm goes dark. You can still look around. Next day is the way on.',
-      'Next day moves on to the next morning and shows what changed overnight. +1 week, +1 month and +1 year run the days one after another. +1 year runs to the end of the farm year.',
-      'A skip stops early and says why if something needs you: a mob with no water, a trough run dry, a crop ready, stock dying of anything but natural causes, calving starting, the whole farm eaten out, or cash going below zero and then three quarters of the way to where the bank takes the farm.',
-    ],
+    lines: [...FAST_DAY_LINES],
   },
   {
     id: 'daily',
@@ -58,8 +83,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     lines: [
       'Open the build tools with the Build tab. The tools are Fence, Gate, Pipe, Trough, Portable trough, Water hub and Remove. Look goes back to just looking.',
       'Fence: pick permanent, electric or tape, then drag along the paddock lines. Gate: tap a fence to put a gate in it, and tap a gate to open or shut it. Pipe: drag across squares, starting from the bore, a trough, a hub or pipe that is already there. Trough: tap a square that water reaches. Water hub: tap a fence corner or a square.',
-      'Every job shows a card first, with its cost and the light it uses. You confirm, and the tool goes back to Look.',
-      'Red on the map while you draw means one thing: this can not be done. The part of a line that does not fit in today shows red and is not built. Only the part that fits is built. Draw the rest again another day. A line the game can not build at all shows red too.',
+      ...FAST_BUILD_LINES,
     ],
   },
   {
@@ -201,3 +225,19 @@ export const SHEEP_HELP_TERMS: readonly HelpTerm[] = [
   },
   { term: 'Wethers', means: 'Male sheep that have been marked.' },
 ];
+
+/**
+ * The topics for the farm on screen. `HELP_TOPICS` is the Fast Farm's. A Daily Farm keeps the
+ * daylight budget, so its day and build topics say how the light works.
+ */
+export function helpTopicsFor(daily: boolean): readonly HelpTopic[] {
+  if (!daily) return HELP_TOPICS;
+  return HELP_TOPICS.map((t) => {
+    if (t.id === 'day') return { ...t, lines: [...DAILY_DAY_LINES] };
+    if (t.id === 'build') {
+      const keep = t.lines.slice(0, t.lines.length - FAST_BUILD_LINES.length);
+      return { ...t, lines: [...keep, ...DAILY_BUILD_LINES] };
+    }
+    return t;
+  });
+}

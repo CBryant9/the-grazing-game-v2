@@ -600,6 +600,8 @@ class PixiFarmMap implements FarmMap {
   private readonly maxPixelRatio: number;
   private readonly font: string;
   private minutes: number | null = null;
+  /** The light's colour last laid over the map, so an unchanged time of day draws no frame. */
+  private lightTint: number | null = null;
   private weather: MapWeather = { kind: 'clear' };
   private highlight: number | null = null;
   private pickable: readonly PickablePaddock[] | null = null;
@@ -2212,9 +2214,14 @@ class PixiFarmMap implements FarmMap {
 
   private applyLight(): void {
     const light = this.view?.light ?? { first: 360, last: 1080 };
-    this.world.tint = mapTint(this.minutes, light.first, light.last, this.weather.kind);
+    const tint = mapTint(this.minutes, light.first, light.last, this.weather.kind);
+    // Fast Farm's moving day sets the time every frame (milestone 9): a frame is drawn only when
+    // the colour of the light really changes, so the middle of the day costs nothing.
+    if (tint === this.lightTint && (!this.surround || this.surround.tint === tint)) return;
+    this.lightTint = tint;
+    this.world.tint = tint;
     // The country round the farm gets the same light as the farm.
-    if (this.surround) this.surround.tint = this.world.tint;
+    if (this.surround) this.surround.tint = tint;
     this.invalidate();
   }
 

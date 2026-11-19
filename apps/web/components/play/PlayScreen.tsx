@@ -13,6 +13,8 @@ import { BuildBar } from './BuildBar';
 import { BuildCard } from './BuildCard';
 import { BuildGuide } from './BuildGuide';
 import { DailyOverlay } from './DailyBits';
+import { DayClockRunner } from './DayClock';
+import { mapClock, useDayClock } from '@/lib/game/dayclock';
 import { FarmMap, type MapCovers } from './FarmMap';
 import { HelpPanel } from './HelpPanel';
 import { HerdList, PaddockList } from './Lists';
@@ -152,10 +154,17 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const trayCardRef = useRef<HTMLDivElement>(null);
 
   const { clock } = snapshot;
-  // Evening: nothing more can start today, so the farm is lit for dusk. It can still be looked at.
+  // Evening (Daily Farm): nothing more can start today, so the farm is lit for dusk. It can still
+  // be looked at. A Fast Farm is never evening: its light follows the moving day (`mapClock`).
   const minutes = clock.evening
     ? Math.max(clock.now, clock.lastLight + DUSK_AFTER_LAST_LIGHT)
     : clock.now;
+  const moving = !clock.daylightLimit;
+  // The cattle keep time with the moving day: faster at 2x and 4x, standing still when paused.
+  // A Daily Farm's day is real time, so its cattle walk at the normal pace.
+  const dayPaused = useDayClock((s) => s.paused);
+  const daySpeed = useDayClock((s) => s.speed);
+  const cattlePace = moving ? (dayPaused ? 0 : daySpeed) : 1;
 
   // The page itself does not scroll: the map takes the room.
   useEffect(() => {
@@ -291,6 +300,8 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
               view={snapshot.view}
               theme={theme}
               minutes={minutes}
+              liveClock={moving ? mapClock : null}
+              cattlePace={cattlePace}
               selected={move ? move.target : paddockId}
               pickable={pickables}
               reduceMotion={reduceMotion}
@@ -389,6 +400,7 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
         </div>
         {!pc && <Nav />}
       </div>
+      {moving && <DayClockRunner snapshot={snapshot} />}
       {yearEnd && <YearEndCard end={yearEnd} />}
       {summary && !yearEnd && <SummaryCard summary={summary} />}
       {snapshot.over && !overHidden && !yearEnd && !summary && (

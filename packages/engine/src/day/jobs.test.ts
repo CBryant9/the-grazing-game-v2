@@ -13,6 +13,7 @@ import {
   work,
 } from '../../test-support/workingDay';
 import type { Action, ActionType } from '../actions/types';
+import { permanentMetresPerDay } from '../data/jobTimes';
 import { EDGE, getEdge } from '../farm/topology';
 import { GRID_N, GRID_W } from '../grid';
 import { labourPool } from '../labour/pool';
@@ -139,26 +140,32 @@ describe('a line too long for today', () => {
   });
 
   it('only whole squares are built: the light left over is less than the next square needs', () => {
-    // 100 m squares (1,040 ha). Half a day is 250 m: two whole squares, and half a square's light to spare.
+    // 100 m squares (1,040 ha). A day there builds about 930 m (the pace grows with the farm,
+    // `fenceScale`), so half a day is about 465 m: four whole squares, and part of one to spare.
     const farm = openFarm('nsw', { size: 1040 });
+    const perDay = permanentMetresPerDay(1040);
+    expect(perDay).toBeCloseTo(500 * Math.sqrt(1040 / 300), 6);
     const half = withLightLeft(farm, (farm.clock.lastLight - farm.clock.firstLight) / 2);
     const done = work(half, { type: 'buildFence', edges: across(12, 2, 20), fence: 'permanent' });
-    expect(done.job.line!.fits.metres).toBe(200);
-    expect(done.job.line!.doesNotFit.metres).toBe(1700);
-    // A fifth of the day goes on each square. Two fifths were used and a tenth is left.
-    expect(done.job.workMin).toBeCloseTo(done.job.dayMin * 0.4, 6);
-    expect(done.job.leftAfterMin).toBeCloseTo(done.job.dayMin * 0.1, 6);
+    expect(done.job.line!.fits.metres).toBe(400);
+    expect(done.job.line!.doesNotFit.metres).toBe(1500);
+    // Each square takes 100 m of the day's metres. Four were built; the rest of the half day is left.
+    expect(done.job.workMin).toBeCloseTo((done.job.dayMin * 400) / perDay, 6);
+    expect(done.job.leftAfterMin).toBeCloseTo(done.job.dayMin * (0.5 - 400 / perDay), 6);
+    expect(done.job.leftAfterMin).toBeLessThan((done.job.dayMin * 100) / perDay);
     expect(done.job.usesRestOfDay).toBe(true);
     // The third square is not half built: it is not there at all.
-    expect(getEdge(done.farm.layout.fences, across(12, 4, 4)[0]!)).toBe(EDGE.none);
+    expect(getEdge(done.farm.layout.fences, across(12, 6, 6)[0]!)).toBe(EDGE.none);
     // The light left can still go on a job that fits in it.
     expect(work(done.farm, { type: 'placePortable', cell: cell(5, 5) }).job.outcome).toBe('done');
   });
 
   it('with no light for even one whole square, the line is refused with the reason', () => {
     const farm = openFarm('nsw', { size: 1040 });
-    // A 100 m square of permanent fence is a fifth of the day. Leave a sixth.
-    const late = withLightLeft(farm, (farm.clock.lastLight - farm.clock.firstLight) / 6);
+    // A 100 m square of permanent fence is 100 m of the day's metres (about a ninth of the day). Leave a little less.
+    const square =
+      (farm.clock.lastLight - farm.clock.firstLight) * (100 / permanentMetresPerDay(1040));
+    const late = withLightLeft(farm, square * 0.8);
     const before = farmHash(late);
     const no = turnedDown(late, {
       type: 'buildFence',
@@ -167,11 +174,11 @@ describe('a line too long for today', () => {
     });
     expect(no.reason).toBe('not-enough-daylight');
     expect(no.message).toMatch(
-      /^You don't have enough time to do this today\. The first piece of the line takes 2 h \d+ m and there is 2 h \d+ m of light left\.$/,
+      /^You don't have enough time to do this today\. The first piece of the line takes 1 h \d+ m and there is 1 h \d+ m of light left\.$/,
     );
     expect(farmHash(late)).toBe(before);
-    // A fifth of the day is enough for one square.
-    const enough = withLightLeft(farm, (farm.clock.lastLight - farm.clock.firstLight) / 5);
+    // A square's share of the day is enough for one square.
+    const enough = withLightLeft(farm, square * 1.05);
     expect(
       work(enough, { type: 'buildFence', edges: across(12, 2, 20), fence: 'permanent' }).job.line!
         .fits.metres,

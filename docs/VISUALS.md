@@ -320,6 +320,18 @@ Claudia: "I'd like to see a grid representing the fence, making it more visual s
 - **Themes:** the country keeps its natural colours in both. Only the surround, the labels and the markers change.
 - **The surround (round the farm):** bush country, so the farm never floats in an empty field. Dark: the mockup's bush, `#55653a` with clumps of `#4a5832`, `#66753f` and `#5d6b3a` (the mockup's map code, the `bush` tile). Light: a lighter sage bush, `#939f72` with `#87936a`, `#a2ad80` and `#8d9a6c`, greyer than any paddock so it never reads as pasture. It is one 64 pixel tile, repeated under the farm and moved with it. Zoomed out it keeps its screen size; zoomed in past about 11 pixels a square it grows with the farm. It takes the same time-of-day tint as the farm. The farm's dark rim still marks the boundary. Nothing on it can be tapped, and it carries no game figure. *(Changed: milestone 8, from the mockup. This replaces the builder's earlier near-black (dark) and beige (light) surround.)* **(builder: the light theme colours and the zoom at which it starts to grow)**
 
+### The moving day (Fast Farm, m9, 19 Nov 2026)
+
+Claudia: "the day could just slowly move as you're playing and you see a sunset and sunrise happen across time". On a Fast Farm the map's light follows a clock for the screen (`lib/game/dayclock.ts`, `components/play/DayClock.tsx`), not the farm's clock:
+
+- **One day on screen:** 16 s at 1× (`DAY_SECONDS`). First light to last light takes 12 s (`LIGHT_SECONDS`): warm at first light, white through the day, warm before last light (the same `lightTint` as before). Then 4 s of night: dusk to an hour past last light, dark, and the dawn to the next first light. 2× and 4× halve and quarter it.
+- **The swap is not seen:** the next day is asked for in the middle of the night, when the map is dark. If the answer is slow the map waits in the dark.
+- **The sun waits at dusk** (a little after last light, still warm) while a build card, a move, a plan, a job or market card mid-confirm, or any confirm is open, and while the tab is hidden. It stands still when paused, during the first-day tour, and while a summary or the year-end card is in front.
+- **The day bar** in the daylight bar's place: the same track, first light to last light, with a small pale sun moving along it and dimmed at night. Its note says what changed overnight (facts), or "Paused", or that the sun waits at dusk.
+- **Smooth, no wasted frames:** the light is handed straight to the renderer every frame, outside React. The renderer draws a frame only when the colour of the light really changes (`applyLight` in `packages/render/src/map.ts`), so the white middle of the day draws nothing. The frame loop stops while the sun stands still (paused, held at dusk, waiting for the server).
+- **Reduce motion:** the days still pass, but the map stays in plain daylight and the sun on the bar is not drawn.
+- **Daily Farm** is unchanged: its map is lit for the farm's own clock, and dims for dusk once no job fits.
+
 ### Not done yet in the rebuild's map, or not checked
 
 For Claudia to know before she looks at it. Each is from the spec above.

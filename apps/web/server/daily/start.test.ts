@@ -1,4 +1,5 @@
 import { createFarm } from '@gg/engine';
+import { FARM_GRID_W } from '@gg/shared';
 import { loadRealData } from '@gg/engine/server';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { GameError } from '../game/game';
@@ -38,6 +39,25 @@ describe('starting a Daily Farm', () => {
       d: '2026-11-13',
       day: 0,
     });
+  }, 120_000);
+
+  it('keeps the daylight budget: a fence longer than the light left is cut short (Fast Farm has no limit)', async () => {
+    const r = await rig({ date: '2026-11-13', time: '10:00:00' });
+    const f = newFarm();
+    const snap = await r.game.create(f.key, choices(), OWNER);
+    expect(snap.clock.daylightLimit).toBe(true);
+    const edges = [];
+    for (let vy = 2; vy <= 22; vy += 2) {
+      for (let x = 0; x < FARM_GRID_W; x++)
+        edges.push({ line: 'h' as const, index: vy * FARM_GRID_W + x });
+    }
+    const p = await r.game.preview(f.key, {
+      action: { type: 'buildFence', edges: edges.slice(0, 60), fence: 'permanent' },
+    });
+    if (!p.ok) throw new Error(p.message);
+    expect(p.card.onClock).toBe(true);
+    expect(p.card.outcome).toBe('part');
+    expect(p.card.line!.doesNotFit.edges.length).toBeGreaterThan(0);
   }, 120_000);
 
   it('arrives on Day 1 with nothing spent and nothing decided, the herd placed today, even late in the month', async () => {

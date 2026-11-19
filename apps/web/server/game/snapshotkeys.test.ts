@@ -60,6 +60,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   clock: [
     'canStartJobs',
     'dayMin',
+    'daylightLimit',
     'evening',
     'firstLight',
     'lastLight',
@@ -379,6 +380,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'leftAfterMin',
     'line',
     'notes',
+    'onClock',
     'outcome',
     'perDay',
     'summary',
@@ -450,6 +452,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'leftAfterMin',
     'line',
     'notes',
+    'onClock',
     'outcome',
     'perDay',
     'summary',
@@ -684,9 +687,10 @@ async function serverFixtures(): Promise<{
   const person = snap.workforce.seekers[0]!;
   replies.preview!.push(await game.preview(A, { action: { type: 'hireHand', person: person.id } }));
   replies.act!.push(await game.act(A, { action: { type: 'hireHand', person: person.id } }));
-  const twelve = Array.from({ length: 12 }, (_, i) => ({
+  // Long enough that a team (faster on a bigger place, `fenceScale`) is still at it after a day.
+  const twelve = Array.from({ length: 34 }, (_, i) => ({
     line: 'h' as const,
-    index: 20 * W + 5 + i,
+    index: 20 * W + 3 + i,
   }));
   const order = {
     action: { type: 'orderContractFence' as const, edges: twelve, team: 1 as const },

@@ -20,7 +20,8 @@ import type { EdgeRef } from '../farm/topology';
 import { dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
-import { contractDone, runMetresLeft } from './contract';
+import { contractDone, runMetresLeft, teamMetresPerDay } from './contract';
+import { permanentMetresPerDay } from '../data/jobTimes';
 import { handShare, onDuty, usedToday, weeklyWage, worksOn } from './help';
 import { labourPool, standingOf } from './pool';
 import type { HandKind, HandSkills } from './types';
@@ -163,7 +164,9 @@ export function workforceView(farm: FarmState): WorkforceView {
       offUntil: h.offUntil,
       owed: h.owed,
       dayLeft: status === 'working' ? Math.max(0, 1 - usedToday(farm, h)) : 0,
-      fenceMetresPerDay: Math.round(handShare(h, 'fencing') * 500),
+      fenceMetresPerDay: Math.round(
+        handShare(h, 'fencing') * permanentMetresPerDay(farm.layout.scale.farmHa),
+      ),
     };
   });
   const next = labour?.nextPayDay ?? null;
@@ -219,7 +222,7 @@ export function contractView(farm: FarmState): ContractRunView[] {
       left: r.left.map((e) => ({ line: e.line, index: e.index })),
       metresBuilt: r.built.length * side,
       metresLeft: runMetresLeft(farm, r),
-      metresPerDay: LABOUR.teamMetresPerDay.value[r.team],
+      metresPerDay: teamMetresPerDay(farm, r.team),
       nextWorkDay: done.startDay,
       doneDay: done.doneDay,
       doneDate: dateOn(farm, done.doneDay),

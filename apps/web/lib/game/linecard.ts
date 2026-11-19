@@ -41,7 +41,7 @@ export function lineFacts(card: JobCardWire): LineFacts | null {
           : `Costs ${money(part ? card.costToday : card.cost)}${part ? ' for the part that fits' : ''}.`,
     time: `Takes ${aboutTime(card.workMin)}.`,
     notFit: l.words,
-    fullDay: card.usesRestOfDay ? 'This would use up your full day.' : null,
+    fullDay: card.onClock && card.usesRestOfDay ? 'This would use up your full day.' : null,
     fitsM,
     lateM,
     nothingFits: fitsM <= 0,

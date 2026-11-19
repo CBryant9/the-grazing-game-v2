@@ -63,6 +63,11 @@ export interface ClockWire {
   canStartJobs: boolean;
   /** No job can start: the screen dims the farm and lights up Next day. */
   evening: boolean;
+  /**
+   * True on a Daily Farm: jobs are held to the light, and the daylight bar shows. False on a Fast
+   * Farm (Claudia, 19 Nov 2026): no daylight limit, and the day moves by itself on the screen.
+   */
+  daylightLimit: boolean;
 }
 
 export interface TotalsWire {
@@ -933,6 +938,8 @@ export interface JobCardWire {
   leftAfterMin: number;
   usesRestOfDay: boolean;
   fitsToday: boolean;
+  /** False on a Fast Farm: the job takes none of the day's light, and the card says nothing about light. */
+  onClock: boolean;
   cost: number;
   costToday: number;
   /** For a supplement: what it costs a day for the mob while it is on, dollars. Null for any other job. */

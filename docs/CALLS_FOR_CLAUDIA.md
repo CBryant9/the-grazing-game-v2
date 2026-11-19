@@ -578,6 +578,22 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B198. Sheep sizes and stand-back.** Sheep are sized by the cattle rule (ewe 1.3 m, wether 1.35, ram 1.5, young 1.1, lamb 0.75) and spread by the flock rule above, but do not walk yet. Stand-back from fences is now a fifth of a square at the sides and 0.35 under a fence for cattle (0.14 and 0.22 for sheep), as the animals are smaller. [Change: `SHEEP_LENGTH_M`, `STAND_BACK`, `SHEEP_STAND_BACK`]
 
+#### Time: Fast Farm (m9, 19 Nov 2026)
+
+**B200. Hands on a Fast Farm.** With no daylight limit there is no day of yours for a hand to save, so on a Fast Farm the hands take no share of your jobs. Their day goes to their own duties (refilling troughs, putting tape back up) and to helping a fencing team. They still cost their wages. On a Daily Farm nothing changed. Other choice: let them take their share anyway (it would change nothing but the card), or make their wages lower on a Fast Farm. [Change: `handsMinutes` in `packages/engine/src/day/act.ts`]
+
+**B201. A Fast Farm day takes about 16 seconds.** 12 s of light, then 4 s of dusk, night and dawn. 2× and 4× give 8 s and 4 s. So a year at 1× is about 1 h 37 min, and at 4× about 24 min; the skips are still there for longer jumps. Other choice: a slower or faster day. [Change: `DAY_SECONDS` and `LIGHT_SECONDS` in `apps/web/lib/game/dayclock.ts`]
+
+**B202. When the moving day stops.** The sun waits at dusk (the day does not end) while a build card, a move, a plan, squares to sow, a job or market card mid-confirm, the start-a-new-farm confirm, or a request is under way, and while the tab is hidden. A result that is only being read (Done) does not hold the day; it stays on screen into the next day. The day pauses itself (Play to carry on) for anything a skip stops for (no water, a trough dry, a crop ready, deaths not from natural causes, calving starting, eaten out, the bank facts), the year end, a worker report that needs your eye, and if the day could not be fetched. It stands still during the first-day tour until its last step, "Let the day run", and while the farm is ended. Other choice: pause on any open sheet. [Change: `holdsDay` and `useGate` in `components/play/DayClock.tsx`, `autoDay` in `lib/game/store.ts`]
+
+**B203. One line a day, the full summary on a stop.** A day that passes while playing shows one line of facts in the top bar ("Overnight: 4 mm rain · cash -$57 · 2 calves born"). The full summary card shows when the day pauses itself, and after Next day or a skip, as before. Other choice: no line, or a small card that fades. [Change: `dayLine` in `lib/game/dayclock.ts`]
+
+**B204. Play, Pause and speed on a phone.** Play or Pause and the speed (1×, 2×, 4×) are two square buttons before Next day. On a phone held upright the skips take their short names (+1w, +1m, +1y) so the row fits at 375 px. The choice is kept on the device. A new device starts playing at 1×. Other choice: start paused. [Change: `DayControls` in `DayClock.tsx`, `TimeButtons` in `TopBar.tsx`, `parseSaved` in `dayclock.ts`]
+
+**B205. Fence pace grows with the farm.** A day of permanent fence, and a contract team's day, is multiplied by sqrt(ha / 300), from 1 (300 ha or less) to 5 (7,500 ha and up): a bigger place runs a bigger fencing plant. On 6,000 ha a day is about 2,240 m (9 squares) instead of 500 m (2 squares). The cost a metre is the same, so a team just finishes sooner. Electric fence, tape and pipe are unchanged. It applies on both farms (the engine has no mode); on a Fast Farm it changes the time a card says and how fast a team works. A game-balance call, not a sourced figure. Other choice: a different base area or cap, or scale electric too. [Change: `FENCE_SCALE_BASE_HA` and `FENCE_SCALE_MAX` in `packages/engine/src/data/jobTimes.ts`]
+
+**B206. The time a job takes still shows on a Fast Farm.** A job card on a Fast Farm still says how long the work takes (a long fence can take more than a day of light), and the job is done at once. It is a fact about the work, kept so the real figures stay in view. Other choice: leave the time off a Fast Farm card. [Change: `cardLines` in `lib/game/format.ts`, `BuildCard.tsx`]
+
 ## 2. Stand-in figures
 
 These numbers have no sourced real figure behind them. Each is one constant or setting. "Replaced by" says what would replace it.

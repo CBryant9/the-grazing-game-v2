@@ -101,8 +101,9 @@ describe('nothing a player can reach uses it', () => {
   it('the public action can not be made instant: a switch passed in the env is ignored', () => {
     const farm = openFarm('nsw');
     const job: Action = { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' };
-    // What a server route would pass if it spread a request into the env.
-    const spread = { instant: true, clock: 'off', noClock: true } as unknown as ActionEnv;
+    // What a server route would pass if it spread a request into the env. (`noClock` is the one
+    // real switch since 19 Nov 2026, set by the server for a Fast Farm only: see clock.test.ts.)
+    const spread = { instant: true, clock: 'off' } as unknown as ActionEnv;
     const done = applyAction(farm, job, spread);
     if (!done.ok) throw new Error(done.message);
     // Still a day's work: 500 m of the 1,800 m, exactly as with no env at all.

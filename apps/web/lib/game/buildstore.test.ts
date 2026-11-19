@@ -32,7 +32,14 @@ const view = {
 } as unknown as FarmView;
 
 const snap = (): Snapshot =>
-  ({ view, todo: [], paddocks: [{ id: 0 }], mobs: [] }) as unknown as Snapshot;
+  ({
+    view,
+    todo: [],
+    paddocks: [{ id: 0 }],
+    mobs: [],
+    // A Daily Farm's clock: the light can run out. A Fast Farm has none (see below).
+    clock: { daylightLimit: true },
+  }) as unknown as Snapshot;
 
 const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   action: 'buildFence',
@@ -41,6 +48,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   leftAfterMin: 300,
   usesRestOfDay: false,
   fitsToday: true,
+  onClock: true,
   cost: 100,
   costToday: 100,
   perDay: null,
@@ -217,6 +225,25 @@ describe('drawing a fence', () => {
     expect(buildDraft(build(), view)!.segments.every((s) => s.style === 'late')).toBe(true);
     await useGame.getState().buildConfirm();
     expect(api.act).not.toHaveBeenCalled();
+  });
+
+  it('a Fast Farm never draws the all-red line: it has no daylight limit', async () => {
+    useGame.setState({
+      snapshot: { ...snap(), clock: { daylightLimit: false } } as unknown as Snapshot,
+    });
+    useGame.getState().selectTool('fence');
+    api.preview.mockResolvedValue({
+      ok: false,
+      reason: 'no-daylight',
+      message: 'It is last light. No more jobs can start today.',
+      version: 'v1',
+    } satisfies PreviewResponse);
+    const g = useGame.getState();
+    g.buildDrag({ phase: 'start', corner: corner(2, 3), square: -1 });
+    g.buildDrag({ phase: 'end', corner: corner(5, 3), square: -1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(build().allLate).toBe(false);
+    expect(buildDraft(build(), view)!.segments.some((s) => s.style === 'late')).toBe(false);
   });
 
   it('only the newest answer is used', async () => {

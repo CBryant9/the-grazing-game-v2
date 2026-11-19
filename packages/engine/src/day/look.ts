@@ -4,6 +4,7 @@
  * changes the farm or moves the clock.
  */
 
+import type { ActionEnv } from '../actions/apply';
 import type { Action, ActionRefusalReason } from '../actions/types';
 import type { CalendarDate } from '../calendar';
 import { markable, weanable } from '../cattle/breeding';
@@ -45,10 +46,33 @@ export interface ClockView {
    * farm can still be looked at.
    */
   evening: boolean;
+  /** True when jobs are held to the light (Daily Farm). False with the clock off (Fast Farm). */
+  daylightLimit: boolean;
 }
 
-export function clockView(farm: FarmState): ClockView {
+/**
+ * The clock for the screens. With the clock off (`env.noClock`, Fast Farm)
+ * jobs never run out of light, so it is never evening and jobs can always
+ * start while the farm is running.
+ */
+export function clockView(farm: FarmState, env: Pick<ActionEnv, 'noClock'> = {}): ClockView {
   const left = lightLeft(farm);
+  if (env.noClock) {
+    return {
+      day: farm.day,
+      date: dateOn(farm),
+      firstLight: farm.clock.firstLight,
+      lastLight: farm.clock.lastLight,
+      now: timeNow(farm),
+      dayMin: dayMinutes(farm),
+      usedMin: farm.clock.used,
+      leftMin: left,
+      canStartJobs: !farm.over,
+      shortestJobMin: SHORTEST_JOB_MIN,
+      evening: false,
+      daylightLimit: false,
+    };
+  }
   return {
     day: farm.day,
     date: dateOn(farm),
@@ -61,6 +85,7 @@ export function clockView(farm: FarmState): ClockView {
     canStartJobs: !farm.over && left > NO_TIME,
     shortestJobMin: SHORTEST_JOB_MIN,
     evening: left < SHORTEST_JOB_MIN,
+    daylightLimit: true,
   };
 }
 
@@ -100,7 +125,7 @@ export interface MobHusbandry {
  * is the job card's own answer (`previewAction`), so the reason is the one
  * the job would give: nothing to do, no light left, the bank, the game over.
  */
-export function husbandryNow(farm: FarmState, env: SourceEnv = {}): MobHusbandry[] {
+export function husbandryNow(farm: FarmState, env: ActionEnv = {}): MobHusbandry[] {
   const job = (action: Action, count: number): HusbandryJob => {
     const card = previewAction(farm, action, env);
     return card.ok

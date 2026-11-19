@@ -558,7 +558,7 @@ How long each job takes, for one person with normal gear. The table is `packages
 
 | Job | Figure | Mark | In the engine | Used |
 |---|---|---|---|---|
-| Permanent fence, on your own | 500 m a working day | Decided | `permanentFenceMPerDay` | yes |
+| Permanent fence, on your own | 500 m a working day, on a place of 300 ha or less (more on a bigger place: "Fence pace and farm size" below) | Decided | `permanentFenceMPerDay` | yes |
 | Electric fence, single wire | 1,000 m an hour | Proposed | `electricFenceMPerHour` | yes |
 | Temporary tape, put out or roll up | 3,000 m an hour | Proposed | `tapeMPerHour` | yes |
 | Poly pipe with a pipe layer | 400 m an hour | Proposed | `pipeMPerHour` | yes |
@@ -593,12 +593,23 @@ How long each job takes, for one person with normal gear. The table is `packages
 
 Not built yet: contractor fencing teams (500 m and 1,000 m a day, Decided, PRD 5.11) and a farm hand's share of a fence (about 500 m, Proposed).
 
+### Fence pace and farm size (19 Nov 2026, a game-balance call)
+
+Claudia: the fence a farmer can build in a day should scale with the farm's size, "so that it doesn't take forever for the larger properties to get a fence in". **These two figures are a game-balance call by the builder, not a sourced figure.** No published figure for how fencing pace grows with property size was looked for or used. The reasoning a grazier would accept: a bigger place runs a bigger fencing plant (a post driver on the tractor, a wire spinner, more gear on the ute), so a day on the fence builds more.
+
+| Figure | Value | Mark | In the engine |
+|---|---|---|---|
+| Area up to which the table's pace holds | 300 ha | Builder (game balance) | `FENCE_SCALE_BASE_HA` |
+| Most the pace is multiplied by | 5 times | Builder (game balance) | `FENCE_SCALE_MAX` |
+
+`fenceScale(ha) = clamp(sqrt(ha / 300), 1, 5)` multiplies the permanent fence pace (yours, and a hand helping a team) and a contract team's metres a day. The square root follows the map: a square's side grows with the square root of the farm's area. Examples: 200 ha 1 times (500 m a day), 1,000 ha 1.83 (about 910 m), 3,000 ha 3.16 (about 1,580 m), 6,000 ha 4.47 (about 2,240 m), 7,500 ha and up 5 (2,500 m). Unchanged: the cost a metre (materials, and the contractor's $5 a metre), and electric fence, tape and pipe (by the hour, fast already). Change: the two constants in `packages/engine/src/data/jobTimes.ts`.
+
 ### Rules the builder chose (all for Claudia to check)
 
 The PRD gives the figures. Where it does not say how a figure is applied, the simplest reading was built.
 
 1. **"500 m per working day".** A working day is that day's light, from first light to last light, whatever its length. So a whole day on the fence builds 500 m in June and in December, half a day builds 250 m, and time spent on other jobs comes off it in proportion. The other way to read it is a fixed pace by the hour (500 m over a 10 hour day would be 50 m an hour: about 535 m on a Western Victoria June day and 715 m on a Central Queensland December day). `metresPerMinute` in `jobTimes.ts`.
-2. **Whole segments only.** A line is built one map square's side at a time. A segment is built if all of it fits in the light left. On a big farm a segment is long (340 m on 12,000 ha), so a day of permanent fence there is one segment, not 500 m.
+2. **Whole segments only.** A line is built one map square's side at a time. A segment is built if all of it fits in the light left. On a big farm a segment is long (340 m on 12,000 ha). Before 19 Nov 2026 a day of permanent fence there was one segment; with the pace scaled to the farm (above) it is seven.
 3. **The bank must cover the whole line as drawn**, though only the part that fits is built and charged today.
 4. **A job that needs more than a whole day's light** can be done at first light, before anything else that day, and it uses the whole day. This is so no job is impossible. With the muster gone it matters only for a very big mob: weaning 2,000 head is 17 h 10 m.
 5. **Taking things out takes as long as putting them in:** pulling down fence (at the pace of its kind), taking out a gate (60 min), a trough or a water hub (180 min). `removalWork` and the removal cases in `day/spec.ts`. Fence built from materials on hand takes as long as new fence: only the price changes (14 Nov 2026).
@@ -830,7 +841,7 @@ The game uses the 2026 rates on every farm, as its other costs (fence, troughs) 
 
 | Figure | Value | Mark | Source |
 |---|---|---|---|
-| A 1-man team, a 2-man team | 500 m and 1,000 m a day | Decided | PRD 5.4 and 5.11; REQUIREMENTS (13 Nov 2026) |
+| A 1-man team, a 2-man team | 500 m and 1,000 m a day on a place of 300 ha or less, times `fenceScale` on a bigger place (19 Nov 2026, game balance: "Fence pace and farm size") | Decided | PRD 5.4 and 5.11; REQUIREMENTS (13 Nov 2026) |
 | Labour charge | $5 a metre, either team | Stand-in | No published labour-only rate was found. Price guides list installed rural stock fence (materials and labour together) at about $8 to $25 a metre (Oneflare, https://www.oneflare.com.au/costs/rural-fencing; Airtasker about $18 to $20 a metre for simple wire mesh, https://www.airtasker.com/au/costs/fencing-installation/rural-fencing-cost; neither dated). The game's permanent fence materials are $7 a metre, so $5 of labour gives $12 a metre in all. An older document on exclusion fence put contract construction at $2,500 to $3,000 a km, undated and not verified. Section 21 row 15: "the same rate for either team" |
 | Days contractors work | Monday to Friday | Builder | — |
 | Metres a day for a team | — | not found | No published figure for metres a day by a one-man or two-man fencing team was found; the PRD's are used |

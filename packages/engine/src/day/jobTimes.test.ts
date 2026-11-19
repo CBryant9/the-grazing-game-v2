@@ -13,7 +13,15 @@ import {
   work,
 } from '../../test-support/workingDay';
 import type { Action, JobCard } from '../actions/types';
-import { JOB_TIMES, type JobFigure } from '../data/jobTimes';
+import {
+  FENCE_SCALE_BASE_HA,
+  FENCE_SCALE_MAX,
+  JOB_TIMES,
+  fenceScale,
+  metresPerMinute,
+  permanentMetresPerDay,
+  type JobFigure,
+} from '../data/jobTimes';
 import { EDGE, cloneFences, setEdge } from '../farm/topology';
 import { GRID_N, GRID_W } from '../grid';
 import { LAND } from '../pasture/state';
@@ -147,6 +155,43 @@ describe('fence, tape and pipe', () => {
     expect(500 * (1 - 180 / rest.dayMin)).toBeGreaterThan(350);
     expect(500 * (1 - 180 / rest.dayMin)).toBeLessThan(400);
     expect(rest.line!.fits.metres).toBe(350);
+  });
+
+  it('permanent fence scales with the size of the place: a bigger place runs a bigger plant', () => {
+    // Claudia, 19 Nov 2026: so a fence does not take forever on a big place.
+    expect(FENCE_SCALE_BASE_HA).toBe(300);
+    expect(FENCE_SCALE_MAX).toBe(5);
+    expect(fenceScale(200)).toBe(1);
+    expect(fenceScale(300)).toBe(1);
+    expect(fenceScale(1200)).toBeCloseTo(2, 9);
+    expect(fenceScale(6000)).toBeCloseTo(Math.sqrt(20), 9);
+    expect(fenceScale(100_000)).toBe(5);
+    expect(fenceScale(0)).toBe(1);
+    expect(permanentMetresPerDay(260)).toBe(500);
+    expect(permanentMetresPerDay(1200)).toBeCloseTo(1000, 9);
+    // Electric, tape and pipe go by the hour, fast already: they do not scale.
+    for (const pace of ['electric', 'tape', 'pipe'] as const) {
+      expect(metresPerMinute(pace, 700, 6000)).toBe(metresPerMinute(pace, 700, 200));
+    }
+  });
+
+  it('a whole day on the fence builds about as many squares on 6,000 ha as on a small place', () => {
+    const job = (farm: FarmState): JobCard =>
+      card(farm, { type: 'buildFence', edges: across(10, 0, 39), fence: 'permanent' });
+    const big = openFarm('cq', { size: 6000 });
+    const small = openFarm('cq', { size: 260 });
+    const side = big.layout.scale.sideM;
+    expect(side).toBeGreaterThan(200);
+    const bigDay = job(big);
+    const smallDay = job(small);
+    // 500 m a day would be only two of these big squares. With the bigger plant it is nine.
+    expect(Math.floor(500 / side)).toBe(2);
+    expect(bigDay.line!.fits.pieces.length).toBe(Math.floor(permanentMetresPerDay(6000) / side));
+    expect(bigDay.line!.fits.pieces.length).toBeGreaterThanOrEqual(8);
+    expect(smallDay.line!.fits.metres).toBe(500);
+    // The cost a metre is the same: only the pace changed.
+    const perM = (c: JobCard): number => c.costToday / c.line!.fits.metres;
+    expect(perM(bigDay)).toBeCloseTo(perM(smallDay), 1);
   });
 
   it('permanent fence: 500 m a day in the shortest days and the longest', () => {

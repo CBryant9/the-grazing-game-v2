@@ -402,8 +402,8 @@ After playing the rebuild, Claudia said it "lost a bit of the whimsy and ease" o
 
 ### Time
 
-- [ ] **No daylight limit in Fast Farm.** "The daylight limitation on the fast farm should be removed so it's only daylight on the day to day farm, so they can actually do a bunch and develop their farm faster." Jobs in Fast Farm cost money only. Daily Farm keeps the daylight budget. *(Reverses, for Fast Farm only: the daylight bar, the red "doesn't fit today" part of a line, and "At last light the farm goes dark".)*
-- [ ] **In Fast Farm the day moves by itself.** "It's hard to skip forward and remember to all the time on Fast Farm. I reckon the day could just slowly move as you're playing and you see a sunset and sunrise happen across time, so the individual days move, not too fast, but they pass, and they can pause and play and still skip."
+- [x] **No daylight limit in Fast Farm.** "The daylight limitation on the fast farm should be removed so it's only daylight on the day to day farm, so they can actually do a bunch and develop their farm faster." Jobs in Fast Farm cost money only. Daily Farm keeps the daylight budget. *(Reverses, for Fast Farm only: the daylight bar, the red "doesn't fit today" part of a line, and "At last light the farm goes dark".)* **Built (m9-time, engine 0.23.0):** the server runs a Fast Farm's jobs with the clock off (`noClock`): nothing is refused for light, a line is built whole, the clock is not used up. A job card still says how long the work takes. The daylight bar, the light rows, the all-red line and the daylight words in Help, setup and the tour are gone from a Fast Farm. A Daily Farm is unchanged. Hands take no share of the player's jobs on a Fast Farm (CALLS B200).
+- [x] **In Fast Farm the day moves by itself.** "It's hard to skip forward and remember to all the time on Fast Farm. I reckon the day could just slowly move as you're playing and you see a sunset and sunrise happen across time, so the individual days move, not too fast, but they pass, and they can pause and play and still skip." **Built (m9-time):** a day takes about 16 s at 1× (12 s of light, then dusk, night and dawn), with 2× and 4×. Play or Pause and the speed sit beside Next day and the skips; the choice is kept on the device. One call to the server a day, in the dark. The sun waits at dusk while a card or confirm is open and while the tab is hidden; the day pauses itself for anything a skip stops for, the year end, the end of the farm and during the first-day tour. A day passed while playing shows one line of facts in the top bar; the full summary is kept for Next day, skips and pauses (CALLS B201 to B204).
 
 ### Cattle on the map
 
@@ -413,7 +413,7 @@ After playing the rebuild, Claudia said it "lost a bit of the whimsy and ease" o
 
 ### Daily Farm
 
-- [ ] **The fence a farmer can build in a day scales with the farm's size**, "so that it doesn't take forever for the larger properties to get a fence in."
+- [x] **The fence a farmer can build in a day scales with the farm's size**, "so that it doesn't take forever for the larger properties to get a fence in." **Built (m9-time, engine 0.23.0):** permanent fence and a contract team's metres a day are multiplied by `fenceScale(ha) = clamp(sqrt(ha / 300), 1, 5)`: a bigger place runs a bigger fencing plant. 6,000 ha builds about 2,240 m a day (9 squares) against 500 m (2 squares). The cost a metre is unchanged. The fence card and the team cards say the pace (CALLS B205; DATA.md, "Fence pace and farm size").
 
 ### Pictures
 

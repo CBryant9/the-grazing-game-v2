@@ -7,6 +7,7 @@ import { badgeText, unreadWord } from '@/lib/game/more';
 import { useGame } from '@/lib/game/store';
 import { useMe } from '@/lib/auth/store';
 import { DailyTime, ModeTag } from './DailyBits';
+import { DayControls, SunTrack } from './DayClock';
 import { HelpButton } from './HelpPanel';
 import { Icon } from './Icon';
 import { useUi } from './ui';
@@ -74,8 +75,18 @@ export function DaylightBar({
   );
 }
 
-/** Next day, +1 week, +1 month, +1 year (PRD 5.3). Next day is the main button. */
-export function TimeButtons({ short = false }: { short?: boolean }) {
+/**
+ * Next day, +1 week, +1 month, +1 year (PRD 5.3). Next day is the main button. On a Fast Farm
+ * the day also moves by itself, so Play or Pause and the speed come first, and Next day jumps
+ * to tomorrow (Claudia, 19 Nov 2026).
+ */
+export function TimeButtons({
+  short = false,
+  moving = false,
+}: {
+  short?: boolean;
+  moving?: boolean;
+}) {
   const busy = useGame((s) => s.busy > 0);
   const over = useGame((s) => s.snapshot?.over != null);
   const evening = useGame((s) => s.snapshot?.clock.evening ?? false);
@@ -84,10 +95,12 @@ export function TimeButtons({ short = false }: { short?: boolean }) {
   const off = busy || over;
   return (
     <div className={styles.times} role="group" aria-label="Move time on">
+      {moving && <DayControls />}
       <button
         type="button"
         className={`${styles.tb} ${styles.tbpri} ${evening && !over ? styles.invite : ''}`}
         disabled={off}
+        aria-label={moving ? 'Next day: jump to tomorrow' : undefined}
         onClick={() => void nextDay()}
       >
         Next day <span aria-hidden="true">▸</span>
@@ -211,13 +224,17 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
   const openFarms = useOpenFarms();
   const { farm, date, season, totals, clock } = snapshot;
   const daily = snapshot.daily ?? null;
+  // The daylight bar is the Daily Farm's: a Fast Farm has no daylight limit (Claudia, 19 Nov 2026).
+  const lit = clock.daylightLimit;
   const day = `Day ${num(snapshot.day + 1)}`;
   const year = `Year ${num(snapshot.score.year)}`;
   const rain = totals.rainMm;
+  // A Fast Farm's day moves by itself: Play or Pause and the speed sit with the skips, and the
+  // skips take their short names on a phone so the row still fits.
   const times = daily ? (
     <DailyTime daily={daily} />
   ) : (
-    <TimeButtons short={layout === 'landscape'} />
+    <TimeButtons short={layout === 'landscape' || layout === 'phone'} moving={!lit} />
   );
   const farmBtn = (
     <button
@@ -254,7 +271,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
           </p>
         </div>
         <div className={styles.topdl}>
-          <DaylightBar clock={clock} />
+          {lit ? <DaylightBar clock={clock} /> : <SunTrack clock={clock} />}
         </div>
         <div className={styles.toptimes}>{times}</div>
         <div className={styles.topextra}>
@@ -277,7 +294,11 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
           </p>
         </div>
         <div className={styles.topdl}>
-          <DaylightBar clock={clock} labels={false} />
+          {lit ? (
+            <DaylightBar clock={clock} labels={false} />
+          ) : (
+            <SunTrack clock={clock} labels={false} />
+          )}
         </div>
         <div className={styles.toptimes}>{times}</div>
         <div className={styles.topextra}>
@@ -304,7 +325,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
         <Bell />
         <HelpButton />
       </div>
-      <DaylightBar clock={clock} />
+      {lit ? <DaylightBar clock={clock} /> : <SunTrack clock={clock} />}
       <p className={styles.meta}>
         {typeof rain === 'number' && (
           <span>

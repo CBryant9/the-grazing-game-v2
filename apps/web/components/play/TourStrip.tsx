@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useHelp } from '@/lib/game/helpstore';
 import { useGame } from '@/lib/game/store';
-import { currentStep, stepLabel, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
+import { currentStep, DAILY_TOUR_TEXT, stepLabel, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
 import { Icon } from './Icon';
 import styles from './help.module.css';
 
@@ -58,14 +58,8 @@ export function TourStrip({
     );
   }
 
-  // A Daily Farm has no Next day: its day ends at midnight.
-  const text =
-    daily && step === 'day'
-      ? {
-          title: 'End the day',
-          body: 'The day ends at midnight. Press Done for today when you have finished. A summary of the night shows next time you open the farm.',
-        }
-      : TOUR_TEXT[step];
+  // A Daily Farm keeps the daylight budget and has no Next day: its day ends at midnight.
+  const text = (daily ? DAILY_TOUR_TEXT[step] : undefined) ?? TOUR_TEXT[step];
   if (compact && !open) {
     return (
       <section ref={strip} tabIndex={-1} className={styles.strip} aria-label="First day tour">

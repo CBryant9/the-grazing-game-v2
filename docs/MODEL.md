@@ -742,7 +742,8 @@ Code: `packages/engine/src/sim/clock.ts`, `data/jobTimes.ts` and `day/` (`spec.t
 A job's time is its work only. The times are one table, `JOB_TIMES` in `data/jobTimes.ts`, with every figure marked Decided, Proposed or Builder. They are set out in DATA.md, "Job times", with the rules the builder chose and the figures that were taken out. In brief:
 
 ```
-permanent fence   metres ÷ (500 ÷ the day's minutes of light)      a whole day builds 500 m
+permanent fence   metres ÷ (500 × fenceScale(ha) ÷ the day's minutes of light)
+                  a whole day builds 500 m, more on a place over 300 ha
 electric fence    metres ÷ 1,000 m an hour
 tape              metres ÷ 3,000 m an hour, out or rolled up
 pipe              metres ÷ 400 m an hour
@@ -758,6 +759,18 @@ buy, sow, harvest none of the day
 ```
 
 **"500 m a working day".** The builder's reading: a working day is that day's light. A whole day on the fence builds 500 m in any season, and the fence gets the share of 500 m that it gets of the day.
+
+**Fence pace and farm size (Claudia, 19 Nov 2026, engine 0.23.0).** "So that it doesn't take forever for the larger properties to get a fence in." A bigger place runs a bigger fencing plant (a post driver on the tractor, a wire spinner, more gear on the ute), so a day of permanent fence builds more there. A map square's side grows with the square root of the farm's area (`sqrt(ha / 1040) × 100` m), so the pace does too:
+
+```
+fenceScale(ha) = clamp(sqrt(ha / 300), 1, 5)        FENCE_SCALE_BASE_HA = 300, FENCE_SCALE_MAX = 5
+your own day    500 m × fenceScale(ha)              permanentMetresPerDay
+a 1-man team    500 m × fenceScale(ha) a working day    teamMetresPerDay
+a 2-man team  1,000 m × fenceScale(ha) a working day
+a hand helping a team: their minutes at your own (scaled) pace
+```
+
+So 200 ha builds 500 m a day (about 11 squares of 44 m), 1,000 ha about 910 m (9 squares of 98 m), and 6,000 ha about 2,240 m (9 squares of 240 m, against 2 at 500 m). The cost a metre is unchanged: materials and the contractor's $5 a metre labour. A team just finishes sooner. Electric fence, tape and pipe go by the hour and are fast already: they do not scale. The engine has no mode, so this holds on both farms; on a Fast Farm it only changes the time a fence card says it takes and how fast a team works. A game-balance call, not a sourced figure (DATA.md, "Fence pace and farm size"). `fenceScale` in `data/jobTimes.ts`, `teamMetresPerDay` in `labour/contract.ts`.
 
 ### Doing a job: one path for the card and the real thing
 
@@ -841,6 +854,18 @@ Each item names the action that deals with it, and gives that action ready to se
 
 **Evening** (`clockView(farm)`). The clock view gives the light used and left, and two plain flags. `canStartJobs` is false once the light is used up. `evening` is true when less light is left than the shortest job in the table that takes time and is done in one go (moving a mob, 15 minutes: `shortestJobMin`). From then only jobs shorter than that still fit (a few segments of tape, for example), so a screen can dim the farm and light up Next day. `canStartJobs` is false only when no light is left. The farm can still be looked at after dark.
 
+### Fast Farm: no daylight limit (Claudia, 19 Nov 2026, engine 0.23.0)
+
+"The daylight limitation on the fast farm should be removed so it's only daylight on the day to day farm, so they can actually do a bunch and develop their farm faster." The engine has no notion of the game mode, so it has one switch: `ActionEnv.noClock`. The server sets it for a Fast Farm and never for a Daily Farm (`envFor` in `apps/web/server/game/game.ts`). With it on:
+
+- No job is refused for light (`no-daylight`, `not-enough-daylight` never come), and a line is built whole: nothing shows red for "not today".
+- The clock is not used up: `farm.clock.used` stays at 0, so every job starts at first light. The job's time is still worked out from the table and shown as a fact, and the job is logged with its start and finish.
+- The hands take no share of the player's jobs. With no light to save, that share would do nothing, so their day is kept for their own duties (refilling troughs, putting tape back up) and for helping a fencing team.
+- The job card says `onClock: false`, `fitsToday: true` and `usesRestOfDay: false`. `clockView(farm, env)` says `evening: false`, `canStartJobs: true` (unless the farm is over) and `daylightLimit: false`.
+- Every other rule holds: the bank, sale days and the yards, one mob a paddock.
+
+The tick never reads the clock, so nothing in the grass or cattle model changes. On the screen a Fast Farm's day moves by itself (VISUALS, "The moving day"); that is a clock for the screen only, and each day it calls the same Next day.
+
 ### The time of day on what happens
 
 - Every job done on the clock is in the action log with when it started and finished (`LoggedAction.at`). `jobsToday(farm)` gives today's in order.
@@ -852,7 +877,7 @@ Each item names the action that deals with it, and gives that action ready to se
 
 `applyInstant` (in `actions/apply.ts`) does a whole action at once with no clock: no job time and no daylight limit. It exists because the calibration suites and the MVP comparisons were written before jobs took time, and their figures depend on a farm being set up all at once on day 0. With it they pass with no change to an expected number.
 
-**The public API can't be made instant.** `applyAction` and `previewAction` take an env with no switch for the clock, and ignore one if it is passed anyway. `applyInstant` is not exported from the engine's index. Test support reaches it by importing the engine's own file (`test-support/instant.ts`, `applyInstantly`). Lint forbids engine and server code from importing it, and tests hold all of this: a public call with `instant: true` cast into the env still runs on the clock; the env type has no such field; the function is named in two files only; and nothing outside the engine names it. The tick never reads the clock, so a farm driven this way runs exactly as it did on engine 0.6.0.
+**The public API can't be made instant.** `applyAction` and `previewAction` ignore an `instant` switch if one is passed anyway. (Their one switch, `noClock`, is Fast Farm's: it takes the daylight limit away, but every rule, the bank, sale days and the yards still hold, and the job is still recorded with its time. See "Fast Farm: no daylight limit" above.) `applyInstant` is not exported from the engine's index. Test support reaches it by importing the engine's own file (`test-support/instant.ts`, `applyInstantly`). Lint forbids engine and server code from importing it, and tests hold all of this: a public call with `instant: true` cast into the env still runs on the clock; the env type has no such field; the function is named in two files only; and nothing outside the engine names it. The tick never reads the clock, so a farm driven this way runs exactly as it did on engine 0.6.0.
 
 ### Saves
 

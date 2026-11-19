@@ -5,7 +5,7 @@ import { useHelp } from '@/lib/game/helpstore';
 import { useLayout } from '@/lib/game/hooks';
 import { useGame } from '@/lib/game/store';
 import { Sheet } from './Sheet';
-import { HELP_TERMS, HELP_TOPICS, SHEEP_HELP_TERMS, SHEEP_HELP_TOPICS } from './helptopics';
+import { HELP_TERMS, SHEEP_HELP_TERMS, SHEEP_HELP_TOPICS, helpTopicsFor } from './helptopics';
 import helpStyles from './help.module.css';
 import styles from './play.module.css';
 
@@ -104,7 +104,10 @@ function HelpContent() {
   const replay = useHelp((s) => s.tourReplay);
   // Sheep topics only on a farm that shows sheep (the server sends the sheep market then).
   const sheep = useGame((s) => !!s.snapshot?.market.sheep);
-  const topics = sheep ? [...HELP_TOPICS, ...SHEEP_HELP_TOPICS] : HELP_TOPICS;
+  // A Daily Farm keeps the daylight budget; a Fast Farm has none (Claudia, 19 Nov 2026).
+  const daily = useGame((s) => s.snapshot?.daily != null);
+  const base = helpTopicsFor(daily);
+  const topics = sheep ? [...base, ...SHEEP_HELP_TOPICS] : base;
   const terms = sheep ? [...HELP_TERMS, ...SHEEP_HELP_TERMS] : HELP_TERMS;
   return (
     <>

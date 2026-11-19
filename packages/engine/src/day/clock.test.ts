@@ -259,6 +259,7 @@ describe('looking is free', () => {
       standingOf: (f) => engine.standingOf(f),
       workforceView: (f) => engine.workforceView(f),
       contractView: (f) => engine.contractView(f),
+      teamMetresPerDay: (f) => engine.teamMetresPerDay(f, 1),
       workerReport: (f) => engine.workerReport(f),
       // Sheep (milestone 2.3).
       occupiedAreas: (f) => engine.occupiedAreas(f, engine.surveyOf(f)),
@@ -519,5 +520,79 @@ describe('evening', () => {
       to: { cell: b.emptyCell },
     });
     expect(no.reason).toBe('not-enough-daylight');
+  });
+});
+
+describe('Fast Farm: the clock off (Claudia, 19 Nov 2026)', () => {
+  const OFF = { noClock: true } as const;
+
+  it('a line of any length is built whole, uses no light, and the card says it is off the clock', () => {
+    const farm = openFarm('nsw');
+    const job: Action = { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' };
+    const card = previewAction(farm, job, OFF);
+    if (!card.ok) throw new Error(card.message);
+    expect(card.card.outcome).toBe('done');
+    expect(card.card.onClock).toBe(false);
+    expect(card.card.fitsToday).toBe(true);
+    expect(card.card.usesRestOfDay).toBe(false);
+    expect(card.card.line!.doesNotFit.pieces).toEqual([]);
+    expect(card.card.notToday).toBeUndefined();
+    // The time it takes is still a fact: more than a whole day's light for 1,800 m.
+    expect(card.card.workMin).toBeGreaterThan(card.card.dayMin);
+    const done = work(farm, job, OFF);
+    expect(done.job).toEqual(card.card);
+    expect(done.farm.clock.used).toBe(0);
+    // The same line on the clock is cut short at a day's work.
+    const clocked = work(farm, job);
+    expect(clocked.job.outcome).toBe('part');
+    expect(clocked.job.onClock).toBe(true);
+    expect(done.farm.year.infra).toBeGreaterThan(clocked.farm.year.infra);
+  });
+
+  it('no job is refused for light, even at last light, and the clock never says evening', () => {
+    const b = busyFarm();
+    const farm = atLastLight(b.farm);
+    expect(clockView(farm, OFF).evening).toBe(false);
+    expect(clockView(farm, OFF).canStartJobs).toBe(true);
+    expect(clockView(farm, OFF).daylightLimit).toBe(false);
+    expect(clockView(farm).daylightLimit).toBe(true);
+    const jobs: Action[] = [
+      { type: 'buildFence', edges: across(12, 2, 37), fence: 'tape' },
+      { type: 'layPipe', cells: [cell(33, 10)] },
+      { type: 'moveMob', mob: b.steers, to: { cell: b.emptyCell } },
+      { type: 'setGate', edge: b.gate, open: true },
+      { type: 'refillPortable', port: b.port },
+    ];
+    for (const job of jobs) {
+      const done = work(farm, job, OFF);
+      expect(done.job.outcome, job.type).not.toBe('part');
+      expect(done.farm.clock.used, job.type).toBe(farm.clock.used);
+    }
+  });
+
+  it('many jobs in one day all go through, one after another', () => {
+    const b = busyFarm();
+    let farm = b.farm;
+    for (let i = 0; i < 6; i++) {
+      farm = work(
+        farm,
+        { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' },
+        OFF,
+      ).farm;
+      farm = work(farm, { type: 'removeFence', edges: across(12, 2, 37) }, OFF).farm;
+    }
+    expect(farm.clock.used).toBe(0);
+    expect(clockView(farm, OFF).evening).toBe(false);
+  });
+
+  it('the rules other than light still hold: the bank still says no', () => {
+    const farm = openFarm('nsw');
+    const broke = { ...farm, cash: farm.overdraft - 1 } as FarmState;
+    const no = turnedDown(
+      broke,
+      { type: 'buildFence', edges: across(12, 2, 37), fence: 'permanent' },
+      OFF,
+    );
+    expect(no.reason).toBe('bank-limit');
   });
 });
