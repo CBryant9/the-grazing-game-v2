@@ -1100,6 +1100,8 @@ class PixiFarmMap implements FarmMap {
     } else {
       // The same cattle: they keep walking, drawn to today's feed.
       this.herd.feed(view);
+      // The squares may stand taller or shorter: the dots and patches sit on them afresh.
+      if (anyChanged) this.farKey = '';
     }
     lap('cattle');
     const labelsKey = JSON.stringify([
