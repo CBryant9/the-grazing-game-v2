@@ -174,14 +174,14 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 - **On a phone held upright** the farm fills the height and runs past the sides (PRD 6.1). On its side, and on a PC, the whole farm fits.
 - **Zoomed out:** each square is one clean colour **(builder: the mixing rule, the raise, the bands and the flecks)** worked out from its figures: soil, straw litter or shaded ground underneath, mixed with the colour of the tops by ground cover. Rank grass reads as straw, leafy grass as green, short grass shows soil. Each square is raised by its height (90 cm is half a square) and the front of a raised square shows where it stands taller than the square in front of it. Cropping country shows its rows.
 - **Zoomed out, green at the base and seed heads still read.** The front of a raised square is the sward in profile: a green band from the ground up as far as the green reaches, and a straw band above it. So rank grass with green at its base shows green under straw from a distance. A pasture square that carries seed heads has three pale flecks on it. *(The first build drew the front as a darker copy of the top and drew no seed heads zoomed out. The realism check found it.)* **(builder)**
-- **Zoomed in:** the ground is one soft picture, 9 pixels to a square. Squares blend into their neighbours inside a paddock but never across a fence line or a change of country, so a short paddock beside a rank one keeps a sharp fence-line contrast. Nine tufts stand on each square. **(builder)**
+- **Zoomed in:** the ground is one picture, 18 pixels to a square, laid in the pattern of the pasture's form (see "The base of a paddock" below). Squares blend into their neighbours inside a paddock but never across a fence line or a change of country, so a short paddock beside a rank one keeps a sharp fence-line contrast. Nine tufts stand on each square. *(Changed: 19 Nov 2026, from 9 pixels to a square with one blended colour, after Claudia found the base "pretty bare and weird on some spots, great in others".)* **(builder)**
 - **Taps** open the paddock, never a cow. Zoomed out, the tap is tested against the raised squares as drawn (LESSONS 28).
 
 ### Grass, square by square
 
 | Thing | How the rebuild draws it |
 |---|---|
-| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under cover × 1.05. Low cover shows soil between tufts. The cover figure is the model's paddock summary cover: feed ÷ 1,000 kg DM/ha, up to 1. *(The MVP's map used (feed − 50) ÷ 950 for the map and feed ÷ 1,000 for the sheet. The rebuild uses the sheet's figure for both.)* **(builder)** |
+| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under the share of ground hidden × 1.05. The share hidden is the view's `hidden` figure, worked out on the server for the pasture's form (see "The base of a paddock" below). A view from before 19 Nov 2026 has no `hidden`, and uses the model's cover (feed ÷ 1,000 kg DM/ha, up to 1) as before. *(Changed: 19 Nov 2026. The model's own ground cover figure, used in the score and on the paddock sheet, is unchanged.)* **(builder)** |
 | Bare soil, litter, shaded ground | The colours above, unchanged. Dry grass sits on straw litter, never soil |
 | Height | Tuft height follows the view's height in cm: 90 cm is 0.62 of a square, each tuft give or take a third. Grass is drawn tall against the cattle on purpose, as in the MVP and the mockups, so height reads **(builder)** |
 | Green leaf colour | Young to old leaf, the colours above, by the view's leaf age |
@@ -192,6 +192,41 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 | Crops | Upright plants in three rows to a square, bright green while leafy, golden with seed heads once heading or done. Three furrows to a square in the ground. A crop's height is the paddock summary's height for the square, held to the crop's tallest. *(The MVP's map used feed ÷ 450.)* **(builder)** |
 | Fallow | Worked brown soil with furrows and a few lighter clods. No tufts |
 | Stubble | Pale straw ground with rows of very short stalks. No green, whatever its figures say |
+
+### The base of a paddock (19 Nov 2026)
+
+Claudia, after playing: "we need to make sure the base of the paddock looks a bit more like what that real grass type would form. From the air it's pretty bare and weird on some spots, great in others." *(Before this, every pasture was nine random tufts on one blended colour, and a tuft stood or did not on a hard test of the model's cover in tenths, so at about 300 kg DM/ha three tufts in nine stood on brown soil, and neighbouring squares jumped a tenth at a time.)*
+
+**What the server sends.** Two display figures for each square, both optional so a past day's picture still draws (`squares.form` and `squares.hidden`, view version still 4):
+
+- `form`: how the plants sit on the ground, seen from above. From the district for native pasture, from the species for a sowing, rows for crops, annual forages and stubble, bare for fallow. An oversown legume (stylo) keeps the native form.
+- `hidden`: the share of the ground the sward and its litter hide from above, in twentieths: 1 − e^(−feed ÷ k), with feed the green and dead feed in kg DM/ha and k by form (table below). Stubble is 20 (it lies flat and covers the ground). Fallow is 0. The curve rises fast and then flattens, the shape found in temperate native pastures (Lodge and Murphy 2002, `docs/DATA.md`). A carpet hides the ground at far less feed than tussocks do (an Indian couch sward was 63% covered at 350 kg DM/ha; at 50% cover it held about a third of the feed of tussock pasture). The curve is on the server; the browser gets only the share.
+
+| Form | Where | k, kg DM/ha | Hidden at 300 / 800 / 1,500 kg DM/ha | How it is drawn from above |
+|---|---|---|---|---|
+| Tropical tussock | Central Queensland native (black speargrass, Queensland bluegrass, Indian couch) | 750 | 35% / 65% / 85% | Tussock clumps, with a finer grain between them (the couch) |
+| Low tufts | Northern Tablelands native (red grass, wallaby grass, weeping grass) | 600 | 40% / 75% / 90% | Small close tufts and fine grain, nearly even |
+| Open tussock | Central West and Western Victoria native (wallaby grass, speargrass, red grass, kangaroo grass) | 1,050 | 25% / 55% / 75% | Clumps with open ground between |
+| Bunch | Buffel grass | 1,050 | 25% / 55% / 75% | Big clumps, broad tufts |
+| Hedgerow | Leucaena and buffel | 1,050 | 25% / 55% / 75% | Buffel clumps, with two dark green hedgerows across each square (thinner where browsed hard) |
+| Carpet | Perennial ryegrass and white clover, multi-species | 350 | 60% / 90% / 100% | Fine, even grain: near-continuous leaf with small scattered gaps. White clover flowers |
+| Tussock and clover | Phalaris and sub clover | 450 | 50% / 85% / 95% | Mostly fine grain with some clumping. White clover flowers |
+| Crowns | Lucerne | 900 | 30% / 60% / 80% | Separate crowns, four to a square each way |
+| Rows | Crops, annual forages, stubble | 900 | 30% / 60% / 80% | Filling out from the middle of three drill rows a square, furrows between |
+
+(Shares rounded to 5%. k for the sown pastures, lucerne and crops are stand-ins: `docs/CALLS_FOR_CLAUDIA.md`, G2.)
+
+**How the ground picture is laid.** Each square has two colours: its open ground (soil, with litter lying in the gaps the more the sward hides, up to 45% litter) and its sward's base (the low leaf over shaded ground or litter, with some of the tops colour: more for a carpet, less for tussocks). Each pixel has a fixed order in its square for its form's pattern, and is the base colour once the square's hidden share passes it, with a soft edge. So the share of the square that shows open ground is exactly what the server sent, whatever the pattern. The patterns:
+
+- **Clumps** grow round the nine tuft spots, the spots whose tufts stand first first, so zoomed in each tussock stands on its own clump. A clump reaches into the next square, so none is cut off at a square's edge. Inside a clump the leaf is a little brighter, at its edge a little darker.
+- **Carpet** is a fine grain, so its gaps are small and scattered. Between tussocks the open ground lies in patches.
+- **Rows** fill from the middle of each drill row out to the furrow.
+
+The hidden share and both colours blend between squares inside a paddock (never across a fence or a change of country), so neighbouring squares never jump. The ground picture of a square averages to its open ground and base mixed by the hidden share (a test holds the two within 14 in each colour channel). Zoomed out each square is that colour with the tops laid over it, as the tufts lay them zoomed in.
+
+Seed heads, green at the base of rank grass, crops, fallow and stubble are drawn as before, on top. The cattle contrast test now includes every open ground, base and field colour, for three forms.
+
+**Speed.** The patterns are worked out once for each square the first time it is drawn with a form, and kept. A new day blends and thresholds only. After the first view the ground is repainted a few rows a frame (up to 5 ms a frame), changed rows and the rows either side, and goes to the screen in one piece when done; until then the map shows yesterday's ground. *(Not measured on a phone. On the build PC, under heavy load from other work, a full repaint took 20 to 60 ms against 20 to 37 ms for the old 9 pixel picture, and the first paint of a farm about 0.4 s. Spread over frames as above.)*
 
 ### Cattle
 

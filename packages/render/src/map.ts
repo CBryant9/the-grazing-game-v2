@@ -514,6 +514,8 @@ class PixiFarmMap implements FarmMap {
   private framesDrawn = 0;
   /** 1 for each row whose standing grass is waiting to be rebuilt. */
   private readonly tuftsStale = new Uint8Array(GRID_H);
+  /** 1 for each row of squares whose ground is waiting to be repainted. */
+  private readonly groundStale = new Uint8Array(GRID_H);
   private lastViewMs = 0;
   private lastViewParts: Record<string, number> = {};
   private slowFrames: number[] = [];
@@ -764,7 +766,8 @@ class PixiFarmMap implements FarmMap {
 
   /** Move whatever moves. Returns true if another frame is needed. */
   private animate(now: number, dt: number): boolean {
-    let moving = this.rebuildGrass(GRASS_BUDGET_MS);
+    let moving = this.repaintGround(GRASS_BUDGET_MS);
+    moving = this.rebuildGrass(GRASS_BUDGET_MS) || moving;
     // The fade between the zoomed-out map and the detail. With reduce motion it is instant.
     const target = this.lod.mode === 'near' ? 1 : 0;
     if (this.nearMix !== target) {
@@ -794,6 +797,30 @@ class PixiFarmMap implements FarmMap {
       moving = moving || this.fan !== null || this.ring.visible;
     }
     return moving;
+  }
+
+  /**
+   * Repaint stale rows of the ground picture for up to `budgetMs`. When the
+   * last is done the picture goes to the screen in one piece. Returns true
+   * if rows are still waiting.
+   */
+  private repaintGround(budgetMs: number): boolean {
+    const stale = this.groundStale;
+    if (!this.view || !stale.includes(1)) return false;
+    const t0 = performance.now();
+    for (let r = 0; r < GRID_H; r++) {
+      if (!stale[r]) continue;
+      if (performance.now() - t0 >= budgetMs) return true;
+      // Runs of stale rows are painted together.
+      let to = r + 1;
+      while (to < GRID_H && stale[to] && to - r < 3) to++;
+      paintGround(this.view, this.looks, this.groundPixels.data, r, to);
+      stale.fill(0, r, to);
+      r = to - 1;
+    }
+    this.groundCanvas.getContext('2d')!.putImageData(this.groundPixels, 0, 0);
+    this.groundSprite.texture.source.update();
+    return false;
   }
 
   /**
@@ -977,9 +1004,15 @@ class PixiFarmMap implements FarmMap {
     };
     lap('looks');
     if (anyChanged || fencesChanged) {
-      paintGround(view, this.looks, this.groundPixels.data);
-      this.groundCanvas.getContext('2d')!.putImageData(this.groundPixels, 0, 0);
-      this.groundSprite.texture.source.update();
+      // The ground picture: painted at once for the first view. After that
+      // the changed rows (and the rows either side, which blend into them)
+      // are repainted a few a frame, so a new day never holds the page up.
+      // Until they are all done the map shows yesterday's ground.
+      for (let r = 0; r < GRID_H; r++) {
+        const near = fencesChanged || changedRows[r] || changedRows[r - 1] || changedRows[r + 1];
+        if (near) this.groundStale[r] = 1;
+      }
+      if (first) this.repaintGround(Infinity);
       lap('ground');
       this.drawFar();
       lap('fields');
@@ -2441,7 +2474,8 @@ class PixiFarmMap implements FarmMap {
     const lo = minZoom(vp);
     const nearAll = Math.min(MAX_ZOOM, Math.max(31, containZoom(vp)));
     const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
-    // Finish any grass still waiting, so the run measures a settled map.
+    // Finish any ground and grass still waiting, so the run measures a settled map.
+    this.repaintGround(Infinity);
     this.rebuildGrass(Infinity);
     const pixel = new Uint8Array(4);
     if (this.raf) {

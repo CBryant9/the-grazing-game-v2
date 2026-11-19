@@ -1,4 +1,4 @@
-import { PADDOCK_LABELS, VIEW_LAND } from '@gg/shared';
+import { PADDOCK_LABELS, VIEW_FORM, VIEW_LAND } from '@gg/shared';
 import { describe, expect, it } from 'vitest';
 import { contrast, lit, luminance, shade } from './colour';
 import { squareLook } from './grass';
@@ -47,6 +47,15 @@ function grassColours(): number[] {
               });
               const l = squareLook(view, i);
               out.add(l.ground).add(l.field).add(l.leaf).add(l.straw);
+              out.add(l.bare).add(l.base).add(l.floor);
+              // Each way a pasture can sit on the ground has its own base colour.
+              for (const form of [VIEW_FORM.carpet, VIEW_FORM.openTussock, VIEW_FORM.rows]) {
+                setSquare(view, i, { form, hidden: cover * 2 });
+                const f = squareLook(view, i);
+                out.add(f.bare).add(f.base).add(f.floor).add(f.field);
+              }
+              view.squares.form = undefined;
+              view.squares.hidden = undefined;
             }
           }
         }

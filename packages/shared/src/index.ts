@@ -143,11 +143,13 @@ export {
   FARM_GRID_W,
   FARM_VIEW_VERSION,
   VIEW_FENCE,
+  VIEW_FORM,
   VIEW_LABELS,
   VIEW_LAND,
 } from './farmView';
 export type {
   FarmView,
+  ViewForm,
   FarmViewArea,
   FarmViewBuilding,
   FarmViewCattle,

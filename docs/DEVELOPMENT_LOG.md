@@ -2602,6 +2602,25 @@ Branch `m8-realism-2` from `m7-final` at ea8fa24. A read-only review of the day'
 - `apps/web/lib/game/types.ts` (two wire fields) and `components/play/stockfeed.test.ts` (the tests of the two components) were edited beside the two components.
 - The inbox's marking note (the engine's 45-day note, shown once a drop or again after marking) is unchanged.
 
+## 19 Nov 2026: m9 grass, the base of a paddock follows its pasture
+
+Branch `m9-grass` from `m9-fun-and-flow` (b8338a3). Claudia, after playing: "we need to make sure the base of the paddock looks a bit more like what that real grass type would form. From the air it's pretty bare and weird on some spots, great in others."
+
+**Why it looked bare and odd.** Every pasture was nine random tufts on one blended colour. A tuft stood only if its random number was under the model's cover (feed ÷ 1,000, in tenths), so at about 300 kg DM/ha three tufts in nine stood on brown soil, and neighbouring squares jumped a tenth at a time.
+
+**What was built.**
+
+- The view carries two optional display lists for each square (`form`, `hidden`; version still 4). The server works out the share of ground hidden from the feed with a curve for each form (fast then flat, a carpet far faster than tussocks), from sources where found (`docs/DATA.md`, "Ground hidden from above"). Model numbers are unchanged: the calibration and MVP comparison tests pass untouched.
+- The ground picture is 18 pixels a square and lays open ground and sward base in each form's pattern: tussock clumps round the tufts that stand, a fine carpet, low tufts, couch between tropical tussocks, lucerne crowns, drill rows, leucaena hedgerows (`docs/VISUALS.md`, "The base of a paddock"). The share of open ground in each square is exactly the share sent, and it blends between squares in a paddock.
+- Tufts stand by the same share. Tussock forms have broader tufts and a carpet finer ones. White clover flowers only where a clover runs through the sward.
+- After the first view, the ground is repainted a few rows a frame and shown when done.
+
+**How it was tested.** New engine tests: each district's native form, rows for crops, bare fallow, stubble hidden, the hidden share matching the curve square by square, carpet against tussock at 300 kg DM/ha. New render tests: the share hidden is the share sent for every form (within 0.1), tussock clumps gather round standing tufts, a carpet's gaps are scattered and a tussock's in patches, crops fill from the row, the share runs smoothly across neighbouring squares (no band jumps more than 0.1), the ground picture averages to the colour the zoomed-out map is built from, the fallback for old views, clover only on clover forms, tussocks broader than carpet, hedgerows dark. The cattle contrast test now covers the new colours. Fixtures regenerated (`pnpm dev:map-fixtures`).
+
+**What was looked at.** The Browser pane would not draw for this session (it was not shown in any window), so the ground picture was painted to image files and looked at: a lab farm with every form against feed from 4,000 kg DM/ha to nothing, and the Central Queensland dry season (550 to 690 kg DM/ha: straw tussocks and couch over about 40% open ground), Western Victoria green season (about 3,000 kg DM/ha: green carpet with small scattered gaps), Tablelands (about 1,100 kg DM/ha: even fine tufts, about 15% open) and the Central West crops (open tussocks around 1,200 kg DM/ha, rows, stubble and fallow) fixtures. The zoomed-out colours run smoothly with no jumps. One fault found this way and fixed: a tussock square at full cover lost its light and shade and looked smoother than its neighbour at 95%. Not looked at: tufts on the new base in the live map, phone sizes, light theme, a Fast Farm in each district (`docs/CALLS_FOR_CLAUDIA.md` G6).
+
+**Calls:** `docs/CALLS_FOR_CLAUDIA.md` G1 to G6.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
