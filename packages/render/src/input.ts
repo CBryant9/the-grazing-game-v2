@@ -30,6 +30,8 @@ export interface InputTarget {
   tap(x: number, y: number): void;
   /** The mouse is over a point, or has left the map (null). */
   hover(point: Point | null): void;
+  /** A finger (not a mouse) went down on a point. Touch has no hover, so this stands in for it. */
+  press?(point: Point): void;
   fit(): void;
 }
 
@@ -88,6 +90,7 @@ export function attachInput(el: HTMLElement, target: InputTarget): InputHandle {
       drawing = target.mode() === 'draw' && !space && !middle;
       drawStarted = false;
       lastDraw = null;
+      if (e.pointerType !== 'mouse') target.press?.(p);
     } else {
       // A second finger: the line drawn so far stays, and the two fingers move the map.
       if (drawing && drawStarted && lastDraw) target.drag('end', lastDraw);

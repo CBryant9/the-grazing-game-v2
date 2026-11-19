@@ -142,3 +142,15 @@ export type {
   MapDraft,
   NotFit,
 } from './draft';
+
+export {
+  BUILD_GRID,
+  fencedCorners,
+  fencedEdges,
+  gridKindFor,
+  gridLines,
+  gridStep,
+  lengthWords,
+  showCornerDots,
+} from './buildgrid';
+export type { BuildTarget, GridKind } from './buildgrid';
