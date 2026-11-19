@@ -19,6 +19,7 @@
 import {
   FARM_VIEW_VERSION,
   VIEW_FENCE,
+  VIEW_FORM,
   VIEW_LABELS,
   type FarmView,
   type FarmViewArea,
@@ -34,10 +35,11 @@ import {
   type FarmViewSward,
   type FarmViewTrough,
   type ViewCattleKind,
+  type ViewForm,
 } from '@gg/shared';
 import { fieldProgress } from '../crops/fields';
 import { DISTRICTS } from '../data/districts';
-import { SPECIES } from '../data/species';
+import { SPECIES, type SpeciesId } from '../data/species';
 import { squareHubs } from '../farm/layout';
 import { EDGE, labelSquare } from '../farm/topology';
 import { NO_WATER_DISTANCE, PORTABLE_CAPACITY_L, pipeReach } from '../farm/water';
@@ -60,6 +62,76 @@ export const VIEW_WEATHERED_KG = 4500;
 export const VIEW_SEED_HEADS = { rankness: 0.35, massKgHa: 1800 } as const;
 /** Cattle below this condition score are drawn thin, and at or above the other, fat (docs/VISUALS.md). */
 export const VIEW_BODY_SHAPE = { thinBelow: 2, fatFrom: 3.6 } as const;
+
+/**
+ * How each district's native pasture sits on the ground, seen from above
+ * (docs/VISUALS.md, "The base of a paddock"; docs/DATA.md, district native
+ * species). A display code only.
+ */
+export const VIEW_NATIVE_FORM: Record<FarmState['district'], ViewForm> = {
+  // Black speargrass and Queensland bluegrass tussocks, Indian couch between.
+  cq: VIEW_FORM.tropicalTussock,
+  // Red grass and wallaby grass tufts, weeping grass between.
+  nsw: VIEW_FORM.lowTufts,
+  // Wallaby grass, speargrass and red grass.
+  cw: VIEW_FORM.openTussock,
+  // Kangaroo grass, wallaby grass and weeping grass.
+  wv: VIEW_FORM.openTussock,
+};
+
+/**
+ * How each sown species sits on the ground. `native` is an oversown legume:
+ * the native grass is still what shows. A display code only.
+ */
+export const VIEW_SPECIES_FORM: Record<SpeciesId, ViewForm | 'native'> = {
+  buffel: VIEW_FORM.bunch,
+  leucaena: VIEW_FORM.hedgerow,
+  stylo: 'native',
+  phal: VIEW_FORM.tussockClover,
+  rye: VIEW_FORM.carpet,
+  lucerne: VIEW_FORM.crowns,
+  multi: VIEW_FORM.carpet,
+  oats: VIEW_FORM.rows,
+  wheat: VIEW_FORM.rows,
+  barley: VIEW_FORM.rows,
+  grsorg: VIEW_FORM.rows,
+  forsorg: VIEW_FORM.rows,
+  millet: VIEW_FORM.rows,
+  annrye: VIEW_FORM.rows,
+  brass: VIEW_FORM.rows,
+};
+
+/**
+ * How much of the ground the sward and its litter hide from above, by
+ * form: hidden = 1 - e^(-feed / k), with feed the green and dead feed in
+ * kg DM/ha and k from this table. Cover rises fast at low feed and then
+ * flattens (the logarithmic shape Lodge and Murphy 2002 found in northern
+ * NSW native pastures). A carpet hides the ground at much less feed than
+ * tussocks do: an Indian couch sward was 63% covered at 350 kg DM/ha, and
+ * at 50% cover it held about a third of the feed of tussock pasture
+ * (docs/DATA.md, "Ground hidden from above"). The figures for the sown
+ * pastures, lucerne and crops are stand-ins (docs/CALLS_FOR_CLAUDIA.md).
+ * A drawing figure only: the model's ground cover is unchanged.
+ */
+export const VIEW_HIDE_KG: Record<ViewForm, number> = {
+  [VIEW_FORM.tropicalTussock]: 750,
+  [VIEW_FORM.lowTufts]: 600,
+  [VIEW_FORM.openTussock]: 1050,
+  [VIEW_FORM.bunch]: 1050,
+  [VIEW_FORM.hedgerow]: 1050,
+  [VIEW_FORM.carpet]: 350,
+  [VIEW_FORM.tussockClover]: 450,
+  [VIEW_FORM.crowns]: 900,
+  [VIEW_FORM.rows]: 900,
+  [VIEW_FORM.bare]: 1,
+};
+
+/** The share of the ground hidden from above, in twentieths, for a form and its feed. */
+export function hiddenTwentieths(form: ViewForm, feedKgHa: number): number {
+  if (form === VIEW_FORM.bare) return 0;
+  const k = VIEW_HIDE_KG[form];
+  return Math.round((1 - Math.exp(-Math.max(0, feedKgHa) / k)) * 20);
+}
 
 const EDGE_TO_VIEW: Record<number, number> = {
   [EDGE.none]: VIEW_FENCE.none,
@@ -152,7 +224,10 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     arable: new Array<number>(GRID_N),
     paddock: new Array<number>(GRID_N),
     area: new Array<number>(GRID_N),
+    form: new Array<number>(GRID_N),
+    hidden: new Array<number>(GRID_N),
   };
+  const nativeForm = VIEW_NATIVE_FORM[farm.district];
   const one = [0];
   for (let i = 0; i < GRID_N; i++) {
     one[0] = i;
@@ -192,6 +267,18 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     sq.arable[i] = crops.arable[i] ? 1 : 0;
     sq.paddock[i] = topology.paddockOf[i]!;
     sq.area[i] = topology.areaOf[i]!;
+    // How the pasture sits on the ground, and how much of it the sward hides.
+    let form: ViewForm = nativeForm;
+    if (land === LAND.fallow) form = VIEW_FORM.bare;
+    else if (land === LAND.stubble || land === LAND.annual || land === LAND.crop) {
+      form = VIEW_FORM.rows;
+    } else if (k !== undefined) {
+      const f = VIEW_SPECIES_FORM[crops.fields[k]!.sp];
+      if (f !== 'native') form = f;
+    }
+    sq.form![i] = form;
+    // Stubble lies flat and keeps the ground covered (docs/VISUALS.md).
+    sq.hidden![i] = land === LAND.stubble ? 20 : hiddenTwentieths(form, s.mass);
   }
 
   // ---- Fences and gates

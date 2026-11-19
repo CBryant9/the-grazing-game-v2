@@ -41,6 +41,36 @@ export const VIEW_LAND = {
 } as const;
 export type ViewLand = (typeof VIEW_LAND)[keyof typeof VIEW_LAND];
 
+/**
+ * What a square's pasture looks like from above (`squares.form`): how the
+ * plants sit on the ground. A display code for the picture only. It says
+ * nothing about how the pasture grows (docs/VISUALS.md, "The base of a
+ * paddock"). Added 20 Nov 2026.
+ */
+export const VIEW_FORM = {
+  /** Central Queensland native: black speargrass and bluegrass tussocks, Indian couch between. */
+  tropicalTussock: 0,
+  /** Northern Tablelands native: low tufts of red grass and wallaby grass, weeping grass between. */
+  lowTufts: 1,
+  /** Central West and Western Victoria native: speargrass, wallaby grass and kangaroo grass tussocks, open ground between. */
+  openTussock: 2,
+  /** Buffel grass: big bunch tussocks. */
+  bunch: 3,
+  /** Leucaena hedgerows with buffel between. */
+  hedgerow: 4,
+  /** Ryegrass and white clover, or a multi-species mix: a near-continuous carpet. */
+  carpet: 5,
+  /** Phalaris tussocks in a sub clover carpet. */
+  tussockClover: 6,
+  /** Lucerne: separate crowns. */
+  crowns: 7,
+  /** Crops, annual forages and stubble: plants in drilled rows. */
+  rows: 8,
+  /** Fallow: worked soil with nothing growing. */
+  bare: 9,
+} as const;
+export type ViewForm = (typeof VIEW_FORM)[keyof typeof VIEW_FORM];
+
 /** What sits on a line between two squares (`fences.h` and `fences.v`). */
 export const VIEW_FENCE = {
   none: 0,
@@ -114,6 +144,20 @@ export interface FarmViewSquares {
   paddock: number[];
   /** The grazing area each square is in (an id in `areas`). */
   area: number[];
+  /**
+   * How the pasture sits on the ground, seen from above (see VIEW_FORM).
+   * Added 20 Nov 2026 and left out of older stored views, so the view
+   * version is unchanged (a past day's picture still draws).
+   */
+  form?: number[];
+  /**
+   * How much of the ground the sward and its litter hide, seen from above,
+   * in twentieths: 0 is bare soil, 20 is hidden. A display figure for the
+   * picture only. It follows the pasture's form (a carpet hides the ground
+   * at less feed than tussocks do). The model's own ground cover is `cover`.
+   * Added 20 Nov 2026, optional like `form`.
+   */
+  hidden?: number[];
 }
 
 /** Every fence line on the farm, as VIEW_FENCE codes. */

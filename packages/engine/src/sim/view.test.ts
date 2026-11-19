@@ -3,6 +3,7 @@ import {
   FARM_GRID_N,
   FARM_VIEW_VERSION,
   VIEW_FENCE,
+  VIEW_FORM,
   VIEW_LABELS,
   VIEW_LAND,
   type FarmView,
@@ -34,7 +35,7 @@ import { dateOn, plantingsNow, surveyOf } from './derived';
 import { cloneFarm, type FarmState } from './state';
 import { farmTotals, paddockSummaries } from './summary';
 import { stepDay } from './tick';
-import { farmView } from './view';
+import { VIEW_HIDE_KG, VIEW_NATIVE_FORM, farmView, hiddenTwentieths } from './view';
 
 vi.setConfig({ testTimeout: 120_000 });
 
@@ -83,6 +84,8 @@ const ALLOWED: Record<string, readonly string[]> = {
     'arable',
     'paddock',
     'area',
+    'form',
+    'hidden',
   ],
   'view.fences': ['h', 'v'],
   'view.gates[]': ['line', 'index', 'open', 'kind'],
@@ -232,6 +235,73 @@ function bigHerdFarm(): FarmState {
   for (let d = 0; d < 3; d++) stepDay(farm);
   return farm;
 }
+
+describe('how the pasture sits on the ground (a display code, 20 Nov 2026)', () => {
+  it.each(DISTRICT_IDS)("%s: native squares carry the district's own form", (id) => {
+    const farm = runningFarm(4, id, 3);
+    const view = farmView(farm);
+    let native = 0;
+    for (let i = 0; i < FARM_GRID_N; i++) {
+      if (view.squares.land[i] !== VIEW_LAND.native || view.squares.planting[i]) continue;
+      native++;
+      expect(view.squares.form![i]).toBe(VIEW_NATIVE_FORM[id]);
+    }
+    expect(native).toBeGreaterThan(0);
+  });
+
+  it('cropping country is in rows, fallow is bare, and stubble keeps the ground hidden', () => {
+    const farm = createFarm({
+      seed: 11,
+      district: 'cw',
+      size: 'medium',
+      start: { year: 2023, month: 3 },
+      startType: 'running',
+      mixed: { arablePct: 40, croppedPct: 60 },
+      difficulty: 'medium',
+    });
+    for (let d = 0; d < 40; d++) stepDay(farm);
+    const view = farmView(farm);
+    let rows = 0;
+    for (let i = 0; i < FARM_GRID_N; i++) {
+      const land = view.squares.land[i]!;
+      const form = view.squares.form![i]!;
+      if (land === VIEW_LAND.crop || land === VIEW_LAND.annual) {
+        expect(form).toBe(VIEW_FORM.rows);
+        rows++;
+      }
+      if (land === VIEW_LAND.fallow) {
+        expect(form).toBe(VIEW_FORM.bare);
+        expect(view.squares.hidden![i]).toBe(0);
+      }
+      if (land === VIEW_LAND.stubble) expect(view.squares.hidden![i]).toBe(20);
+    }
+    expect(rows).toBeGreaterThan(0);
+  });
+
+  it('the hidden ground follows the feed on each square, by its form', () => {
+    const farm = runningFarm(4, 'cq', 3);
+    const view = farmView(farm);
+    for (let i = 0; i < FARM_GRID_N; i += 7) {
+      const mass = farm.pasture.G[i]! + farm.pasture.D[i]!;
+      const form = view.squares.form![i]! as (typeof VIEW_FORM)[keyof typeof VIEW_FORM];
+      if (view.squares.land[i] === VIEW_LAND.stubble) continue;
+      expect(view.squares.hidden![i]).toBe(hiddenTwentieths(form, mass));
+    }
+  });
+
+  it('a carpet hides the ground at much less feed than tussocks do, and no feed hides nothing', () => {
+    for (const form of Object.values(VIEW_FORM)) expect(hiddenTwentieths(form, 0)).toBe(0);
+    // About 300 kg DM/ha: a grazed-down ryegrass and clover carpet still hides half the ground.
+    expect(hiddenTwentieths(VIEW_FORM.carpet, 300)).toBeGreaterThanOrEqual(11);
+    expect(hiddenTwentieths(VIEW_FORM.openTussock, 300)).toBeLessThanOrEqual(5);
+    // Rising fast, then flattening: every form is nearly hidden by 3,500 kg DM/ha.
+    for (const form of Object.values(VIEW_FORM)) {
+      if (form === VIEW_FORM.bare) continue;
+      expect(hiddenTwentieths(form, 3500)).toBeGreaterThanOrEqual(19);
+      expect(VIEW_HIDE_KG[form]).toBeGreaterThan(0);
+    }
+  });
+});
 
 describe('the farm view holds only what the map draws', () => {
   it.each(DISTRICT_IDS)('%s: every field is on the list, on a running mixed farm', (id) => {
@@ -434,9 +504,11 @@ describe('the farm view says what the model says', () => {
       arable: [0, 1],
       paddock: [0, view.paddocks.length - 1],
       area: [0, view.areas.length - 1],
+      form: [0, 9],
+      hidden: [0, 20],
     };
     for (const [name, [lo, hi]] of Object.entries(ranges)) {
-      const list = view.squares[name as keyof FarmView['squares']];
+      const list = view.squares[name as keyof FarmView['squares']]!;
       expect(list.length, name).toBe(FARM_GRID_N);
       for (const v of list) {
         expect(Number.isInteger(v), name).toBe(true);
