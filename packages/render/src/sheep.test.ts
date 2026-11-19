@@ -1,10 +1,11 @@
 import { VIEW_FENCE, type FarmView } from '@gg/shared';
 import { describe, expect, it } from 'vitest';
-import { MAX_SHARE_OF_AREA, placeCattle, placementKey } from './cattle';
+import { placeCattle, placementKey } from './cattle';
 import { GROUND_SQUASH as K } from './grid';
 import { squareAtWorld } from './hit';
 import {
-  SHEEP_MAX_PER_SQUARE,
+  FLOCK_DRAWN_MAX,
+  SHEEP_M2_PER_HEAD,
   SHEEP_STAND_BACK,
   SHEEP_YARDS_DRAWN,
   placeSheep,
@@ -160,7 +161,10 @@ describe('sheep stand where a flock can stand', () => {
     const view = sampleView();
     view.areas.length = 1;
     view.squares.area.fill(0);
-    view.flocks = [flock({ area: 0, anchor: cell(28, 10), head: 400 })];
+    // 6,000 sheep at 60 m² a head take 36 ha: more than the 25 squares of the pen.
+    view.flocks = [
+      flock({ area: 0, anchor: cell(28, 10), head: 6000, sheep: [{ kind: 'ewe', n: 6000, thin: 0 }] }),
+    ];
     const outside = only(view).sheep.filter((s) => {
       const col = Math.floor(s.x);
       const row = Math.floor(s.y);
@@ -224,8 +228,8 @@ describe('sheep stand where a flock can stand', () => {
   });
 });
 
-describe('big flocks do not hide the pasture', () => {
-  it('a flock of 7,000 draws a sample, keeps its real head count and stands on four squares in ten at most', () => {
+describe('a flock takes up its true ground', () => {
+  it('a flock of 7,000 draws a sample over its true ground and keeps its real head count', () => {
     const view = sheepView();
     const big = view.flocks![0]!;
     const p = placeSheep(view).find((f) => f.flock === big.id)!;
@@ -233,15 +237,14 @@ describe('big flocks do not hide the pasture', () => {
     expect(p.total).toBe(7900);
     expect(p.sampled).toBe(true);
     expect(p.sheep.length).toBeLessThan(p.total);
-    expect(p.cells.length).toBeLessThanOrEqual(Math.ceil(area * MAX_SHARE_OF_AREA));
-    expect(p.sheep.length).toBeLessThanOrEqual(p.cells.length * SHEEP_MAX_PER_SQUARE);
+    expect(SHEEP_M2_PER_HEAD).toBe(60);
+    // 7,000 adults at 60 m² a head is 42 ha, or the whole area if that is less.
+    expect(p.cells.length).toBe(Math.min(area, Math.ceil((7000 * 60) / 10000)));
     // Nowhere near one sprite for each sheep.
-    expect(p.sheep.length).toBeLessThan(1100);
-    const per = new Map<number, number>();
-    for (const s of p.sheep) per.set(squareOf(s), (per.get(squareOf(s)) ?? 0) + 1);
-    // Lambs stand beside their ewes, so a square can hold a few over the average.
-    expect(Math.max(...per.values())).toBeLessThanOrEqual(SHEEP_MAX_PER_SQUARE + 2);
-    expect(p.sheep.length / per.size).toBeLessThanOrEqual(SHEEP_MAX_PER_SQUARE);
+    expect(p.sheep.length).toBeLessThanOrEqual(FLOCK_DRAWN_MAX);
+    // The sample is spread over all of its ground.
+    const used = new Set(p.sheep.map(squareOf));
+    expect(used.size).toBeGreaterThan(p.cells.length * 0.9);
   });
 
   it('the sample keeps every kind in the flock and the share of thin and lambs', () => {
@@ -261,14 +264,16 @@ describe('big flocks do not hide the pasture', () => {
     expect(lambs / p.sheep.length).toBeLessThan(0.15);
   });
 
-  it('a small flock is drawn whole, four to a square when it has room', () => {
+  it('a small flock is drawn whole, close together on part of a square', () => {
     const p = only(withFlock({ head: 24, sheep: [{ kind: 'ewe', n: 24, thin: 0 }] }));
     expect(p.sampled).toBe(false);
     expect(p.sheep.length).toBe(24);
-    expect(p.cells.length).toBe(6);
+    // 24 x 60 m² is 1,440 m² of a 1 ha square.
+    expect(p.cells.length).toBe(1);
+    expect(p.herdM2).toBe(24 * 60);
   });
 
-  it('a small area uses every square, up to eight to a square', () => {
+  it('a flock in a small pen is drawn whole over as much of it as its numbers need', () => {
     const view = sampleView();
     const id = fenceBox(view, 10, 20, 11, 21, VIEW_FENCE.netting);
     view.flocks = [
@@ -280,8 +285,9 @@ describe('big flocks do not hide the pasture', () => {
       }),
     ];
     const p = only(view);
-    expect(p.cells.length).toBe(4);
-    expect(p.sheep.length).toBe(32);
+    // 400 x 60 m² is 2.4 ha: three of the pen's four squares.
+    expect(p.cells.length).toBe(3);
+    expect(p.sheep.length).toBe(400);
     expect(p.total).toBe(400);
   });
 });

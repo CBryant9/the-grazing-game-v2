@@ -32,8 +32,21 @@ export const cattleSprite = (breed: CattleBreed, kind: ViewCattleKind, shape: Bo
 
 export const TUFT_VARIANTS = 3;
 
-/** Texture pixels for one square across, for cattle. A cow is about four tenths of a square long. */
+/**
+ * Texture pixels for one square across, for cattle, before the map sizes
+ * them. The map draws each beast near its real size against the paddock
+ * (cattle.ts, `cowPx`), so this is only the size a sprite has on its own.
+ */
 const CATTLE_PPU = 210;
+
+/** A cattle sprite is this many times as wide as the beast's body is long. The map sizes by body length. */
+export const CATTLE_W_PER_BODY = 1.3;
+/** A sheep sprite is this many times as wide as the sheep's body is long. */
+export const SHEEP_W_PER_BODY = 1.55;
+
+/** The zoomed-out dot for a beast or a sheep, and its size in texture pixels. */
+export const DOT_SPRITE = { cattle: 'dot.cattle', sheep: 'dot.sheep' } as const;
+export const DOT_TEXTURE_PX = 16;
 
 const N = NATURAL;
 
@@ -195,7 +208,7 @@ function addCattle(reg: SpriteRegistry): void {
     for (const kind of ['cow', 'heifer', 'steer', 'bull', 'calf'] as const) {
       const size = kind === 'bull' ? 1.14 : kind === 'calf' ? 0.58 : kind === 'heifer' ? 0.92 : 1;
       const len = Math.round(88 * size);
-      const w = Math.round(len * 1.3);
+      const w = Math.round(len * CATTLE_W_PER_BODY);
       const h = Math.round(len * 1.02) + 10;
       for (const shape of kind === 'calf' ? (['normal'] as const) : shapes) {
         reg.set(cattleSprite(breed, kind, shape), {
@@ -379,7 +392,7 @@ function addSheep(reg: SpriteRegistry): void {
   };
   for (const kind of ['ewe', 'wether', 'ram', 'young', 'lamb'] as const) {
     const len = Math.round(50 * size[kind]);
-    const w = Math.round(len * 1.55);
+    const w = Math.round(len * SHEEP_W_PER_BODY);
     const h = Math.round(len * 1.08) + 10;
     for (const thin of kind === 'lamb' ? [false] : [false, true]) {
       reg.set(sheepSprite(kind, thin), {
@@ -931,10 +944,34 @@ function addThings(reg: SpriteRegistry): void {
 }
 
 /** Every sprite the map uses, drawn in code. */
+/**
+ * Zoomed out, each beast is a dot: a dark middle in the cattle outline colour
+ * with a thin pale rim, so it reads on every ground and grass colour as the
+ * cattle do (the same pair of colours, held to 3 to 1 by the palette test).
+ * A sheep's dot is pale with a dark rim, so a flock never reads as cattle.
+ */
+function addDots(reg: SpriteRegistry): void {
+  const S = DOT_TEXTURE_PX;
+  const paint =
+    (inner: number, outer: number) =>
+    (ctx: Ctx): void => {
+      ctx.fillStyle = css(outer);
+      oval(ctx, S / 2, S / 2, S / 2 - 0.5, S / 2 - 0.5);
+      ctx.fill();
+      ctx.fillStyle = css(inner);
+      oval(ctx, S / 2, S / 2, S * 0.33, S * 0.33);
+      ctx.fill();
+    };
+  const dot = { w: S, h: S, ax: 0.5, ay: 0.5, ppu: S };
+  reg.set(DOT_SPRITE.cattle, { ...dot, paint: paint(N.cattleOutline, N.cattleHalo) });
+  reg.set(DOT_SPRITE.sheep, { ...dot, paint: paint(N.sheepHalo, N.sheepOutline) });
+}
+
 export function defaultSprites(): SpriteRegistry {
   const reg = new SpriteRegistry();
   addCattle(reg);
   addSheep(reg);
+  addDots(reg);
   addGrass(reg);
   addThings(reg);
   return reg;

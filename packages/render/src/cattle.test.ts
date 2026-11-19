@@ -1,11 +1,18 @@
 import { VIEW_FENCE, type FarmView } from '@gg/shared';
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_DRAWN_CROWDED,
-  MAX_DRAWN_PER_SQUARE,
-  MAX_SHARE_OF_AREA,
+  ANIMAL_MIN_PX,
+  CATTLE_EXAGGERATION,
+  CATTLE_MAX_PX,
+  CATTLE_MIN_PX,
+  FARM_DRAWN_MAX,
+  HERD_M2_PER_HEAD,
+  MOB_DRAWN_MAX,
   STAND_BACK,
   YARDS_DRAWN,
+  animalPx,
+  cowPx,
+  herdSquares,
   placeCattle,
   placementKey,
   standingBox,
@@ -115,9 +122,11 @@ describe('cattle stay inside their grazing area', () => {
     const view = sampleView();
     // A fence across the left paddock at row 6, from the boundary to column 15. The gap is at 16 to 19.
     for (let x = 0; x < 16; x++) view.fences.h[hEdge(6, x)] = VIEW_FENCE.electric;
-    view.mobs = [mob({ head: 20, anchor: cell(3, 5) })];
+    view.mobs = [
+      mob({ head: 250, anchor: cell(3, 5), cattle: [{ kind: 'steer', n: 250, thin: 0, fat: 0 }] }),
+    ];
     const p = only(view);
-    // Twenty head take ten squares. All ten are on the mob's side of the fence, not just across it.
+    // 250 head at 400 m² a head take ten 1 ha squares. All ten are on the mob's side of the fence, not just across it.
     expect(p.cells.length).toBe(10);
     for (const c of p.cells) expect(Math.floor(c / 40)).toBeLessThan(6);
   });
@@ -140,7 +149,8 @@ describe('cattle stay inside their grazing area', () => {
         view.fences.v[vEdge(11, 4)] = VIEW_FENCE.permanent;
         view.fences.h[hEdge(11, 3)] = VIEW_FENCE.permanent;
       }
-      view.mobs = [mob({ area: box, anchor: cell(2, 10), head: 60 })];
+      // 100 head at 400 m² a head want four 1 ha squares.
+      view.mobs = [mob({ area: box, anchor: cell(2, 10), head: 100 })];
       return only(view);
     };
     const shut = make(false);
@@ -188,35 +198,71 @@ describe('cattle stay inside their grazing area', () => {
   });
 });
 
-describe('how many cattle are drawn', () => {
-  it('a mob with room draws every beast, about two to a square', () => {
+describe('how many cattle are drawn, and over how much ground', () => {
+  it('a mob takes up its true ground: 400 m² a head, one sprite a head', () => {
+    expect(HERD_M2_PER_HEAD).toBe(400);
     const p = only(withMob(180));
     expect(p.total).toBe(180);
     expect(p.beasts.length).toBe(180);
     expect(p.sampled).toBe(false);
-    expect(p.cells.length).toBe(90);
+    // 180 x 400 m² is 7.2 ha: eight squares of 1 ha.
+    expect(p.cells.length).toBe(8);
+    expect(p.herdM2).toBe(180 * 400);
   });
 
-  it('big mobs do not hide the pasture: on open country a mob stands on four squares in ten at most, three to a square', () => {
+  it('a mob that takes up less than a square stands in part of it', () => {
+    const p = only(withMob(5));
+    expect(p.cells.length).toBe(1);
+    const xs = p.beasts.map((b) => b.x);
+    const ys = p.beasts.map((b) => b.y);
+    // 2,000 m² of a 10,000 m² square: under half the width and depth.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(0.5);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(0.5);
+  });
+
+  it('a big mob draws a sample, spread over its true ground, and keeps its real count', () => {
     const view = sampleView();
     view.mobs = [
       mob({ id: 1, seed: 5, area: 0, anchor: cell(5, 5), head: 2000 }),
       mob({ id: 2, seed: 6, area: 1, anchor: cell(30, 10), head: 2200 }),
     ];
     for (const m of view.mobs) m.cattle = [{ kind: 'steer', n: m.head, thin: 0, fat: 0 }];
-    expect(MAX_SHARE_OF_AREA).toBe(0.4);
-    expect(MAX_DRAWN_PER_SQUARE).toBe(3);
     for (const p of placeCattle(view)) {
-      const area = view.mobs.find((m) => m.id === p.mob)!.area;
-      const squares = view.squares.area.filter((a) => a === area).length;
-      expect(p.cells.length).toBeLessThanOrEqual(Math.ceil(squares * 0.4));
-      expect(p.beasts.length).toBeLessThanOrEqual(p.cells.length * 3);
-      const perSquare = new Map<number, number>();
-      for (const b of p.beasts) perSquare.set(squareOf(b), (perSquare.get(squareOf(b)) ?? 0) + 1);
-      expect(Math.max(...perSquare.values())).toBeLessThanOrEqual(3);
-      // The mob is sampled, and keeps its real head count for the marker.
+      const m = view.mobs.find((x) => x.id === p.mob)!;
+      const squares = view.squares.area.filter((a) => a === m.area).length;
+      expect(p.beasts.length).toBe(MOB_DRAWN_MAX);
       expect(p.sampled).toBe(true);
-      expect(p.total).toBeGreaterThanOrEqual(2000);
+      expect(p.total).toBe(m.head);
+      // Its ground is its true ground (2,000 head take 80 ha), or the whole area if that is less.
+      expect(p.cells.length).toBe(Math.min(squares, Math.ceil((m.head * 400) / 10000)));
+      // The sample is spread over all of it, not bunched at the start.
+      const used = new Set(p.beasts.map(squareOf));
+      expect(used.size).toBeGreaterThan(p.cells.length * 0.9);
+    }
+  });
+
+  it('the farm draws no more than its budget, and each mob keeps a share', () => {
+    const view = sampleView();
+    view.mobs = [];
+    for (let k = 0; k < 12; k++) {
+      view.mobs.push(
+        mob({
+          id: k + 1,
+          seed: 100 + k,
+          area: k % 2,
+          anchor: k % 2 ? cell(30, 5 + k) : cell(5, 5 + k),
+          head: 900,
+          cattle: [{ kind: 'cow', n: 900, thin: 0, fat: 0 }],
+        }),
+      );
+    }
+    const placed = placeCattle(view);
+    const drawn = placed.reduce((t, p) => t + p.beasts.length, 0);
+    expect(FARM_DRAWN_MAX).toBe(3000);
+    expect(drawn).toBeLessThanOrEqual(FARM_DRAWN_MAX);
+    for (const p of placed) {
+      expect(p.beasts.length).toBeGreaterThanOrEqual(200);
+      expect(p.total).toBe(900);
     }
   });
 
@@ -237,7 +283,7 @@ describe('how many cattle are drawn', () => {
     }
   });
 
-  it('a very big mob on a small area uses every square, six to a square, and keeps its real count', () => {
+  it('the same mob fills a small strip, so high density looks crowded', () => {
     const view = sampleView();
     const box = fenceBox(view, 24, 4, 25, 5, VIEW_FENCE.tape); // four squares
     view.mobs = [
@@ -249,11 +295,20 @@ describe('how many cattle are drawn', () => {
       }),
     ];
     const p = only(view);
-    expect(MAX_DRAWN_CROWDED).toBe(6);
     expect(p.cells.length).toBe(4);
-    expect(p.beasts.length).toBe(24);
+    expect(p.beasts.length).toBe(MOB_DRAWN_MAX);
+    expect(p.herdM2).toBe(4 * 10000);
     expect(p.sampled).toBe(true);
     expect(p.total).toBe(4000);
+  });
+
+  it('900 head on a 3,000 ha farm take up about 36 ha, not a quarter of the farm (Claudia, 19 Nov 2026)', () => {
+    const sideM = Math.sqrt(3000 / 1040) * 100;
+    const squares = herdSquares(900, sideM, 1040);
+    expect(squares).toBe(13);
+    expect(squares / 1040).toBeLessThan(0.02);
+    // On a 200 ha farm the same mob needs 187 squares: a paddock or more.
+    expect(herdSquares(900, Math.sqrt(200 / 1040) * 100, 1040)).toBeGreaterThan(150);
   });
 
   it('thin and fat cattle are drawn in their share of the mob', () => {
@@ -292,7 +347,7 @@ describe('how many cattle are drawn', () => {
 
   it('a sampled mob still shows its bulls', () => {
     const view = sampleView();
-    const box = fenceBox(view, 24, 4, 25, 4, VIEW_FENCE.tape); // two squares: 12 drawn
+    const box = fenceBox(view, 24, 4, 25, 4, VIEW_FENCE.tape); // two squares
     view.mobs = [
       mob({
         area: box,
@@ -305,8 +360,8 @@ describe('how many cattle are drawn', () => {
       }),
     ];
     const p = only(view);
-    expect(p.beasts.length).toBe(12);
-    expect(p.beasts.filter((b) => b.kind === 'bull').length).toBe(1);
+    expect(p.beasts.length).toBe(MOB_DRAWN_MAX);
+    expect(p.beasts.filter((b) => b.kind === 'bull').length).toBe(4);
   });
 });
 
@@ -331,5 +386,36 @@ describe('where mobs are not drawn in a paddock', () => {
     const view = sampleView();
     view.mobs = [mob({ head: 0, cattle: [] })];
     expect(placeCattle(view)).toEqual([]);
+  });
+});
+
+describe('how big a beast is drawn', () => {
+  const side = (ha: number): number => Math.sqrt(ha / 1040) * 100;
+
+  it('a cow is its real 2.4 m times the exaggeration, between the least and most', () => {
+    expect(CATTLE_EXAGGERATION).toBe(4);
+    // 1,040 ha (100 m squares) at 60 px a square: 2.4 x 0.6 x 4 = 5.76 px.
+    expect(cowPx(60, 100)).toBeCloseTo(5.76, 5);
+    expect(cowPx(1, 100)).toBe(CATTLE_MIN_PX);
+    expect(cowPx(500, 100)).toBe(CATTLE_MAX_PX);
+  });
+
+  it('at full zoom on a 200 ha farm a cow is clearly a cow, 18 px long', () => {
+    expect(cowPx(96, side(200))).toBe(CATTLE_MAX_PX);
+    expect(CATTLE_MAX_PX).toBe(18);
+    // Half way in, still about ten pixels.
+    expect(cowPx(44, side(200))).toBeGreaterThan(9);
+  });
+
+  it('on a 3,000 ha farm cattle are small against the paddock at every zoom', () => {
+    expect(cowPx(25, side(3000))).toBe(CATTLE_MIN_PX);
+    expect(cowPx(96, side(3000))).toBeLessThan(6);
+  });
+
+  it('calves, heifers and bulls are in proportion to the cow, and nothing is a speck', () => {
+    const cow = cowPx(96, side(200));
+    expect(animalPx(2.7, 96, side(200))).toBeCloseTo((cow * 2.7) / 2.4, 5);
+    expect(animalPx(1.3, 96, side(200))).toBeCloseTo((cow * 1.3) / 2.4, 5);
+    expect(animalPx(1.3, 25, side(6000))).toBe(ANIMAL_MIN_PX);
   });
 });

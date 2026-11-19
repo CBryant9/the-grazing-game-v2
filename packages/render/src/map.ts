@@ -12,8 +12,9 @@
  *
  * Speed (PRD 14.10):
  * - Nothing is drawn unless something changed: there is no idle redraw loop.
- * - Grass and cattle are static batches. Moving the camera only moves the
- *   container they sit in.
+ * - Grass is a static batch. Moving the camera only moves the container it
+ *   sits in. Cattle walk and graze (herd.ts): only their positions and sizes
+ *   go up to the graphics card each frame, and only while something moves.
  * - A new view redraws only the rows of grass whose squares changed, and
  *   moves cattle only if something about them or their fences changed.
  * - Light and weather are a tint, not a full-screen filter.
@@ -60,8 +61,16 @@ import {
   type Point,
   type Viewport,
 } from './camera';
-import { placeCattle, placementKey, type MobPlacement } from './cattle';
-import { placeSheep, sheepPlacementKey, type FlockPlacement } from './sheep';
+import {
+  ANIMAL_MIN_PX,
+  CATTLE_LENGTH_M,
+  cowPx,
+  placeCattle,
+  placementKey,
+  type MobPlacement,
+} from './cattle';
+import { Herd, WALK_LENGTHS_PER_S } from './herd';
+import { SHEEP_LENGTH_M, placeSheep, sheepPlacementKey, type FlockPlacement } from './sheep';
 import { shade } from './colour';
 import { columnsSpanned, fenceRuns, outlineOf, type FenceRun } from './fences';
 import {
@@ -102,14 +111,21 @@ import {
 import type { DraftDot, DraftKind, MapDraft } from './draft';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
-import { easeFade, fadeStep, lodMode, type LodMode } from './lod';
+import { DOT_PX, easeFade, fadeStep, herdAsDots, lodMode, type LodMode } from './lod';
 import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, MESH, TICK, tickOffsets } from './linestyle';
 import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
 import { NATURAL, breedFor, paletteFor, type MapPalette, type MapTheme } from './palette';
 import { scatter } from './random';
 import { SURROUND_TILE, paintSurround, surroundScale } from './surround';
-import { cattleSprite, defaultSprites, sheepSprite } from './sprites/painters';
+import {
+  CATTLE_W_PER_BODY,
+  DOT_SPRITE,
+  SHEEP_W_PER_BODY,
+  cattleSprite,
+  defaultSprites,
+  sheepSprite,
+} from './sprites/painters';
 import { packAtlas, type SpriteDef, type SpriteRegistry } from './sprites/registry';
 
 export interface FarmMapOptions {
@@ -272,6 +288,12 @@ export interface FarmMap {
   setReduceMotion(on: boolean): void;
   /** Draw every beast, or go back to sampling big mobs. For the speed test. */
   setEveryBeast(on: boolean): void;
+  /**
+   * How fast the farm's days are running, so the cattle walk faster when
+   * the days do: 1 (the default), 2, 4, or 0 for paused. Paused, they stand
+   * still, though a mob that was just moved still walks to its paddock.
+   */
+  setCattlePace(pace: number): void;
   fitFarm(mode?: FitMode): void;
   /** Zoom to a level in screen pixels per square, on a square or on the middle of the screen. */
   zoomTo(pxPerSquare: number, square?: number): void;
@@ -406,6 +428,13 @@ interface PinnedLabel {
 
 const WASH_LAYERS: readonly WashLayer[] = ['waterReach', 'quality', 'grazed', 'arable'];
 
+/** The row of the map a ground y is in. */
+const rowFor = (gy: number): number => Math.min(GRID_H - 1, Math.max(0, Math.floor(gy)));
+
+/** The square a ground point is on. */
+const cellOf = (gx: number, gy: number): number =>
+  rowFor(gy) * GRID_W + Math.min(GRID_W - 1, Math.max(0, Math.floor(gx)));
+
 function makeCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = w;
@@ -482,6 +511,38 @@ class PixiFarmMap implements FarmMap {
   private looks: SquareLook[] = [];
   private raise = new Float32Array(GRID_N);
   private placements: MobPlacement[] = [];
+  /** The cattle on the map, walking and grazing. */
+  private readonly herd = new Herd();
+  /** How fast the days run: the cattle walk faster with them (0 is paused). */
+  private cattlePace = 1;
+  /** One sprite for each beast in the herd, in the same order. */
+  private beastParts: Particle[] = [];
+  /** Which row each beast's sprite is in now. */
+  private beastRow = new Int16Array(0);
+  /** For each sprite in the cattle rows (cattle then sheep): its length against a cow's, and its body length in texture pixels. */
+  private beastLen = new Float32Array(0);
+  private beastTex = new Float32Array(0);
+  private sheepParts: Particle[] = [];
+  private sheepLen = new Float32Array(0);
+  private sheepTex = new Float32Array(0);
+  /** Zoomed out: a dot for each beast and sheep, where the mob is not too crowded to read as dots. */
+  private dots = new ParticleContainer<Particle>({
+    dynamicProperties: { position: true, vertex: true, rotation: false, uvs: false, color: false },
+  });
+  /** Each beast's dot, or null while its mob shows as a patch. */
+  private beastDots: (Particle | null)[] = [];
+  private farKey = '';
+  /** The zoom the animal sizes were last set for. */
+  private sizedZoom = 0;
+  /** The marker and badge of each mob, so they follow the herd as it drifts. */
+  private herdPins = new Map<number, PinnedLabel[]>();
+  private wakeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the cattle last stopped drawing frames because all of them were standing, or 0. */
+  private cattleRestFrom = 0;
+  private readonly rowDirty = new Uint8Array(GRID_H);
+  private readonly onVisibility = (): void => {
+    if (typeof document !== 'undefined' && !document.hidden) this.invalidate();
+  };
   private flockPlacements: FlockPlacement[] = [];
   private sheepDrawn = 0;
   private pinned: PinnedLabel[] = [];
@@ -600,6 +661,9 @@ class PixiFarmMap implements FarmMap {
       this.observer.observe(host);
     }
 
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibility);
+    }
     this.cam = fitCamera(this.vp, this.options.fit ?? 'auto');
     if (this.options.view) this.setView(this.options.view);
     else this.applyCamera();
@@ -680,25 +744,32 @@ class PixiFarmMap implements FarmMap {
       world.addChild(sprite);
       this.washes.set(layer, { sprite, canvas, dirty: true });
     }
-    world.addChild(this.pipeG, this.footprints, this.ring, this.outlines);
+    this.dots.boundsArea = new Rectangle(-2, -3, WORLD_W + 4, WORLD_H + 6);
+    world.addChild(this.pipeG, this.footprints, this.dots, this.ring, this.outlines);
     world.addChild(this.fenceFar, this.fenceNear);
 
     const still = { position: false, vertex: false, rotation: false, uvs: false, color: false };
+    const moving = { position: true, vertex: true, rotation: false, uvs: false, color: false };
     for (let r = 0; r < GRID_H; r++) {
       const row: Row = {
         line: new Container(),
         tufts: new ParticleContainer<Particle>({ dynamicProperties: still }),
         things: new Container(),
-        cattle: new ParticleContainer<Particle>({ dynamicProperties: still }),
+        // Cattle walk: their positions and sizes (facing) change each frame.
+        cattle: new ParticleContainer<Particle>({ dynamicProperties: moving }),
         tuftCount: 0,
       };
       // Particle batches do not work out their own bounds. The whole farm will do.
       const bounds = new Rectangle(-2, -3, WORLD_W + 4, WORLD_H + 6);
       row.tufts.boundsArea = bounds;
       row.cattle.boundsArea = bounds;
-      world.addChild(row.line, row.tufts, row.things, row.cattle);
+      world.addChild(row.line, row.tufts, row.things);
       this.rows.push(row);
     }
+    // The cattle stand over all the grass, back to front among themselves, so
+    // a beast drawn near its real size never hides in tall grass (VISUALS:
+    // cattle never blur into the grass). The MVP drew them over the grass too.
+    for (const row of this.rows) world.addChild(row.cattle);
 
     // The draft and the hover sit on top of everything standing on the farm.
     world.addChild(this.contractG, this.draftG, this.hoverG);
@@ -773,6 +844,7 @@ class PixiFarmMap implements FarmMap {
       moving = this.nearMix !== target;
     }
     if (this.reduceMotion) return moving;
+    if (this.stepCattle(dt)) moving = true;
     if (this.weather.kind === 'rain') {
       const drops = this.rain.particleChildren;
       for (let k = 0; k < drops.length; k++) {
@@ -849,6 +921,8 @@ class PixiFarmMap implements FarmMap {
       this.surround.tilePosition.set(world.position.x, world.position.y);
     }
 
+    if (cam.zoom !== this.sizedZoom) this.sizeAnimals();
+    this.refreshFar();
     const mode = lodMode(cam.zoom, this.lodStarted ? this.lod.mode : undefined);
     // The first picture, and every change with reduce motion on, is shown at once.
     if (!this.lodStarted || this.reduceMotion) this.nearMix = mode === 'near' ? 1 : 0;
@@ -891,6 +965,8 @@ class PixiFarmMap implements FarmMap {
     this.fenceNear.alpha = lod.near;
     this.footprints.visible = far;
     this.footprints.alpha = lod.far;
+    this.dots.visible = far && this.dots.particleChildren.length > 0;
+    this.dots.alpha = lod.far;
 
     // Rows off the top or bottom of the screen are not drawn.
     const [, y0, , y1] = visibleWorld(cam, vp);
@@ -1014,6 +1090,9 @@ class PixiFarmMap implements FarmMap {
       this.placements = placeCattle(view, { everyBeast: this.everyBeast });
       this.flockPlacements = placeSheep(view, { everyBeast: this.everyBeast });
       this.buildCattle();
+    } else {
+      // The same cattle: they keep walking, drawn to today's feed.
+      this.herd.feed(view);
     }
     lap('cattle');
     const labelsKey = JSON.stringify([
@@ -1135,59 +1214,306 @@ class PixiFarmMap implements FarmMap {
     row.tufts.update();
   }
 
-  /** Individual cattle, zoomed in. */
+  /**
+   * The cattle and sheep, zoomed in, and their dots zoomed out. Cattle
+   * already on the map keep their places (herd.ts), so a new day never
+   * reshuffles them.
+   */
   private buildCattle(): void {
     const view = this.view!;
     const breed = breedFor(view.district);
-    const byRow: { x: number; y: number; id: string; flip: boolean }[][] = [];
-    for (let r = 0; r < GRID_H; r++) byRow.push([]);
-    for (const p of this.placements) {
-      for (const b of p.beasts) {
-        const r = Math.min(GRID_H - 1, Math.max(0, Math.floor(b.y)));
-        byRow[r]!.push({ x: b.x, y: b.y, id: cattleSprite(breed, b.kind, b.shape), flip: b.flip });
+    const herd = this.herd;
+    herd.sync(view, this.placements);
+    if (this.reduceMotion) herd.settle();
+    for (const row of this.rows) row.cattle.particleChildren.length = 0;
+
+    const n = herd.n;
+    this.beastParts = new Array<Particle>(n);
+    this.beastRow = new Int16Array(n);
+    this.beastLen = new Float32Array(n);
+    this.beastTex = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const kind = herd.kind[i]!;
+      const id = cattleSprite(breed, kind, herd.shape[i]!);
+      const def = this.def(id);
+      const p = new Particle(this.tex(id));
+      p.anchorX = def.ax;
+      p.anchorY = def.ay;
+      p.x = herd.x[i]!;
+      p.y = herd.y[i]! * K;
+      this.beastParts[i] = p;
+      this.beastLen[i] = CATTLE_LENGTH_M[kind] / CATTLE_LENGTH_M.cow;
+      this.beastTex[i] = def.w / CATTLE_W_PER_BODY;
+      const r = rowFor(herd.y[i]!);
+      this.beastRow[i] = r;
+      this.rows[r]!.cattle.particleChildren.push(p);
+    }
+    // Sheep stand in the same layer, so they sort back to front with the
+    // cattle, sized by the same rule. They do not walk yet.
+    const sheep: { x: number; y: number; id: string; flip: boolean; len: number }[] = [];
+    for (const f of this.flockPlacements) {
+      for (const s of f.sheep) {
+        sheep.push({
+          x: s.x,
+          y: s.y,
+          id: sheepSprite(s.kind, s.thin),
+          flip: s.flip,
+          len: SHEEP_LENGTH_M[s.kind] / CATTLE_LENGTH_M.cow,
+        });
       }
     }
-    // Sheep stand in the same layer, so they sort back to front with the cattle.
-    this.sheepDrawn = 0;
-    for (const p of this.flockPlacements) {
-      for (const s of p.sheep) {
-        const r = Math.min(GRID_H - 1, Math.max(0, Math.floor(s.y)));
-        byRow[r]!.push({ x: s.x, y: s.y, id: sheepSprite(s.kind, s.thin), flip: s.flip });
-        this.sheepDrawn++;
+    this.sheepDrawn = sheep.length;
+    this.sheepParts = new Array<Particle>(sheep.length);
+    this.sheepLen = new Float32Array(sheep.length);
+    this.sheepTex = new Float32Array(sheep.length);
+    sheep.forEach((s, k) => {
+      const def = this.def(s.id);
+      const p = new Particle(this.tex(s.id));
+      p.anchorX = def.ax;
+      p.anchorY = def.ay;
+      p.x = s.x;
+      p.y = s.y * K;
+      p.scaleX = s.flip ? -1 : 1;
+      this.sheepParts[k] = p;
+      this.sheepLen[k] = s.len;
+      this.sheepTex[k] = def.w / SHEEP_W_PER_BODY;
+      this.rows[rowFor(s.y)]!.cattle.particleChildren.push(p);
+    });
+    for (const row of this.rows) {
+      row.cattle.particleChildren.sort((a, b) => a.y - b.y);
+      row.cattle.update();
+    }
+    this.sizeAnimals();
+    this.refreshFar(true);
+  }
+
+  /**
+   * Size every animal for the zoom: near its real length against the paddock
+   * (cattle.ts, `cowPx`), and the dots a steady few pixels across.
+   */
+  private sizeAnimals(): void {
+    const zoom = this.cam.zoom;
+    this.sizedZoom = zoom;
+    const cow = cowPx(zoom, this.view?.scale.sideM ?? 100);
+    const dir = this.herd.dir;
+    for (let i = 0; i < this.beastParts.length; i++) {
+      const p = this.beastParts[i]!;
+      const s = Math.max(ANIMAL_MIN_PX, cow * this.beastLen[i]!) / zoom / this.beastTex[i]!;
+      p.scaleY = s;
+      p.scaleX = dir[i]! < 0 ? -s : s;
+    }
+    for (let k = 0; k < this.sheepParts.length; k++) {
+      const p = this.sheepParts[k]!;
+      const s = Math.max(ANIMAL_MIN_PX, cow * this.sheepLen[k]!) / zoom / this.sheepTex[k]!;
+      p.scaleY = s;
+      p.scaleX = p.scaleX < 0 ? -s : s;
+    }
+    const d = DOT_PX / zoom / this.def(DOT_SPRITE.cattle).w;
+    for (const p of this.dots.particleChildren) {
+      p.scaleX = d;
+      p.scaleY = d;
+    }
+  }
+
+  /** Put each beast's sprite where the herd says, keep each row back to front, and move the dots. */
+  private placeBeasts(force = false): void {
+    const herd = this.herd;
+    const dirty = this.rowDirty;
+    dirty.fill(0);
+    let joined = false;
+    for (let i = 0; i < herd.n; i++) {
+      const p = this.beastParts[i];
+      if (!p) continue;
+      const x = herd.x[i]!;
+      const wy = herd.y[i]! * K;
+      const left = herd.dir[i]! < 0;
+      if (!force && p.x === x && p.y === wy && p.scaleX < 0 === left) continue;
+      p.x = x;
+      p.y = wy;
+      p.scaleX = left ? -p.scaleY : p.scaleY;
+      const r = rowFor(herd.y[i]!);
+      const was = this.beastRow[i]!;
+      if (r !== was) {
+        const from = this.rows[was]!.cattle.particleChildren;
+        const at = from.indexOf(p);
+        if (at >= 0) from.splice(at, 1);
+        this.rows[r]!.cattle.particleChildren.push(p);
+        this.beastRow[i] = r;
+        dirty[was] = 2;
+        dirty[r] = 2;
+      } else if (!dirty[r]) {
+        dirty[r] = 1;
       }
     }
     for (let r = 0; r < GRID_H; r++) {
-      const beasts = byRow[r]!.sort((a, b) => a.y - b.y);
-      const list = this.rows[r]!.cattle.particleChildren;
-      for (let k = 0; k < beasts.length; k++) {
-        const b = beasts[k]!;
-        const def = this.def(b.id);
-        let p = list[k];
-        if (!p) {
-          p = new Particle(this.tex(b.id));
-          list.push(p);
+      if (!dirty[r]) continue;
+      const row = this.rows[r]!;
+      const list = row.cattle.particleChildren;
+      // Nearly in order already: an insertion sort is a single pass.
+      let swapped = false;
+      for (let k = 1; k < list.length; k++) {
+        const p = list[k]!;
+        let j = k - 1;
+        while (j >= 0 && list[j]!.y > p.y) {
+          list[j + 1] = list[j]!;
+          j--;
         }
-        p.texture = this.tex(b.id);
-        p.x = b.x;
-        p.y = b.y * K;
-        p.anchorX = def.ax;
-        p.anchorY = def.ay;
-        p.scaleX = (b.flip ? -1 : 1) / def.ppu;
-        p.scaleY = 1 / def.ppu;
+        if (j !== k - 1) {
+          list[j + 1] = p;
+          swapped = true;
+        }
       }
-      list.length = beasts.length;
-      this.rows[r]!.cattle.update();
+      // A new order (or a new member) changes what is in the batch, not just where.
+      if (swapped || dirty[r] === 2) row.cattle.update();
+      if (dirty[r] === 2) joined = true;
     }
-    // The soft footprint under each mob's marker, zoomed out: the squares it stands on.
+    // A beast walked into a row that was empty: show or hide rows again.
+    if (joined) this.applyLod();
+    if (this.lod.far > 0.01 || force) this.placeDots();
+  }
+
+  /** Each beast's dot over its feet, on the zoomed-out squares (raised by their grass). */
+  private placeDots(): void {
+    const herd = this.herd;
+    for (let i = 0; i < herd.n; i++) {
+      const d = this.beastDots[i];
+      if (!d) continue;
+      const x = herd.x[i]!;
+      const y = herd.y[i]!;
+      d.x = x;
+      d.y = y * K - this.raise[cellOf(x, y)]!;
+    }
+  }
+
+  /**
+   * Zoomed out: each mob as dots where its cattle stand far enough apart to
+   * read as dots, otherwise as a filled patch over the ground it takes up
+   * (the marker carries the head count). A mob on its way to a new paddock
+   * shows as dots, so it can be seen going. Rebuilt only when that changes.
+   */
+  private refreshFar(force = false): void {
+    const view = this.view;
+    if (!view) return;
+    const zoom = this.cam.zoom;
+    const sideM = view.scale.sideM;
+    const herd = this.herd;
+    const mobDots = herd.mobs.map(
+      (m) =>
+        m.where === 'paddock' &&
+        (m.rushing > 0 || herdAsDots(m.herdM2, m.total, zoom, sideM)),
+    );
+    const flockDots = this.flockPlacements.map(
+      (f) => f.cells.length > 0 && herdAsDots(f.herdM2, f.total, zoom, sideM),
+    );
+    const key =
+      herd.mobs.map((m, k) => `${mobDots[k] ? 'd' : 'p'}${m.id}:${m.start}`).join(',') +
+      '|' +
+      flockDots.map((b) => (b ? 'd' : 'p')).join('');
+    if (!force && key === this.farKey) return;
+    this.farKey = key;
+
+    const list = this.dots.particleChildren;
+    list.length = 0;
+    const scale = DOT_PX / zoom / this.def(DOT_SPRITE.cattle).w;
+    const make = (id: string, x: number, y: number): Particle => {
+      const d = new Particle(this.tex(id));
+      d.anchorX = 0.5;
+      d.anchorY = 0.5;
+      d.scaleX = scale;
+      d.scaleY = scale;
+      d.x = x;
+      d.y = y * K - this.raise[cellOf(x, y)]!;
+      list.push(d);
+      return d;
+    };
+    this.beastDots = new Array<Particle | null>(herd.n).fill(null);
+    herd.mobs.forEach((m, k) => {
+      if (!mobDots[k]) return;
+      for (let i = m.from; i < m.to; i++) {
+        this.beastDots[i] = make(DOT_SPRITE.cattle, herd.x[i]!, herd.y[i]!);
+      }
+    });
+    this.flockPlacements.forEach((f, k) => {
+      if (!flockDots[k]) return;
+      for (const s of f.sheep) make(DOT_SPRITE.sheep, s.x, s.y);
+    });
+    this.dots.update();
+    this.dots.visible = this.lod.far > 0.01 && list.length > 0;
+
+    // The footprint under each marker: light under dots, a filled patch for a crowded mob.
     const g = this.footprints.clear();
-    for (const p of this.placements) {
-      for (const c of p.cells) g.rect(colOf(c), rowOf(c) * K, 1.02, K + 0.02);
-      g.fill({ color: 0x281a0a, alpha: 0.14 });
+    const cover = (cells: readonly number[]): void => {
+      for (const c of cells) g.rect(colOf(c), rowOf(c) * K - this.raise[c]!, 1.02, K + 0.02);
+    };
+    herd.mobs.forEach((m, k) => {
+      cover(m.cells);
+      if (mobDots[k]) g.fill({ color: 0x281a0a, alpha: 0.14 });
+      else g.fill({ color: NATURAL.cattleOutline, alpha: m.where === 'yards' ? 0.14 : 0.5 });
+    });
+    this.flockPlacements.forEach((f, k) => {
+      cover(f.cells);
+      if (flockDots[k]) g.fill({ color: 0x281a0a, alpha: 0.14 });
+      else g.fill({ color: NATURAL.sheepHalo, alpha: 0.55 });
+    });
+  }
+
+  /** The markers and badges follow each herd's patch. */
+  private moveHerdPins(): void {
+    for (const m of this.herd.mobs) {
+      const pins = this.herdPins.get(m.id);
+      if (!pins || pins.length < 2) continue;
+      pins[0]!.wx = m.centre.x;
+      pins[0]!.wy = m.centre.y * K;
+      pins[1]!.wx = m.centre.x;
+      pins[1]!.wy = (m.centre.y - m.spread.y) * K - 0.5;
     }
-    for (const p of this.flockPlacements) {
-      for (const c of p.cells) g.rect(colOf(c), rowOf(c) * K, 1.02, K + 0.02);
-      g.fill({ color: 0x281a0a, alpha: 0.14 });
+    this.placeLabels();
+  }
+
+  /**
+   * Walk the cattle on by a frame. Returns true while any on screen moves.
+   * When all of them are standing, no frames are drawn until the first one
+   * is due to set off again; a hidden page draws none at all.
+   */
+  private stepCattle(dt: number): boolean {
+    const herd = this.herd;
+    const view = this.view;
+    if (!view || !herd.n) return false;
+    if (typeof document !== 'undefined' && document.hidden) {
+      this.cattleRestFrom = 0;
+      return false;
     }
+    const now = performance.now();
+    if (this.wakeTimer) {
+      clearTimeout(this.wakeTimer);
+      this.wakeTimer = null;
+    }
+    // While no frames were drawn, the standing cattle kept grazing.
+    if (this.cattleRestFrom) {
+      herd.rest(((now - this.cattleRestFrom) / 1000) * this.cattlePace);
+      this.cattleRestFrom = 0;
+    }
+    const zoom = this.cam.zoom;
+    const walk = (WALK_LENGTHS_PER_S * cowPx(zoom, view.scale.sideM)) / zoom;
+    const [x0, y0, x1, y1] = visibleWorld(this.cam, this.vp);
+    const rect = [x0 - 1, y0 / K - 1, x1 + 1, y1 / K + 3] as const;
+    const res = herd.step(Math.min(100, dt) / 1000, this.cattlePace, walk, rect);
+    if (res.moved) this.placeBeasts();
+    if (res.shifted || res.arrived) {
+      this.moveHerdPins();
+      this.refreshFar(res.shifted);
+    }
+    if (!res.moved && Number.isFinite(res.wakeIn)) {
+      this.cattleRestFrom = now;
+      this.wakeTimer = setTimeout(
+        () => {
+          this.wakeTimer = null;
+          this.invalidate();
+        },
+        Math.max(16, res.wakeIn * 1000),
+      );
+    }
+    return res.moved;
   }
 
   /** Everything that stands on the map and is not grass or cattle. */
@@ -1663,10 +1989,14 @@ class PixiFarmMap implements FarmMap {
     }
 
     // ---- Mobs: one marker each zoomed out, a small head-count badge zoomed in.
+    // They follow the herd's patch as it drifts round the paddock.
     const mobs = new Map(view.mobs.map((m) => [m.id, m]));
+    this.herdPins.clear();
     for (const p of this.placements) {
       const mob = mobs.get(p.mob);
       if (!mob) continue;
+      const at = this.herd.mob(p.mob) ?? p;
+      const pinsBefore = this.pinned.length;
       const dry = mob.status.noWater;
       const count = mob.head.toLocaleString('en-AU');
       const icon = (size: number): Sprite => {
@@ -1679,18 +2009,19 @@ class PixiFarmMap implements FarmMap {
       if (dry) big.push(this.text('no water', 10, ui.noWater));
       pin(
         this.pill(big, { line: dry ? ui.noWater : ui.markerLine, pad: 8 }),
-        p.centre.x,
-        p.centre.y * K,
+        at.centre.x,
+        at.centre.y * K,
         { when: 'far' },
       );
       const small: Container[] = [icon(9), this.text(count, 10, ui.markerText)];
       if (dry) small.push(this.text('no water', 10, ui.noWater));
       pin(
         this.pill(small, { line: dry ? ui.noWater : ui.markerLine, pad: 6, gap: 4 }),
-        p.centre.x,
-        (p.centre.y - p.spread.y) * K - 0.5,
+        at.centre.x,
+        (at.centre.y - at.spread.y) * K - 0.5,
         { when: 'near', lift: 8 },
       );
+      this.herdPins.set(p.mob, this.pinned.slice(pinsBefore));
     }
 
     // ---- Flocks: a woolly marker with the head count and the word "sheep" zoomed out, so a flock is never taken for cattle.
@@ -2339,6 +2670,19 @@ class PixiFarmMap implements FarmMap {
 
   setReduceMotion(on: boolean): void {
     this.reduceMotion = on;
+    if (on) {
+      // Nothing moves: a mob on its way is put where it was going.
+      this.herd.settle();
+      this.placeBeasts(true);
+      this.refreshFar(true);
+    }
+    this.invalidate();
+  }
+
+  setCattlePace(pace: number): void {
+    const next = Number.isFinite(pace) ? Math.max(0, Math.min(16, pace)) : 1;
+    if (next === this.cattlePace) return;
+    this.cattlePace = next;
     this.invalidate();
   }
 
@@ -2536,6 +2880,10 @@ class PixiFarmMap implements FarmMap {
     if (this.destroyed) return;
     this.destroyed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibility);
+    }
     this.input?.detach();
     this.observer?.disconnect();
     for (const set of Object.values(this.handlers)) set.clear();

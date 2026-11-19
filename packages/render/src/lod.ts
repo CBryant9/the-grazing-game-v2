@@ -56,3 +56,33 @@ export const easeFade = (t: number): number => {
   const k = t < 0 ? 0 : t > 1 ? 1 : t;
   return k * k * (3 - 2 * k);
 };
+
+// ---------------------------------------------------------------------------
+// Cattle zoomed out (19 Nov 2026: "I would like to see the cows when zoomed
+// out if the densities aren't too large")
+// ---------------------------------------------------------------------------
+
+/** Zoomed out, each beast drawn is a dot this many screen pixels across. */
+export const DOT_PX = 3.5;
+
+/**
+ * Zoomed out, a mob is drawn as dots only while its cattle stand at least
+ * this many screen pixels apart (at their true density). Closer than that
+ * the dots run into a blob, so the mob is drawn as a filled patch over the
+ * ground it takes up, with its head count on the marker.
+ */
+export const DOT_MIN_SPACING_PX = 4.5;
+
+/**
+ * How far apart a mob's cattle stand on screen, in pixels, at their true
+ * density: `herdM2` square metres for `head` head, at `pxPerSquare` on
+ * squares `sideM` metres a side.
+ */
+export function herdSpacingPx(herdM2: number, head: number, pxPerSquare: number, sideM: number): number {
+  if (head <= 0) return Infinity;
+  return (Math.sqrt(herdM2 / head) * pxPerSquare) / Math.max(1, sideM);
+}
+
+/** Zoomed out: draw this mob as dots (true) or as a filled herd patch (false). */
+export const herdAsDots = (herdM2: number, head: number, pxPerSquare: number, sideM: number): boolean =>
+  herdSpacingPx(herdM2, head, pxPerSquare, sideM) >= DOT_MIN_SPACING_PX;
