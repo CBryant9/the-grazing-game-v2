@@ -395,3 +395,31 @@ Claudia asked that the built game match the mockups (`docs/mockups/index.html`) 
 - [x] **The game screens follow the mockups' layout and parts** on a phone held upright, a phone on its side and a PC, in both themes: the floating top bar, the pixel icons and the tab order (Build, Herd, Paddocks, Market, Plans, More), the things-to-check banner, the paddock sheet, the build tray and job card, the full-screen day summary, More as a sheet of rows, the segmented controls and sort chips, the market rows that open in place, the herd rows, the paddocks list and table, the score bars, the setup's step badges and recommended start, and the PC's website header, game header, panel tabs and sponsor rail. *(Built in m8, branch `m8-look-game`. VISUALS "The game screens as the mockups". The parts that need a figure the browser does not get yet show when the server sends it: see the log.)*
 - [x] **Setup has a recommended start picked on every step**, so a new player can tap straight through: Fast Farm, the first district, a small farm, grazing, random seasons, a running farm, medium. Only the farm name has to be typed. *(Built in m8.)*
 - [x] **Things to do can be put away**, one at a time, with a small "Put away" on each. *(The screen side of the m8 playability change.)*
+
+## 19 Nov 2026: more fun and easier to play (after Claudia's own game)
+
+After playing the rebuild, Claudia said it "lost a bit of the whimsy and ease" of the MVP. Her words: "I want to balance real numbers but actual fun and engagement with playing the game. If it looks like too little progress in the day to day version people will lose interest, and in Fast Farm we want them to move through the times better, and the navigation and knowing what to do needs to be more obvious, visual and easier to navigate." Where these differ from rules above, these win.
+
+### Time
+
+- [ ] **No daylight limit in Fast Farm.** "The daylight limitation on the fast farm should be removed so it's only daylight on the day to day farm, so they can actually do a bunch and develop their farm faster." Jobs in Fast Farm cost money only. Daily Farm keeps the daylight budget. *(Reverses, for Fast Farm only: the daylight bar, the red "doesn't fit today" part of a line, and "At last light the farm goes dark".)*
+- [ ] **In Fast Farm the day moves by itself.** "It's hard to skip forward and remember to all the time on Fast Farm. I reckon the day could just slowly move as you're playing and you see a sunset and sunrise happen across time, so the individual days move, not too fast, but they pass, and they can pause and play and still skip."
+
+### Cattle on the map
+
+- [ ] **The cows move like they did in the MVP**, which "is fun".
+- [ ] **Cows can be seen zoomed out**, unless the numbers are too large to draw.
+- [ ] **Cow size is closer to true scale against the paddock**, so density is easy to read. "Right now 900 fills like a quarter of the area on 3000 ha."
+
+### Daily Farm
+
+- [ ] **The fence a farmer can build in a day scales with the farm's size**, "so that it doesn't take forever for the larger properties to get a fence in."
+
+### Pictures
+
+- [ ] **The base of a paddock looks like what that grass type would form.** "From the air it's pretty bare and weird in some spots, great in others."
+
+### Building and finding your way
+
+- [ ] **A grid showing where fences can go while building**, "making it more visual so I know what to select."
+- [ ] **What to do next is obvious and visual.** "I'm finding the navigation really hard when I go into build and stuff."
