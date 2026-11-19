@@ -773,6 +773,22 @@ How the arable land is laid out: it grows outwards from one square (or from the 
 - Stubble from an unharvested crop or a finished annual forage: dead = max(800, dead + green) kg DM/ha. A finished annual becomes stubble 30 days after its life is up. Off arable land a finished planting goes back to native pasture instead.
 - Self-sown annual ryegrass comes back at 12% of a full stand (the species' `regen` figure), on the 15th of the first month of its sowing window.
 
+## Ground hidden from above, for the map picture (19 Nov 2026)
+
+Drawing figures only: the model's own ground cover (feed ÷ 1,000 kg DM/ha, up to 1, in the score and on the paddock sheet) is unchanged. The server sends each square's share of ground hidden, 1 − e^(−feed ÷ k), with k by the pasture's form (`VIEW_HIDE_KG` in `packages/engine/src/sim/view.ts`; the table is in `docs/VISUALS.md`, "The base of a paddock"). Read 19 to 20 Nov 2026.
+
+| Fact | Source | Used for |
+|---|---|---|
+| In two grazed native perennial grass pastures on the Northern Tablelands, ground cover was logarithmically related to herbage, litter and total mass: it rises fast at low mass and flattens, and 100% cover can occur at low mass. Herbage mass explained 68 to 77% of cover for mean data | Lodge, G.M. and Murphy, S.R. (2002). Ground cover in temperate native perennial grass pastures. II. Relationship with herbage and litter mass. The Rangeland Journal 24(2), 301 to 312, doi 10.1071/RJ02017 (abstract, publish.csiro.au/rj/RJ02017, and the Rangelands Gateway summary) | The shape of the curve (fast then flat). Low tufts (Tablelands native), k = 600 |
+| For pastures in south-eastern Australia on flat, non-erosion-prone land the suggested minimum is 70% ground cover, with herbage mass at least 800 to 1,200 kg DM/ha | Agriculture Victoria, "Monitoring groundcover and soil degradation" (agriculture.vic.gov.au; the page refused automatic reading, so this is from the search summary of it) | Open tussock k = 1,050 gives 70% at about 1,260 kg DM/ha, the top of that range; low tufts give 70% at about 720 |
+| An Indian couch (Bothriochloa pertusa) pasture in north-east Queensland in drought averaged 63% ground cover at 350 kg DM/ha. At 50% cover these pastures hold only about 33% of the biomass of local tussock pastures | Rangeland Journal paper on B. pertusa hillslopes, era.daf.qld.gov.au/id/eprint/5224/1/RJ15097.pdf (from the search summary; the figures quoted there) | Carpet k = 350 (63% at 350 kg DM/ha). Tussocks: 50% cover at about three times the couch's feed gives k about 1,050 |
+| Indian couch becomes dominant in heavily grazed tussock pastures based on buffel and black speargrass | Tropical Forages, Bothriochloa pertusa fact sheet (apps.lucidcentral.org/tropical_forages) | Central Queensland native drawn as tussocks with a finer grain between; k = 750, between couch and tussock |
+| Black speargrass (Heteropogon contortus) is a perennial tussock grass to 1.5 m | NSW DPI, Grassed up, Heteropogon contortus (dpi.nsw.gov.au) | Central Queensland native as tussocks |
+| Red grass (Bothriochloa macra) is a tufted perennial with leaves that lie quite flat to the ground, especially when grazed; it forms a prostrate tuft of basal leaves | NSW DPI, red grass (dpi.nsw.gov.au); EverGraze native grasses brochure (feedinglivestock.vic.gov.au) | Low tufts |
+| Weeping grass (Microlaena stipoides) is a tufted perennial with a short rhizome, green through the year | EverGraze native grasses brochure | Low tufts, the grain between |
+
+**Not found (stand-ins, `docs/CALLS_FOR_CLAUDIA.md` G2):** a cover against herbage mass figure for sown ryegrass and white clover, phalaris and sub clover, lucerne, buffel on its own, leucaena, or crops; and a source for the growth habit of wallaby grass, kangaroo grass, phalaris, perennial ryegrass, white clover and lucerne (drawn as commonly described, not checked against a source this time).
+
 ## When a cow shows as PTIC (14 Nov 2026)
 
 | Figure | Value | Source |

@@ -501,12 +501,13 @@ export function paintGround(
           let t: number;
           let depth = 1;
           if (!order) t = hidden;
-          else if (hidden >= 0.995) t = 1;
           else if (hidden <= 0.005) t = 0;
           else {
             const d = hidden - (order[k]! + 0.5) / 256;
-            t = d * 14 + 0.5;
+            t = hidden >= 0.995 ? 1 : d * 14 + 0.5;
             t = t < 0 ? 0 : t > 1 ? 1 : t;
+            // The tussocks' light and shade carry on to full cover, so a
+            // square at full cover does not look smoother than its neighbour.
             // Into a tussock the leaf is thicker and catches the light; its edge is in shade.
             if (tussock && t > 0.5) depth = 0.9 + 0.16 * Math.min(1, Math.max(0, d / 0.22));
           }

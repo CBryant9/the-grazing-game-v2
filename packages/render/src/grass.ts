@@ -228,9 +228,10 @@ export function squareLook(view: FarmView, i: number): SquareLook {
   const ground = mix(N.soil, under, cover);
   // From a distance the tops are what shows, so rank grass reads as straw.
   const tops = mix(straw, leaf, greenReach ** 1.5);
-  // The open ground between plants is soil. Where plenty of dry feed
-  // stands, some litter lies about on it too (builder).
-  const bare = mix(N.soil, N.litter, 0.3 * cover * (1 - greenShare));
+  // The open ground between plants is soil. The more of the ground the
+  // sward hides, the more litter lies about in the gaps too, so a
+  // well-covered paddock does not show raw soil between its plants (builder).
+  const bare = mix(N.soil, N.litter, 0.45 * cover);
   // Where the sward hides the ground: its low leaf over litter or shade.
   const base = mix(under, tops, BASE_TOPS[form]);
   const floor = mix(bare, base, cover);
