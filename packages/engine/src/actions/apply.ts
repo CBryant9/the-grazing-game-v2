@@ -188,11 +188,18 @@ const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isI
 const edgeKey = (e: EdgeRef): string => e.line + e.index;
 
 /**
- * What an action can be given in place of the farm's own sources. There
- * is no switch in here for the farm clock: nothing a caller passes can
- * turn it off.
+ * What an action can be given in place of the farm's own sources, and one
+ * switch for the farm clock.
+ *
+ * `noClock` (Claudia, 19 Nov 2026): Fast Farm has no daylight limit. With
+ * it on, a job is never refused for light, a line is built whole and the
+ * clock is not used up: jobs cost money only. The engine has no notion of
+ * the game mode, so the server sets this for a Fast Farm and leaves it off
+ * for a Daily Farm, which keeps the daylight budget.
  */
-export type ActionEnv = SourceEnv;
+export interface ActionEnv extends SourceEnv {
+  noClock?: boolean;
+}
 
 /** What the part of a line that fits today tells the rules about the job it belongs to. */
 export interface PartOptions {

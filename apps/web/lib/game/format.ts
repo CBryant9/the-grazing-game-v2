@@ -101,13 +101,14 @@ export function cardLines(card: JobCardWire): string[] {
   } else if (card.cost < 0) lines.push(`Pays ${money(-card.cost)}.`);
   else if (card.cost === 0) lines.push('No cost.');
   else lines.push(`Costs ${money(card.cost)}.`);
-  if (card.outcome !== 'free') {
+  // A Fast Farm has no daylight limit: its cards say nothing about light (Claudia, 19 Nov 2026).
+  if (card.outcome !== 'free' && card.onClock) {
     lines.push(
       card.usesRestOfDay
         ? 'This would use up your full day.'
         : `About ${durationText(card.leftAfterMin)} of light left after.`,
     );
   }
-  if (card.outcome === 'part') lines.push('Only part of it fits today.');
+  if (card.outcome === 'part' && card.onClock) lines.push('Only part of it fits today.');
   return [...lines, ...card.notes];
 }

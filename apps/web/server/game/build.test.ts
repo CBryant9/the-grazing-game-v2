@@ -127,9 +127,12 @@ describe('the build tools through the server', () => {
     expect(s0.view.fences.h.slice(5 * W + 10, 5 * W + 14).every((c) => c === 0)).toBe(true);
   });
 
-  it('a permanent fence longer than the day: the part that fits is built, the rest is red and not remembered', async () => {
+  it('a permanent fence longer than a day of light is built whole on a Fast Farm: no daylight limit', async () => {
+    // Claudia, 19 Nov 2026: Fast Farm jobs cost money only. The Daily Farm keeps the light
+    // (server/daily/start.test.ts); the cut-short line is tested in the engine (day/clock.test.ts).
     const game = server();
-    await game.create(A, choices());
+    const s0 = await game.create(A, choices());
+    expect(s0.clock.daylightLimit).toBe(false);
     // A zig-zag of row lines, longer than one day's light.
     const edges: EdgeWire[] = [];
     for (let vy = 2; vy <= 22 && edges.length + 40 <= MAX_LINE_PIECES; vy += 2) {
@@ -140,17 +143,13 @@ describe('the build tools through the server', () => {
     expect(p.ok).toBe(true);
     if (!p.ok) return;
     const line = p.card.line!;
-    expect(p.card.outcome).toBe('part');
-    expect(p.card.usesRestOfDay).toBe(true);
-    expect(line.doesNotFit.edges.length).toBeGreaterThan(0);
-    expect(line.fits.edges.length).toBeGreaterThan(0);
-    expect(line.fits.edges.length + line.doesNotFit.edges.length).toBe(edges.length);
-    // The two messages: the owner's sentence, then the metres that fit and the metres that do not.
-    expect(line.words[0]).toBe("You don't have enough time to do this today.");
-    expect(line.words[1]).toContain(`${line.fits.metres.toLocaleString('en-AU')} m fits today`);
-    expect(line.words[1]).toContain(`${line.doesNotFit.metres.toLocaleString('en-AU')} m does not`);
-    // The pieces that fit are the first ones drawn.
-    expect(line.fits.edges).toEqual(edges.slice(0, line.fits.edges.length));
+    expect(p.card.outcome).toBe('done');
+    expect(p.card.onClock).toBe(false);
+    expect(p.card.usesRestOfDay).toBe(false);
+    expect(line.doesNotFit.edges).toEqual([]);
+    expect(line.fits.edges).toEqual(edges);
+    expect(line.words).toEqual([]);
+    expect(p.card.notes.join(' ')).not.toMatch(/enough time|light/);
 
     const done = await game.act(A, { action });
     expect(done.ok).toBe(true);
@@ -158,16 +157,14 @@ describe('the build tools through the server', () => {
     expect(done.card).toEqual(p.card);
     const built = (code: number): number =>
       done.snapshot.view.fences.h.filter((c) => c === code).length;
-    // Only the part that fits is built (the boundary rows are not counted).
-    expect(built(VIEW_FENCE.permanent)).toBe(line.fits.edges.length);
-    for (const e of line.doesNotFit.edges) {
-      expect(done.snapshot.view.fences.h[e.index]).toBe(VIEW_FENCE.none);
-    }
-    expect(done.message).toContain(`Built ${line.fits.metres.toLocaleString('en-AU')} m`);
-    // The day is used up: the same line cannot be started again today.
-    const again = await game.preview(A, { action });
-    expect(again.ok).toBe(false);
-    if (!again.ok) expect(again.message).toMatch(/enough time/);
+    expect(built(VIEW_FENCE.permanent)).toBe(edges.length);
+    expect(done.snapshot.clock.usedMin).toBe(0);
+    expect(done.snapshot.clock.evening).toBe(false);
+    // Another job can start straight away.
+    const more = await game.preview(A, {
+      action: { type: 'buildFence', edges: row(1, 0, 6), fence: 'tape' },
+    });
+    expect(more.ok).toBe(true);
   }, 60_000);
 
   it('a refusal gives the server reason, and changes nothing', async () => {

@@ -43,15 +43,30 @@ export const TOUR_TEXT: Record<TourStepId, TourStepText> = {
   },
   fence: {
     title: 'Look at the fence tool',
-    body: 'Tap the Build tab, pick Fence and drag a short line. The card shows the cost and the light it uses. Cancel is fine.',
+    body: 'Tap the Build tab, pick Fence and drag a short line. The card shows what it costs. Cancel is fine.',
   },
   market: {
     title: 'Open the market',
     body: 'Tap Market to see the next sale day and the prices.',
   },
   day: {
+    title: 'Let the day run',
+    body: 'Watch the sun go down, or tap Next day to jump to tomorrow. A line at the top says what changed overnight.',
+  },
+};
+
+/**
+ * A Daily Farm's own words for the steps that differ: it keeps the daylight budget and has no
+ * Next day (its day ends at midnight). Fast Farm's words above never mention daylight limits.
+ */
+export const DAILY_TOUR_TEXT: Partial<Record<TourStepId, TourStepText>> = {
+  fence: {
+    title: 'Look at the fence tool',
+    body: 'Tap the Build tab, pick Fence and drag a short line. The card shows the cost and the light it uses. Cancel is fine.',
+  },
+  day: {
     title: 'End the day',
-    body: 'Tap Next day. A summary shows what changed overnight.',
+    body: 'The day ends at midnight. Press Done for today when you have finished. A summary of the night shows next time you open the farm.',
   },
 };
 

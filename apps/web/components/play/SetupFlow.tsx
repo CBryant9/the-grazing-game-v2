@@ -380,7 +380,7 @@ export function SetupFlow({ initial = null }: { initial?: SetupOptions | null })
                 {
                   value: 'fast',
                   title: 'Fast Farm',
-                  text: 'Play at your own pace. Jobs still use daylight, then tap Next day. Skip a week, month or year with plans running.',
+                  text: 'Play at your own pace. The days pass by themselves, and you can pause, speed up or skip a week, month or year. Jobs cost money only, with no daylight limit.',
                 },
               ]}
             />

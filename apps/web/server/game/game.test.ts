@@ -226,7 +226,10 @@ describe('the game server', () => {
     expect(done.ok).toBe(true);
     if (preview.ok && done.ok) {
       expect(done.card).toEqual(preview.card);
-      expect(done.snapshot.clock.usedMin).toBeCloseTo(snap.clock.usedMin + preview.card.workMin, 0);
+      // A Fast Farm has no daylight limit: the job takes its time as a fact, and none of the light.
+      expect(preview.card.onClock).toBe(false);
+      expect(preview.card.workMin).toBeGreaterThan(0);
+      expect(done.snapshot.clock.usedMin).toBe(snap.clock.usedMin);
       expect(done.message).toMatch(/marked/);
       expect(done.snapshot.todo.find((t) => t.key === item!.key)).toBeUndefined();
     }
@@ -250,25 +253,26 @@ describe('the game server', () => {
     );
   });
 
-  it('refuses a job when the light is used up, with the reason', async () => {
+  it('never refuses a job for light on a Fast Farm, and the day never goes to evening', async () => {
     const game = server();
     const s = await game.create(A, choices());
+    expect(s.clock.daylightLimit).toBe(false);
     const mob = s.mobs.find((m) => m.where === 'paddock')!;
     const cells = [...new Set(s.view.paddocks.map((p) => p.labelCell))];
-    let reason: string | null = null;
-    for (let i = 0; i < 200 && !reason; i++) {
+    let moved = 0;
+    for (let i = 0; i < 80; i++) {
       const r = await game.act(A, {
         action: { type: 'moveMob', mob: mob.id, cell: cells[i % cells.length]! },
       });
-      if (!r.ok && r.reason.includes('daylight')) reason = r.message;
+      if (r.ok) moved++;
+      else expect(r.reason).not.toMatch(/daylight/);
     }
-    expect(reason).toMatch(/time|light/i);
-    const evening = (await game.snapshot(A))!;
-    expect(evening.clock.leftMin).toBeLessThan(60);
-    // Looking still works, and Next day starts a fresh day with the light back.
-    const next = (await game.endDay(A)).snapshot;
-    expect(next.clock.leftMin).toBe(next.clock.dayMin);
-    expect(next.clock.evening).toBe(false);
+    // Far more moves than one day of light would hold (each takes at least 15 minutes).
+    expect(moved).toBeGreaterThan(60);
+    const after = (await game.snapshot(A))!;
+    expect(after.clock.evening).toBe(false);
+    expect(after.clock.canStartJobs).toBe(true);
+    expect(after.clock.usedMin).toBe(0);
   }, 60_000);
 
   it('ends the day and says what happened', async () => {

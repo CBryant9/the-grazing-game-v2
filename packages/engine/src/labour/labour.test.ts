@@ -291,6 +291,23 @@ describe('a hand helping on the player’s jobs', () => {
     expect(work(weekend, line).job.hands).toBeUndefined();
   });
 
+  it('with the clock off (Fast Farm) the hands take no share of the player’s jobs and keep their day', () => {
+    let farm = openFarm('nsw');
+    farm = hireOne(farm, AVERAGE).farm;
+    farm = toWeekday(endDay(farm).farm, WEEKDAYS);
+    const line = {
+      type: 'buildFence' as const,
+      edges: across(12, 0, 39),
+      fence: 'permanent' as const,
+    };
+    const done = work(farm, line, { noClock: true });
+    // The whole line is built, by the player, with no light used and the hand's day untouched.
+    expect(done.job.outcome).toBe('done');
+    expect(done.job.hands).toBeUndefined();
+    expect(done.farm.clock.used).toBe(0);
+    expect(workforceView(done.farm).hands[0]!.dayLeft).toBeCloseTo(1, 9);
+  });
+
   it('a hand with dogs takes the stock work off the player', () => {
     const b = busyFarm();
     let farm = hireOne(b.farm, { ...AVERAGE, dogs: true }).farm;

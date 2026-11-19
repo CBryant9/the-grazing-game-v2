@@ -28,6 +28,7 @@ import {
   surveyOf,
   thingsToDo,
   type Action,
+  type ActionEnv,
   type CattleClassId,
   type CreateFarmOptions,
   type EdgeRef,
@@ -359,14 +360,19 @@ function createOptions(c: SetupChoices, seed: number): CreateFarmOptions {
  */
 const dailyEnvs = new WeakMap<object, SourceEnv>();
 
-const envFor = (c: SetupChoices): SourceEnv => {
+/**
+ * A Fast Farm has no daylight limit (Claudia, 19 Nov 2026): its jobs run with the clock off
+ * (`noClock`). A Daily Farm keeps the daylight budget. Every job, card and snapshot of the farm
+ * takes its env from here, so the two can not disagree.
+ */
+const envFor = (c: SetupChoices): ActionEnv => {
   if (c.mode === 'daily') {
     const env = dailyEnvs.get(c);
     if (!env)
       throw new GameError(503, 'Daily Farm is not available right now. Try again in a moment.');
     return env;
   }
-  return realYears(c) ? { data: loadRealData() } : {};
+  return realYears(c) ? { data: loadRealData(), noClock: true } : { noClock: true };
 };
 
 const int = (v: unknown, min: number, max: number): number | null =>
@@ -620,6 +626,7 @@ function cardWire(card: JobCard, extra: Extras = noExtras): JobCardWire {
     leftAfterMin: Math.round(card.leftAfterMin),
     usesRestOfDay: card.usesRestOfDay,
     fitsToday: card.fitsToday,
+    onClock: card.onClock,
     cost: Math.round(card.cost),
     costToday: Math.round(card.costToday),
     perDay,

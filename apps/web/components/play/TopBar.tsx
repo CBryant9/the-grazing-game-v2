@@ -211,6 +211,8 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
   const openFarms = useOpenFarms();
   const { farm, date, season, totals, clock } = snapshot;
   const daily = snapshot.daily ?? null;
+  // The daylight bar is the Daily Farm's: a Fast Farm has no daylight limit (Claudia, 19 Nov 2026).
+  const lit = clock.daylightLimit;
   const day = `Day ${num(snapshot.day + 1)}`;
   const year = `Year ${num(snapshot.score.year)}`;
   const rain = totals.rainMm;
@@ -253,9 +255,11 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
             {plural(totals.head, 'head', 'head')} · <span className={styles.season}>{season}</span>
           </p>
         </div>
-        <div className={styles.topdl}>
-          <DaylightBar clock={clock} />
-        </div>
+        {lit && (
+          <div className={styles.topdl}>
+            <DaylightBar clock={clock} />
+          </div>
+        )}
         <div className={styles.toptimes}>{times}</div>
         <div className={styles.topextra}>
           <HelpButton />
@@ -276,9 +280,11 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
             <ModeTag daily={daily} /> · {daily ? day : year} · {dayDate(date)}
           </p>
         </div>
-        <div className={styles.topdl}>
-          <DaylightBar clock={clock} labels={false} />
-        </div>
+        {lit && (
+          <div className={styles.topdl}>
+            <DaylightBar clock={clock} labels={false} />
+          </div>
+        )}
         <div className={styles.toptimes}>{times}</div>
         <div className={styles.topextra}>
           <HelpButton />
@@ -304,7 +310,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
         <Bell />
         <HelpButton />
       </div>
-      <DaylightBar clock={clock} />
+      {lit && <DaylightBar clock={clock} />}
       <p className={styles.meta}>
         {typeof rain === 'number' && (
           <span>

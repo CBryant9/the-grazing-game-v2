@@ -47,6 +47,7 @@ const card = (over: Partial<JobCardWire> = {}): JobCardWire => ({
   leftAfterMin: 250,
   usesRestOfDay: false,
   fitsToday: true,
+  onClock: true,
   cost: 72,
   costToday: 72,
   perDay: null,
@@ -83,6 +84,11 @@ describe('cardLines', () => {
     ]);
     expect(cardLines(card({ outcome: 'part' }))).toContain('Only part of it fits today.');
     expect(cardLines(card({ cost: -300 }))).toContain('Pays $300.');
+  });
+  it('says nothing about light on a Fast Farm card, where jobs cost money only', () => {
+    const fast = cardLines(card({ onClock: false, usesRestOfDay: false, leftAfterMin: 600 }));
+    expect(fast.join(' ')).not.toMatch(/light|full day|fits today/);
+    expect(fast[0]).toMatch(/^Takes /);
   });
   it('adds the notes after the figures', () => {
     expect(cardLines(card({ notes: ['One more fact.'] })).at(-1)).toBe('One more fact.');

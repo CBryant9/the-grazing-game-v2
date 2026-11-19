@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
-import { HELP_TERMS, HELP_TOPICS, SHEEP_HELP_TERMS, SHEEP_HELP_TOPICS } from './helptopics';
+import { DAILY_TOUR_TEXT, TOUR_FINISHED, TOUR_TEXT } from '@/lib/game/tour';
+import {
+  HELP_TERMS,
+  HELP_TOPICS,
+  SHEEP_HELP_TERMS,
+  SHEEP_HELP_TOPICS,
+  helpTopicsFor,
+} from './helptopics';
 
 const all = [
-  ...[...HELP_TOPICS, ...SHEEP_HELP_TOPICS].flatMap((t) => [t.title, ...t.lines]),
+  ...[...HELP_TOPICS, ...helpTopicsFor(true), ...SHEEP_HELP_TOPICS].flatMap((t) => [
+    t.title,
+    ...t.lines,
+  ]),
   ...[...HELP_TERMS, ...SHEEP_HELP_TERMS].flatMap((t) => [t.term, t.means]),
 ];
 
@@ -95,5 +104,28 @@ describe('the help topics', () => {
     expect(text.toLowerCase()).not.toContain('overgrazed');
     expect(text.toLowerCase()).not.toContain('good');
     expect(text.toLowerCase()).not.toContain('bad');
+  });
+});
+
+describe('Fast Farm and Daily Farm help (Claudia, 19 Nov 2026)', () => {
+  const words = (topics: readonly { lines: string[] }[]): string =>
+    topics.flatMap((t) => t.lines).join(' ');
+
+  it('a Fast Farm never mentions a daylight limit, in Help or the tour', () => {
+    const fast = [words(helpTopicsFor(false)), ...Object.values(TOUR_TEXT).map((t) => t.body)];
+    for (const s of fast) {
+      expect(s).not.toMatch(/daylight bar|light left|light it uses|goes dark|fits in today/i);
+    }
+    expect(words(helpTopicsFor(false))).toContain('no daylight limit');
+    expect(words(helpTopicsFor(false))).toMatch(/Pause/);
+  });
+
+  it('a Daily Farm keeps its daylight help and the same topics in the same order', () => {
+    const daily = helpTopicsFor(true);
+    expect(daily.map((t) => t.id)).toEqual(HELP_TOPICS.map((t) => t.id));
+    expect(words(daily)).toContain('The daylight bar at the top');
+    expect(words(daily)).toContain('does not fit in today shows red');
+    expect(DAILY_TOUR_TEXT.fence!.body).toContain('the light it uses');
+    for (const t of daily) expect(t.lines.length).toBeLessThanOrEqual(6);
   });
 });

@@ -471,9 +471,13 @@ export const useGame = create<GameState>()((set, get) => {
   const setBuild = (patch: Partial<BuildState>): void =>
     set((s) => (s.build ? { build: { ...s.build, ...patch } } : {}));
 
-  /** The server said none of today's light is left for the first piece of the line. */
+  /**
+   * The server said none of today's light is left for the first piece of the line. Only a Daily
+   * Farm has a daylight limit: a Fast Farm never draws the all-red line (Claudia, 19 Nov 2026).
+   */
   const tooLate = (reason: string): boolean =>
-    reason === 'not-enough-daylight' || reason === 'no-daylight';
+    get().snapshot?.clock.daylightLimit !== false &&
+    (reason === 'not-enough-daylight' || reason === 'no-daylight');
 
   /** The job card for a line as it is drawn, asked at most a few times a second. */
   const lineChecker = latestOnly<SimpleAction, PreviewResponse>({

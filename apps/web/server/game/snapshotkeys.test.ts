@@ -60,6 +60,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   clock: [
     'canStartJobs',
     'dayMin',
+    'daylightLimit',
     'evening',
     'firstLight',
     'lastLight',
@@ -379,6 +380,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'leftAfterMin',
     'line',
     'notes',
+    'onClock',
     'outcome',
     'perDay',
     'summary',
@@ -450,6 +452,7 @@ const REPLY_KEYS: Record<string, readonly string[]> = {
     'leftAfterMin',
     'line',
     'notes',
+    'onClock',
     'outcome',
     'perDay',
     'summary',
