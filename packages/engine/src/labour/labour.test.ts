@@ -29,6 +29,7 @@ import { farmHash, loadFarm, saveFarm } from '../save/save';
 import { dateOn } from '../sim/derived';
 import type { FarmEvent } from '../sim/events';
 import type { FarmState } from '../sim/state';
+import { teamMetresPerDay } from './contract';
 import { contractView, jobSeekers, workerReport, workforceView } from './reads';
 import { labourPool } from './pool';
 import type { Hand } from './types';
@@ -349,6 +350,25 @@ describe('contract fencing', () => {
       const mine = work(f, { type: 'buildFence', edges: across(4, 0, 39), fence: 'permanent' });
       expect(mine.job.line!.fits.metres).toBe(500);
     }
+  });
+
+  it('on a big place a team brings a bigger plant: more a day, the same charge a metre', () => {
+    // Claudia, 19 Nov 2026. 1,200 ha is twice the pace (fenceScale).
+    const farm = toWeekday(openFarm('nsw', { size: 1200 }), [1]);
+    expect(teamMetresPerDay(farm, 1)).toBeCloseTo(1000, 6);
+    expect(teamMetresPerDay(farm, 2)).toBeCloseTo(2000, 6);
+    const side = farm.layout.scale.sideM;
+    const line = across(12, 0, 39);
+    const order = work(farm, { type: 'orderContractFence', edges: line, team: 1 });
+    const ratePerM = order.job.contract!.ratePerM;
+    expect(ratePerM).toBe(5);
+    const day = endDay(order.farm);
+    const built = events(day.dawn, 'contract-built')[0]!;
+    expect(built.type === 'contract-built' && built.metres).toBe(Math.floor(1000 / side) * side);
+    expect(contractView(order.farm)[0]!.metresPerDay).toBeCloseTo(1000, 6);
+    // The quote's finish day comes sooner than at 500 m a day.
+    const slow = Math.ceil((line.length * side) / 500);
+    expect(order.job.contract!.doneDay - order.farm.day).toBeLessThan(slow);
   });
 
   it('runs on over days and across a skip, needs nothing each day, and is done on the day it said', () => {

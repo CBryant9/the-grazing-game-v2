@@ -76,6 +76,7 @@ import {
   payFrom,
   hireLines,
   letGoLines,
+  ownPaceLine,
   reportWire,
   teamOptions,
   type DateOf,
@@ -1592,6 +1593,10 @@ export class GameServer {
         ...fenceRuleNotes(farm, action),
         ...gateNotesFor(farm, action),
         ...water,
+        // How much a day of permanent fence is on this place: more on a big one (fenceScale).
+        ...(action.type === 'buildFence' && action.fence === 'permanent'
+          ? [ownPaceLine(farm)]
+          : []),
       ],
       perDay: null,
       summary: [],

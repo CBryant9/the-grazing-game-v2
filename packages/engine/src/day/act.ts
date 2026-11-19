@@ -376,7 +376,9 @@ function doLine(
   const light = lightNow(farm, env);
   if (light.on && light.left <= NO_TIME) return noDaylight();
   const sideM = farm.layout.scale.sideM;
-  const minutes = spec.pieces.map((p) => pieceMinutes(p.work, light.dayMin));
+  const minutes = spec.pieces.map((p) =>
+    pieceMinutes(p.work, light.dayMin, farm.layout.scale.farmHa),
+  );
   const total = minutes.reduce((t, m) => t + m, 0);
   // The first part of the line is the hands' share, from their own day.
   const handsHave = handsMinutes(farm, skill, light);

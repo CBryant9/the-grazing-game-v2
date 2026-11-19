@@ -48,9 +48,12 @@ export type JobSpec =
   | { kind: 'whole'; parts: JobWorkPart[] }
   | { kind: 'line'; what: JobWorkPart['what']; pieces: Piece[] };
 
-/** Minutes a piece takes on a day with `dayMin` minutes of light. */
-export const pieceMinutes = (work: PieceWork, dayMin: number): number =>
-  'minutes' in work ? work.minutes : work.metres / metresPerMinute(work.pace, dayMin);
+/**
+ * Minutes a piece takes on a day with `dayMin` minutes of light, on a farm of `farmHa` hectares
+ * (permanent fence goes faster on a big place: `fenceScale`).
+ */
+export const pieceMinutes = (work: PieceWork, dayMin: number, farmHa: number): number =>
+  'minutes' in work ? work.minutes : work.metres / metresPerMinute(work.pace, dayMin, farmHa);
 
 const pieceKey = (ref: JobPiece): string =>
   'edge' in ref ? ref.edge.line + ref.edge.index : 'c' + ref.cell;

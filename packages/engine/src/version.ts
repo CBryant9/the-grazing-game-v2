@@ -163,8 +163,16 @@
  * start values. `feedAvailShare` and `UNGRAZEABLE_KG` are exported for the words. No grass,
  * cattle, sheep, crop, season, price or score formula changed: every benchmark was re-run
  * (docs/CALIBRATION.md, the m8 realism 2 entry). Save format 17.
+ *
+ * 0.23.0 (m9, Claudia 19 Nov 2026: time): `ActionEnv.noClock`, the one switch for the farm
+ * clock, which the server sets for a Fast Farm. With it on a job is never refused for light, a
+ * line is built whole, the clock is not used up and the hands take no share of the player's
+ * jobs; the job card says `onClock` and the clock view says `daylightLimit`. Permanent fence and
+ * contract teams build faster on a big place (`fenceScale`: sqrt(ha / 300), 1 to 5); the cost a
+ * metre is unchanged; electric, tape and pipe do not scale. No grass, cattle, sheep, crop,
+ * season, price or score formula changed, and nothing is added to a save: save format 17.
  */
-export const ENGINE_VERSION = '0.22.0';
+export const ENGINE_VERSION = '0.23.0';
 
 /**
  * The shape of a saved farm. Old saves are upgraded with defaults.

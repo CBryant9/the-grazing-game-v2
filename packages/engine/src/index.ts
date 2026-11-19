@@ -647,7 +647,15 @@ export type { SavedFarm } from './save/save';
 
 // Milestone 1.5a: the working day (the farm clock, job times, Next day and
 // skips, what needs doing).
-export { JOB_TIMES, SKIP_DAYS, metresPerMinute } from './data/jobTimes';
+export {
+  FENCE_SCALE_BASE_HA,
+  FENCE_SCALE_MAX,
+  JOB_TIMES,
+  SKIP_DAYS,
+  fenceScale,
+  metresPerMinute,
+  permanentMetresPerDay,
+} from './data/jobTimes';
 export type { FigureStatus, JobFigure, Pace, SkipLength } from './data/jobTimes';
 export { dayMinutes, lightLeft, lightOn, timeNow } from './sim/clock';
 export type { ClockSpan, FarmClock } from './sim/state';
@@ -704,6 +712,7 @@ export { standingOf } from './labour/pool';
 export { worksOn } from './labour/help';
 // The player's list of people looking for work: `jobSeekers` (today only, no hidden figures).
 export { contractView, jobSeekers, workerReport, workforceView } from './labour/reads';
+export { teamMetresPerDay } from './labour/contract';
 export type {
   ContractRunView,
   HandStatus,

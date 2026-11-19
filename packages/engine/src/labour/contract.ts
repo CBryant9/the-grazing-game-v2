@@ -11,14 +11,23 @@
  * charge per metre. It stops for a reason only, with an event saying why:
  * the bank won't cover the day's work, or the line has changed since it was
  * ordered (the player put a different fence on a segment still to build).
+ *
+ * On a bigger place a team brings a bigger plant and builds more a day
+ * (`teamMetresPerDay`, Claudia 19 Nov 2026). The charge a metre is the same,
+ * so the team just finishes sooner.
  */
 
+import { fenceScale } from '../data/jobTimes';
 import { LABOUR } from '../data/labour';
 import { weekdayOf } from '../market/saleCalendar';
 import { dateOn } from '../sim/derived';
 import type { FarmState } from '../sim/state';
 import { EDGE, getEdge } from '../farm/topology';
 import type { ContractRun } from './types';
+
+/** Metres of permanent fence a team builds on a working day on this farm: the PRD's pace, scaled by `fenceScale`. */
+export const teamMetresPerDay = (farm: Pick<FarmState, 'layout'>, team: 1 | 2): number =>
+  LABOUR.teamMetresPerDay.value[team] * fenceScale(farm.layout.scale.farmHa);
 
 /** True if contractors work on that farm day. */
 export function contractorWorks(farm: FarmState, day: number): boolean {
@@ -53,7 +62,7 @@ export function contractDone(
   run: ContractRun,
 ): { startDay: number; doneDay: number } {
   const need = runMetresLeft(farm, run) - run.progressM;
-  const perDay = LABOUR.teamMetresPerDay.value[run.team];
+  const perDay = teamMetresPerDay(farm, run.team);
   let startDay = -1;
   let have = 0;
   for (let d = farm.day + 1; d < farm.day + 20000; d++) {

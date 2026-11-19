@@ -1,12 +1,15 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import {
+  JOB_TIMES,
   LABOUR,
   contractView,
   dateOn,
   jobSeekers,
+  permanentMetresPerDay,
   previewAction,
   standingOf,
+  teamMetresPerDay,
   workerReport,
   workforceView,
   type EdgeRef,
@@ -733,7 +736,11 @@ export function contractLines(farm: FarmState, card: JobCard): string[] {
     `Materials ${money(c.materials)} plus labour ${money(c.labour)}: ${money(c.cost)} in all.`,
     'Nothing is charged today. Each working day is charged for what is built that day.',
     runDates(longDate(dateParts(c.startDate)), longDate(dateParts(c.doneDate))),
-    'It uses none of your day. It carries on by itself, over Next day and skips.',
+    teamPaceLine(farm, c.team),
+    // A Fast Farm has no daylight limit: there is no day of the player's to save.
+    card.onClock
+      ? 'It uses none of your day. It carries on by itself, over Next day and skips.'
+      : 'It carries on by itself, day by day and over skips.',
   ];
   if ((farm.labour?.hands.length ?? 0) > 0) {
     out.push('Your hands help the team on the days they work, so it can be done sooner.');
@@ -780,12 +787,37 @@ export function teamOptions(farm: FarmState, env: SourceEnv, edges: EdgeRef[]): 
       lines: [
         `Materials ${money(c.materials)} plus labour ${money(c.labour)}.`,
         `Done on ${longDate(dateParts(c.doneDate))}.`,
-        'Uses none of your day.',
+        teamPaceLine(farm, t),
+        ...(r.card.onClock ? ['Uses none of your day.'] : []),
       ],
       reason: null,
     });
   }
   return out;
+}
+
+/**
+ * How much permanent fence a team builds a working day here. A bigger place runs a bigger
+ * fencing plant, so a team builds more a day on it (Claudia, 19 Nov 2026; `fenceScale`).
+ */
+export function teamPaceLine(farm: FarmState, t: 1 | 2): string {
+  const m = teamMetresPerDay(farm, t);
+  const base = LABOUR.teamMetresPerDay.value[t];
+  return m > base + 0.5
+    ? `Builds about ${num(Math.round(m / 10) * 10)} m a working day: a place this size runs a bigger fencing plant.`
+    : `Builds about ${num(m)} m a working day.`;
+}
+
+/**
+ * What one person builds in a day of permanent fence on this farm, for the fence card. A
+ * bigger place runs a bigger plant, so it is more on a big place (`fenceScale`).
+ */
+export function ownPaceLine(farm: FarmState): string {
+  const m = permanentMetresPerDay(farm.layout.scale.farmHa);
+  const base = JOB_TIMES.permanentFenceMPerDay.value;
+  return m > base + 0.5
+    ? `On your own you build about ${num(Math.round(m / 10) * 10)} m of permanent fence a day here: a place this size runs a bigger fencing plant.`
+    : `On your own you build about ${num(m)} m of permanent fence a day.`;
 }
 
 export const hasHands = (farm: FarmState): boolean => (farm.labour?.hands.length ?? 0) > 0;

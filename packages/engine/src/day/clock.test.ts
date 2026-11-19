@@ -259,6 +259,7 @@ describe('looking is free', () => {
       standingOf: (f) => engine.standingOf(f),
       workforceView: (f) => engine.workforceView(f),
       contractView: (f) => engine.contractView(f),
+      teamMetresPerDay: (f) => engine.teamMetresPerDay(f, 1),
       workerReport: (f) => engine.workerReport(f),
       // Sheep (milestone 2.3).
       occupiedAreas: (f) => engine.occupiedAreas(f, engine.surveyOf(f)),
