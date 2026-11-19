@@ -538,6 +538,26 @@ Each line says what was built. The bracket gives the log reference and where to 
 
 **B172. The slim bar stays on a phone on its side.** The mockup's landscape panels cover the whole screen. Here the slim top bar (date, time buttons, cash) stays above an open panel, so the day and money are always in view and Next day is one tap away. Other choice: cover it, as the mockup. [Change: `.listpanel` and `.sheet` in `play.module.css`]
 
+#### Cattle on the map: walking, size and spread (m9, 19 Nov 2026)
+
+**B190. How big a beast is drawn.** Its real length (cow 2.4 m, heifer 2.2, steer 2.3, bull 2.7, calf 1.3) times 4, held between 5 and 18 screen pixels for a cow. At full zoom on 200 ha a cow is 18 px; on 3,000 ha seen whole it is 5 px. Other choice: a bigger factor (cattle easier to see, density overstated) or a smaller one (truer, harder to see). [Change: `CATTLE_EXAGGERATION`, `CATTLE_MIN_PX`, `CATTLE_MAX_PX` in `packages/render/src/cattle.ts`]
+
+**B191. Zoomed right in, a beast is at least a tenth of a square.** Without it, a cow on a 3,000 to 6,000 ha farm is about 5 px even at full zoom, a speck beside the windmill. With it, a player who zooms in to look at the cattle sees what each one is, and the herd looks denser than it is at that zoom only. Other choice: true size at every zoom. [Change: `CATTLE_MIN_SHARE_OF_SQUARE`]
+
+**B192. A mob takes up 400 m² a head, a flock 60 m².** Inside the 300 to 500 asked for. 900 head on 3,000 ha take about 36 ha (13 of 1,040 squares). The same mob in a small strip fills it. The sheep figure is a stand-in: a flock grazes closer than cattle. Other choice: 300 (tighter) or 500 (looser). [Change: `HERD_M2_PER_HEAD` in `cattle.ts`, `SHEEP_M2_PER_HEAD` in `sheep.ts`]
+
+**B193. How many are drawn.** One a head up to 400 a mob, 600 a flock and 3,000 on the farm (every mob fewer in proportion past that, 24 at the least). Past that a sample over the mob's true ground; the badge keeps the real count. The cap is farm-wide, not per screen, because the whole farm is on screen zoomed out. Other choice: higher caps on a PC. [Change: `MOB_DRAWN_MAX`, `FLOCK_DRAWN_MAX`, `FARM_DRAWN_MAX`]
+
+**B194. Dots or a patch zoomed out.** Each beast a 3.5 px dot while the mob's cattle stand at least 4.5 px apart at their true density; closer, a filled patch over the mob's ground. A 200 to 300 ha farm seen whole shows dots; a 3,000 ha or bigger farm seen whole shows grazing mobs as patches. The marker now sits on the herd's top edge so the herd shows under it. Other choice: always dots (they run into a blob on big farms), or a smaller spacing. [Change: `DOT_PX`, `DOT_MIN_SPACING_PX` in `lod.ts`, `FAR_MARKER_LIFT` in `map.ts`]
+
+**B195. How the cattle walk.** The MVP's rules: stand 0.5 to 4 s, walk at 1.8 of their own lengths a second, 7% of walks to water, up to 45% next to a mob-mate, the rest to better feed. The herd's patch drifts every 25 to 70 s. All of it runs that many times faster at 2x or 4x and stops when paused. Other choice: slower, calmer cattle (fewer walks, longer standing). [Change: the constants at the top of `packages/render/src/herd.ts`]
+
+**B196. A moved mob trots straight across.** It goes in a straight line from where it stood to its new paddock in 1.5 to 6 seconds, across fences if they are in the way, because there are no routes (you took them out). It still walks after a move made while paused. Other choice: fade them out and in. [Change: `TROT_LENGTHS_PER_S`, `TROT_SECONDS` in `herd.ts`]
+
+**B197. Cattle draw over the grass in front of them.** A row of cattle goes after the grass of the row in front and before the troughs and windmill in front. Near-real-size cattle would otherwise hide in tall grass. A cow standing in the windmill's own row can show in front of its tower. [Change: `buildScene` in `map.ts`]
+
+**B198. Sheep sizes and stand-back.** Sheep are sized by the cattle rule (ewe 1.3 m, wether 1.35, ram 1.5, young 1.1, lamb 0.75) and spread by the flock rule above, but do not walk yet. Stand-back from fences is now a fifth of a square at the sides and 0.35 under a fence for cattle (0.14 and 0.22 for sheep), as the animals are smaller. [Change: `SHEEP_LENGTH_M`, `STAND_BACK`, `SHEEP_STAND_BACK`]
+
 ## 2. Stand-in figures
 
 These numbers have no sourced real figure behind them. Each is one constant or setting. "Replaced by" says what would replace it.

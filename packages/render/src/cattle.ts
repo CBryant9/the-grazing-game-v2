@@ -1,43 +1,109 @@
 /**
- * Where each beast stands on the map.
+ * Where each beast stands on the map, and how big it is drawn.
  *
  * The farm does not store where cattle stand: the model has no use for it
  * (LESSONS W3, "the model never reads the picture"). The map works it out
- * from the view, and always the same way, so cattle do not jump about
- * between frames or days for no reason. A mob moves on the map only when
- * something about it changes: it is moved, its numbers change, or a fence,
- * gate or trough in its grazing area changes.
+ * from the view, and always the same way, so cattle do not jump about for no
+ * reason. This file gives each mob's first places. From there the cattle
+ * walk and graze (herd.ts), and keep their places from one day to the next.
  *
  * The rules, all drawing rules:
  * - Cattle stand inside their grazing area, and never on the wrong side of
  *   a fence (LESSONS 29). They stand back from fence lines.
  * - No beast stands on a square with a trough, the bore or a building.
- * - A mob gathers round the square it was put on (usually water) and spreads
- *   out from there, two to a square.
- * - Big mobs do not hide the pasture (REQUIREMENTS). On open country a mob
- *   stands on no more than four squares in ten of its grazing area, three to
- *   a square at most. Past that it draws a sample of its cattle. The marker
- *   and badge always carry the real head count (PRD 7).
- * - On a small area (a tape cell, say) the mob uses every square, up to six
- *   to a square, so high density looks crowded.
+ * - A mob takes up about as much ground as a real mob grazing together:
+ *   `HERD_M2_PER_HEAD` a head, or the whole grazing area if that is smaller.
+ *   So a mob in a big paddock is a loose cluster round the square it was put
+ *   on (usually water), and the same mob in a small strip fills it.
+ * - Each beast is drawn near its real size against the paddock (see
+ *   `cowPx`), so how crowded a mob looks follows its real density
+ *   (Claudia, 19 Nov 2026: "900 fills like a quarter of the area on 3000 ha").
+ * - One sprite a head up to `MOB_DRAWN_MAX` a mob and `FARM_DRAWN_MAX` a
+ *   farm. Past that a mob draws a sample, spread over its true area, so its
+ *   footprint stays true. The marker and badge always carry the real head
+ *   count (PRD 7).
  */
 
 import { VIEW_FENCE, type FarmView, type FarmViewMob, type ViewCattleKind } from '@gg/shared';
 import { GRID_H, GRID_N, GRID_W, colOf, hIndex, rowOf, vIndex } from './grid';
 import { hash3, scatter, unit } from './random';
 
-/** A mob with room spreads out to about this many to a square. */
-export const SPREAD_PER_SQUARE = 2;
-/** The most cattle drawn on one square of open country. Past this a mob is sampled. */
-export const MAX_DRAWN_PER_SQUARE = 3;
-/** The most cattle drawn on one square of a small area, where a crowd should look like one. */
-export const MAX_DRAWN_CROWDED = 6;
-/** An area of this many squares or fewer is small: the mob may use all of it. */
-export const SMALL_AREA_SQUARES = 8;
-/** On a bigger area a mob stands on no more than this share of the squares, so the pasture shows. */
-export const MAX_SHARE_OF_AREA = 0.4;
+/**
+ * Ground a mob takes up while it grazes together, square metres a head. A
+ * mob of 100 spreads over about 4 ha. Real cattle spread wider over a day;
+ * the herd's patch moves about the paddock to show that (herd.ts).
+ */
+export const HERD_M2_PER_HEAD = 400;
+/** The most cattle drawn for one mob. Past this the mob is sampled over its true area. */
+export const MOB_DRAWN_MAX = 400;
+/** The most cattle drawn on the whole farm. Past this every mob draws fewer, in proportion. */
+export const FARM_DRAWN_MAX = 3000;
+/** The fewest drawn for a mob when the farm's budget is shared out (or the whole mob, if smaller). */
+export const MOB_DRAWN_MIN = 24;
 /** The most cattle drawn in the stock yards. */
 export const YARDS_DRAWN = 14;
+/** The speed test's "every beast" draws up to this many to a square, over the whole area. */
+export const EVERY_BEAST_PER_SQUARE = 6;
+/** An area of this many squares or fewer is small (kept for the sheep and the tests). */
+export const SMALL_AREA_SQUARES = 8;
+
+/** Body length nose to tail, metres, for the size on the map. */
+export const CATTLE_LENGTH_M: Readonly<Record<ViewCattleKind, number>> = {
+  cow: 2.4,
+  heifer: 2.2,
+  steer: 2.3,
+  bull: 2.7,
+  calf: 1.3,
+};
+/** How many times its real size a beast is drawn, so it reads as a beast and not a speck. */
+export const CATTLE_EXAGGERATION = 4;
+/** A cow is never drawn shorter than this on screen, zoomed in (CSS pixels). */
+export const CATTLE_MIN_PX = 5;
+/**
+ * Zoomed right in, a cow is never shorter than this share of a square on
+ * screen, so a player who zooms in to look at the cattle can always see
+ * what each beast is, even on a big farm. Zoomed out the true size rules.
+ */
+export const CATTLE_MIN_SHARE_OF_SQUARE = 0.1;
+/** A cow is never drawn longer than this on screen (CSS pixels). A bull is a little longer. */
+export const CATTLE_MAX_PX = 18;
+/** Nothing that stands is drawn shorter than this (a calf or lamb on a big farm). */
+export const ANIMAL_MIN_PX = 3.5;
+
+/**
+ * How long a cow is drawn, in screen pixels, at a zoom of `pxPerSquare` on
+ * a farm whose squares are `sideM` metres a side: its real length times the
+ * exaggeration, held between the least and most. The least grows with the
+ * zoom (`CATTLE_MIN_SHARE_OF_SQUARE`).
+ */
+export function cowPx(pxPerSquare: number, sideM: number): number {
+  const real = (CATTLE_LENGTH_M.cow * pxPerSquare * CATTLE_EXAGGERATION) / Math.max(1, sideM);
+  const least = Math.min(
+    CATTLE_MAX_PX,
+    Math.max(CATTLE_MIN_PX, pxPerSquare * CATTLE_MIN_SHARE_OF_SQUARE),
+  );
+  return real < least ? least : real > CATTLE_MAX_PX ? CATTLE_MAX_PX : real;
+}
+
+/** How long an animal `lengthM` long is drawn, in screen pixels: in proportion to the cow. */
+export function animalPx(lengthM: number, pxPerSquare: number, sideM: number): number {
+  return Math.max(ANIMAL_MIN_PX, (cowPx(pxPerSquare, sideM) * lengthM) / CATTLE_LENGTH_M.cow);
+}
+
+/** A cow's length in squares at its exaggerated size, held to what reads. For spacing calves. */
+export const cowSquares = (sideM: number): number =>
+  Math.min(0.42, Math.max(0.025, (CATTLE_LENGTH_M.cow * CATTLE_EXAGGERATION) / Math.max(1, sideM)));
+
+/** How many squares a mob of `head` grazes over, on squares `sideM` a side, in an area of `areaSquares`. */
+export function herdSquares(
+  head: number,
+  sideM: number,
+  areaSquares: number,
+  m2PerHead = HERD_M2_PER_HEAD,
+): number {
+  const want = Math.ceil((Math.max(1, head) * m2PerHead) / (sideM * sideM));
+  return Math.max(1, Math.min(areaSquares, want));
+}
 
 /**
  * How far cattle stand back inside a square, as a share of the square.
@@ -45,7 +111,7 @@ export const YARDS_DRAWN = 14;
  * deeper because a beast is drawn standing up from its feet: any closer to
  * a fence above it and its back would show over the wire.
  */
-export const STAND_BACK = { side: 0.3, top: 0.55, bottom: 0.06, open: 0.08 } as const;
+export const STAND_BACK = { side: 0.2, top: 0.35, bottom: 0.03, open: 0.03 } as const;
 
 export type BodyShape = 'thin' | 'normal' | 'fat';
 
@@ -57,17 +123,30 @@ export interface Beast {
   shape: BodyShape;
   /** True to draw it facing left. */
   flip: boolean;
+  /** For a calf: its mother's place in the mob's `beasts`, or -1. */
+  dam: number;
 }
 
 export interface MobPlacement {
   mob: number;
+  where: FarmViewMob['where'];
+  /** The grazing area, or -1 in the yards. */
+  area: number;
   /** Head in the mob, calves included. */
   total: number;
   /** The cattle drawn. Fewer than `total` when the mob is sampled. */
   beasts: Beast[];
   sampled: boolean;
-  /** The squares the mob stands on. */
+  /** The squares the mob grazes over now, nearest its start first. */
   cells: number[];
+  /** The square the mob gathers round (the first of `cells`). */
+  start: number;
+  /**
+   * The true ground the mob takes up, square metres: head times
+   * `HERD_M2_PER_HEAD`, or its whole grazing area if smaller. For how crowded
+   * it is drawn zoomed out.
+   */
+  herdM2: number;
   /** The middle of the mob, in ground coordinates. The marker goes here. */
   centre: { x: number; y: number };
   /** How far the mob reaches from its middle, in squares. */
@@ -100,6 +179,11 @@ export interface PlacementGround {
   blocked: Uint8Array;
   /** Open gates, as "h12" or "v340". */
   openGates: Set<string>;
+  /**
+   * Which ways stock can step out of each square, worked out once: 1 right,
+   * 2 left, 4 down, 8 up. Walking and spreading read this, not the fences.
+   */
+  ways: Uint8Array;
 }
 
 export function placementGround(view: FarmView): PlacementGround {
@@ -116,11 +200,31 @@ export function placementGround(view: FarmView): PlacementGround {
   for (const b of view.buildings) blocked[b.cell] = 1;
   const openGates = new Set<string>();
   for (const g of view.gates) if (g.open) openGates.add(g.line + g.index);
-  return { view, areaCells, blocked, openGates };
+  const ways = new Uint8Array(GRID_N);
+  const ground = { view, areaCells, blocked, openGates, ways };
+  for (let i = 0; i < GRID_N; i++) {
+    ways[i] =
+      (fenceLets(ground, i, 1, 0) ? 1 : 0) |
+      (fenceLets(ground, i, -1, 0) ? 2 : 0) |
+      (fenceLets(ground, i, 0, 1) ? 4 : 0) |
+      (fenceLets(ground, i, 0, -1) ? 8 : 0);
+  }
+  return ground;
 }
 
 /** True if stock can walk from a square to the next one across, down, back or up. */
-function canStep(g: PlacementGround, from: number, dx: number, dy: number): boolean {
+export function canStep(g: PlacementGround, from: number, dx: number, dy: number): boolean {
+  const bit = dx > 0 ? 1 : dx < 0 ? 2 : dy > 0 ? 4 : 8;
+  return (g.ways[from]! & bit) !== 0;
+}
+
+/** The fences' own answer to `canStep`, before it is put in the table. */
+function fenceLets(
+  g: Omit<PlacementGround, 'ways'>,
+  from: number,
+  dx: number,
+  dy: number,
+): boolean {
   const col = colOf(from);
   const row = rowOf(from);
   const f = g.view.fences;
@@ -150,34 +254,42 @@ export function walkOrder(g: PlacementGround, start: number, seed: number): numb
   // spreads out in a rounded shape, not a diamond.
   const FAR = 1e9;
   const dist = new Int32Array(GRID_N).fill(FAR);
-  const queue = [start];
+  // Squares by distance (a bucket queue): each square is settled once.
+  const buckets: number[][] = [[start]];
   dist[start] = 0;
-  for (let q = 0; q < queue.length; q++) {
-    const i = queue[q]!;
-    const d = dist[i]!;
-    for (const [dx, dy] of STEPS) {
-      let open: boolean;
-      if (dx !== 0 && dy !== 0) {
-        // A diagonal step needs both ways round the corner to be open.
-        open =
-          canStep(g, i, dx, 0) &&
-          canStep(g, i + dx, 0, dy) &&
-          canStep(g, i, 0, dy) &&
-          canStep(g, i + dy * GRID_W, dx, 0);
-      } else {
-        open = canStep(g, i, dx, dy);
+  for (let d = 0; d < buckets.length; d++) {
+    const bucket = buckets[d];
+    if (!bucket) continue;
+    for (let q = 0; q < bucket.length; q++) {
+      const i = bucket[q]!;
+      if (dist[i] !== d) continue;
+      for (const [dx, dy] of STEPS) {
+        let open: boolean;
+        if (dx !== 0 && dy !== 0) {
+          // A diagonal step needs both ways round the corner to be open.
+          open =
+            canStep(g, i, dx, 0) &&
+            canStep(g, i + dx, 0, dy) &&
+            canStep(g, i, 0, dy) &&
+            canStep(g, i + dy * GRID_W, dx, 0);
+        } else {
+          open = canStep(g, i, dx, dy);
+        }
+        if (!open) continue;
+        const j = i + dx + dy * GRID_W;
+        const cost = d + (dx !== 0 && dy !== 0 ? 3 : 2);
+        if (cost >= dist[j]!) continue;
+        dist[j] = cost;
+        (buckets[cost] ??= []).push(j);
       }
-      if (!open) continue;
-      const j = i + dx + dy * GRID_W;
-      const cost = d + (dx !== 0 && dy !== 0 ? 3 : 2);
-      if (cost >= dist[j]!) continue;
-      dist[j] = cost;
-      queue.push(j);
     }
   }
   const reached: number[] = [];
   for (let i = 0; i < GRID_N; i++) if (dist[i]! < FAR && !g.blocked[i]) reached.push(i);
-  return reached.sort((a, b) => dist[a]! - dist[b]! || hash3(seed, a, 11) - hash3(seed, b, 11));
+  // Each square's order key, worked out once: distance first, then the seed's tie-break.
+  const key = new Float64Array(GRID_N);
+  for (const i of reached) key[i] = dist[i]! * 4294967296 + hash3(seed, i, 11);
+  return reached.sort((a, b) => key[a]! - key[b]!);
 }
 
 const STEPS: readonly (readonly [number, number])[] = [
@@ -190,6 +302,23 @@ const STEPS: readonly (readonly [number, number])[] = [
   [1, -1],
   [-1, -1],
 ];
+
+/**
+ * True if stock can walk from one square to a square next to it, across or
+ * on the diagonal, without going through a fence or a shut gate. A diagonal
+ * step needs one of the two ways round the corner to be open.
+ */
+export function stepOpen(g: PlacementGround, from: number, to: number): boolean {
+  if (from === to) return true;
+  const dx = colOf(to) - colOf(from);
+  const dy = rowOf(to) - rowOf(from);
+  if (Math.abs(dx) > 1 || Math.abs(dy) > 1) return false;
+  if (dx === 0 || dy === 0) return canStep(g, from, dx, dy);
+  return (
+    (canStep(g, from, dx, 0) && canStep(g, from + dx, 0, dy)) ||
+    (canStep(g, from, 0, dy) && canStep(g, from + dy * GRID_W, dx, 0))
+  );
+}
 
 /** The part of a square cattle may stand in: [x0, y0, x1, y1] in ground coordinates. */
 export function standingBox(view: FarmView, square: number): [number, number, number, number] {
@@ -272,104 +401,45 @@ function roster(mob: FarmViewMob, adults: number): { kind: ViewCattleKind; shape
 
 const clampTo = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 
-/** Where one mob's cattle stand, or null for a mob the map does not draw (the feedlot). */
-export function placeMob(
-  g: PlacementGround,
-  mob: FarmViewMob,
-  options: PlacementOptions = {},
-): MobPlacement | null {
-  const total = mob.head + mob.calves;
-  if (mob.where === 'lot' || total <= 0) return null;
-  const view = g.view;
+/** The yards' standing box for a square: inside the pens. */
+export const yardsBox = (c: number): [number, number, number, number] => [
+  colOf(c) + 0.22,
+  rowOf(c) + 0.5,
+  colOf(c) + 0.78,
+  rowOf(c) + 0.92,
+];
 
-  let order: number[];
-  let cap: number;
-  if (mob.where === 'yards') {
-    const yards = view.buildings.find((b) => b.kind === 'yards');
-    if (!yards) return null;
-    order = [yards.cell];
-    cap = YARDS_DRAWN;
-  } else {
-    const cells = g.areaCells.get(mob.area);
-    if (!cells || !cells.length) return null;
-    const start = view.squares.area[mob.anchor] === mob.area ? mob.anchor : cells[0]!;
-    order = walkOrder(g, start, mob.seed);
-    // An area that is all troughs and buildings: stand where they can.
-    if (!order.length) order = cells.slice();
-    if (options.everyBeast || order.length <= SMALL_AREA_SQUARES) {
-      cap = order.length * MAX_DRAWN_CROWDED;
-    } else {
-      // Open country: at most four squares in ten, three to a square.
-      order = order.slice(0, Math.max(1, Math.ceil(order.length * MAX_SHARE_OF_AREA)));
-      cap = order.length * MAX_DRAWN_PER_SQUARE;
-    }
-  }
+/**
+ * Shrink a standing box about its middle to `k` of its size. A mob that
+ * takes up less than a square stands in part of it, so its density is true.
+ */
+export function shrinkBox(
+  box: readonly [number, number, number, number],
+  k: number,
+): [number, number, number, number] {
+  if (k >= 1) return [box[0], box[1], box[2], box[3]];
+  const cx = (box[0] + box[2]) / 2;
+  const cy = (box[1] + box[3]) / 2;
+  const hx = ((box[2] - box[0]) / 2) * k;
+  const hy = ((box[3] - box[1]) / 2) * k;
+  return [cx - hx, cy - hy, cx + hx, cy + hy];
+}
 
-  const drawn = Math.min(total, cap);
-  const used = Math.min(order.length, Math.max(1, Math.ceil(drawn / SPREAD_PER_SQUARE)));
-  const cells = order.slice(0, used);
-  const boxes = cells.map((c) =>
-    mob.where === 'yards'
-      ? ([colOf(c) + 0.22, rowOf(c) + 0.5, colOf(c) + 0.78, rowOf(c) + 0.92] as const)
-      : standingBox(view, c),
-  );
-
-  const calves =
-    mob.calves > 0 ? Math.min(mob.calves, Math.round((drawn * mob.calves) / total)) : 0;
-  const adults = roster(mob, Math.min(mob.head, drawn - calves));
-  const beasts: Beast[] = [];
-  const cellOf: number[] = [];
-  adults.forEach((a, j) => {
-    const k = j % used;
-    const box = boxes[k]!;
-    beasts.push({
-      x: box[0] + (box[2] - box[0]) * unit(hash3(mob.seed, j, 1)),
-      y: box[1] + (box[3] - box[1]) * unit(hash3(mob.seed, j, 2)),
-      kind: a.kind,
-      shape: a.shape,
-      flip: (hash3(mob.seed, j, 3) & 1) === 1,
-    });
-    cellOf.push(k);
-  });
-  // Calves stand beside a cow where there is one, otherwise beside any adult.
-  const cows = adults.map((a, j) => (a.kind === 'cow' ? j : -1)).filter((j) => j >= 0);
-  const dams = cows.length ? cows : adults.map((_, j) => j);
-  for (let c = 0; c < calves; c++) {
-    if (!dams.length) {
-      const k = c % used;
-      const box = boxes[k]!;
-      beasts.push({
-        x: box[0] + (box[2] - box[0]) * unit(hash3(mob.seed, c, 4)),
-        y: box[1] + (box[3] - box[1]) * unit(hash3(mob.seed, c, 5)),
-        kind: 'calf',
-        shape: 'normal',
-        flip: (hash3(mob.seed, c, 6) & 1) === 1,
-      });
-      continue;
-    }
-    const j = dams[c % dams.length]!;
-    const dam = beasts[j]!;
-    const box = boxes[cellOf[j]!]!;
-    const side = (hash3(mob.seed, c, 7) & 1) === 1 ? 1 : -1;
-    beasts.push({
-      x: clampTo(dam.x + side * (0.14 + 0.06 * unit(hash3(mob.seed, c, 8))), box[0], box[2]),
-      y: clampTo(dam.y + 0.05 + 0.05 * unit(hash3(mob.seed, c, 9)), box[1], box[3]),
-      kind: 'calf',
-      shape: 'normal',
-      flip: dam.flip,
-    });
-  }
-
+/** Where a mob's marker sits, and how far the mob reaches from it, for a set of squares. */
+export function markerOf(cells: readonly number[]): {
+  centre: { x: number; y: number };
+  spread: { x: number; y: number };
+} {
   let mx = 0;
   let my = 0;
   for (const c of cells) {
     mx += colOf(c) + 0.5;
     my += rowOf(c) + 0.5;
   }
-  mx /= cells.length;
-  my /= cells.length;
+  mx /= Math.max(1, cells.length);
+  my /= Math.max(1, cells.length);
   // The marker sits on one of the mob's own squares, so it is never across a fence.
-  let best = cells[0]!;
+  let best = cells[0] ?? 0;
   let bd = Infinity;
   let sx = 0.5;
   let sy = 0.5;
@@ -384,23 +454,168 @@ export function placeMob(
     sx = Math.max(sx, Math.abs(dx) + 0.5);
     sy = Math.max(sy, Math.abs(dy) + 0.5);
   }
+  return { centre: { x: colOf(best) + 0.5, y: rowOf(best) + 0.5 }, spread: { x: sx, y: sy } };
+}
+
+/** The squares a mob grazes over from `start`, nearest first, and the true ground it covers. */
+export function herdGround(
+  g: PlacementGround,
+  mob: Pick<FarmViewMob, 'area' | 'head' | 'seed'>,
+  start: number,
+  options: PlacementOptions = {},
+): { cells: number[]; herdM2: number; boxScale: number } {
+  const sideM = g.view.scale.sideM;
+  const squareM2 = sideM * sideM;
+  let order = walkOrder(g, start, mob.seed);
+  // An area that is all troughs and buildings: stand where they can.
+  if (!order.length) order = (g.areaCells.get(mob.area) ?? [start]).slice();
+  if (options.everyBeast) return { cells: order, herdM2: order.length * squareM2, boxScale: 1 };
+  const n = herdSquares(mob.head, sideM, order.length);
+  const herdM2 = Math.min(Math.max(1, mob.head) * HERD_M2_PER_HEAD, order.length * squareM2);
+  // Less ground than the squares it is given: stand in the middle part of each.
+  const boxScale = n > 1 ? 1 : Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / squareM2)));
+  return { cells: order.slice(0, n), herdM2, boxScale };
+}
+
+/**
+ * Where one mob's cattle stand, or null for a mob the map does not draw (the
+ * feedlot). `budget` is the most to draw for it (its share of the farm's).
+ */
+export function placeMob(
+  g: PlacementGround,
+  mob: FarmViewMob,
+  options: PlacementOptions = {},
+  budget = MOB_DRAWN_MAX,
+): MobPlacement | null {
+  const total = mob.head + mob.calves;
+  if (mob.where === 'lot' || total <= 0) return null;
+  const view = g.view;
+
+  let cells: number[];
+  let cap: number;
+  let herdM2: number;
+  let boxScale = 1;
+  if (mob.where === 'yards') {
+    const yards = view.buildings.find((b) => b.kind === 'yards');
+    if (!yards) return null;
+    cells = [yards.cell];
+    cap = YARDS_DRAWN;
+    herdM2 = view.scale.sideM * view.scale.sideM * 0.2;
+  } else {
+    const area = g.areaCells.get(mob.area);
+    if (!area || !area.length) return null;
+    const start = view.squares.area[mob.anchor] === mob.area ? mob.anchor : area[0]!;
+    const ground = herdGround(g, mob, start, options);
+    cells = ground.cells;
+    herdM2 = ground.herdM2;
+    boxScale = ground.boxScale;
+    cap = options.everyBeast ? cells.length * EVERY_BEAST_PER_SQUARE : budget;
+  }
+
+  const drawn = Math.max(1, Math.min(total, cap));
+  const used = cells.length;
+  const boxes = cells.map((c) =>
+    mob.where === 'yards' ? yardsBox(c) : shrinkBox(standingBox(view, c), boxScale),
+  );
+  // Each beast's square: round the squares when there are more beasts than
+  // squares, otherwise spread evenly through them.
+  const squareFor = (j: number, n: number): number =>
+    n >= used ? j % used : Math.min(used - 1, Math.floor(((j + 0.5) * used) / n));
+
+  const calves =
+    mob.calves > 0 ? Math.min(mob.calves, Math.round((drawn * mob.calves) / total)) : 0;
+  const adults = roster(mob, Math.min(mob.head, drawn - calves));
+  const beasts: Beast[] = [];
+  const cellOf: number[] = [];
+  adults.forEach((a, j) => {
+    const k = squareFor(j, adults.length);
+    const box = boxes[k]!;
+    beasts.push({
+      x: box[0] + (box[2] - box[0]) * unit(hash3(mob.seed, j, 1)),
+      y: box[1] + (box[3] - box[1]) * unit(hash3(mob.seed, j, 2)),
+      kind: a.kind,
+      shape: a.shape,
+      flip: (hash3(mob.seed, j, 3) & 1) === 1,
+      dam: -1,
+    });
+    cellOf.push(k);
+  });
+  // Calves stand beside a cow where there is one, otherwise beside any adult.
+  const cows = adults.map((a, j) => (a.kind === 'cow' ? j : -1)).filter((j) => j >= 0);
+  const dams = cows.length ? cows : adults.map((_, j) => j);
+  const gap = cowSquares(view.scale.sideM);
+  for (let c = 0; c < calves; c++) {
+    if (!dams.length) {
+      const box = boxes[c % used]!;
+      beasts.push({
+        x: box[0] + (box[2] - box[0]) * unit(hash3(mob.seed, c, 4)),
+        y: box[1] + (box[3] - box[1]) * unit(hash3(mob.seed, c, 5)),
+        kind: 'calf',
+        shape: 'normal',
+        flip: (hash3(mob.seed, c, 6) & 1) === 1,
+        dam: -1,
+      });
+      continue;
+    }
+    const j = dams[c % dams.length]!;
+    const dam = beasts[j]!;
+    const box = boxes[cellOf[j]!]!;
+    const side = (hash3(mob.seed, c, 7) & 1) === 1 ? 1 : -1;
+    beasts.push({
+      x: clampTo(dam.x + side * gap * (0.55 + 0.25 * unit(hash3(mob.seed, c, 8))), box[0], box[2]),
+      y: clampTo(dam.y + gap * (0.1 + 0.15 * unit(hash3(mob.seed, c, 9))), box[1], box[3]),
+      kind: 'calf',
+      shape: 'normal',
+      flip: dam.flip,
+      dam: j,
+    });
+  }
+
+  const { centre, spread } = markerOf(cells);
   return {
     mob: mob.id,
+    where: mob.where,
+    area: mob.where === 'yards' ? -1 : mob.area,
     total,
     beasts,
     sampled: beasts.length < total,
     cells,
-    centre: { x: colOf(best) + 0.5, y: rowOf(best) + 0.5 },
-    spread: { x: sx, y: sy },
+    start: cells[0]!,
+    herdM2,
+    centre,
+    spread,
   };
+}
+
+/**
+ * How many to draw for each mob: one a head up to `MOB_DRAWN_MAX`, and if
+ * the farm would draw more than `FARM_DRAWN_MAX`, every mob fewer in proportion.
+ */
+export function drawBudgets(view: FarmView): Map<number, number> {
+  const want = new Map<number, number>();
+  let sum = 0;
+  for (const m of view.mobs) {
+    if (m.where !== 'paddock') continue;
+    const n = Math.min(MOB_DRAWN_MAX, m.head + m.calves);
+    want.set(m.id, n);
+    sum += n;
+  }
+  if (sum > FARM_DRAWN_MAX) {
+    const k = FARM_DRAWN_MAX / sum;
+    for (const [id, n] of want) {
+      want.set(id, Math.max(Math.min(n, MOB_DRAWN_MIN), Math.floor(n * k)));
+    }
+  }
+  return want;
 }
 
 /** Where every mob's cattle stand. Mobs in the feedlot are left out. */
 export function placeCattle(view: FarmView, options: PlacementOptions = {}): MobPlacement[] {
   const g = placementGround(view);
+  const budgets = drawBudgets(view);
   const out: MobPlacement[] = [];
   for (const mob of view.mobs) {
-    const p = placeMob(g, mob, options);
+    const p = placeMob(g, mob, options, budgets.get(mob.id) ?? MOB_DRAWN_MAX);
     if (p) out.push(p);
   }
   return out;

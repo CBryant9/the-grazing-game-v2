@@ -1,6 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { LOD_FADE_MS, easeFade, fadeStep, lodMode } from './lod';
+import {
+  DOT_MIN_SPACING_PX,
+  DOT_PX,
+  LOD_FADE_MS,
+  easeFade,
+  fadeStep,
+  herdAsDots,
+  herdSpacingPx,
+  lodMode,
+} from './lod';
 import { DEFAULT_LAYERS, MAP_LAYER_IDS, MAP_LAYER_INFO, toggleLayer, withLayers } from './layers';
+
+describe('cattle zoomed out: dots, or a patch where they are too close to read', () => {
+  const side = (ha: number): number => Math.sqrt(ha / 1040) * 100;
+
+  it('spacing follows the true density on screen', () => {
+    // 100 head on 4 ha is 20 m apart. On 100 m squares at 25 px a square that is 5 px.
+    expect(herdSpacingPx(40000, 100, 25, 100)).toBeCloseTo(5, 5);
+    expect(herdSpacingPx(40000, 0, 25, 100)).toBe(Infinity);
+  });
+
+  it('a 200 ha farm seen whole shows each mob as dots', () => {
+    expect(herdAsDots(900 * 400, 900, 25, side(200))).toBe(true);
+  });
+
+  it('900 head at grazing density on 3,000 ha seen whole is a patch; spread over a big paddock, dots', () => {
+    expect(herdAsDots(900 * 400, 900, 25, side(3000))).toBe(false);
+    expect(herdAsDots(900 * 2000, 900, 25, side(3000))).toBe(true);
+  });
+
+  it('the dots are a few pixels across, and need a little room between them', () => {
+    expect(DOT_PX).toBeGreaterThanOrEqual(3);
+    expect(DOT_MIN_SPACING_PX).toBeGreaterThan(DOT_PX);
+  });
+});
 
 describe('level of detail by zoom', () => {
   it('at 26 pixels a square or less, mobs are markers. Above it, cattle are drawn', () => {

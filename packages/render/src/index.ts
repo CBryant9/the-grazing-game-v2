@@ -60,21 +60,27 @@ export { CATTLE, NATURAL, THEMES, breedFor, paletteFor } from './palette';
 export type { CattleBreed, MapPalette, MapTheme, ThemeColours } from './palette';
 
 export {
-  MAX_DRAWN_CROWDED,
-  MAX_DRAWN_PER_SQUARE,
-  MAX_SHARE_OF_AREA,
-  SMALL_AREA_SQUARES,
-  SPREAD_PER_SQUARE,
+  ANIMAL_MIN_PX,
+  CATTLE_EXAGGERATION,
+  CATTLE_LENGTH_M,
+  CATTLE_MAX_PX,
+  CATTLE_MIN_PX,
+  FARM_DRAWN_MAX,
+  HERD_M2_PER_HEAD,
+  MOB_DRAWN_MAX,
   STAND_BACK,
+  YARDS_DRAWN,
+  animalPx,
+  cowPx,
   placeCattle,
   placementKey,
 } from './cattle';
 export type { Beast, BodyShape, MobPlacement, PlacementOptions } from './cattle';
 
 export {
-  SHEEP_MAX_CROWDED,
-  SHEEP_MAX_PER_SQUARE,
-  SHEEP_SPREAD_PER_SQUARE,
+  FLOCK_DRAWN_MAX,
+  SHEEP_LENGTH_M,
+  SHEEP_M2_PER_HEAD,
   SHEEP_STAND_BACK,
   SHEEP_YARDS_DRAWN,
   placeSheep,
