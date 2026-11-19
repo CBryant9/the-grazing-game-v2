@@ -59,6 +59,7 @@ import {
   type Camera,
   type FitMode,
   type Point,
+  type ScreenInset,
   type Viewport,
 } from './camera';
 import {
@@ -109,6 +110,22 @@ import {
   type Corner,
 } from './lines';
 import type { DraftDot, DraftKind, MapDraft } from './draft';
+import {
+  BUILD_GRID,
+  bucketZoom,
+  edgeCorner,
+  gridBucket,
+  fencedCorners,
+  fencedEdges,
+  gridKindFor,
+  gridLines,
+  gridStep,
+  lengthWords,
+  nearCorners,
+  nearLines,
+  showCornerDots,
+  targetCentre,
+} from './buildgrid';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
 import { DOT_PX, easeFade, fadeStep, herdAsDots, lodMode, type LodMode } from './lod';
@@ -277,6 +294,12 @@ export interface FarmMap {
   setTool(tool: MapTool): void;
   /** Draw a draft on top of the map (a line about to be built), or null to clear it. Only the overlay is redrawn. */
   setDraft(draft: MapDraft | null): void;
+  /**
+   * How much of the top and bottom of the map the page covers, in CSS pixels
+   * (a phone's floating top bar and build tray). The map can then be dragged
+   * that much further, so every part of the farm can be brought into the clear.
+   */
+  setInsets(top: number, bottom: number, left?: number, right?: number): void;
   /**
    * Contract fencing under way: the segments the contractor has built and
    * the ones still to build, drawn in the contractor's colour. Null clears it.
@@ -482,6 +505,19 @@ class PixiFarmMap implements FarmMap {
   /** The draft of a line about to be built, and what the mouse is over in a tool. Each redraws on its own. */
   private draftG = new Graphics();
   private hoverG = new Graphics();
+  /** The build grid: drawn once per zoom while a tool is picked, never per frame. */
+  private gridG = new Graphics();
+  /** The grid near the pointer or finger, stronger. Redrawn only when the corner under it changes. */
+  private gridNearG = new Graphics();
+  private gridFocus: Corner | null = null;
+  /** Screen covered by the page's bars (a phone's top bar and build tray): the farm may be pulled out from under them. */
+  private inset: Required<ScreenInset> = { top: 0, bottom: 0, left: 0, right: 0 };
+  /** The zoom step the grid was last drawn for. NaN when it is not drawn. */
+  private gridBucket = NaN;
+  /** The live length at the end of a line being drawn. */
+  private lengthTag: Container | null = null;
+  private lengthTagAt: { wx: number; wy: number } | null = null;
+  private buildUi = new Container();
   /** The contractor's fence under way: built (solid) and still to build (dashed), in the contractor's own colour. */
   private contractG = new Graphics();
   private contractor: ContractorFence | null = null;
@@ -659,6 +695,11 @@ class PixiFarmMap implements FarmMap {
       moveTo: (cam) => this.setCamera(cam),
       tap: (x, y) => this.onTap(x, y),
       hover: (p) => this.onHover(p),
+      inset: () => this.inset,
+      // A finger has no hover: in a tool, pressing shows what is under it, as the mouse does.
+      press: (p) => {
+        if (this.tool !== 'look') this.onHover(p);
+      },
       fit: () => this.fitFarm(),
     });
     if (this.options.autoResize !== false && typeof ResizeObserver === 'function') {
@@ -751,6 +792,8 @@ class PixiFarmMap implements FarmMap {
     }
     this.dots.boundsArea = new Rectangle(-2, -3, WORLD_W + 4, WORLD_H + 6);
     world.addChild(this.pipeG, this.footprints, this.dots, this.ring, this.outlines);
+    // The build grid sits under the fences, so the fences it lights up stay on top.
+    world.addChild(this.gridG, this.gridNearG);
     world.addChild(this.fenceFar, this.fenceNear);
 
     const still = { position: false, vertex: false, rotation: false, uvs: false, color: false };
@@ -784,7 +827,7 @@ class PixiFarmMap implements FarmMap {
     world.addChild(this.contractG, this.draftG, this.hoverG);
     this.rain.boundsArea = new Rectangle(0, 0, 4096, 4096);
     this.rain.visible = false;
-    this.ui.addChild(this.labelLayer, this.rain);
+    this.ui.addChild(this.labelLayer, this.buildUi, this.rain);
     this.surroundCanvas = makeCanvas(SURROUND_TILE, SURROUND_TILE);
     this.surround = new TilingSprite({
       texture: new Texture({
@@ -935,7 +978,7 @@ class PixiFarmMap implements FarmMap {
   // -------------------------------------------------------------------------
 
   private setCamera(cam: Camera): void {
-    const next = clampCamera(cam, this.vp);
+    const next = clampCamera(cam, this.vp, this.inset);
     if (next.zoom === this.cam.zoom && next.x === this.cam.x && next.y === this.cam.y) return;
     this.cam = next;
     this.applyCamera();
@@ -976,9 +1019,13 @@ class PixiFarmMap implements FarmMap {
       this.drawRing();
     }
     // The build overlay is sized in screen pixels, so it follows the zoom (only the overlay is redrawn).
-    if (this.overlayZoom !== cam.zoom && (this.draft || this.hoverTool || this.contractor)) {
+    if (
+      this.overlayZoom !== cam.zoom &&
+      (this.draft || this.hoverTool || this.contractor || this.tool !== 'look')
+    ) {
       this.drawOverlays();
     }
+    this.placeLengthTag();
     this.invalidate();
   }
 
@@ -1108,6 +1155,8 @@ class PixiFarmMap implements FarmMap {
       this.keys.fences = fencesKey;
       this.drawFences();
       this.drawOutlines();
+      // The fences a line joins to are lit while building, so they follow a new fence.
+      if (this.tool !== 'look') this.drawGrid();
     }
     const thingsKey = JSON.stringify([
       view.water,
@@ -2291,6 +2340,8 @@ class PixiFarmMap implements FarmMap {
     // Only a new corner or square is news.
     const key = corner ? `c${corner.vx},${corner.vy}` : `s${square}`;
     if (phase === 'move' && key === this.dragLast) return;
+    // The grid is stronger round the finger while it draws.
+    this.focusGrid(corner ?? { vx: colOf(square), vy: rowOf(square) });
     this.dragLast = phase === 'end' ? '' : key;
     const e: MapDragEvent = { phase, corner, square, x: p.x, y: p.y };
     for (const fn of this.handlers.drag) fn(e);
@@ -2352,6 +2403,15 @@ class PixiFarmMap implements FarmMap {
         this.hoverTool = next;
         this.drawHover();
       }
+      this.focusGrid(
+        !next
+          ? null
+          : next.kind === 'corner'
+            ? next.corner
+            : next.kind === 'square'
+              ? { vx: colOf(next.square), vy: rowOf(next.square) }
+              : edgeCorner(next.edge),
+      );
       return;
     }
     const h = p ? this.hit(p.x, p.y) : null;
@@ -2425,7 +2485,26 @@ class PixiFarmMap implements FarmMap {
     this.hoverSquare = -1;
     this.drawOutlines();
     this.drawHover();
+    this.gridFocus = null;
+    this.drawGrid();
     this.input?.refreshCursor();
+  }
+
+  setInsets(top: number, bottom: number, left = 0, right = 0): void {
+    const r = (v: number): number => Math.max(0, Math.round(v));
+    const next = { top: r(top), bottom: r(bottom), left: r(left), right: r(right) };
+    const was = this.inset;
+    if (
+      next.top === was.top &&
+      next.bottom === was.bottom &&
+      next.left === was.left &&
+      next.right === was.right
+    ) {
+      return;
+    }
+    this.inset = next;
+    // Pull the camera back into range if a bar went away.
+    this.setCamera(this.cam);
   }
 
   setDraft(draft: MapDraft | null): void {
@@ -2548,6 +2627,159 @@ class PixiFarmMap implements FarmMap {
     this.drawContractor();
     this.drawDraft();
     this.drawHover();
+    // The grid only on a zoom step (four to a doubling), so a pinch does not rebuild it every frame.
+    if (gridBucket(this.cam.zoom) !== this.gridBucket) this.drawGrid();
+  }
+
+  /**
+   * The build grid (docs/VISUALS.md, "The grid while building"): the fence
+   * lines and corners a tool can use, faint so the grass still reads, with the
+   * fences and boundary lit as the things a line joins to. Drawn in screen
+   * pixels, once per zoom step, and cleared in Look.
+   */
+  private drawGrid(): void {
+    const g = this.gridG.clear();
+    const view = this.view;
+    const kind = gridKindFor(this.tool);
+    this.gridBucket = gridBucket(this.cam.zoom);
+    if (!view || kind === 'none') {
+      this.gridBucket = NaN;
+      this.gridNearG.clear();
+      this.invalidate();
+      return;
+    }
+    const G = BUILD_GRID;
+    // Sized for the zoom step, not the exact zoom: within a few per cent of true pixels.
+    const zoom = bucketZoom(this.gridBucket);
+    const u = 1 / zoom;
+    // The fences, gates and boundary: lit softly underneath, so they stand out as what to join or tap.
+    const fenced = fencedEdges(view);
+    for (const e of fenced) {
+      const [x0, y0, x1, y1] = edgeEnds(e);
+      g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+    }
+    if (fenced.length) {
+      g.stroke({
+        color: G.haloColour,
+        width: (kind === 'fences' ? G.haloWidthPx + 3 : G.haloWidthPx) * u,
+        alpha: kind === 'squares' ? G.haloAlpha * 0.5 : G.haloAlpha,
+        cap: 'round',
+      });
+    }
+    if (kind !== 'fences') {
+      // The lattice: thinned when zoomed out so it never turns to noise.
+      const { cols, rows } = gridLines(gridStep(zoom));
+      for (const x of cols) {
+        if (x === 0 || x === GRID_W) continue;
+        g.moveTo(x, 0).lineTo(x, WORLD_H);
+      }
+      for (const y of rows) {
+        if (y === 0 || y === GRID_H) continue;
+        g.moveTo(0, y * K).lineTo(WORLD_W, y * K);
+      }
+      g.stroke({ color: G.lineColour, width: G.lineWidthPx * u, alpha: G.lineAlpha });
+      g.rect(0, 0, WORLD_W, WORLD_H).stroke({
+        color: G.lineColour,
+        width: G.lineWidthPx * 1.5 * u,
+        alpha: G.edgeAlpha,
+      });
+      if (kind === 'lines' && showCornerDots(zoom)) {
+        for (let vy = 0; vy <= GRID_H; vy++) {
+          for (let vx = 0; vx <= GRID_W; vx++) g.circle(vx, vy * K, G.dotRadiusPx * u);
+        }
+        g.fill({ color: G.lineColour, alpha: G.dotAlpha });
+      }
+    }
+    if (kind === 'corners') {
+      // A hub goes on a fence corner: each one gets a dot to tap.
+      const corners = fencedCorners(view);
+      for (const c of corners) g.circle(c.vx, c.vy * K, 3.2 * u);
+      g.fill({ color: G.haloColour, alpha: 0.85 });
+      for (const c of corners) g.circle(c.vx, c.vy * K, 3.2 * u);
+      g.stroke({ color: NATURAL.fenceCasing, width: 1.2 * u, alpha: 0.8 });
+    }
+    this.drawGridNear();
+  }
+
+  /** Move the stronger patch of grid to a new corner. Only a change of corner redraws it. */
+  private focusGrid(c: Corner | null): void {
+    const was = this.gridFocus;
+    if ((!c && !was) || (c && was && sameCorner(c, was))) return;
+    this.gridFocus = c;
+    this.drawGridNear();
+  }
+
+  /** The grid round the pointer or finger: every line and corner, stronger, fading out. */
+  private drawGridNear(): void {
+    const g = this.gridNearG.clear();
+    const c = this.gridFocus;
+    const kind = gridKindFor(this.tool);
+    if (!c || kind === 'none' || kind === 'fences') {
+      this.invalidate();
+      return;
+    }
+    const G = BUILD_GRID;
+    const u = 1 / bucketZoom(gridBucket(this.cam.zoom));
+    const R = G.nearRadius;
+    // Three steps of strength, so the patch fades into the faint grid instead of ending in a box.
+    for (const [r, a] of [
+      [R, G.nearAlpha * 0.35],
+      [R - 1, G.nearAlpha * 0.65],
+      [R - 2, G.nearAlpha],
+    ] as const) {
+      for (const e of nearLines(c, r)) {
+        const [x0, y0, x1, y1] = edgeEnds(e);
+        g.moveTo(x0, y0 * K).lineTo(x1, y1 * K);
+      }
+      g.stroke({ color: G.lineColour, width: G.lineWidthPx * 1.2 * u, alpha: a });
+    }
+    if (kind === 'lines') {
+      for (const p of nearCorners(c, R - 1)) g.circle(p.vx, p.vy * K, G.nearDotRadiusPx * u);
+      g.fill({ color: G.lineColour, alpha: G.nearAlpha + 0.2 });
+    }
+    this.invalidate();
+  }
+
+  /** The length of a line being drawn, beside its end, at a steady size. */
+  private drawLengthTag(): void {
+    this.lengthTag?.destroy({ children: true });
+    this.lengthTag = null;
+    this.lengthTagAt = null;
+    const d = this.draft;
+    const view = this.view;
+    if (!d || !view || d.kind === 'mark') return;
+    // Whole metres a side, as the job card counts them, so the two always agree.
+    const side = Math.round(view.scale.sideM);
+    let metres = 0;
+    if (d.segments.length) {
+      metres = d.segments.length * side;
+      const end = d.dots[d.dots.length - 1];
+      if (end) this.lengthTagAt = { wx: end.vx, wy: end.vy * K };
+    } else if (d.squares.length) {
+      // Pipe runs from the middle of one square to the next, as the job card counts it.
+      metres = (d.squares.length - 1) * side;
+      const end = d.squares[d.squares.length - 1]!.cell;
+      this.lengthTagAt = { wx: colOf(end) + 0.5, wy: (rowOf(end) + 0.5) * K };
+    }
+    if (!this.lengthTagAt || metres <= 0) return;
+    const ui = this.palette.ui;
+    const tag = this.pill([this.text(lengthWords(metres), 13, ui.labelText)], {
+      line: DRAFT_COLOUR[d.kind],
+      pad: 7,
+    });
+    this.lengthTag = tag;
+    this.buildUi.addChild(tag);
+    this.placeLengthTag();
+  }
+
+  /** Keep the length beside the end of the line as the map moves. */
+  private placeLengthTag(): void {
+    const tag = this.lengthTag;
+    const at = this.lengthTagAt;
+    if (!tag || !at) return;
+    const s = worldToScreen(this.cam, this.vp, at.wx, at.wy);
+    // Above and to the right of the end, clear of the finger.
+    tag.position.set(Math.round(s.x + 6 + tag.width / 2), Math.round(s.y - 24));
   }
 
   /** The draft of a line about to be built. Only this layer is redrawn. */
@@ -2556,6 +2788,7 @@ class PixiFarmMap implements FarmMap {
     this.overlayZoom = this.cam.zoom;
     const d = this.draft;
     if (!d) {
+      this.drawLengthTag();
       this.invalidate();
       return;
     }
@@ -2659,6 +2892,7 @@ class PixiFarmMap implements FarmMap {
       g.stroke({ color: colour, width: 4 * u, cap: 'round' });
     }
     for (const dot of d.dots) this.drawDot(g, dot, u);
+    this.drawLengthTag();
     this.invalidate();
   }
 
@@ -2700,6 +2934,13 @@ class PixiFarmMap implements FarmMap {
     } else {
       this.drawDot(g, { ...h.corner, joins: cornerJoinsFence(this.view, h.corner) }, u);
     }
+    // A tap tool gets a clear target ring, so a finger can see what it is about to pick.
+    if (this.tool === 'edge' || this.tool === 'square' || this.tool === 'corner') {
+      const c = targetCentre(h);
+      const r = BUILD_GRID.ringRadiusPx * u;
+      g.circle(c.gx, c.gy * K, r).stroke({ color: NATURAL.fenceCasing, width: 5 * u, alpha: 0.8 });
+      g.circle(c.gx, c.gy * K, r).stroke({ color: 0xffffff, width: 2.5 * u });
+    }
     this.invalidate();
   }
 
@@ -2739,18 +2980,24 @@ class PixiFarmMap implements FarmMap {
 
   zoomTo(pxPerSquare: number, square?: number): void {
     if (square === undefined) {
-      this.setCamera(zoomAt(this.cam, this.vp, pxPerSquare, this.vp.width / 2, this.vp.height / 2));
+      this.setCamera(
+        zoomAt(this.cam, this.vp, pxPerSquare, this.vp.width / 2, this.vp.height / 2, this.inset),
+      );
     } else {
-      this.setCamera(lookAt(this.vp, pxPerSquare, colOf(square) + 0.5, (rowOf(square) + 0.5) * K));
+      this.setCamera(
+        lookAt(this.vp, pxPerSquare, colOf(square) + 0.5, (rowOf(square) + 0.5) * K, this.inset),
+      );
     }
   }
 
   panBy(dx: number, dy: number): void {
-    this.setCamera(panCamera(this.cam, this.vp, dx, dy));
+    this.setCamera(panCamera(this.cam, this.vp, dx, dy, this.inset));
   }
 
   centreOn(square: number): void {
-    this.setCamera(lookAt(this.vp, this.cam.zoom, colOf(square) + 0.5, (rowOf(square) + 0.5) * K));
+    this.setCamera(
+      lookAt(this.vp, this.cam.zoom, colOf(square) + 0.5, (rowOf(square) + 0.5) * K, this.inset),
+    );
   }
 
   getCamera(): Camera {
@@ -2769,7 +3016,7 @@ class PixiFarmMap implements FarmMap {
     this.vp = { width: w, height: h };
     this.app.renderer.resize(w, h, this.pixelRatio);
     // The same middle and zoom, so turning a phone keeps your place (PRD 6.1a).
-    this.cam = clampCamera(this.cam, this.vp);
+    this.cam = clampCamera(this.cam, this.vp, this.inset);
     if (this.weather.kind === 'rain') this.buildRain();
     this.applyCamera();
     for (const fn of this.handlers.camera) fn({ ...this.cam });

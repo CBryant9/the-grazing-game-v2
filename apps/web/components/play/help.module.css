@@ -115,6 +115,23 @@
   font-size: 0.8125rem;
   line-height: 1.35;
 }
+/* The phone's one-line tour: the step and its title, a tap opens the rest. */
+.sline {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.sflip svg {
+  transform: rotate(180deg);
+}
 .sbtns {
   flex: none;
   display: flex;

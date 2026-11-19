@@ -2638,6 +2638,38 @@ Branch `m9-cattle` from `m9-fun-and-flow` at b8338a3. After playing the rebuild 
 
 **Looked at** (dev map lab and a real Fast Farm, served on port 3102). The Browser pane was hidden for the whole session, so frames ran only when a screenshot was taken: walking was seen to move on between screenshots but was not watched at full speed, and 60 fps on a phone was not measured.
 
+## 19 Nov 2026: a grid while building, and knowing what to do next
+
+Branch `m9-build-nav` from `m9-fun-and-flow` at b8338a3. Claudia, after playing: "I'm finding the navigation really hard when I go into build and stuff. I'd like to see a grid representing the fence, making it more visual so I know what to select." And: "the navigation and knowing what to do needs to be more obvious, visual and easier to navigate." Calls B180 to B188.
+
+**What was built**
+
+- **The build grid** (`packages/render/src/buildgrid.ts`, drawn in `map.ts`): while a tool is picked, a faint lattice of fence lines and corners in screen pixels, thinned zoomed out, stronger three squares round the pointer or finger; fences, gates and the boundary glow light green as the things to join to; Gate and Remove light only what they can pick; the hub tool marks every fence corner; a target ring under the mouse, or under a finger as it presses (`press` in `input.ts`, touch has no hover); a live length at the end of a line, counted as the card counts it. Drawn on zoom steps, never per frame. Gone in Look. VISUALS "The grid while building".
+- **The step chip** (`lib/game/buildguide.ts`, `BuildGuide.tsx`): Draw, Check, Build (or Tap, Check, Confirm), one plain line on what to do next, and Back to Look. Under the top bar on a phone, heading the tool column on its side, top middle on a PC with the floating card kept below it.
+- **The tool bar**: an icon and a word on every tool, all eight in sight, the one in use filled in. On a phone the tray slides away while a line is drawn and shrinks to the kind of fence and the card once the card is up.
+- **Keeping clear of the page** (`ScreenInset` in `camera.ts`, `lib/game/covers.ts`): the map can be dragged out from under a phone's top bar and tray, or a landscape tool column and card, and moves the end of a line clear when its card comes up. Before this, with the tray open on a phone held upright, the bottom of the farm could not be reached at all.
+- **What to do next** (`lib/game/nextsteps.ts`, `Todo.tsx`): first steps for a farm with no stock water, one paddock or no stock, each a fact and a button straight to the tool (map framed) or tab; a mob with no water gets Put in a trough on its paddock; Put it back up frames the fallen fence. Each first step can be put away.
+- **The tour** is one line on a phone (upright or on its side) and waits while a tool is picked.
+- The fence help line now says "Drag along the grid from a fence or a corner to draw a fence."
+
+**Seen in the browser** (Fast Farm, Central Queensland, small, running; phone 375x812, phone on its side 812x375, PC 1366x800; light and dark)
+
+- Phone upright: Build opens the tray with all eight tools in two rows. Fence shows the lattice and the middle fence glowing, the chip says "Drag along the grid from a fence or a corner." A drag drew a 392 m line with its length at the end; the chip went to Check, then Build; the tray shrank to the fence kinds and the card and the map moved up so the line sat above it. Built it, then a gate in it (target ring on the fence, "Check the card, then press Put in a gate."), pipe from a trough (length 392 m, as the card), a trough on the pipe, a water hub on a fence corner (the corner dots showed), and took a fence down (lilac mark, ring). Blocked jobs read "The card says why. Tap something else, or OK." Dark theme: the grid and glow read on the grass, the chip and tray in dark colours.
+- Phone on its side: the chip heads the tool column at the left, the eight tools in one row, the card at the right. A line drawn between them stays in view.
+- PC: the chip top middle, the panel's tools with icons, the grid with corner dots at 22 px a square. A tall card is kept below the chip and scrolls.
+- Not seen live: the first-step rows and the no-water button. The session's farm had water, fences and stock and no thing to do came up in a month, and starting a new farm in the dev server was refused (403 on the farm delete, before this change). Unit tests cover them.
+
+**Proof**
+
+- `pnpm typecheck` clean. `pnpm lint` clean. Prettier clean on every changed file. `pnpm test`: 248 files, 4,407 tests: 4,378 passed, 22 expected failures, 4 skips, 3 failed. The 3 failures are all in `server/notify/routes.test.ts` (the unsubscribe link in an email), which this branch does not touch; they fail the same when the file is run alone.
+- New tests: `render/buildgrid.test.ts` (the grid's steps, thinning, fences and corners lit, the patch round the pointer, the target ring, the length words), `render/camera.test.ts` (the farm pulled out from under a bar, and no camera moved that was in range), `render/input.test.ts` (a finger's press stands in for hover), `web/lib/game/buildstore.test.ts` (the step chip through a fence and a gate), `web/lib/game/nextsteps.test.ts` (first steps, the trough button, the fallen fence's square), `web/lib/game/covers.test.ts` (insets and the shortest move clear of a cover).
+
+**Not done or not checked**
+
+- The `realism-guardian` agent was not run. No real phone: touch was checked with synthetic pointer events in the browser pane.
+- Pinch-zooming with a tool picked still pans with two fingers; one-finger drag draws (unchanged).
+- The landscape length pill can sit under the card when the line ends at the card's edge.
+
 ## Ideas raised but not built yet
 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).

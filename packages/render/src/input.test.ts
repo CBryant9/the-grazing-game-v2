@@ -103,3 +103,27 @@ describe.each(['pan', 'draw'] as const)('zooming in a %s tool', (mode) => {
     expect(cam().zoom).toBe(before);
   });
 });
+
+describe('a finger in a tool', () => {
+  it('pressing stands in for hover, so the target under the finger shows; a mouse press does not', () => {
+    const el = new FakeTarget();
+    const cam: Camera = fitFarm(vp, 'auto');
+    const presses: string[] = [];
+    attachInput(el as unknown as HTMLElement, {
+      mode: () => 'pan',
+      drag: () => {},
+      camera: () => cam,
+      viewport: () => vp,
+      moveTo: () => {},
+      tap: () => {},
+      hover: () => {},
+      press: (p) => presses.push(`${p.x},${p.y}`),
+      fit: () => {},
+    });
+    el.fire('pointerdown', touch(1, 120, 80));
+    el.fire('pointerup', touch(1, 120, 80));
+    el.fire('pointerdown', { ...touch(2, 50, 60), pointerType: 'mouse' });
+    el.fire('pointerup', { ...touch(2, 50, 60), pointerType: 'mouse' });
+    expect(presses).toEqual(['120,80']);
+  });
+});

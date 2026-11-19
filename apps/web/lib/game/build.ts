@@ -94,6 +94,8 @@ export interface BuildState {
   team: 0 | 1 | 2;
   /** The teams the server priced for the line as drawn. Kept while a team's own card is on show. */
   teams?: TeamOptionWire[];
+  /** True while a finger or the mouse is down drawing a line. The phone's tray steps aside meanwhile. */
+  drawing?: boolean;
 }
 
 export const newBuild = (tool: BuildTool, over: Partial<BuildState> = {}): BuildState => ({

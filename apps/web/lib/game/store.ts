@@ -1133,7 +1133,14 @@ export const useGame = create<GameState>()((set, get) => {
         cells =
           e.phase === 'start' ? startSquares(b.cells, e.square) : extendSquares(b.cells, e.square);
       }
-      const next: BuildState = { ...b, corners, cells, team: 0, teams: undefined };
+      const next: BuildState = {
+        ...b,
+        corners,
+        cells,
+        team: 0,
+        teams: undefined,
+        drawing: e.phase !== 'end',
+      };
       const action = lineAction(next);
       const enough = b.tool === 'fence' ? corners.length > 1 : cells.length > 0;
       set({

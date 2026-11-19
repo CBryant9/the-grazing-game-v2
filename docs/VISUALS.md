@@ -295,6 +295,22 @@ All of this is drawn on two layers above everything else on the farm, so a draft
 - **Panning in a tool:** a drag draws, so the map is moved with two fingers, the space bar held, or the middle mouse button. Wheel and pinch still zoom. In Look nothing changed: one finger pans, a tap opens the paddock.
 - **Builder's choices (not in the spec above):** the dashed white for draft tape, the 7 px dark casing, the 7 px dot, a trough or hub picked is marked with a white square or dot, and a tap in a tool reaches the nearest fence within 22 px (10 px counts as "right under the finger" in Remove, so a trough beside a fence can still be picked).
 
+### The grid while building (19 Nov 2026)
+
+Claudia: "I'd like to see a grid representing the fence, making it more visual so I know what to select." While a build tool is picked the map shows what that tool can use. It goes the moment the tool snaps back to Look. (`packages/render/src/buildgrid.ts`, drawn by `map.ts`.)
+
+- **Fence:** a faint white lattice of the fence lines (1 px, 20%), the farm's edge a little stronger (32%). Zoomed out it thins so lines are never closer than 12 px on screen: every line, then every 2nd, 5th or 10th. Once squares are 18 px or more, every corner gets a small dot. Around the pointer or finger, three squares out, every line and corner is drawn stronger and fades in three steps, so the player sees exactly which corners a drag will snap to.
+- **What a line joins to:** every fence, gate and the boundary gets a soft light-green glow underneath (9 px, 42%), so the things to start from stand out. The fences themselves stay on top, in their own colours.
+- **Pipe, trough, portable trough:** the same lattice, read as squares; the fence glow is half as strong.
+- **Gate and Remove:** no lattice. The fences and gates a tap can pick glow more strongly (12 px).
+- **Water hub on a corner:** the lattice, and a light-green dot with a dark edge on every fence corner, the corners a hub can go on.
+- **Target ring:** in a tap tool the thing under the mouse, or under a finger as it presses, gets a white ring (15 px) on a dark casing, round the middle of the segment, square or corner.
+- **Length:** a pill at the end of a line being drawn gives its length, "300 m" or "1.2 km", in the line's colour. It counts whole metres a side (pipe from square middle to square middle), as the job card does, so the two agree.
+- **Red** stays only for "doesn't fit today". Nothing in the grid is red.
+- **Speed:** the grid is drawn in screen pixels on zoom steps (four to a doubling), never per frame, and only the stronger patch is redrawn as the pointer moves to a new corner.
+- **Keeping clear of the page:** on a phone the farm can be dragged out from under the top bar and the build tray (on its side, from under the tool column and the card), and when the card comes up the map moves just enough to show the end of the line. Without a bar nothing changes: a camera that was in range still is.
+- **Builder's choices:** every strength, width and step above, the light green of the glow (`#d8ffb0`), the 12 px gap, the 18 px for dots and the three-square patch.
+
 ### Layers, light and weather
 
 - **Layers:** water reach, pasture quality, recently grazed, arable land, pipe and labels, with the colours and strengths above. The profit layer is listed but not drawn yet: the view carries no figures for each beast.

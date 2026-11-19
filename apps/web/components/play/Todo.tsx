@@ -1,12 +1,96 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import type { SimpleAction, Snapshot } from '@/lib/game/types';
 import { cardLines, doneLines, plural } from '@/lib/game/format';
+import {
+  FIRST_OFF_KEY,
+  edgeSquare,
+  firstSteps,
+  parseFirstOff,
+  todoGo,
+  type NextGo,
+  type NextStep,
+} from '@/lib/game/nextsteps';
 import { useGame, type JobState } from '@/lib/game/store';
 import { ContractList, useContractWork } from './Contracts';
 import { Icon } from './Icon';
+import { useUi } from './ui';
 import styles from './play.module.css';
+
+/** Take the player straight there: the tool picked and the map on the spot, or the tab opened. */
+export function useGoTo(): (go: NextGo) => void {
+  const select = useGame((s) => s.selectTool);
+  const setTab = useGame((s) => s.setTab);
+  const focusOn = useUi((s) => s.focusOn);
+  return useCallback(
+    (go: NextGo) => {
+      if (go.kind === 'tab') {
+        setTab(go.tab);
+        return;
+      }
+      select(go.tool);
+      if (go.square !== null) focusOn(go.square);
+    },
+    [select, setTab, focusOn],
+  );
+}
+
+const firstOffKey = (farm: string): string => `${FIRST_OFF_KEY}:${farm}`;
+
+function readFirstOff(farm: string): string[] {
+  try {
+    return parseFirstOff(window.localStorage.getItem(firstOffKey(farm)));
+  } catch {
+    return [];
+  }
+}
+
+/** The first steps this farm shows, and a way to put one away (kept in this browser). */
+export function useFirstSteps(snapshot: Snapshot): {
+  steps: NextStep[];
+  putAway: (key: string) => void;
+} {
+  const farm = snapshot.farm.name;
+  const stored = useUi((s) => s.firstOff[farm]);
+  const setFirstOff = useUi((s) => s.setFirstOff);
+  const keys = stored ?? readFirstOff(farm);
+  const putAway = (key: string): void => {
+    const next = [...keys, key];
+    setFirstOff(farm, next);
+    try {
+      window.localStorage.setItem(firstOffKey(farm), JSON.stringify(next));
+    } catch {
+      // Storage is off: it stays put away until the page is opened again.
+    }
+  };
+  return { steps: firstSteps(snapshot, keys), putAway };
+}
+
+/** A first step: one fact, a button that goes straight there, and Put away. */
+function FirstStepRow({ step, onPutAway }: { step: NextStep; onPutAway: () => void }) {
+  const goTo = useGoTo();
+  return (
+    <li className={`${styles.todo} ${styles.todofirst}`}>
+      <div className={styles.todohead}>
+        <p className={styles.todotext}>{step.text}</p>
+        <button
+          type="button"
+          className={styles.putaway}
+          aria-label={`Put away: ${step.text}`}
+          onClick={onPutAway}
+        >
+          Put away
+        </button>
+      </div>
+      <div className={styles.jobbtns}>
+        <button type="button" className="btn sm coral" onClick={() => goTo(step.go)}>
+          {step.button}
+        </button>
+      </div>
+    </li>
+  );
+}
 
 function Row({
   item,
@@ -36,6 +120,10 @@ function Row({
   const startAct = useGame((s) => s.startAct);
   const confirmAct = useGame((s) => s.confirmAct);
   const dismissAct = useGame((s) => s.dismissAct);
+  const snapshot = useGame((s) => s.snapshot);
+  const focusOn = useUi((s) => s.focusOn);
+  const goTo = useGoTo();
+  const extra = snapshot ? todoGo(snapshot, item) : null;
   const slot = `todo:away:${item.key}`;
   const away = useGame((s) => s.acts[slot]);
   const phase = job?.phase;
@@ -71,23 +159,29 @@ function Row({
           </button>
         </p>
       )}
-      {!phase && (item.button || item.mob != null) && (
+      {!phase && (item.button || item.mob != null || extra) && (
         <div className={styles.jobbtns}>
           {item.button && (
             <button
               type="button"
               className="btn sm"
-              onClick={() =>
-                item.opens === 'move' && item.mob != null
-                  ? void startMove({ mobId: item.mob })
-                  : item.opens === 'fix' && item.edge
-                    ? void startFix(item.edge)
-                    : item.opens === 'workforce'
-                      ? openWorkforce()
-                      : void startJob(item.key)
-              }
+              onClick={() => {
+                if (item.opens === 'move' && item.mob != null) void startMove({ mobId: item.mob });
+                else if (item.opens === 'fix' && item.edge) {
+                  // The card opens beside the fence, and the map comes to it.
+                  void startFix(item.edge);
+                  const sq = edgeSquare(item.edge);
+                  if (sq !== null) focusOn(sq);
+                } else if (item.opens === 'workforce') openWorkforce();
+                else void startJob(item.key);
+              }}
             >
               {item.button}
+            </button>
+          )}
+          {extra && (
+            <button type="button" className="btn sm coral" onClick={() => goTo(extra.go)}>
+              {extra.button}
             </button>
           )}
           {item.mob != null && (
@@ -165,9 +259,15 @@ export function TodoList({ snapshot }: { snapshot: Snapshot }) {
     .filter((j) => !live.has(j.key))
     .map((j) => ({ key: j.key, text: j.text, button: j.button, urgent: false, mob: null }));
   const items = [...snapshot.todo, ...ghosts];
-  if (!items.length) return <p className="muted">Nothing needs doing right now.</p>;
+  const first = useFirstSteps(snapshot);
+  if (!items.length && !first.steps.length) {
+    return <p className="muted">Nothing needs doing right now.</p>;
+  }
   return (
     <ul className={styles.todolist}>
+      {first.steps.map((s) => (
+        <FirstStepRow key={s.key} step={s} onPutAway={() => first.putAway(s.key)} />
+      ))}
       {items.map((t) => (
         <Row key={t.key} item={t} job={jobs[t.key]} live={live.has(t.key)} />
       ))}
@@ -192,7 +292,7 @@ export function PaddockChips({ snapshot }: { snapshot: Snapshot }) {
 }
 
 /** The square bullet's colour on the banner: coral for urgent, amber for the rest (the mockup). */
-const BULLET = { urgent: '#ec6a48', rest: '#f0b43a' };
+const BULLET = { urgent: '#ec6a48', rest: '#f0b43a', first: '#7fe05a' };
 
 /**
  * The banner under the top bar: "N things to check", open with the first three as short
@@ -203,7 +303,8 @@ export function TodoBanner({ snapshot }: { snapshot: Snapshot }) {
   const [view, setView] = useState<'peek' | 'closed' | 'full'>('peek');
   const jobs = useGame((s) => s.jobs);
   const id = useId();
-  const count = snapshot.todo.length;
+  const first = useFirstSteps(snapshot).steps;
+  const count = snapshot.todo.length + first.length;
   const contractWork = useContractWork();
   const working = Object.keys(jobs).length > 0 || contractWork;
   const shown = working ? 'full' : count === 0 && view === 'peek' ? 'closed' : view;
@@ -232,7 +333,13 @@ export function TodoBanner({ snapshot }: { snapshot: Snapshot }) {
       {shown === 'peek' && (
         <div id={id} className={styles.bannerbody}>
           <ul className={styles.peeklist}>
-            {snapshot.todo.slice(0, 3).map((t) => (
+            {first.map((s) => (
+              <li key={s.key}>
+                <i style={{ background: BULLET.first }} aria-hidden="true" />
+                {s.text}
+              </li>
+            ))}
+            {snapshot.todo.slice(0, Math.max(0, 3 - first.length)).map((t) => (
               <li key={t.key}>
                 <i
                   style={{ background: t.urgent ? BULLET.urgent : BULLET.rest }}

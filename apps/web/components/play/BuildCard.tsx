@@ -203,7 +203,7 @@ export function BuildCard({
 
   if (b.phase === 'previewing') {
     const metres = line
-      ? `${num((b.tool === 'fence' ? Math.max(0, b.corners.length - 1) : b.cells.length) * sideM)} m. `
+      ? `${num(Math.max(0, (b.tool === 'fence' ? b.corners.length : b.cells.length) - 1) * sideM)} m. `
       : '';
     return wrap(
       <>
