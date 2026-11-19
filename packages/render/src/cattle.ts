@@ -24,12 +24,7 @@
  *   count (PRD 7).
  */
 
-import {
-  VIEW_FENCE,
-  type FarmView,
-  type FarmViewMob,
-  type ViewCattleKind,
-} from '@gg/shared';
+import { VIEW_FENCE, type FarmView, type FarmViewMob, type ViewCattleKind } from '@gg/shared';
 import { GRID_H, GRID_N, GRID_W, colOf, hIndex, rowOf, vIndex } from './grid';
 import { hash3, scatter, unit } from './random';
 
@@ -64,6 +59,12 @@ export const CATTLE_LENGTH_M: Readonly<Record<ViewCattleKind, number>> = {
 export const CATTLE_EXAGGERATION = 4;
 /** A cow is never drawn shorter than this on screen, zoomed in (CSS pixels). */
 export const CATTLE_MIN_PX = 5;
+/**
+ * Zoomed right in, a cow is never shorter than this share of a square on
+ * screen, so a player who zooms in to look at the cattle can always see
+ * what each beast is, even on a big farm. Zoomed out the true size rules.
+ */
+export const CATTLE_MIN_SHARE_OF_SQUARE = 0.1;
 /** A cow is never drawn longer than this on screen (CSS pixels). A bull is a little longer. */
 export const CATTLE_MAX_PX = 18;
 /** Nothing that stands is drawn shorter than this (a calf or lamb on a big farm). */
@@ -72,11 +73,16 @@ export const ANIMAL_MIN_PX = 3.5;
 /**
  * How long a cow is drawn, in screen pixels, at a zoom of `pxPerSquare` on
  * a farm whose squares are `sideM` metres a side: its real length times the
- * exaggeration, held between the least and most.
+ * exaggeration, held between the least and most. The least grows with the
+ * zoom (`CATTLE_MIN_SHARE_OF_SQUARE`).
  */
 export function cowPx(pxPerSquare: number, sideM: number): number {
   const real = (CATTLE_LENGTH_M.cow * pxPerSquare * CATTLE_EXAGGERATION) / Math.max(1, sideM);
-  return real < CATTLE_MIN_PX ? CATTLE_MIN_PX : real > CATTLE_MAX_PX ? CATTLE_MAX_PX : real;
+  const least = Math.min(
+    CATTLE_MAX_PX,
+    Math.max(CATTLE_MIN_PX, pxPerSquare * CATTLE_MIN_SHARE_OF_SQUARE),
+  );
+  return real < least ? least : real > CATTLE_MAX_PX ? CATTLE_MAX_PX : real;
 }
 
 /** How long an animal `lengthM` long is drawn, in screen pixels: in proportion to the cow. */
@@ -89,7 +95,12 @@ export const cowSquares = (sideM: number): number =>
   Math.min(0.42, Math.max(0.025, (CATTLE_LENGTH_M.cow * CATTLE_EXAGGERATION) / Math.max(1, sideM)));
 
 /** How many squares a mob of `head` grazes over, on squares `sideM` a side, in an area of `areaSquares`. */
-export function herdSquares(head: number, sideM: number, areaSquares: number, m2PerHead = HERD_M2_PER_HEAD): number {
+export function herdSquares(
+  head: number,
+  sideM: number,
+  areaSquares: number,
+  m2PerHead = HERD_M2_PER_HEAD,
+): number {
   const want = Math.ceil((Math.max(1, head) * m2PerHead) / (sideM * sideM));
   return Math.max(1, Math.min(areaSquares, want));
 }
@@ -168,6 +179,11 @@ export interface PlacementGround {
   blocked: Uint8Array;
   /** Open gates, as "h12" or "v340". */
   openGates: Set<string>;
+  /**
+   * Which ways stock can step out of each square, worked out once: 1 right,
+   * 2 left, 4 down, 8 up. Walking and spreading read this, not the fences.
+   */
+  ways: Uint8Array;
 }
 
 export function placementGround(view: FarmView): PlacementGround {
@@ -184,11 +200,31 @@ export function placementGround(view: FarmView): PlacementGround {
   for (const b of view.buildings) blocked[b.cell] = 1;
   const openGates = new Set<string>();
   for (const g of view.gates) if (g.open) openGates.add(g.line + g.index);
-  return { view, areaCells, blocked, openGates };
+  const ways = new Uint8Array(GRID_N);
+  const ground = { view, areaCells, blocked, openGates, ways };
+  for (let i = 0; i < GRID_N; i++) {
+    ways[i] =
+      (fenceLets(ground, i, 1, 0) ? 1 : 0) |
+      (fenceLets(ground, i, -1, 0) ? 2 : 0) |
+      (fenceLets(ground, i, 0, 1) ? 4 : 0) |
+      (fenceLets(ground, i, 0, -1) ? 8 : 0);
+  }
+  return ground;
 }
 
 /** True if stock can walk from a square to the next one across, down, back or up. */
 export function canStep(g: PlacementGround, from: number, dx: number, dy: number): boolean {
+  const bit = dx > 0 ? 1 : dx < 0 ? 2 : dy > 0 ? 4 : 8;
+  return (g.ways[from]! & bit) !== 0;
+}
+
+/** The fences' own answer to `canStep`, before it is put in the table. */
+function fenceLets(
+  g: Omit<PlacementGround, 'ways'>,
+  from: number,
+  dx: number,
+  dy: number,
+): boolean {
   const col = colOf(from);
   const row = rowOf(from);
   const f = g.view.fences;
@@ -218,34 +254,42 @@ export function walkOrder(g: PlacementGround, start: number, seed: number): numb
   // spreads out in a rounded shape, not a diamond.
   const FAR = 1e9;
   const dist = new Int32Array(GRID_N).fill(FAR);
-  const queue = [start];
+  // Squares by distance (a bucket queue): each square is settled once.
+  const buckets: number[][] = [[start]];
   dist[start] = 0;
-  for (let q = 0; q < queue.length; q++) {
-    const i = queue[q]!;
-    const d = dist[i]!;
-    for (const [dx, dy] of STEPS) {
-      let open: boolean;
-      if (dx !== 0 && dy !== 0) {
-        // A diagonal step needs both ways round the corner to be open.
-        open =
-          canStep(g, i, dx, 0) &&
-          canStep(g, i + dx, 0, dy) &&
-          canStep(g, i, 0, dy) &&
-          canStep(g, i + dy * GRID_W, dx, 0);
-      } else {
-        open = canStep(g, i, dx, dy);
+  for (let d = 0; d < buckets.length; d++) {
+    const bucket = buckets[d];
+    if (!bucket) continue;
+    for (let q = 0; q < bucket.length; q++) {
+      const i = bucket[q]!;
+      if (dist[i] !== d) continue;
+      for (const [dx, dy] of STEPS) {
+        let open: boolean;
+        if (dx !== 0 && dy !== 0) {
+          // A diagonal step needs both ways round the corner to be open.
+          open =
+            canStep(g, i, dx, 0) &&
+            canStep(g, i + dx, 0, dy) &&
+            canStep(g, i, 0, dy) &&
+            canStep(g, i + dy * GRID_W, dx, 0);
+        } else {
+          open = canStep(g, i, dx, dy);
+        }
+        if (!open) continue;
+        const j = i + dx + dy * GRID_W;
+        const cost = d + (dx !== 0 && dy !== 0 ? 3 : 2);
+        if (cost >= dist[j]!) continue;
+        dist[j] = cost;
+        (buckets[cost] ??= []).push(j);
       }
-      if (!open) continue;
-      const j = i + dx + dy * GRID_W;
-      const cost = d + (dx !== 0 && dy !== 0 ? 3 : 2);
-      if (cost >= dist[j]!) continue;
-      dist[j] = cost;
-      queue.push(j);
     }
   }
   const reached: number[] = [];
   for (let i = 0; i < GRID_N; i++) if (dist[i]! < FAR && !g.blocked[i]) reached.push(i);
-  return reached.sort((a, b) => dist[a]! - dist[b]! || hash3(seed, a, 11) - hash3(seed, b, 11));
+  // Each square's order key, worked out once: distance first, then the seed's tie-break.
+  const key = new Float64Array(GRID_N);
+  for (const i of reached) key[i] = dist[i]! * 4294967296 + hash3(seed, i, 11);
+  return reached.sort((a, b) => key[a]! - key[b]!);
 }
 
 const STEPS: readonly (readonly [number, number])[] = [

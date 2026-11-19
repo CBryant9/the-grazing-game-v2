@@ -766,13 +766,17 @@ class PixiFarmMap implements FarmMap {
       const bounds = new Rectangle(-2, -3, WORLD_W + 4, WORLD_H + 6);
       row.tufts.boundsArea = bounds;
       row.cattle.boundsArea = bounds;
-      world.addChild(row.line, row.tufts, row.things);
+      // A row's cattle go in after the grass of the row in front of them,
+      // so a beast drawn near its real size never hides in tall grass
+      // (VISUALS: cattle never blur into the grass), and before the things
+      // in that row, so a trough or the windmill in front still covers them.
+      const behind = this.rows[r - 1];
+      world.addChild(row.line, row.tufts);
+      if (behind) world.addChild(behind.cattle);
+      world.addChild(row.things);
       this.rows.push(row);
     }
-    // The cattle stand over all the grass, back to front among themselves, so
-    // a beast drawn near its real size never hides in tall grass (VISUALS:
-    // cattle never blur into the grass). The MVP drew them over the grass too.
-    for (const row of this.rows) world.addChild(row.cattle);
+    world.addChild(this.rows[GRID_H - 1]!.cattle);
 
     // The draft and the hover sit on top of everything standing on the farm.
     world.addChild(this.contractG, this.draftG, this.hoverG);

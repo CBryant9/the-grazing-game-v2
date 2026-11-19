@@ -429,7 +429,7 @@ export class Herd {
         if (f & RUSH) {
           const dx = tx[i]! - x[i]!;
           const dy = ty[i]! - y[i]!;
-          const d = Math.hypot(dx, dy);
+          const d = Math.sqrt(dx * dx + dy * dy);
           if (!this.trot[i]) {
             const secs = Math.min(TROT_SECONDS[1], Math.max(TROT_SECONDS[0], d / trotSpeed));
             this.trot[i] = d / secs || trotSpeed;
@@ -467,7 +467,7 @@ export class Herd {
         out.moved = true;
         const dx = tx[i]! - x[i]!;
         const dy = ty[i]! - y[i]!;
-        const d = Math.hypot(dx, dy);
+        const d = Math.sqrt(dx * dx + dy * dy);
         const s = walk * this.gait[i]! * p * dt;
         if (d <= s) {
           x[i] = tx[i]!;

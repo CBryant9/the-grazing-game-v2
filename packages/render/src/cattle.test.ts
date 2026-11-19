@@ -5,6 +5,7 @@ import {
   CATTLE_EXAGGERATION,
   CATTLE_MAX_PX,
   CATTLE_MIN_PX,
+  CATTLE_MIN_SHARE_OF_SQUARE,
   FARM_DRAWN_MAX,
   HERD_M2_PER_HEAD,
   MOB_DRAWN_MAX,
@@ -394,8 +395,8 @@ describe('how big a beast is drawn', () => {
 
   it('a cow is its real 2.4 m times the exaggeration, between the least and most', () => {
     expect(CATTLE_EXAGGERATION).toBe(4);
-    // 1,040 ha (100 m squares) at 60 px a square: 2.4 x 0.6 x 4 = 5.76 px.
-    expect(cowPx(60, 100)).toBeCloseTo(5.76, 5);
+    // 50 m squares at 60 px a square: 2.4 x 1.2 x 4 = 11.52 px.
+    expect(cowPx(60, 50)).toBeCloseTo(11.52, 5);
     expect(cowPx(1, 100)).toBe(CATTLE_MIN_PX);
     expect(cowPx(500, 100)).toBe(CATTLE_MAX_PX);
   });
@@ -407,9 +408,12 @@ describe('how big a beast is drawn', () => {
     expect(cowPx(44, side(200))).toBeGreaterThan(9);
   });
 
-  it('on a 3,000 ha farm cattle are small against the paddock at every zoom', () => {
+  it('on a 3,000 ha farm cattle are small against the paddock, but zoomed right in each is still a beast', () => {
     expect(cowPx(25, side(3000))).toBe(CATTLE_MIN_PX);
-    expect(cowPx(96, side(3000))).toBeLessThan(6);
+    expect(cowPx(40, side(3000))).toBe(CATTLE_MIN_PX);
+    // Zoomed right in, a tenth of a square: about 10 px.
+    expect(CATTLE_MIN_SHARE_OF_SQUARE).toBe(0.1);
+    expect(cowPx(96, side(3000))).toBeCloseTo(9.6, 5);
   });
 
   it('calves, heifers and bulls are in proportion to the cow, and nothing is a speck', () => {
