@@ -154,10 +154,7 @@ export function WorkforcePanel({ snapshot }: { snapshot: Snapshot }) {
           Your hands
         </h3>
         {w.hands.length === 0 ? (
-          <p className="muted">
-            No hands on the farm. A hand works their own days, does the first part of your jobs from
-            their own day and is paid on pay day.
-          </p>
+          <p className="muted">{w.noHandsText}</p>
         ) : (
           <>
             {w.payText && <p>{w.payText}</p>}

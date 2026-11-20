@@ -230,7 +230,8 @@ export function buildSnapshot(
       seq: m.seq,
       day: m.day,
       date: dateParts(dateOn(farm, m.day)),
-      time: m.at === undefined ? null : clockText(m.at),
+      // A Fast Farm is off the clock: its jobs take no time of day, so no time is shown.
+      time: m.at === undefined || clock.daylightLimit === false ? null : clockText(m.at),
       kind: words.kind,
       text: words.text,
       unread: m.seq > read,
@@ -290,7 +291,7 @@ export function buildSnapshot(
     paddocks,
     feed: feedWire(farm, env, mobs),
     build: buildWire(materialsOnHand(farm), shown),
-    workforce: workforceWire(farm, stored.missedWages ?? []),
+    workforce: workforceWire(farm, stored.missedWages ?? [], clock.daylightLimit),
     contracts: contractsWire(farm),
     inbox,
     inboxUnread,

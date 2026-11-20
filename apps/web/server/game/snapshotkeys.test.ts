@@ -333,7 +333,16 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
     'suppLabel',
   ],
   'feed.supplements[].options[]': ['adds', 'id', 'label', 'perDay'],
-  workforce: ['canHire', 'hands', 'owedText', 'payText', 'seekers', 'seekersText', 'standing'],
+  workforce: [
+    'canHire',
+    'hands',
+    'noHandsText',
+    'owedText',
+    'payText',
+    'seekers',
+    'seekersText',
+    'standing',
+  ],
   'workforce.hands[]': [
     'daysText',
     'dogs',

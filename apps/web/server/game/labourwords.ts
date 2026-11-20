@@ -139,8 +139,16 @@ const skillsOf = (s: { fencing: number; stock: number; water: number }): SkillWi
     text: `${label} ${rating} of 5`,
   }));
 
-const dogsText = (dogs: boolean): string =>
-  dogs ? 'Has a team of dogs. Stock jobs take less of your day.' : 'No dogs.';
+/**
+ * The dogs line. On a Daily Farm a hand with dogs takes less of your day on stock jobs. On a
+ * Fast Farm hands take no share of your jobs (CALLS B200), so the dogs are only a fact.
+ */
+const dogsText = (dogs: boolean, onClock: boolean): string =>
+  !dogs
+    ? 'No dogs.'
+    : onClock
+      ? 'Has a team of dogs. Stock jobs take less of your day.'
+      : 'Has a team of dogs.';
 
 type PersonFacts = Pick<
   JobSeeker,
@@ -165,7 +173,7 @@ export function personFor(farm: FarmState, ref: unknown): number {
   return ids.find((id) => personRef(farm, id) === ref) ?? -1;
 }
 
-function personWire(farm: FarmState, p: PersonFacts): PersonWire {
+function personWire(farm: FarmState, p: PersonFacts, onClock: boolean): PersonWire {
   return {
     id: personRef(farm, p.id),
     name: p.name,
@@ -175,7 +183,7 @@ function personWire(farm: FarmState, p: PersonFacts): PersonWire {
     daysText: daysText(p.days),
     skills: skillsOf(p.skills),
     dogs: p.dogs,
-    dogsText: dogsText(p.dogs),
+    dogsText: dogsText(p.dogs, onClock),
   };
 }
 
@@ -555,6 +563,7 @@ function handWire(
   h: HandView,
   nextPay: DateParts | null,
   dateOf: DateOf,
+  onClock: boolean,
 ): HandWire {
   const status =
     h.status === 'starts-soon'
@@ -565,10 +574,14 @@ function handWire(
           ? 'Not one of their days today'
           : `Off hurt until ${dayText(farm, h.offUntil ?? farm.day)}`;
   return {
-    ...personWire(farm, {
-      ...h,
-      contractDays: h.kind === 'contract' ? LABOUR.contractDays.value : null,
-    }),
+    ...personWire(
+      farm,
+      {
+        ...h,
+        contractDays: h.kind === 'contract' ? LABOUR.contractDays.value : null,
+      },
+      onClock,
+    ),
     statusText: status,
     endText: h.endDay === null ? null : `Contract ends on ${dayText(farm, h.endDay)}`,
     owedText:
@@ -580,21 +593,32 @@ function handWire(
 }
 
 /** The Workforce panel: everything it shows, as words and whole numbers. */
-export function workforceWire(farm: FarmState, missedDays: readonly number[]): WorkforceWire {
+/**
+ * The Workforce panel. `onClock` false is a Fast Farm, where hands take no share of the player's
+ * jobs (CALLS B200): the words say what a hand does there instead.
+ */
+export function workforceWire(
+  farm: FarmState,
+  missedDays: readonly number[],
+  onClock = true,
+): WorkforceWire {
   const wf = workforceView(farm);
   const seekers = jobSeekers(farm);
   const dateOf: DateOf = (d) => dateParts(dateOn(farm, d));
   const nextPay = wf.nextPayDate ? dateParts(wf.nextPayDate) : null;
   const full = wf.hands.length >= wf.maxHands;
   return {
-    seekers: seekers.map((p) => personWire(farm, p)),
+    seekers: seekers.map((p) => personWire(farm, p, onClock)),
     seekersText: full
       ? `The farm has ${plural(wf.hands.length, 'hand')}, the most it can take on at once.`
       : seekers.length === 0
         ? 'No one is looking for work in the district today.'
         : `${plural(seekers.length, 'person is', 'people are')} looking for work in the district.`,
     canHire: !full,
-    hands: wf.hands.map((h) => handWire(farm, h, nextPay, dateOf)),
+    hands: wf.hands.map((h) => handWire(farm, h, nextPay, dateOf, onClock)),
+    noHandsText: onClock
+      ? 'No hands on the farm. A hand works their own days, does the first part of your jobs from their own day and is paid on pay day.'
+      : 'No hands on the farm. On a Fast Farm a hand does their own duties (refilling troughs, putting tape back up) and helps a fencing team. Your jobs are done at once, so they take no share of them. A hand is paid on pay day.',
     payText:
       wf.hands.length === 0 || !nextPay
         ? null

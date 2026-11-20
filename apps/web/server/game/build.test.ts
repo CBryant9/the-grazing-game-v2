@@ -513,3 +513,22 @@ describe("the owner's snapshot names the farm by its id", () => {
     expect(seen?.farm.id).toBeUndefined();
   });
 });
+
+describe('the inbox on a Fast Farm', () => {
+  it('gives no time of day for a job: the farm is off the clock', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices({ startType: 'running' }));
+    expect(s0.clock.daylightLimit).toBe(false);
+    // Move the first mob in with the second: the inbox says they joined.
+    const [a, b] = s0.view.mobs;
+    const there = s0.view.paddocks.find((p) => s0.view.squares.paddock[b!.anchor] === p.id)!;
+    const done = await game.act(A, {
+      action: { type: 'moveMob', mob: a!.id, cell: there.labelCell },
+    });
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    const joined = done.snapshot.inbox.find((m) => /joined/.test(m.text));
+    expect(joined).toBeDefined();
+    for (const m of done.snapshot.inbox) expect(m.time).toBeNull();
+  });
+});

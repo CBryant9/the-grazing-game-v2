@@ -627,6 +627,8 @@ export interface WorkforceWire {
   seekersText: string;
   canHire: boolean;
   hands: HandWire[];
+  /** What the panel says with no hands: what a hand does on this farm (Fast Farm and Daily differ). */
+  noHandsText: string;
   /** The next pay day and what is owed to the hands so far. Null with no hands. */
   payText: string | null;
   /** Wages the farm could not pay when due, and what happens to them. Null when none are owed. */

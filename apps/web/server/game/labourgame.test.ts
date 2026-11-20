@@ -283,6 +283,19 @@ function farmWithSeekers(): FarmState {
 }
 
 describe('the Workforce panel', () => {
+  it('on a Fast Farm the words say what a hand does there: no share of your jobs (CALLS B200)', () => {
+    const farm = farmWithSeekers();
+    const daily = workforceWire(farm, []);
+    const fast = workforceWire(farm, [], false);
+    expect(daily.noHandsText).toMatch(/does the first part of your jobs/);
+    expect(fast.noHandsText).not.toMatch(/your jobs from|of your day/);
+    expect(fast.noHandsText).toMatch(/own duties/);
+    expect(fast.noHandsText).toMatch(/fencing team/);
+    for (const p of fast.seekers) expect(p.dogsText).not.toMatch(/of your day/);
+    const withDogs = daily.seekers.filter((p) => p.dogs);
+    for (const p of withDogs) expect(p.dogsText).toMatch(/Stock jobs take less of your day/);
+  });
+
   it('says each person as facts: skills as plain numbers, days, pay and dogs', () => {
     const farm = farmWithSeekers();
     const w = workforceWire(farm, []);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   applyAction,
   createFarm,
@@ -14,6 +14,8 @@ import { GameError, GameServer, farmIdFor, parseAction } from './game';
 import { buildSnapshot } from './snapshot';
 import { MemoryFarmStore, type StoredFarm } from './store';
 import { cleanName, parseSetup, setupOptions } from './setup';
+import { newFarm } from '../player';
+import { OWNER, at, choices as dailyChoices, database, keepThrough, rig } from '../daily/testrig';
 
 const A = 'a'.repeat(32);
 const B = 'b'.repeat(32);
@@ -275,6 +277,34 @@ describe('the game server', () => {
     expect(after.clock.usedMin).toBe(0);
   }, 60_000);
 
+  it('a Daily Farm keeps the light: at last light a job is refused, it is evening, and the next day the light is back', async () => {
+    // Fast Farm has no daylight limit (the test above); the Daily Farm keeps it (Claudia, 19 Nov 2026).
+    const r = await rig({ date: '2026-11-13', time: '10:00:00' });
+    await keepThrough(r, '2026-11-14');
+    const f = newFarm();
+    const s = await r.game.create(f.key, dailyChoices(), OWNER);
+    expect(s.clock.daylightLimit).toBe(true);
+    const mob = s.mobs.find((m) => m.where === 'paddock')!;
+    const cells = [...new Set(s.view.paddocks.map((p) => p.labelCell))];
+    let reason: string | null = null;
+    for (let i = 0; i < 200 && !reason; i++) {
+      const res = await r.game.act(f.key, {
+        action: { type: 'moveMob', mob: mob.id, cell: cells[i % cells.length]! },
+      });
+      if (!res.ok && res.reason.includes('daylight')) reason = res.message;
+    }
+    expect(reason).toMatch(/time|light/i);
+    const evening = (await r.game.snapshot(f.key))!;
+    expect(evening.clock.leftMin).toBeLessThan(60);
+    // Looking still works. The next day (after the midnight rollover) starts with the light back.
+    r.clock.now = at('2026-11-14', '00:20:00');
+    await r.roll({ feed: false });
+    const next = (await r.game.snapshot(f.key))!;
+    expect(next.day).toBe(evening.day + 1);
+    expect(next.clock.leftMin).toBe(next.clock.dayMin);
+    expect(next.clock.evening).toBe(false);
+  }, 180_000);
+
   it('ends the day and says what happened', async () => {
     const game = server();
     const first = await game.create(A, choices());
@@ -513,4 +543,8 @@ describe('the snapshot keeps the rules hidden', () => {
     );
     expect(snap.farm.district).toBe('wv');
   });
+});
+
+afterAll(async () => {
+  await (await database()).close();
 });
