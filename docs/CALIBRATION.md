@@ -1541,6 +1541,12 @@ What changed (no grass, cattle, sheep, crop, season, price or score formula, no 
 
 Existing tests edited, none a calibration test, each for a decided change: the version tests (`day/saves.test.ts`, 0.21.0 and format 16; `money/rescue.test.ts`, format 16; `server/game/oldsaves.test.ts`); the no-hands digest leaves out the two new records (`labour/noHands.test.ts`); the list of reads in `day/clock.test.ts` (five new reads); the key lists in `server/game/snapshotkeys.test.ts` and the record's keys in `server/game/routes.test.ts`. New: `sim/stockbook.test.ts` (13 tests), `server/game/stockfeed.test.ts` (30), `components/play/stockfeed.test.ts` (10).
 
+### 20 Nov 2026, m9 join and review fixes: engine 0.23.0, save format 17
+
+What changed in the engine (no grass, cattle, sheep, crop, season, price or score formula, no data table figure, no band): job times and contract pace only (m9 time: `ActionEnv.noClock` for a Fast Farm, and permanent fence and contract teams faster on a big place, `fenceScale` = sqrt(ha / 300), 1 to 5). After the review the farm view's `squares.hidden` is the model's own ground cover in twentieths (it was a drawing curve by pasture form, `VIEW_HIDE_KG`, now taken out); the view is not a model figure and is not saved. Nothing was added to a save.
+
+**The benchmarks were re-run on this tip (20 Nov 2026):** `npx vitest run packages/engine/src/calibration packages/engine/src/labour/noHands.test.ts` gives 21 files passed, 242 tests passed, 20 expected failures (the open calibration rows) and 4 skips, in 201 s. No band, skip, `it.fails` or tolerance changed. **The no-hands digests pass untouched** (`labour/noHands.test.ts`, the m8 realism 2 digests), so every grass, cattle, money and score figure on those farms is as it was.
+
 ### Earlier checks (build sessions, older model versions)
 
 - **v1, after the intake tune (260 ha, 25–60 steers):**

@@ -2632,7 +2632,7 @@ Branch `m9-cattle` from `m9-fun-and-flow` at b8338a3. After playing the rebuild 
 4. **Drawing order.** A row of cattle goes after the grass of the row in front and before the things in front, so small cattle never hide in tall grass and a trough or the windmill still covers them.
 5. **Speed.** Typed arrays; only mobs on screen move; only positions and sizes go to the graphics card each frame (the row containers' position and vertex are dynamic); one insertion-sort pass keeps rows in order; no frames while every beast on screen is standing (a timer wakes the map when the first is due) and none on a hidden page. Fence steps are worked out once a view, and the spread uses a bucket queue: placing the 4,000-head fixture's mobs went from about 15 ms to 5 ms, and a step of its 1,200 drawn beasts is about 0.25 ms on the build PC.
 
-**Constants:** `HERD_M2_PER_HEAD` 400, `SHEEP_M2_PER_HEAD` 60, `CATTLE_EXAGGERATION` 4, `CATTLE_MIN_PX` 5, `CATTLE_MIN_SHARE_OF_SQUARE` 0.1, `CATTLE_MAX_PX` 18, `ANIMAL_MIN_PX` 3.5, `MOB_DRAWN_MAX` 400, `FLOCK_DRAWN_MAX` 600, `FARM_DRAWN_MAX` 3,000, `DOT_PX` 3.5, `DOT_MIN_SPACING_PX` 4.5, `WALK_LENGTHS_PER_S` 1.8, `IDLE_SECONDS` 0.5 to 4, `TO_WATER` 0.07, `NEAR_MATE` 0.45, `HERD_SHIFT_SECONDS` 25 to 70, `TROT_SECONDS` 1.5 to 6. Stand-back from fences cut to 0.2 (sides) and 0.35 (under a fence above) for cattle, 0.14 and 0.22 for sheep, since the animals are now smaller. The calls are B190 to B198 in `docs/CALLS_FOR_CLAUDIA.md` (numbered from 190 so they do not clash with the m9 time calls, B180 to B186).
+**Constants:** `HERD_M2_PER_HEAD` 400, `SHEEP_M2_PER_HEAD` 60, `CATTLE_EXAGGERATION` 4, `CATTLE_MIN_PX` 5, `CATTLE_MIN_SHARE_OF_SQUARE` 0.1, `CATTLE_MAX_PX` 18, `ANIMAL_MIN_PX` 3.5, `MOB_DRAWN_MAX` 400, `FLOCK_DRAWN_MAX` 600, `FARM_DRAWN_MAX` 3,000, `DOT_PX` 3.5, `DOT_MIN_SPACING_PX` 4.5, `WALK_LENGTHS_PER_S` 1.8, `IDLE_SECONDS` 0.5 to 4, `TO_WATER` 0.07, `NEAR_MATE` 0.45, `HERD_SHIFT_SECONDS` 25 to 70, `TROT_SECONDS` 1.5 to 6. Stand-back from fences cut to 0.2 (sides) and 0.35 (under a fence above) for cattle, 0.14 and 0.22 for sheep, since the animals are now smaller. The calls are B190 to B198 in `docs/CALLS_FOR_CLAUDIA.md` (numbered from 190 so they do not clash with the m9 time calls, B200 to B206).
 
 **Tests:** `herd.test.ts` (new: walk and stop, never out of the area or through a fence with a spur, calves near mothers, facing, drawn to better feed, faster with the pace and still when paused, places kept over a new day and a smaller mob, a moved mob walks there, bought cattle from the yards, reduce motion, the patch drifts inside its area, only mobs on screen move, a fence put through the herd). `cattle.test.ts`, `sheep.test.ts` and `lod.test.ts` updated for the new spread, size and dot rules (900 head on 3,000 ha take 13 squares; 200 ha full zoom 18 px; 3,000 ha whole farm is a patch).
 
@@ -2704,8 +2704,46 @@ Branch `m9-time` from `m9-fun-and-flow` at b8338a3. Claudia's 19 Nov 2026 reques
 
 ### Not done
 
-- The `realism-guardian` agent was not run on this branch. Lighthouse was not run.
-- Other m9 builders may also bump the engine to 0.23.0: check the version at the join. The cattle pace on the map (`FarmMap.setCattlePace`, from the cattle builder) is not on this branch, so the day clock's speed and pause are not yet wired to it.
+- The `realism-guardian` agent was not run on this branch on its own. It was run on both halves after the join (the cattle, grass and build half, and this time half); its findings were fixed on 20 Nov 2026 (the entry below). Lighthouse was not run.
+- Other m9 builders may also bump the engine to 0.23.0: check the version at the join. *(Done at the join: the cattle pace is now wired. `PlayScreen` passes `cattlePace` to the map: 0 when the day is paused, otherwise the day's speed; 1 on a Daily Farm.)*
+
+## 20 Nov 2026: Review fixes after the m9 join
+
+The realism review of the joined branch (`m9-fun-and-flow`: grass base, cattle, build grid and step flow, Fast Farm's moving day) found the items below. All were fixed on this branch.
+
+### Grass, cattle and the map
+
+- **The model's diet weighting was in browser code** (PRD 5.16). The map's walking cattle copied the engine's energy slope, water decay and bare-ground cut into `packages/render/src/herd.ts`. Now a made-up drawing preference from the view's cover, green share and distance to water (`DRAW_PULL_*`): linear in cover, half as much again for all green, a mild linear pull to water. LESSONS M11.
+- **Big mobs hid the pasture on crowded strips.** A cap per square from the drawn size (`perSquareCap`, `MAX_HIDDEN_SHARE` 0.4 at full zoom, `DRAWN_AREA_PER_LENGTH2` 1): about 43 steers on a 1 ha square, 11 cows on a square of a 200 ha farm; sheep the same. The "big mobs do not hide the pasture" test is back beside the strip test, and a strip still reads denser than a paddock. LESSONS M12.
+- **The zoomed-out herd patch blended into the grass.** 80% fill with a pale rim for cattle, 85% pale with a dark rim for sheep, the rim a steady 1.5 screen pixels (`HERD_PATCH`). The palette test holds patch and dots to 3 to 1 against every ground colour, every pasture form, in daytime light. Animals drawn under 10 px use a small sprite whose rim is at least 1 px (`SMALL_SPRITE_BELOW_PX`, `MIN_RIM_PX`).
+- **The map's ground cover disagreed with the paddock sheet.** The view's `hidden` is now the model's own cover in twentieths; the curve by form (`VIEW_HIDE_KG`) is gone and the form sets only the pattern. VISUALS, DATA ("Ground hidden from above") and CALLS G2 rewritten. The engine's grass and cattle numbers did not change. LESSONS M13.
+- **The live length label and the job card counted differently.** Both now count new fence segments only and new squares of pipe only, at the exact side of a square (`draftMetres`, `lineMetres`), with tests against the server's card, including pipe that does not start on the bore.
+- **First steps were put away per farm name.** The owner's snapshot now carries the farm id (`farm.id`; none for a farm someone else looks at), and the things to do key on it.
+- **The landscape tool row ran over.** Two rows of four at the upright size. Checked in the browser at 667 x 375, 740 x 360 and 812 x 375: no word runs over and the eight tools fit. With Fence picked, the kinds of fence below the tools make the bar scroll by 3 px at 667 x 375 (it already scrolled; the tap height of 44 px was kept).
+- **`FarmMap` read the page's layout on every render**, every drag step included. Insets are measured on a ResizeObserver of the covers and their pieces, and the card is placed when its anchor moves or its contents change size.
+- Small: the orphaned "Every sprite the map uses" comment is on `defaultSprites`; the grass fallback list says it is kept only for stored past-day pictures.
+- Docs: REQUIREMENTS "The base of a paddock" ticked with what was built; 400 m² and 60 m² a head and the cattle and sheep body lengths listed as builder stand-ins (CALLS B192, section 2; VISUALS).
+
+### Fast Farm's moving day (T1 to T8)
+
+- **T1, the day could end under the player's hands.** The day's answer no longer clears anything: what was opened while the request was out is kept and its card asked again against the new day (`askAgain`). Confirm, Build, Next day and the skips wait while it is out ("New day coming", `dayComing`). Tests in `autoday.test.ts`. LESSONS T1. CALLS B202 updated.
+- **T2, nothing stopped an unattended day.** An idle pause after 3 minutes with no pointer, key or touch (`IDLE_PAUSE_MS`): "Paused: no one at the farm for 3 minutes. Play to carry on." The day's own pauses (idle, a stop, a failure) are never saved as the player's choice. The Scores and Diary are no longer fetched every day while open (only when opened, after Next day or a skip, and on a day that stops). CALLS B207 and a cost note for Claudia in REQUIREMENTS: 225 calls an hour at 1x, 450 at 2x, 900 at 4x. LESSONS T2.
+- **T3, hand words on a Fast Farm.** The Workforce panel says what a hand does there, and the dogs line drops "Stock jobs take less of your day". CALLS B200 updated, with lower Fast Farm wages as an option.
+- **T4.** Only `daylightLimit === false` is a Fast Farm, in `PlayScreen` and `TopBar` as in the store and the build card.
+- **T5, inbox times on a Fast Farm.** No time of day is shown for a Fast Farm's inbox. Done in the snapshot words (`snapshot.ts`): the engine stamps the time in `day/act.ts`, which this pass did not touch, so the save still carries it; nothing reads it on a Fast Farm.
+- **T6.** Next day and the skips show as busy (disabled, with an aria label) while the day's own request is out.
+- **T7.** The landscape day bar's `min-width: 0` is for a Fast Farm only; the Daily Farm's DaylightBar keeps 40 px.
+- **T8.** A server-level Daily Farm test is back in `game.test.ts`: at last light a job is refused, it is evening, and after the midnight rollover the light is back.
+- Docs: CALIBRATION (engine 0.23.0 logged), this log's cattle line (the time calls are B200 to B206), the m9 time "Not done" list (the cattle pace is wired: `PlayScreen` passes 0 when paused, else the speed, and 1 on a Daily Farm; `realism-guardian` ran on both halves, which is this pass).
+
+### Checks
+
+- `pnpm typecheck` and `pnpm lint`: clean. Prettier: every changed file passes.
+- `npx vitest run packages/render packages/shared apps/web packages/engine/src/sim packages/engine/src/day packages/engine/src/labour packages/engine/src/actions`: 171 files, 2,544 tests, all pass (230 s).
+- `npx vitest run packages/engine/src/calibration packages/engine/src/labour/noHands.test.ts`: 21 files; 242 pass, 20 expected failures (the open calibration rows), 4 skipped. The no-hands digests match (CALIBRATION.md, this date).
+- The new inbox-time test was checked to fail with the fix taken out, and pass with it.
+- Browser (dev server on 127.0.0.1:3120, a new Fast Farm): the tool row measured at 667 x 375, 740 x 360 and 812 x 375 as above. The zoomed-out herd patch was seen with its rim on a PC-sized pane; the pane's screenshots crop (LESSONS G4), so the phone sizes were measured, not photographed. Nothing was checked on a real phone, and Lighthouse was not run.
+- Not done: the engine still stamps a time on a Fast Farm's inbox entries (`day/act.ts`, not touched in this pass); only the words leave it off. Cattle that walk can still bunch above the per-square cap for a moment (the cap holds where they are placed); a cap on walking was left out.
 
 ## Ideas raised but not built yet
 
