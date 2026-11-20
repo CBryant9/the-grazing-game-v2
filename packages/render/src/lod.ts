@@ -9,6 +9,8 @@
  * nothing pops and the map never sits half way between the two pictures.
  */
 
+import { NATURAL } from './palette';
+
 /** At or below about this many screen pixels per square, mobs become one marker (PRD 7). */
 export const LOD_SWITCH_PX_PER_SQUARE = 26;
 
@@ -61,6 +63,24 @@ export const easeFade = (t: number): number => {
 // Cattle zoomed out (19 Nov 2026: "I would like to see the cows when zoomed
 // out if the densities aren't too large")
 // ---------------------------------------------------------------------------
+
+/**
+ * Zoomed out, a mob too crowded to read as dots is a filled patch over the
+ * ground it takes up, with a rim round its edge: dark with a pale rim for
+ * cattle, pale with a dark rim for sheep, the same pairs as the dots and the
+ * animals themselves. The palette test holds the patch or its rim to 3 to 1
+ * against every ground and grass colour. Drawing figures (builder).
+ */
+export const HERD_PATCH = {
+  cattleFill: NATURAL.cattleOutline,
+  cattleAlpha: 0.8,
+  cattleRim: NATURAL.cattleHalo,
+  sheepFill: NATURAL.sheepHalo,
+  sheepAlpha: 0.85,
+  sheepRim: NATURAL.sheepOutline,
+  /** The rim's width on screen, CSS pixels, at any zoom. */
+  rimPx: 1.5,
+} as const;
 
 /** Zoomed out, each beast drawn is a dot this many screen pixels across. */
 export const DOT_PX = 3.5;

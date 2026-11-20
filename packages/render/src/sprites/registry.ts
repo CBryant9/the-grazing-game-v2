@@ -18,6 +18,8 @@ export interface SpriteDef {
   ay: number;
   /** Texture pixels for one square across. The map scales the sprite by this. */
   ppu: number;
+  /** An animal's body length, texture pixels: the map sizes animals by it. */
+  body?: number;
   /** Draws the sprite, once, onto a canvas of its size. */
   paint?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
   /** Exported art to use in place of drawing it. */

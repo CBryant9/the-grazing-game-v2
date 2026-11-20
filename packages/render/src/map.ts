@@ -128,7 +128,7 @@ import {
 } from './buildgrid';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
-import { DOT_PX, easeFade, fadeStep, herdAsDots, lodMode, type LodMode } from './lod';
+import { DOT_PX, HERD_PATCH, easeFade, fadeStep, herdAsDots, lodMode, type LodMode } from './lod';
 import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, MESH, TICK, tickOffsets } from './linestyle';
 import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
@@ -139,9 +139,11 @@ import {
   CATTLE_W_PER_BODY,
   DOT_SPRITE,
   SHEEP_W_PER_BODY,
+  SMALL_SPRITE_BELOW_PX,
   cattleSprite,
   defaultSprites,
   sheepSprite,
+  smallSprite,
 } from './sprites/painters';
 import { packAtlas, type SpriteDef, type SpriteRegistry } from './sprites/registry';
 
@@ -561,9 +563,14 @@ class PixiFarmMap implements FarmMap {
   /** For each sprite in the cattle rows (cattle then sheep): its length against a cow's, and its body length in texture pixels. */
   private beastLen = new Float32Array(0);
   private beastTex = new Float32Array(0);
+  /** Each sprite's full-size sprite name, and whether it shows its small sprite now. */
+  private beastId: string[] = [];
+  private beastSmall = new Uint8Array(0);
   private sheepParts: Particle[] = [];
   private sheepLen = new Float32Array(0);
   private sheepTex = new Float32Array(0);
+  private sheepId: string[] = [];
+  private sheepSmall = new Uint8Array(0);
   /** Zoomed out: a dot for each beast and sheep, where the mob is not too crowded to read as dots. */
   private dots = new ParticleContainer<Particle>({
     dynamicProperties: { position: true, vertex: true, rotation: false, uvs: false, color: false },
@@ -1048,6 +1055,8 @@ class PixiFarmMap implements FarmMap {
     this.fenceNear.alpha = lod.near;
     this.footprints.visible = far;
     this.footprints.alpha = lod.far;
+    // The patches' rims keep their width on screen: drawn again for a new zoom once they show.
+    if (far && this.footprintZoom !== cam.zoom) this.drawFootprints();
     this.dots.visible = far && this.dots.particleChildren.length > 0;
     this.dots.alpha = lod.far;
 
@@ -1325,6 +1334,8 @@ class PixiFarmMap implements FarmMap {
     this.beastRow = new Int16Array(n);
     this.beastLen = new Float32Array(n);
     this.beastTex = new Float32Array(n);
+    this.beastId = new Array<string>(n);
+    this.beastSmall = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const kind = herd.kind[i]!;
       const id = cattleSprite(breed, kind, herd.shape[i]!);
@@ -1336,7 +1347,8 @@ class PixiFarmMap implements FarmMap {
       p.y = herd.y[i]! * K;
       this.beastParts[i] = p;
       this.beastLen[i] = CATTLE_LENGTH_M[kind] / CATTLE_LENGTH_M.cow;
-      this.beastTex[i] = def.w / CATTLE_W_PER_BODY;
+      this.beastTex[i] = def.body ?? def.w / CATTLE_W_PER_BODY;
+      this.beastId[i] = id;
       const r = rowFor(herd.y[i]!);
       this.beastRow[i] = r;
       this.rows[r]!.cattle.particleChildren.push(p);
@@ -1359,6 +1371,8 @@ class PixiFarmMap implements FarmMap {
     this.sheepParts = new Array<Particle>(sheep.length);
     this.sheepLen = new Float32Array(sheep.length);
     this.sheepTex = new Float32Array(sheep.length);
+    this.sheepId = sheep.map((s) => s.id);
+    this.sheepSmall = new Uint8Array(sheep.length);
     sheep.forEach((s, k) => {
       const def = this.def(s.id);
       const p = new Particle(this.tex(s.id));
@@ -1369,7 +1383,7 @@ class PixiFarmMap implements FarmMap {
       p.scaleX = s.flip ? -1 : 1;
       this.sheepParts[k] = p;
       this.sheepLen[k] = s.len;
-      this.sheepTex[k] = def.w / SHEEP_W_PER_BODY;
+      this.sheepTex[k] = def.body ?? def.w / SHEEP_W_PER_BODY;
       this.rows[rowFor(s.y)]!.cattle.particleChildren.push(p);
     });
     for (const row of this.rows) {
@@ -1389,18 +1403,45 @@ class PixiFarmMap implements FarmMap {
     this.sizedZoom = zoom;
     const cow = cowPx(zoom, this.view?.scale.sideM ?? 100);
     const dir = this.herd.dir;
+    let swapped = false;
+    // Drawn small, an animal uses its small sprite, whose rim stays a pixel or more wide.
+    const pick = (p: Particle, id: string, small: boolean): number => {
+      const name = small ? smallSprite(id) : id;
+      const def = this.def(name);
+      p.texture = this.tex(name);
+      p.anchorX = def.ax;
+      p.anchorY = def.ay;
+      swapped = true;
+      return def.body ?? def.w;
+    };
     for (let i = 0; i < this.beastParts.length; i++) {
       const p = this.beastParts[i]!;
-      const s = Math.max(ANIMAL_MIN_PX, cow * this.beastLen[i]!) / zoom / this.beastTex[i]!;
+      const px = Math.max(ANIMAL_MIN_PX, cow * this.beastLen[i]!);
+      const small = px < SMALL_SPRITE_BELOW_PX ? 1 : 0;
+      if (small !== this.beastSmall[i]) {
+        this.beastSmall[i] = small;
+        this.beastTex[i] = pick(p, this.beastId[i]!, small === 1);
+      }
+      const s = px / zoom / this.beastTex[i]!;
       p.scaleY = s;
       p.scaleX = dir[i]! < 0 ? -s : s;
     }
     for (let k = 0; k < this.sheepParts.length; k++) {
       const p = this.sheepParts[k]!;
-      const s = Math.max(ANIMAL_MIN_PX, cow * this.sheepLen[k]!) / zoom / this.sheepTex[k]!;
+      const px = Math.max(ANIMAL_MIN_PX, cow * this.sheepLen[k]!);
+      const small = px < SMALL_SPRITE_BELOW_PX ? 1 : 0;
+      if (small !== this.sheepSmall[k]) {
+        this.sheepSmall[k] = small;
+        this.sheepTex[k] = pick(p, this.sheepId[k]!, small === 1);
+      }
+      const s = px / zoom / this.sheepTex[k]!;
       p.scaleY = s;
       p.scaleX = p.scaleX < 0 ? -s : s;
     }
+    // A new picture in a batch has to be sent again.
+    if (swapped) for (const row of this.rows) row.cattle.update();
+    // The patches' rims keep their width on screen.
+    if (this.lod.far > 0.01 && this.footprintZoom !== zoom) this.drawFootprints();
     const d = DOT_PX / zoom / this.def(DOT_SPRITE.cattle).w;
     for (const p of this.dots.particleChildren) {
       p.scaleX = d;
@@ -1531,20 +1572,63 @@ class PixiFarmMap implements FarmMap {
     this.dots.update();
     this.dots.visible = this.lod.far > 0.01 && list.length > 0;
 
-    // The footprint under each marker: light under dots, a filled patch for a crowded mob.
+    this.mobDots = mobDots;
+    this.flockDots = flockDots;
+    this.drawFootprints();
+  }
+
+  /** Which mobs and flocks show as dots zoomed out (the rest as patches). */
+  private mobDots: boolean[] = [];
+  private flockDots: boolean[] = [];
+  /** The zoom the patches' rims were last drawn for. */
+  private footprintZoom = 0;
+
+  /**
+   * The footprint under each marker: light under dots, a filled patch with a
+   * rim for a crowded mob (`HERD_PATCH`). The rim is a steady width on
+   * screen, so it is drawn again when the zoom changes.
+   */
+  private drawFootprints(): void {
     const g = this.footprints.clear();
+    this.footprintZoom = this.cam.zoom;
+    const P = HERD_PATCH;
+    const rimW = P.rimPx / Math.max(1e-6, this.cam.zoom);
     const cover = (cells: readonly number[]): void => {
       for (const c of cells) g.rect(colOf(c), rowOf(c) * K - this.raise[c]!, 1.02, K + 0.02);
     };
-    herd.mobs.forEach((m, k) => {
+    // The edge of a patch: every side of its squares that is not shared with another of them.
+    const rim = (cells: readonly number[]): void => {
+      const own = new Set(cells);
+      for (const c of cells) {
+        const x = colOf(c);
+        const r = rowOf(c);
+        const y0 = r * K - this.raise[c]!;
+        const y1 = y0 + K;
+        if (r === 0 || !own.has(c - GRID_W)) g.moveTo(x, y0).lineTo(x + 1, y0);
+        if (r === GRID_H - 1 || !own.has(c + GRID_W)) g.moveTo(x, y1).lineTo(x + 1, y1);
+        if (x === 0 || !own.has(c - 1)) g.moveTo(x, y0).lineTo(x, y1);
+        if (x === GRID_W - 1 || !own.has(c + 1)) g.moveTo(x + 1, y0).lineTo(x + 1, y1);
+      }
+    };
+    this.herd.mobs.forEach((m, k) => {
       cover(m.cells);
-      if (mobDots[k]) g.fill({ color: 0x281a0a, alpha: 0.14 });
-      else g.fill({ color: NATURAL.cattleOutline, alpha: m.where === 'yards' ? 0.14 : 0.5 });
+      if (this.mobDots[k] || m.where === 'yards') {
+        g.fill({ color: 0x281a0a, alpha: 0.14 });
+        return;
+      }
+      g.fill({ color: P.cattleFill, alpha: P.cattleAlpha });
+      rim(m.cells);
+      g.stroke({ color: P.cattleRim, width: rimW, alpha: 1, cap: 'square' });
     });
     this.flockPlacements.forEach((f, k) => {
       cover(f.cells);
-      if (flockDots[k]) g.fill({ color: 0x281a0a, alpha: 0.14 });
-      else g.fill({ color: NATURAL.sheepHalo, alpha: 0.55 });
+      if (this.flockDots[k]) {
+        g.fill({ color: 0x281a0a, alpha: 0.14 });
+        return;
+      }
+      g.fill({ color: P.sheepFill, alpha: P.sheepAlpha });
+      rim(f.cells);
+      g.stroke({ color: P.sheepRim, width: rimW, alpha: 1, cap: 'square' });
     });
   }
 

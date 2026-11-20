@@ -142,7 +142,8 @@ describe('cattle walk and graze', () => {
       }
     }
     const pull = feedPull(view);
-    expect(pull[cell(21, 4)]!).toBeGreaterThan(pull[cell(27, 4)]! * 10);
+    // A drawing preference, not the model's diet: thick green feed draws about five times as hard.
+    expect(pull[cell(21, 4)]!).toBeGreaterThan(pull[cell(27, 4)]! * 4);
     // 600 head want 24 ha: they fill the box, so where they stand is their pick.
     view.mobs = [mob({ area: box, anchor: cell(27, 4), head: 600 })];
     const h = herdFor(view);
@@ -150,6 +151,26 @@ describe('cattle walk and graze', () => {
     let good = 0;
     for (let i = 0; i < h.n; i++) if (h.x[i]! < 25) good++;
     expect(good / h.n).toBeGreaterThan(0.6);
+  });
+
+  it('the pull is a drawing preference: energy does not change it, water a little', () => {
+    const view = sampleView();
+    const a = cell(10, 10);
+    const b = cell(11, 10);
+    for (const i of [a, b]) {
+      view.squares.cover[i] = 8;
+      view.squares.green[i] = 10;
+      view.squares.waterDist[i] = 1;
+    }
+    view.squares.me10[a] = 60;
+    view.squares.me10[b] = 120;
+    let pull = feedPull(view);
+    expect(pull[a]).toBe(pull[b]);
+    // Far from water draws less than near it, but never under half as much.
+    view.squares.waterDist[b] = 30;
+    pull = feedPull(view);
+    expect(pull[b]!).toBeLessThan(pull[a]!);
+    expect(pull[b]!).toBeGreaterThanOrEqual(pull[a]! * 0.49);
   });
 
   it('walk faster when the days run faster, and stand still when paused', () => {

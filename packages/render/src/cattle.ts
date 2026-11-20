@@ -19,12 +19,15 @@
  *   `cowPx`), so how crowded a mob looks follows its real density
  *   (Claudia, 19 Nov 2026: "900 fills like a quarter of the area on 3000 ha").
  * - One sprite a head up to `MOB_DRAWN_MAX` a mob and `FARM_DRAWN_MAX` a
- *   farm. Past that a mob draws a sample, spread over its true area, so its
- *   footprint stays true. The marker and badge always carry the real head
- *   count (PRD 7).
+ *   farm, and never more to a square than hides `MAX_HIDDEN_SHARE` of it
+ *   zoomed right in (`perSquareCap`: big mobs don't hide the pasture,
+ *   REQUIREMENTS; LESSONS M1 and 31). Past that a mob draws a sample, spread
+ *   over its true area, so its footprint stays true. The marker and badge
+ *   always carry the real head count (PRD 7).
  */
 
 import { VIEW_FENCE, type FarmView, type FarmViewMob, type ViewCattleKind } from '@gg/shared';
+import { MAX_ZOOM } from './camera';
 import { GRID_H, GRID_N, GRID_W, colOf, hIndex, rowOf, vIndex } from './grid';
 import { hash3, scatter, unit } from './random';
 
@@ -88,6 +91,47 @@ export function cowPx(pxPerSquare: number, sideM: number): number {
 /** How long an animal `lengthM` long is drawn, in screen pixels: in proportion to the cow. */
 export function animalPx(lengthM: number, pxPerSquare: number, sideM: number): number {
   return Math.max(ANIMAL_MIN_PX, (cowPx(pxPerSquare, sideM) * lengthM) / CATTLE_LENGTH_M.cow);
+}
+
+/**
+ * Zoomed right in, the animals drawn on a square never hide more than this
+ * share of it, however crowded the mob (REQUIREMENTS: "big mobs don't hide
+ * the pasture"; LESSONS M1 and 31). A drawing figure (builder).
+ */
+export const MAX_HIDDEN_SHARE = 0.4;
+/**
+ * The screen area a drawn animal hides, in body lengths squared: side on,
+ * its body, head and legs and the gaps between. A drawing stand-in, a
+ * little under the box its sprite is drawn in (1.3 lengths wide and about
+ * 1.1 high for a beast, 1.55 by 1.2 for a sheep) (builder).
+ */
+export const DRAWN_AREA_PER_LENGTH2 = 1;
+
+/**
+ * The most animals of body length `lengthM` (metres) drawn on one square of
+ * a farm whose squares are `sideM` a side, so that zoomed right in
+ * (`MAX_ZOOM`) they hide no more than `MAX_HIDDEN_SHARE` of the square. At
+ * least one.
+ */
+export function perSquareCap(lengthM: number, sideM: number): number {
+  const share = animalPx(lengthM, MAX_ZOOM, sideM) / MAX_ZOOM;
+  return Math.max(1, Math.floor(MAX_HIDDEN_SHARE / (share * share * DRAWN_AREA_PER_LENGTH2)));
+}
+
+/**
+ * The per-square cap for a mob, by the ground its mix of kinds hides: the
+ * length whose square is the mob's average (a few bulls among cows barely
+ * move it, a mob of bulls is capped as bulls, calves count small).
+ */
+export function mobSquareCap(mob: Pick<FarmViewMob, 'cattle'>, sideM: number): number {
+  let n = 0;
+  let area = 0;
+  for (const c of mob.cattle) {
+    if (c.n <= 0) continue;
+    n += c.n;
+    area += c.n * CATTLE_LENGTH_M[c.kind] ** 2;
+  }
+  return perSquareCap(n > 0 ? Math.sqrt(area / n) : CATTLE_LENGTH_M.cow, sideM);
 }
 
 /** A cow's length in squares at its exaggerated size, held to what reads. For spacing calves. */
@@ -509,7 +553,9 @@ export function placeMob(
     cells = ground.cells;
     herdM2 = ground.herdM2;
     boxScale = ground.boxScale;
-    cap = options.everyBeast ? cells.length * EVERY_BEAST_PER_SQUARE : budget;
+    cap = options.everyBeast
+      ? cells.length * EVERY_BEAST_PER_SQUARE
+      : Math.min(budget, cells.length * mobSquareCap(mob, view.scale.sideM));
   }
 
   const drawn = Math.max(1, Math.min(total, cap));

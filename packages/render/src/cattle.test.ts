@@ -284,7 +284,15 @@ describe('how many cattle are drawn, and over how much ground', () => {
     }
   });
 
-  it('the same mob fills a small strip, so high density looks crowded', () => {
+  /** The most drawn on any one square. */
+  const busiest = (p: MobPlacement): number => {
+    const per = new Map<number, number>();
+    for (const x of p.beasts) per.set(squareOf(x), (per.get(squareOf(x)) ?? 0) + 1);
+    return Math.max(...per.values());
+  };
+
+  /** 4,000 steers on a tape strip of four 1 ha squares. */
+  const strip = (): MobPlacement => {
     const view = sampleView();
     const box = fenceBox(view, 24, 4, 25, 5, VIEW_FENCE.tape); // four squares
     view.mobs = [
@@ -295,12 +303,54 @@ describe('how many cattle are drawn, and over how much ground', () => {
         cattle: [{ kind: 'steer', n: 4000, thin: 0, fat: 0 }],
       }),
     ];
-    const p = only(view);
+    return only(view);
+  };
+
+  it('the same mob fills a small strip, so high density looks crowded, and a strip reads denser than a big paddock', () => {
+    const p = strip();
     expect(p.cells.length).toBe(4);
-    expect(p.beasts.length).toBe(MOB_DRAWN_MAX);
     expect(p.herdM2).toBe(4 * 10000);
     expect(p.sampled).toBe(true);
     expect(p.total).toBe(4000);
+    // 180 head on open country stand at their true density: 180 over eight 1 ha squares.
+    const open = only(withMob(180));
+    expect(open.cells.length).toBe(8);
+    const openPerSquare = open.beasts.length / open.cells.length;
+    expect(openPerSquare).toBeCloseTo(22.5);
+    expect(p.beasts.length / p.cells.length).toBeGreaterThan(openPerSquare * 1.5);
+  });
+
+  it('big mobs do not hide the pasture: zoomed right in, the cattle on a square hide 40% of it at most (REQUIREMENTS; LESSONS M1 and 31)', () => {
+    // At full zoom (96 px a square) on 100 m squares a steer is drawn 9.2 px long
+    // (2.3 m against a cow's 2.4 m, the cow at a tenth of the square: 9.6 px), and
+    // hides about its length squared: 84.6 px². 40% of a 96 px square is 3,686 px²,
+    // so no more than 43 to a square.
+    const p = strip();
+    expect(busiest(p)).toBeLessThanOrEqual(43);
+    expect(busiest(p) * 9.2 * 9.2).toBeLessThanOrEqual(0.4 * 96 * 96);
+    // Still crowded: well over the open paddock's 22 or 23 a square.
+    expect(busiest(p)).toBeGreaterThan(35);
+    expect(p.beasts.length).toBeLessThan(MOB_DRAWN_MAX);
+  });
+
+  it('on a small farm, where cattle are drawn bigger against a square, fewer stand on one', () => {
+    // 200 ha: squares 43.9 m a side. At full zoom a cow is held to 18 px of the 96:
+    // 324 px² a cow, so 11 to a square at most (12 would hide 3,888 of 9,216 px², 42%).
+    const view = sampleView();
+    view.scale = { farmHa: 200, haPerSquare: 200 / 1040, sideM: 43.9 };
+    const box = fenceBox(view, 24, 4, 25, 5, VIEW_FENCE.tape);
+    view.mobs = [
+      mob({
+        area: box,
+        anchor: cell(24, 4),
+        head: 600,
+        cattle: [{ kind: 'cow', n: 600, thin: 0, fat: 0 }],
+      }),
+    ];
+    const p = only(view);
+    expect(busiest(p)).toBeLessThanOrEqual(11);
+    expect(busiest(p)).toBeGreaterThanOrEqual(9);
+    expect(p.total).toBe(600);
   });
 
   it('900 head on a 3,000 ha farm take up about 36 ha, not a quarter of the farm (Claudia, 19 Nov 2026)', () => {
@@ -361,8 +411,10 @@ describe('how many cattle are drawn, and over how much ground', () => {
       }),
     ];
     const p = only(view);
-    expect(p.beasts.length).toBe(MOB_DRAWN_MAX);
-    expect(p.beasts.filter((b) => b.kind === 'bull').length).toBe(4);
+    // Two squares hold no more than their share of the pasture can show (about 80 cattle).
+    expect(p.beasts.length).toBeLessThan(MOB_DRAWN_MAX);
+    expect(p.sampled).toBe(true);
+    expect(p.beasts.filter((b) => b.kind === 'bull').length).toBeGreaterThanOrEqual(1);
   });
 });
 

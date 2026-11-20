@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { frameStats, struggling } from '../bench';
 import { swardCaption, swardParts, swardPlan } from '../sward';
 import { SWARD, sampleView } from '../testing/sampleView';
-import { cattleSprite, defaultSprites } from './painters';
+import { css } from '../colour';
+import { NATURAL } from '../palette';
+import {
+  MIN_RIM_PX,
+  SMALL_SPRITE_BELOW_PX,
+  cattleSprite,
+  defaultSprites,
+  sheepSprite,
+  smallSprite,
+} from './painters';
 import { SpriteRegistry, packAtlas } from './registry';
 
 describe('the sprite registry', () => {
@@ -106,6 +115,75 @@ describe('the sprite registry', () => {
   it('swapping a sprite that does not exist is an error, not a silent new sprite', () => {
     expect(() => new SpriteRegistry().replace('cow', {} as CanvasImageSource)).toThrow(/No sprite/);
   });
+});
+
+/**
+ * Paint a sprite onto a stand-in canvas that only notes the width of each
+ * stroke in the rim colour and in the dark line colour.
+ */
+function strokeWidths(id: string): { rim: number; line: number } {
+  const def = defaultSprites().get(id)!;
+  const widths = { rim: 0, line: 0 };
+  const state: Record<string | symbol, unknown> = {};
+  const ctx = new Proxy(state, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (key === 'stroke') {
+        return () => {
+          const w = Number(target.lineWidth ?? 0);
+          if (target.strokeStyle === css(NATURAL.cattleHalo)) widths.rim = Math.max(widths.rim, w);
+          if (target.strokeStyle === css(NATURAL.cattleOutline)) {
+            widths.line = Math.max(widths.line, w);
+          }
+        };
+      }
+      return () => undefined;
+    },
+    set(target, key, value) {
+      target[key] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  def.paint!(ctx, def.w, def.h);
+  return widths;
+}
+
+describe('small animals keep their rim (the palette test holds the colours)', () => {
+  const reg = defaultSprites();
+  const animals = [
+    cattleSprite('british', 'cow', 'normal'),
+    cattleSprite('brahman', 'bull', 'fat'),
+    cattleSprite('brahman', 'calf', 'normal'),
+    sheepSprite('ewe', false),
+    sheepSprite('lamb', false),
+  ];
+
+  it('every animal has a small sprite, sized by its own body length', () => {
+    for (const id of reg.ids().filter((x) => /^(cattle|sheep)\.[^.]+\.[^.]+(\.[^.]+)?$/.test(x))) {
+      if (id.endsWith('.small')) continue;
+      const small = reg.get(smallSprite(id));
+      expect(small, id).toBeDefined();
+      expect(small!.body, id).toBeGreaterThan(0);
+      expect(reg.get(id)!.body, id).toBeGreaterThan(small!.body!);
+    }
+  });
+
+  it.each(animals)(
+    '%s: drawn under 10 px long, the pale rim outside the dark line is at least 1 px',
+    (id) => {
+      expect(SMALL_SPRITE_BELOW_PX).toBe(10);
+      expect(MIN_RIM_PX).toBe(1);
+      const def = reg.get(smallSprite(id))!;
+      const { rim, line } = strokeWidths(smallSprite(id));
+      // The rim stroke is centred on the shape's edge, and so is the dark line.
+      const ring = (rim - line) / 2;
+      expect(ring).toBeGreaterThan(0);
+      // At the largest size the small sprite is used (just under 10 px), in screen pixels.
+      expect((ring * 9.99) / def.body!).toBeGreaterThanOrEqual(0.99);
+      // The dark line too is most of a pixel there, and more below it.
+      expect(((line / 2) * 9.99) / def.body!).toBeGreaterThanOrEqual(0.45);
+    },
+  );
 });
 
 describe('packing the sprites onto one sheet', () => {

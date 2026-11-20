@@ -297,6 +297,32 @@ describe('a flock takes up its true ground', () => {
   });
 });
 
+describe('big flocks do not hide the pasture (REQUIREMENTS; LESSONS M1 and 31)', () => {
+  it('zoomed right in, the sheep on a square hide 40% of it at most', () => {
+    const view = sampleView();
+    const id = fenceBox(view, 10, 20, 11, 21, VIEW_FENCE.netting);
+    view.flocks = [
+      flock({
+        area: id,
+        anchor: cell(10, 20),
+        head: 3000,
+        sheep: [{ kind: 'ewe', n: 3000, thin: 0 }],
+      }),
+    ];
+    const p = only(view);
+    expect(p.cells.length).toBe(4);
+    expect(p.sampled).toBe(true);
+    expect(p.total).toBe(3000);
+    // At full zoom (96 px a square) on 100 m squares a ewe is 1.3 m against a cow's
+    // 2.4 m drawn 9.6 px: 5.2 px, and hides about 27 px². 40% of 9,216 px² is 3,686.
+    const per = new Map<number, number>();
+    for (const x of p.sheep) per.set(squareOf(x), (per.get(squareOf(x)) ?? 0) + 1);
+    const most = Math.max(...per.values());
+    expect(most * 5.2 * 5.2).toBeLessThanOrEqual(0.4 * 96 * 96);
+    expect(most).toBeGreaterThan(100);
+  });
+});
+
 describe('lambs and thin sheep', () => {
   it('lambs stand beside a ewe', () => {
     const p = only(

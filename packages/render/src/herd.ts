@@ -13,8 +13,9 @@
  *   short walk and stops again. It faces the way it walks.
  * - Where it walks to: now and then to water (`TO_WATER`), often next to a
  *   mob-mate so the mob keeps loosely together (`NEAR_MATE`), otherwise to a
- *   square of the herd's ground picked by feed: more cover, more green and
- *   better quality draw it, closer to water a little more, bare ground hardly.
+ *   square of the herd's ground picked by a drawing preference (`feedPull`):
+ *   more cover and more green draw it, closer to water a little more, bare
+ *   ground hardly. These are made-up drawing weights, not the model's diet.
  * - A calf follows its mother.
  * - It never walks through a fence or out of its grazing area. If the next
  *   step would cross one it stops and picks again.
@@ -64,8 +65,20 @@ export const NEAR_MATE = 0.45;
 export const HERD_SHIFT_SECONDS: readonly [number, number] = [25, 70];
 /** The share of drifts that take the herd to water. */
 export const HERD_TO_WATER = 0.15;
-/** How much less bare ground draws cattle (the MVP's 0.15 under 350 kg DM/ha). */
-export const BARE_PULL = 0.15;
+/**
+ * Drawing weights for where cattle wander on the map (`feedPull`). Made up
+ * for the picture so cattle drift to thicker, greener feed and towards
+ * water. They are not the model's diet choice and must never be copied
+ * from it (PRD 5.16, LESSONS M11).
+ */
+/** Pull of a square with no cover at all, against 1 more for full cover. */
+export const DRAW_PULL_BARE = 0.02;
+/** Extra pull of an all-green square over an all-dry one (half as much again). */
+export const DRAW_PULL_GREEN = 0.5;
+/** Pull lost for each square further from water... */
+export const DRAW_PULL_WATER_PER_SQUARE = 0.02;
+/** ...down to this share at most, so far squares still draw some cattle. */
+export const DRAW_PULL_WATER_LEAST = 0.5;
 
 const RUSH = 1;
 const WALKING = 2;
@@ -122,20 +135,25 @@ const between = (rng: () => number, range: readonly [number, number]): number =>
   range[0] + (range[1] - range[0]) * rng();
 
 /**
- * How strongly a square draws grazing cattle, from the view's figures. The
- * MVP's diet weighting: green feed and some dry, better energy, nearer
- * water, and little pull from bare ground. Only the order matters.
+ * How strongly a square draws cattle on the map. A drawing preference only,
+ * built from what the view already sends for the picture (cover, green
+ * share, distance to water) with the made-up `DRAW_PULL_*` weights: linear
+ * in cover, a mild lift for green, a mild linear pull towards water. It is
+ * not the model's diet choice. Only the order matters.
  */
 export function feedPull(view: FarmView, out = new Float32Array(GRID_N)): Float32Array {
   const sq = view.squares;
+  const sideM = Math.max(1, view.scale.sideM);
   for (let i = 0; i < GRID_N; i++) {
-    const cover = (sq.cover[i] ?? 0) / 10;
-    const green = (sq.green[i] ?? 0) / 20;
-    const me = (sq.me10[i] ?? 80) / 10;
-    let w = (0.15 + cover) * (0.35 + green) * Math.exp((me - 8) * 0.45);
+    const cover = Math.min(1, Math.max(0, (sq.cover[i] ?? 0) / 10));
+    const green = Math.min(1, Math.max(0, (sq.green[i] ?? 0) / 20));
+    let w = (DRAW_PULL_BARE + cover) * (1 + DRAW_PULL_GREEN * green);
     const wd = sq.waterDist[i] ?? -1;
-    if (wd >= 0) w *= Math.exp((-wd * 100) / 3000);
-    if (cover < 0.35) w *= BARE_PULL;
+    if (wd >= 0) {
+      // The view gives hundreds of metres; in squares for the drawing weight.
+      const squares = (wd * 100) / sideM;
+      w *= Math.max(DRAW_PULL_WATER_LEAST, 1 - DRAW_PULL_WATER_PER_SQUARE * squares);
+    }
     out[i] = Math.max(1e-4, w);
   }
   return out;

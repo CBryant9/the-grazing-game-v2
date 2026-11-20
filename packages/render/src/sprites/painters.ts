@@ -44,6 +44,29 @@ export const CATTLE_W_PER_BODY = 1.3;
 /** A sheep sprite is this many times as wide as the sheep's body is long. */
 export const SHEEP_W_PER_BODY = 1.55;
 
+/**
+ * Below this many screen pixels long, an animal is drawn from its small
+ * sprite (`smallSprite`): the same animal with a heavier line and rim, so
+ * the pale rim and the dark line stay at least `MIN_RIM_PX` wide on screen
+ * at every small size. At full size each would be a fraction of a pixel.
+ */
+export const SMALL_SPRITE_BELOW_PX = 10;
+/** The least the pale rim, and the dark line inside it, are drawn on screen, CSS pixels. */
+export const MIN_RIM_PX = 1;
+/** The name of an animal's small sprite. */
+export const smallSprite = (id: string): string => `${id}.small`;
+/** A small sprite's body length in texture pixels, for a cow or a ewe (others in proportion). */
+const SMALL_LEN = 30;
+
+/**
+ * Line widths for a small sprite of body length `len` texture pixels: the
+ * width of the rim ring outside the dark line is `MIN_RIM_PX` on screen when
+ * the animal is drawn `SMALL_SPRITE_BELOW_PX` long, and more below that.
+ * `ring` is how many line widths the ring is in that painter.
+ */
+const smallLine = (len: number, ring: number): number =>
+  (len * MIN_RIM_PX) / SMALL_SPRITE_BELOW_PX / ring;
+
 /** The zoomed-out dot for a beast or a sheep, and its size in texture pixels. */
 export const DOT_SPRITE = { cattle: 'dot.cattle', sheep: 'dot.sheep' } as const;
 export const DOT_TEXTURE_PX = 16;
@@ -83,6 +106,8 @@ interface BeastArt {
   shape: BodyShape;
   /** Body length in texture pixels. */
   len: number;
+  /** The line width, texture pixels, for a small sprite. Left out: worked out from the length. */
+  lw?: number;
 }
 
 function paintBeast(ctx: Ctx, W: number, H: number, art: BeastArt): void {
@@ -91,7 +116,7 @@ function paintBeast(ctx: Ctx, W: number, H: number, art: BeastArt): void {
   const brahman = art.breed === 'brahman';
   const bull = art.kind === 'bull';
   const deep = art.shape === 'thin' ? 0.82 : art.shape === 'fat' ? 1.18 : 1;
-  const lw = Math.max(1.6, L * 0.045);
+  const lw = art.lw ?? Math.max(1.6, L * 0.045);
   const bodyH = L * 0.42 * deep;
   const bodyTop = -L * 0.21 - bodyH;
   const legX = [-0.33, -0.19, 0.15, 0.27];
@@ -210,15 +235,33 @@ function addCattle(reg: SpriteRegistry): void {
       const len = Math.round(88 * size);
       const w = Math.round(len * CATTLE_W_PER_BODY);
       const h = Math.round(len * 1.02) + 10;
+      // The small sprite: the pale rim sits 1.1 line widths outside the dark line.
+      const sLen = Math.round(SMALL_LEN * size);
+      const sLw = smallLine(sLen, 1.1);
+      const sPad = Math.ceil(sLw * 1.6) + 1;
+      const sw = Math.round(sLen * CATTLE_W_PER_BODY) + sPad * 2;
+      const sh = Math.round(sLen * 1.02) + 10 + sPad;
       for (const shape of kind === 'calf' ? (['normal'] as const) : shapes) {
-        reg.set(cattleSprite(breed, kind, shape), {
+        const id = cattleSprite(breed, kind, shape);
+        const colours = CATTLE[breed][kind];
+        reg.set(id, {
           w,
           h,
           ax: 0.5,
           ay: (h - 8) / h,
           ppu: CATTLE_PPU,
+          body: len,
+          paint: (ctx, W, H) => paintBeast(ctx, W, H, { colours, breed, kind, shape, len }),
+        });
+        reg.set(smallSprite(id), {
+          w: sw,
+          h: sh,
+          ax: 0.5,
+          ay: (sh - 8) / sh,
+          ppu: CATTLE_PPU,
+          body: sLen,
           paint: (ctx, W, H) =>
-            paintBeast(ctx, W, H, { colours: CATTLE[breed][kind], breed, kind, shape, len }),
+            paintBeast(ctx, W, H, { colours, breed, kind, shape, len: sLen, lw: sLw }),
         });
       }
     }
@@ -241,6 +284,8 @@ interface SheepArt {
   thin: boolean;
   /** Body length in texture pixels. */
   len: number;
+  /** The line width, texture pixels, for a small sprite. Left out: worked out from the length. */
+  lw?: number;
 }
 
 /**
@@ -256,7 +301,7 @@ function paintSheep(ctx: Ctx, W: number, H: number, art: SheepArt): void {
   const lamb = art.kind === 'lamb';
   const ram = art.kind === 'ram';
   const thin = art.thin && !lamb;
-  const lw = Math.max(1.5, L * 0.05);
+  const lw = art.lw ?? Math.max(1.5, L * 0.05);
   const fleece = thin ? shade(c.fleece, THIN_FLEECE) : c.fleece;
   const ry = L * (thin ? 0.24 : lamb ? 0.33 : 0.3);
   const rx = L * (thin ? 0.43 : 0.46);
@@ -394,14 +439,31 @@ function addSheep(reg: SpriteRegistry): void {
     const len = Math.round(50 * size[kind]);
     const w = Math.round(len * SHEEP_W_PER_BODY);
     const h = Math.round(len * 1.08) + 10;
+    // The small sprite: the pale rim sits 0.7 line widths outside the dark line.
+    const sLen = Math.round(SMALL_LEN * size[kind]);
+    const sLw = smallLine(sLen, 0.7);
+    const sPad = Math.ceil(sLw * 1.7) + 1;
+    const sw = Math.round(sLen * SHEEP_W_PER_BODY) + sPad * 2;
+    const sh = Math.round(sLen * 1.08) + 10 + sPad;
     for (const thin of kind === 'lamb' ? [false] : [false, true]) {
-      reg.set(sheepSprite(kind, thin), {
+      const id = sheepSprite(kind, thin);
+      reg.set(id, {
         w,
         h,
         ax: 0.5,
         ay: (h - 8) / h,
         ppu: SHEEP_PPU,
+        body: len,
         paint: (ctx, W, H) => paintSheep(ctx, W, H, { kind, thin, len }),
+      });
+      reg.set(smallSprite(id), {
+        w: sw,
+        h: sh,
+        ax: 0.5,
+        ay: (sh - 8) / sh,
+        ppu: SHEEP_PPU,
+        body: sLen,
+        paint: (ctx, W, H) => paintSheep(ctx, W, H, { kind, thin, len: sLen, lw: sLw }),
       });
     }
   }
@@ -943,7 +1005,6 @@ function addThings(reg: SpriteRegistry): void {
   def('rain', 10, 44, 0.5, 0.5, 44, paintRain);
 }
 
-/** Every sprite the map uses, drawn in code. */
 /**
  * Zoomed out, each beast is a dot: a dark middle in the cattle outline colour
  * with a thin pale rim, so it reads on every ground and grass colour as the
@@ -967,6 +1028,7 @@ function addDots(reg: SpriteRegistry): void {
   reg.set(DOT_SPRITE.sheep, { ...dot, paint: paint(N.sheepHalo, N.sheepOutline) });
 }
 
+/** Every sprite the map uses, drawn in code. */
 export function defaultSprites(): SpriteRegistry {
   const reg = new SpriteRegistry();
   addCattle(reg);

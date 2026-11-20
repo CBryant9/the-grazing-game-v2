@@ -8,8 +8,9 @@
  * or its whole grazing area if that is smaller, so how crowded it looks
  * follows its real density (19 Nov 2026). Sheep are drawn near their real
  * size against the paddock, in proportion to the cattle. One sprite a head
- * up to `FLOCK_DRAWN_MAX`, then a sample spread over the flock's true
- * ground. The marker and badge always carry the real head count.
+ * up to `FLOCK_DRAWN_MAX`, and never more to a square than hides
+ * `MAX_HIDDEN_SHARE` of it zoomed right in (as the cattle, `perSquareCap`),
+ * then a sample spread over the flock's true ground. The marker and badge always carry the real head count.
  *
  * Sheep do not walk yet: they stand where they are put.
  *
@@ -23,6 +24,7 @@ import {
   cowSquares,
   herdSquares,
   markerOf,
+  perSquareCap,
   placementGround,
   share,
   shrinkBox,
@@ -48,6 +50,18 @@ export const SHEEP_LENGTH_M: Readonly<Record<ViewSheepKind, number>> = {
   young: 1.1,
   lamb: 0.75,
 };
+
+/** The per-square cap for a flock, by the ground its mix of kinds hides (as `mobSquareCap` in cattle.ts). */
+export function flockSquareCap(flock: Pick<FarmViewFlock, 'sheep'>, sideM: number): number {
+  let n = 0;
+  let area = 0;
+  for (const s of flock.sheep) {
+    if (s.n <= 0) continue;
+    n += s.n;
+    area += s.n * SHEEP_LENGTH_M[s.kind] ** 2;
+  }
+  return perSquareCap(n > 0 ? Math.sqrt(area / n) : SHEEP_LENGTH_M.ewe, sideM);
+}
 
 /**
  * How far sheep stand back inside a square, as a share of the square. A
@@ -159,7 +173,7 @@ export function placeFlock(
       cells = order.slice(0, n);
       herdM2 = Math.min(Math.max(1, flock.head) * SHEEP_M2_PER_HEAD, order.length * squareM2);
       boxScale = n > 1 ? 1 : Math.max(0.3, Math.min(1, Math.sqrt(herdM2 / squareM2)));
-      cap = FLOCK_DRAWN_MAX;
+      cap = Math.min(FLOCK_DRAWN_MAX, cells.length * flockSquareCap(flock, sideM));
     }
   }
 
