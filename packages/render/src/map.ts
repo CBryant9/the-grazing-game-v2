@@ -109,7 +109,7 @@ import {
   sameCorner,
   type Corner,
 } from './lines';
-import type { DraftDot, DraftKind, MapDraft } from './draft';
+import { draftMetres, type DraftDot, type DraftKind, type MapDraft } from './draft';
 import {
   BUILD_GRID,
   bucketZoom,
@@ -2839,16 +2839,14 @@ class PixiFarmMap implements FarmMap {
     const d = this.draft;
     const view = this.view;
     if (!d || !view || d.kind === 'mark') return;
-    // Whole metres a side, as the job card counts them, so the two always agree.
-    const side = Math.round(view.scale.sideM);
-    let metres = 0;
+    // Counted as the server's job card counts it, so the two always agree: new
+    // fence segments only (not the boundary, gates or fence of the same kind),
+    // and new squares of pipe, each a full side of a square (`draftMetres`).
+    const metres = draftMetres(view, d);
     if (d.segments.length) {
-      metres = d.segments.length * side;
       const end = d.dots[d.dots.length - 1];
       if (end) this.lengthTagAt = { wx: end.vx, wy: end.vy * K };
     } else if (d.squares.length) {
-      // Pipe runs from the middle of one square to the next, as the job card counts it.
-      metres = (d.squares.length - 1) * side;
       const end = d.squares[d.squares.length - 1]!.cell;
       this.lengthTagAt = { wx: colOf(end) + 0.5, wy: (rowOf(end) + 0.5) * K };
     }

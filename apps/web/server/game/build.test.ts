@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FARM_GRID_H, FARM_GRID_W, VIEW_FENCE } from '@gg/shared';
-import type { EdgeWire, SetupChoices, Snapshot } from '../../lib/game/types';
+import { draftMetres } from '@gg/render/draft';
+import type { Corner } from '@gg/render/lines';
+import { buildDraft, fenceEdges, lineAction, lineMetres, newBuild } from '../../lib/game/build';
+import type { EdgeWire, LineWire, SetupChoices, Snapshot } from '../../lib/game/types';
 import { MAX_LINE_PIECES, parseBuildAction } from './build';
 import { GameError, GameServer, parseAction } from './game';
 import { MemoryFarmStore } from './store';
@@ -423,5 +426,72 @@ describe('a water job that would leave stock dry says so', () => {
     // A trough that leaves water behind says nothing of the kind.
     const keep = await game.preview(A, { action: { type: 'placeTrough', cell: only!.cell } });
     if (keep.ok) expect(keep.card.notes.some((n) => /^After this, /.test(n))).toBe(false);
+  });
+});
+
+describe('the length beside a drawn line and the job card agree (LESSONS G11)', () => {
+  /** The metres the card gives: what fits and what does not, as the server rounds them. */
+  const cardMetres = (p: { card: { line: LineWire | null } }): number =>
+    (p.card.line?.fits.metres ?? 0) + (p.card.line?.doesNotFit.metres ?? 0);
+  const corners = (pts: [number, number][]): Corner[] => pts.map(([vx, vy]) => ({ vx, vy }));
+
+  it('a fence down the boundary and along an old fence counts only the new segments', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices());
+    // Tape first, over two segments of row line 6.
+    const tape = await game.act(A, {
+      action: { type: 'buildFence', edges: row(6, 2, 4), fence: 'tape' },
+    });
+    expect(tape.ok).toBe(true);
+    if (!tape.ok) return;
+    const view = tape.snapshot.view;
+    // Down three boundary segments, then along row line 6 for four squares, the last two
+    // of them over that tape, which a tape line does not build again.
+    const path = corners([
+      [0, 3],
+      [0, 4],
+      [0, 5],
+      [0, 6],
+      ...Array.from({ length: 4 }, (_, i): [number, number] => [i + 1, 6]),
+    ]);
+    const b = newBuild('fence', { fence: 'tape', corners: path, phase: 'confirm' });
+    const p = await game.preview(A, { action: lineAction(b)! });
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    // Seven segments drawn: three on the boundary, four along the row, two of them tape already.
+    expect(fenceEdges(b)).toHaveLength(7);
+    const card = cardMetres(p);
+    expect(Math.round(lineMetres(b, view))).toBe(card);
+    expect(Math.round(draftMetres(view, buildDraft(b, view)!))).toBe(card);
+    // Two new segments at the square's exact side.
+    expect(card).toBe(Math.round(2 * Math.sqrt((s0.farm.setup.farmHa / 1040) * 10000)));
+  });
+
+  it('pipe counts each new square, whether or not it starts on the bore', async () => {
+    const game = server();
+    const s0 = await game.create(A, choices());
+    const view = s0.view;
+    const bore = view.water.bore;
+    const bx = bore % W;
+    const by = Math.floor(bore / W);
+    const dir = bx < W - 8 ? 1 : -1;
+    // From the bore: the bore square is not new pipe.
+    const fromBore = Array.from({ length: 5 }, (_, i) => by * W + bx + dir * i);
+    // Away from the bore, on a row of its own: every square is new.
+    const ry = by < 12 ? by + 6 : by - 6;
+    const loose = Array.from({ length: 5 }, (_, i) => ry * W + bx + dir * i);
+    for (const [cells, fresh] of [
+      [fromBore, 4],
+      [loose, 5],
+    ] as const) {
+      const b = newBuild('pipe', { cells: [...cells], phase: 'confirm' });
+      const p = await game.preview(A, { action: lineAction(b)! });
+      expect(p.ok).toBe(true);
+      if (!p.ok) return;
+      const card = cardMetres(p);
+      expect(Math.round(lineMetres(b, view))).toBe(card);
+      expect(Math.round(draftMetres(view, buildDraft(b, view)!))).toBe(card);
+      expect(card).toBe(Math.round(fresh * Math.sqrt((s0.farm.setup.farmHa / 1040) * 10000)));
+    }
   });
 });

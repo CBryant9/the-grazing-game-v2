@@ -131,17 +131,24 @@ export {
 export type { Corner, CornerHit, EdgeHit } from './lines';
 
 export {
+  draftMetres,
   fenceDraft,
   markDraft,
   markSquares,
+  newFenceMetres,
+  newFenceSegments,
+  newPipeMetres,
+  newPipeSquares,
   pipeDraft,
   snapDots,
+  squareSideM,
   styleSegments,
   styleSquares,
 } from './draft';
 export type {
   DraftDot,
   DraftKind,
+  FenceDraftKind,
   DraftSegment,
   DraftSquare,
   DraftStyle,

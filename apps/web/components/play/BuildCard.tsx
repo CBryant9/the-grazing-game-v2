@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type Ref } from 'react';
-import { isLineTool } from '@/lib/game/build';
+import { isLineTool, lineMetres } from '@/lib/game/build';
 import { aboutTime, cardLines, money, num } from '@/lib/game/format';
 import { lineFacts } from '@/lib/game/linecard';
 import { useGame } from '@/lib/game/store';
@@ -126,7 +126,6 @@ export function BuildCard({
   }, [phase]);
 
   if (!b) return null;
-  const sideM = snapshot?.view.scale.sideM ?? 100;
   const line = isLineTool(b.tool);
   const wrap = (children: React.ReactNode, label: string) => (
     <div
@@ -206,9 +205,9 @@ export function BuildCard({
     ) : null;
 
   if (b.phase === 'previewing') {
-    const metres = line
-      ? `${num(Math.max(0, (b.tool === 'fence' ? b.corners.length : b.cells.length) - 1) * sideM)} m. `
-      : '';
+    // Counted as the server and the map's length label count it: new fence or pipe only.
+    const m = line && snapshot ? lineMetres(b, snapshot.view) : 0;
+    const metres = m > 0 ? `${num(m)} m. ` : '';
     return wrap(
       <>
         <h3 className={styles.cardhead}>{title}</h3>

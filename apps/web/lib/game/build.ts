@@ -1,6 +1,13 @@
 import type { FarmView, ViewEdge } from '@gg/shared';
 import type { MapDraft, NotFit } from '@gg/render/draft';
-import { fenceDraft, markDraft, markSquares, pipeDraft } from '@gg/render/draft';
+import {
+  fenceDraft,
+  markDraft,
+  markSquares,
+  newFenceMetres,
+  newPipeMetres,
+  pipeDraft,
+} from '@gg/render/draft';
 import { edgesOfPath, tapeRun, vertexCorner, type Corner } from '@gg/render/lines';
 import type {
   BuildToolId,
@@ -166,6 +173,20 @@ const notFitOf = (b: BuildState): NotFit | 'all' | null => {
   const line = b.phase === 'confirm' ? b.card?.line : null;
   return line ? { edges: line.doesNotFit.edges, cells: line.doesNotFit.cells } : null;
 };
+
+/**
+ * Metres of new line as drawn, counted the way the server's job card counts
+ * them and the map's length beside the line does (`draftMetres`): new fence
+ * segments only, new squares of pipe only. 0 for anything that is not a line.
+ */
+export function lineMetres(b: BuildState, view: FarmView): number {
+  if (b.tool === 'fence') {
+    const kind = b.team > 0 && b.fence === 'permanent' ? 'contract' : b.fence;
+    return newFenceMetres(view, kind, fenceEdges(b));
+  }
+  if (b.tool === 'pipe') return newPipeMetres(view, b.cells);
+  return 0;
+}
 
 /** The draft the map draws for this state, or null. Only the overlay redraws when it changes. */
 export function buildDraft(b: BuildState | null, view: FarmView): MapDraft | null {
