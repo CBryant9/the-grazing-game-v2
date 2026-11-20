@@ -2696,19 +2696,23 @@
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px 8px;
   background: var(--hud);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
-/* All eight tools in one row, so the column stays short. */
+/*
+ * Two rows of four on a phone on its side, so every word ("Portable" is the
+ * longest) fits at the same size as upright, from 667 px wide (20 Nov 2026:
+ * eight in a row at 0.5rem ran over).
+ */
 .screen[data-layout='landscape'] .toolrow {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 .screen[data-layout='landscape'] .tool {
   min-height: 44px;
-  font-size: 0.5rem;
+  padding: 2px 4px;
 }
 .screen[data-layout='landscape'] .traycard {
   position: absolute;

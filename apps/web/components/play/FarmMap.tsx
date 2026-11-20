@@ -68,6 +68,10 @@ function coverBoxes(wrap: HTMLElement, c: MapCovers): Partial<Record<CoverEdge, 
   };
 }
 
+/** True if two lists hold the same elements in the same order. */
+const sameList = (a: readonly Element[], b: readonly Element[]): boolean =>
+  a.length === b.length && a.every((e, i) => e === b[i]);
+
 /** How close the map comes when a button asks it to frame a spot: near enough to build there, screen pixels a square. */
 export const FOCUS_PX_PER_SQUARE = 30;
 
@@ -337,25 +341,72 @@ export function FarmMap({
       placeCard(el, wrap, map, placing.current.floating ? placing.current.anchor : null);
     }
   };
-  // After every render: the card's size can change with what it says.
+  // When the anchor moves or the card shows, place it. Not on every render: placing reads
+  // the page's layout, and a drag re-renders on every step.
+  const ax = anchor?.gx;
+  const ay = anchor?.gy;
   useLayoutEffect(() => {
     placing.current = { anchor, floating };
     placeNow();
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, ax, ay, floating]);
   useEffect(() => {
     if (!ready) return;
     return mapRef.current?.on('camera', placeNow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
-
-  // The page's bars and columns cover parts of the map: tell the map, so the farm can be pulled clear of them.
+  // The card's size changes with what it says: place it again when its contents change size.
+  // Its children are watched, not the card itself, whose height the placing may cap.
+  const cardWatch = useRef<{ ro: ResizeObserver | null; els: Element[] }>({ ro: null, els: [] });
   useLayoutEffect(() => {
+    const el = anchorEl.current;
+    const els = el ? [...el.children] : [];
+    const w = cardWatch.current;
+    if (sameList(els, w.els)) return;
+    w.ro?.disconnect();
+    w.ro = null;
+    w.els = els;
+    if (!els.length || typeof ResizeObserver !== 'function') return;
+    w.ro = new ResizeObserver(() => placeNow());
+    for (const e of els) w.ro.observe(e);
+  });
+
+  // The page's bars and columns cover parts of the map: tell the map, so the farm can be
+  // pulled clear of them. Measured when one of them, or one of the pieces in them, changes
+  // size (a ResizeObserver), not on every render: a drag re-renders on every step.
+  const coverWatch = useRef<{ ro: ResizeObserver | null; els: Element[] }>({ ro: null, els: [] });
+  const placeInsets = (): void => {
     const map = mapRef.current;
     const wrap = wrapRef.current;
-    if (!ready || !map || !wrap) return;
+    if (!map || !wrap) return;
     const i = insetsOf(coverBoxes(wrap, covers), wrap.clientWidth, wrap.clientHeight);
     map.setInsets(i.top, i.bottom, i.left, i.right);
+  };
+  // After each render only the list of elements is compared (no layout is read). A new
+  // element (a card or chip that came up) is watched, and the insets measured at once.
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!ready || !wrap) return;
+    const els: Element[] = [wrap];
+    for (const c of [covers.top, covers.bottom, covers.left, covers.right]) {
+      const el = c?.current;
+      if (el) els.push(el, ...el.children);
+    }
+    const w = coverWatch.current;
+    if (w.ro && sameList(els, w.els)) return;
+    w.ro?.disconnect();
+    w.els = els;
+    placeInsets();
+    w.ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => placeInsets()) : null;
+    for (const e of els) w.ro?.observe(e);
   });
+  useEffect(
+    () => () => {
+      coverWatch.current.ro?.disconnect();
+      cardWatch.current.ro?.disconnect();
+    },
+    [],
+  );
 
   // When the card comes up, the end of the line is moved out from under the tray, column or card.
   useEffect(() => {
