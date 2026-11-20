@@ -246,6 +246,8 @@ function pastOf(snap: Snapshot): PastDayWire {
 interface Held {
   stored: StoredFarm;
   farm: FarmState;
+  /** The farm's id, for the owner's snapshot (`farm.id`). Set when the farm is held. */
+  id?: string;
   /** The snapshot of this farm as it stands, built once. */
   snap?: Snapshot;
   /** The sheep switch the snapshot was built with: it is built again when the switch changes. */
@@ -730,6 +732,7 @@ export class GameServer {
   }
 
   private remember(farmId: string, held: Held): void {
+    held.id = farmId;
     this.cache.delete(farmId);
     this.cache.set(farmId, held);
     if (this.cache.size > CACHE_LIMIT) {
@@ -882,7 +885,7 @@ export class GameServer {
     if (extra.daily) stored.daily = extra.daily;
     if (kept.length) stored.missedWages = kept;
     else delete stored.missedWages;
-    const next: Held = { stored, farm };
+    const next: Held = { stored, farm, id: farmId };
     const snap = this.snapshotOf(next);
     await this.persist(farmId, () =>
       this.store.put(farmId, stored, {
@@ -953,18 +956,23 @@ export class GameServer {
     return next;
   }
 
-  private snapshotOf(held: Held): Snapshot {
+  /**
+   * The snapshot of a held farm. The owner's carries the farm's id (`farm.id`, so the page can
+   * keep things per farm); `owner` false leaves it out, for a farm someone else is looking at.
+   */
+  private snapshotOf(held: Held, owner = true): Snapshot {
     if (!held.snap || held.snapSheep !== this.sheepOn) {
       held.snap = buildSnapshot(held.farm, held.stored, envFor(held.stored.setup), this.sheepOn);
       held.snapSheep = this.sheepOn;
     }
     // A Daily Farm's part is made fresh each time: it carries the server's clock.
-    return held.stored.daily
+    const snap = held.stored.daily
       ? {
           ...held.snap,
           daily: dailyWire(held.farm, held.stored.daily, this.now(), held.waiting ?? null),
         }
       : held.snap;
+    return owner && held.id ? { ...snap, farm: { ...snap.farm, id: held.id } } : snap;
   }
 
   /**
@@ -1068,7 +1076,7 @@ export class GameServer {
         done: [],
         diary: [],
       };
-      const held: Held = { stored, farm };
+      const held: Held = { stored, farm, id };
       const snap = this.snapshotOf(held);
       try {
         await this.persist(id, () =>
@@ -1155,7 +1163,7 @@ export class GameServer {
         diary: [],
         daily,
       };
-      const held: Held = { stored, farm };
+      const held: Held = { stored, farm, id };
       const snap = this.snapshotOf(held);
       try {
         await this.persist(id, () =>
@@ -1366,7 +1374,8 @@ export class GameServer {
         const farmDate = isoOf(dateOn(raw.farm));
         dailyEnvs.set(raw.stored.setup, { data: await this.daily.data.bundleThrough(farmDate) });
       }
-      return this.snapshotOf(raw);
+      // Someone else's farm: no farm id in it.
+      return this.snapshotOf(raw, false);
     });
   }
 

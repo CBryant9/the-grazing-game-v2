@@ -788,6 +788,11 @@ export interface Snapshot {
    */
   farmVersion: string;
   farm: {
+    /**
+     * The farm's id, the one the farm list gives (`FarmListItem.id`), so the page can keep
+     * things per farm. Left out of a farm someone else is looking at, and of an old snapshot.
+     */
+    id?: string;
     name: string;
     district: DistrictId;
     setup: SetupSummary;

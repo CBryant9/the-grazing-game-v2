@@ -91,7 +91,7 @@ const SNAPSHOT_KEYS: Record<string, readonly string[]> = {
   'daily.catchUp.report[].date': ['date', 'month', 'year'],
   'daily.planDue[]': ['from', 'mob', 'mobName', 'text', 'to'],
   date: ['date', 'month', 'year'],
-  farm: ['district', 'name', 'setup'],
+  farm: ['district', 'id', 'name', 'setup'],
   'farm.setup': [
     'arablePct',
     'difficulty',

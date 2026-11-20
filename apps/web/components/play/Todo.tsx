@@ -51,7 +51,9 @@ export function useFirstSteps(snapshot: Snapshot): {
   steps: NextStep[];
   putAway: (key: string) => void;
 } {
-  const farm = snapshot.farm.name;
+  // Kept per farm by its id, so two farms with the same name never share them. An old
+  // snapshot from before the id was sent falls back to the name.
+  const farm = snapshot.farm.id ?? snapshot.farm.name;
   const stored = useUi((s) => s.firstOff[farm]);
   const setFirstOff = useUi((s) => s.setFirstOff);
   const keys = stored ?? readFirstOff(farm);

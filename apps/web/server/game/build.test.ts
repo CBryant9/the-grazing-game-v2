@@ -495,3 +495,21 @@ describe('the length beside a drawn line and the job card agree (LESSONS G11)', 
     }
   });
 });
+
+describe("the owner's snapshot names the farm by its id", () => {
+  it('two farms with the same name have different ids; someone looking on gets none', async () => {
+    const game = server();
+    const a = await game.create(A, choices({ name: 'Same Name' }));
+    const b = await game.create('b'.repeat(32), choices({ name: 'Same Name' }));
+    expect(a.farm.name).toBe(b.farm.name);
+    expect(a.farm.id).toBeTruthy();
+    expect(b.farm.id).toBeTruthy();
+    expect(a.farm.id).not.toBe(b.farm.id);
+    // The same farm opened again keeps its id.
+    expect((await game.snapshot(A))?.farm.id).toBe(a.farm.id);
+    // A farm looked at by someone else carries no id.
+    const seen = await game.viewSnapshot(a.farm.id!);
+    expect(seen?.farm.name).toBe('Same Name');
+    expect(seen?.farm.id).toBeUndefined();
+  });
+});
