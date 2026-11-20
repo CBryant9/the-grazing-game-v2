@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { cardLines, doneLines } from '@/lib/game/format';
+import { useGame } from '@/lib/game/store';
 import type { JobCardWire } from '@/lib/game/types';
 import styles from './play.module.css';
 
@@ -55,6 +56,7 @@ function Inner({
   cancelLabel = 'Cancel',
   children,
 }: JobBoxProps) {
+  const coming = useGame((s) => s.dayComing);
   if (job.phase === 'previewing') {
     return (
       <p className={styles.todostatus} role="status">
@@ -63,6 +65,9 @@ function Inner({
     );
   }
   if (job.phase === 'confirm' || job.phase === 'applying') {
+    // While the moving day's request for tomorrow is out, Confirm waits: the card is asked
+    // again against the new day when it comes (Fast Farm).
+    const waiting = coming && job.phase === 'confirm';
     return (
       <div className={styles.jobcard} role="group" aria-label={`${title}: job card`}>
         {job.card && (
@@ -76,10 +81,11 @@ function Inner({
           <button
             type="button"
             className="btn sm coral"
-            disabled={job.phase === 'applying' || busy}
+            disabled={job.phase === 'applying' || busy || waiting}
+            aria-busy={waiting || undefined}
             onClick={onConfirm}
           >
-            {job.phase === 'applying' ? 'Working' : confirmLabel}
+            {job.phase === 'applying' ? 'Working' : waiting ? 'New day coming' : confirmLabel}
           </button>
           {children}
           <button

@@ -164,6 +164,12 @@ export interface GameState {
   snapshot: Snapshot | null;
   /** Requests under way. The map can always be looked at while this is above zero. */
   busy: number;
+  /**
+   * Fast Farm: the moving day's own request for tomorrow is on its way. Confirm, Build, Next day
+   * and the skips wait ("New day coming"); anything opened meanwhile is kept and its card asked
+   * again against the new day when it comes.
+   */
+  dayComing: boolean;
   notice: Notice | null;
   tab: Tab;
   paddockId: number | null;
@@ -376,7 +382,7 @@ export const useGame = create<GameState>()((set, get) => {
   const yearEndOf = (r: { yearEnd: YearView | null; yearsClosed: number }): YearEndState | null =>
     r.yearEnd ? { view: r.yearEnd, closed: r.yearsClosed } : null;
 
-  /** After a day or skip: fetch the Scores or Diary again if one is open. */
+  /** After Next day or a skip: fetch the Scores or Diary again if one is open. */
   const refreshRecord = (): void => {
     const { tab, morePage } = get();
     if (tab === 'more' && (morePage === 'scores' || morePage === 'diary')) void get().loadRecord();
@@ -427,6 +433,48 @@ export const useGame = create<GameState>()((set, get) => {
       sow: null,
       build: null,
     });
+  }
+
+  /**
+   * The moving day came in while the player had things open (they were opened after the day was
+   * asked for: before that, anything open held the day). Keep each one, and ask its card again
+   * against the new day, so a Confirm sends what the new day says (LESSONS T1).
+   */
+  function askAgain(): void {
+    const { jobs, acts, move, plan, build, snapshot } = get();
+    const open = (j: JobState): boolean =>
+      j.phase === 'previewing' || j.phase === 'confirm' || j.phase === 'refused';
+    for (const j of Object.values(jobs)) {
+      if (!open(j)) continue;
+      if (snapshot?.todo.some((t) => t.key === j.key && t.button)) void get().startJob(j.key);
+      else setJob(j.key, null);
+    }
+    for (const a of Object.values(acts)) {
+      if (open(a) && a.action) void get().startAct(a.key, a.text, a.action);
+    }
+    if (
+      move &&
+      move.target !== null &&
+      (move.phase === 'previewing' || move.phase === 'confirm' || move.phase === 'refused')
+    ) {
+      void previewMove();
+    }
+    if (
+      plan &&
+      (plan.phase === 'previewing' || plan.phase === 'confirm' || plan.phase === 'refused')
+    ) {
+      set({ plan: { ...plan, phase: 'edit', ticket: undefined } });
+      void get().planCheck();
+    }
+    if (build && build.phase !== 'done' && build.phase !== 'applying' && build.phase !== 'pick') {
+      const action = isLineTool(build.tool) ? lineAction(build) : null;
+      if (action) {
+        setBuild({ phase: 'previewing', card: undefined, shown: undefined, message: undefined });
+        lineChecker.flush(action);
+      } else if (build.picked) {
+        void previewPicked(build.picked);
+      }
+    }
   }
 
   const setJob = (key: string, patch: Partial<JobState> | null): void =>
@@ -574,6 +622,7 @@ export const useGame = create<GameState>()((set, get) => {
     saving: false,
     snapshot: null,
     busy: 0,
+    dayComing: false,
     notice: null,
     tab: 'farm',
     paddockId: null,
@@ -762,34 +811,35 @@ export const useGame = create<GameState>()((set, get) => {
       // Not through `run`: the day's own request does not grey out the time buttons or show the
       // working bar every day. Next day and the skips wait for it (`autoDayOn`).
       autoDayOn = true;
+      set({ dayComing: true });
       try {
         const r = await api.day(versionNow());
-        lineChecker.cancel();
         if (!r.ok) {
           // Someone else moved the farm on (another tab): show it as it is and carry on from there.
-          staleNotice(r);
+          set({ ...adopt(r.snapshot), notice: { message: r.message } });
           outcome = 'stale';
         } else {
           const { snapshot, summary } = r;
           const yearEnd = yearEndOf(r);
           const stop =
             summary.stops.length > 0 || summary.reportFirst || yearEnd !== null || !!snapshot.over;
+          // Nothing is cleared. When the day was asked for nothing was open (anything open holds
+          // the day), so whatever is open now was opened while the request was out, and is kept.
+          // A result being read stays until it is closed. The Scores and Diary are not fetched
+          // again every day: they are read when opened, and after Next day or a skip.
           set({
             ...adopt(snapshot),
             summary: stop ? summary : null,
             dayNote: stop ? null : dayLine(summary, snapshot.totals.rainMm),
             yearEnd,
-            jobs: {},
-            acts: {},
-            // A result being read stays until it is closed. Nothing else is open: the day held for it.
-            move: get().move?.phase === 'done' ? get().move : null,
-            plan: null,
-            sow: null,
-            build: get().build?.phase === 'done' ? get().build : null,
           });
-          refreshRecord();
+          // A day that stops for the player is worth a fresh Scores or Diary, if one is open.
+          if (stop) refreshRecord();
           outcome = stop ? 'pause' : 'next';
         }
+        // Each card opened meanwhile is asked again against the farm as it is now.
+        autoDayOn = false;
+        askAgain();
       } catch (e) {
         // The farm was refused as it stands (over, seen from an old tab): load it again.
         if (e instanceof ApiError && e.status === 409) void get().load();
@@ -798,6 +848,7 @@ export const useGame = create<GameState>()((set, get) => {
         outcome = 'failed';
       } finally {
         autoDayOn = false;
+        set({ dayComing: false });
       }
       return outcome;
     },
@@ -857,7 +908,8 @@ export const useGame = create<GameState>()((set, get) => {
 
     async confirmJob(key) {
       const job = get().jobs[key];
-      if (job?.phase !== 'confirm' || !job.shown || get().busy > 0) return;
+      // Never while the moving day's request is out: the card is asked again when the day comes.
+      if (job?.phase !== 'confirm' || !job.shown || get().busy > 0 || autoDayOn) return;
       setJob(key, { phase: 'applying' });
       const r = await sendAct(job.shown);
       if (r.ok) setJob(key, { phase: 'done', message: r.message, card: r.card ?? job.card });
@@ -892,7 +944,7 @@ export const useGame = create<GameState>()((set, get) => {
 
     async confirmAct(slot) {
       const act = get().acts[slot];
-      if (act?.phase !== 'confirm' || !act.shown || get().busy > 0) return;
+      if (act?.phase !== 'confirm' || !act.shown || get().busy > 0 || autoDayOn) return;
       setAct(slot, { phase: 'applying' });
       const r = await sendAct(act.shown);
       if (r.ok) setAct(slot, { phase: 'done', message: r.message, card: r.card ?? act.card });
@@ -983,7 +1035,7 @@ export const useGame = create<GameState>()((set, get) => {
 
     async moveConfirm() {
       const { move } = get();
-      if (!move || move.phase !== 'confirm' || !move.shown || get().busy > 0) return;
+      if (!move || move.phase !== 'confirm' || !move.shown || get().busy > 0 || autoDayOn) return;
       setMove({ phase: 'applying' });
       const r = await sendAct(move.shown);
       if (r.ok) setMove({ phase: 'done', message: r.message, card: r.card ?? move.card });
@@ -1084,7 +1136,7 @@ export const useGame = create<GameState>()((set, get) => {
 
     async planConfirm() {
       const { plan } = get();
-      if (!plan || plan.phase !== 'confirm' || !plan.shown || get().busy > 0) return;
+      if (!plan || plan.phase !== 'confirm' || !plan.shown || get().busy > 0 || autoDayOn) return;
       set({ plan: { ...plan, phase: 'applying' } });
       const r = await sendAct(plan.shown);
       const now = get().plan;
@@ -1271,7 +1323,7 @@ export const useGame = create<GameState>()((set, get) => {
 
     async buildConfirm() {
       const b = get().build;
-      if (!b || b.phase !== 'confirm' || !b.shown || get().busy > 0) return;
+      if (!b || b.phase !== 'confirm' || !b.shown || get().busy > 0 || autoDayOn) return;
       lineChecker.cancel();
       setBuild({ phase: 'applying' });
       const r = await sendAct(b.shown);

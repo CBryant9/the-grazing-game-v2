@@ -110,6 +110,8 @@ export function BuildCard({
   const b = useGame((s) => s.build);
   const busy = useGame((s) => s.busy > 0);
   const snapshot = useGame((s) => s.snapshot);
+  // The moving day's request for tomorrow is out: Build waits, and the card is asked again.
+  const coming = useGame((s) => s.dayComing);
   const confirm = useGame((s) => s.buildConfirm);
   const end = useGame((s) => s.buildEnd);
   const setTeam = useGame((s) => s.setTeam);
@@ -271,7 +273,7 @@ export function BuildCard({
   const card = b.card;
   const facts = card ? lineFacts(card) : null;
   const working = b.phase === 'applying';
-  const canBuild = !working && !busy && (!facts || !facts.nothingFits);
+  const canBuild = !working && !busy && !coming && (!facts || !facts.nothingFits);
   return wrap(
     <>
       <h3 className={styles.cardhead}>
@@ -326,15 +328,18 @@ export function BuildCard({
           type="button"
           className="btn coral"
           disabled={!canBuild}
+          aria-busy={coming || undefined}
           onClick={() => void confirm()}
         >
           {working
             ? 'Working'
-            : line
-              ? b.team
-                ? 'Order the team'
-                : 'Build it'
-              : b.picked!.confirm}
+            : coming
+              ? 'New day coming'
+              : line
+                ? b.team
+                  ? 'Order the team'
+                  : 'Build it'
+                : b.picked!.confirm}
         </button>
       </div>
     </>,

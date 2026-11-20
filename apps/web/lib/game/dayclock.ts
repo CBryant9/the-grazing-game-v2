@@ -30,6 +30,20 @@ export const NIGHT_MINUTES = 60;
 export const DUSK_HOLD_S = LIGHT_SECONDS + 0.4;
 /** When the next day is asked for: the middle of the night, when the map is dark. */
 export const CALL_AT_S = (LIGHT_SECONDS + DAY_SECONDS) / 2;
+/**
+ * With no pointer, key or touch on the page for this long, the moving day pauses itself. Each
+ * day is a server call that loads and saves the whole farm, so a day left running with no one
+ * there costs for nothing (CALLS B207).
+ */
+export const IDLE_PAUSE_MS = 3 * 60 * 1000;
+/** What the bar says when the day paused itself for that. */
+export const IDLE_WORDS = 'Paused: no one at the farm for 3 minutes. Play to carry on.';
+
+/**
+ * Why the day paused itself, when it did: no one at the farm, a day that stops for the player,
+ * or a day that failed. Not the player's own choice, so never kept on the device.
+ */
+export type AutoPause = 'idle' | 'stop' | 'failed';
 
 /** First and last light, minutes after midnight. */
 export interface DayLight {
@@ -149,12 +163,18 @@ function writeSaved(v: Saved): void {
 export interface DayClockState {
   /** True once the saved choice has been read on this device. */
   loaded: boolean;
+  /** The player's own Pause (kept on the device). */
   paused: boolean;
+  /** The day paused itself, and why. Never kept on the device: Play clears it. */
+  autoPaused: AutoPause | null;
   speed: DaySpeed;
   /** Things open that hold the sun at dusk, by name (a confirm the store does not know about). */
   holds: Record<string, true>;
   load: () => void;
+  /** The player's own Pause or Play, kept on the device. Play also clears a pause the day made. */
   setPaused: (paused: boolean) => void;
+  /** The day pauses itself, for a reason. Not kept on the device. */
+  pauseFor: (why: AutoPause) => void;
   togglePlay: () => void;
   stepSpeed: () => void;
   /** Hold the sun at dusk while `name` is open. Returns the release. */
@@ -170,14 +190,23 @@ export const useDayClock = create<DayClockState>()((set, get) => {
   return {
     loaded: false,
     paused: false,
+    autoPaused: null,
     speed: 1,
     holds: {},
     load() {
       if (get().loaded) return;
       set({ ...readSaved(), loaded: true });
     },
-    setPaused: (paused) => keep({ paused }),
-    togglePlay: () => keep({ paused: !get().paused }),
+    setPaused(paused) {
+      if (!paused) set({ autoPaused: null });
+      keep({ paused });
+    },
+    pauseFor: (why) => set({ autoPaused: why }),
+    togglePlay() {
+      // Stopped for any reason, Play lets the day run. Running, Pause is the player's choice.
+      const stopped = get().paused || get().autoPaused !== null;
+      get().setPaused(!stopped);
+    },
     stepSpeed: () => keep({ speed: nextSpeed(get().speed) }),
     hold(name) {
       set((st) => ({ holds: { ...st.holds, [name]: true } }));

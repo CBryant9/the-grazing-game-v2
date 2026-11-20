@@ -71,6 +71,8 @@ beforeEach(() => {
     plan: null,
     sow: null,
     build: null,
+    tab: 'farm',
+    morePage: 'menu',
   });
 });
 
@@ -138,6 +140,86 @@ describe('the moving day asking for tomorrow', () => {
     api.day.mockResolvedValue(reply(5, summary()));
     await useGame.getState().autoDay();
     expect(useGame.getState().build?.phase).toBe('done');
+  });
+
+  it('while the day is out: a confirm waits, Next day and skips are busy, and "New day coming" shows', async () => {
+    let done!: (r: DayResponse) => void;
+    api.day.mockImplementation(() => new Promise((r) => (done = r)));
+    const card = { action: 'moveMob', notes: [] } as never;
+    useGame.setState({
+      jobs: {
+        wean: {
+          key: 'wean',
+          text: 'Calves to wean',
+          button: 'Wean',
+          phase: 'confirm',
+          card,
+          shown: { req: { todo: 'wean' }, version: 'v4', requestId: 'r1' },
+        },
+      },
+    });
+    const day = useGame.getState().autoDay();
+    expect(useGame.getState().dayComing).toBe(true);
+    // Confirm in that window sends nothing: it can not race the day's request.
+    await useGame.getState().confirmJob('wean');
+    expect(api.act).not.toHaveBeenCalled();
+    expect(useGame.getState().jobs.wean?.phase).toBe('confirm');
+    done(reply(5, summary()));
+    expect(await day).toBe('next');
+    expect(useGame.getState().dayComing).toBe(false);
+  });
+
+  it('a job card opened while the day is out is kept, and asked again against the new day', async () => {
+    let done!: (r: DayResponse) => void;
+    api.day.mockImplementation(() => new Promise((r) => (done = r)));
+    const day = useGame.getState().autoDay();
+    // The player opens a job card while the request is out. Its card comes from the old day.
+    api.preview.mockResolvedValueOnce({ ok: true, card: { notes: ['old'] }, version: 'v4' });
+    const later = { ...snap(5), todo: [{ key: 'wean', text: 'Calves to wean', button: 'Wean' }] };
+    useGame.setState({
+      snapshot: { ...snap(4), todo: later.todo } as unknown as Snapshot,
+    });
+    await useGame.getState().startJob('wean');
+    expect(useGame.getState().jobs.wean?.shown?.version).toBe('v4');
+    // The new day comes in: the card is not lost, and is asked for again on the new day.
+    api.preview.mockResolvedValueOnce({ ok: true, card: { notes: ['new'] }, version: 'v5' });
+    done({ ...reply(5, summary()), snapshot: later as unknown as Snapshot });
+    expect(await day).toBe('next');
+    await vi.waitFor(() => expect(useGame.getState().jobs.wean?.shown?.version).toBe('v5'));
+    expect(useGame.getState().jobs.wean?.phase).toBe('confirm');
+    expect(api.preview).toHaveBeenCalledTimes(2);
+  });
+
+  it('a build tool, a move and a plan opened while the day is out stay open', async () => {
+    let done!: (r: DayResponse) => void;
+    api.day.mockImplementation(() => new Promise((r) => (done = r)));
+    const day = useGame.getState().autoDay();
+    useGame.setState({
+      build: { tool: 'fence', phase: 'pick', corners: [], cells: [] } as never,
+      move: { mobId: 1, target: null, part: false, qtys: {}, phase: 'pick' },
+      plan: { draft: {} as never, phase: 'edit' },
+      sow: { paddockId: 3 } as never,
+    });
+    done(reply(5, summary()));
+    await day;
+    const s = useGame.getState();
+    expect(s.build?.tool).toBe('fence');
+    expect(s.move?.mobId).toBe(1);
+    expect(s.plan?.phase).toBe('edit');
+    expect(s.sow).not.toBeNull();
+    // Nothing had a card yet, so nothing was asked again.
+    expect(api.preview).not.toHaveBeenCalled();
+  });
+
+  it('the Scores are not fetched again every day, only on a day that stops', async () => {
+    const record = vi.fn(async () => undefined);
+    useGame.setState({ tab: 'more', morePage: 'scores', loadRecord: record });
+    api.day.mockResolvedValue(reply(5, summary()));
+    await useGame.getState().autoDay();
+    expect(record).not.toHaveBeenCalled();
+    api.day.mockResolvedValue(reply(6, summary({ stops: ['Mob 1 has no water.'] })));
+    await useGame.getState().autoDay();
+    expect(record).toHaveBeenCalledTimes(1);
   });
 
   it('a manual Next day still shows the full summary and clears the line', async () => {

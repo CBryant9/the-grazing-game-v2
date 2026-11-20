@@ -92,7 +92,10 @@ export function TimeButtons({
   const evening = useGame((s) => s.snapshot?.clock.evening ?? false);
   const nextDay = useGame((s) => s.nextDay);
   const skip = useGame((s) => s.skip);
-  const off = busy || over;
+  // The moving day's own request for tomorrow is out: Next day and the skips wait for it.
+  const coming = useGame((s) => s.dayComing);
+  const off = busy || over || coming;
+  const label = (words: string): string => (coming ? `${words}: busy, a new day is coming` : words);
   return (
     <div className={styles.times} role="group" aria-label="Move time on">
       {moving && <DayControls />}
@@ -100,7 +103,8 @@ export function TimeButtons({
         type="button"
         className={`${styles.tb} ${styles.tbpri} ${evening && !over ? styles.invite : ''}`}
         disabled={off}
-        aria-label={moving ? 'Next day: jump to tomorrow' : undefined}
+        aria-label={coming ? label('Next day') : moving ? 'Next day: jump to tomorrow' : undefined}
+        aria-busy={coming || undefined}
         onClick={() => void nextDay()}
       >
         Next day <span aria-hidden="true">▸</span>
@@ -109,7 +113,8 @@ export function TimeButtons({
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label="+1 week"
+        aria-label={label('+1 week')}
+        aria-busy={coming || undefined}
         onClick={() => void skip('week')}
       >
         <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
@@ -123,7 +128,8 @@ export function TimeButtons({
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label="+1 month"
+        aria-label={label('+1 month')}
+        aria-busy={coming || undefined}
         onClick={() => void skip('month')}
       >
         <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
@@ -137,7 +143,8 @@ export function TimeButtons({
         type="button"
         className={styles.tb}
         disabled={off}
-        aria-label="+1 year"
+        aria-label={label('+1 year')}
+        aria-busy={coming || undefined}
         onClick={() => void skip('year')}
       >
         <span className={short ? styles.tbhide : styles.tblong} aria-hidden="true">
@@ -225,7 +232,8 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
   const { farm, date, season, totals, clock } = snapshot;
   const daily = snapshot.daily ?? null;
   // The daylight bar is the Daily Farm's: a Fast Farm has no daylight limit (Claudia, 19 Nov 2026).
-  const lit = clock.daylightLimit;
+  // Only a farm that says so is a Fast Farm: an old snapshot with no figure is a Daily Farm.
+  const lit = clock.daylightLimit !== false;
   const day = `Day ${num(snapshot.day + 1)}`;
   const year = `Year ${num(snapshot.score.year)}`;
   const rain = totals.rainMm;
@@ -293,7 +301,7 @@ export function TopBar({ snapshot }: { snapshot: Snapshot }) {
             <ModeTag daily={daily} /> · {daily ? day : year} · {dayDate(date)}
           </p>
         </div>
-        <div className={styles.topdl}>
+        <div className={`${styles.topdl} ${lit ? '' : styles.topdlfast}`}>
           {lit ? (
             <DaylightBar clock={clock} labels={false} />
           ) : (

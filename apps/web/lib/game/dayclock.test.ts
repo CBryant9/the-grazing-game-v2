@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CALL_AT_S,
+  DAY_CLOCK_KEY,
   DAY_SECONDS,
   DUSK_HOLD_S,
+  IDLE_PAUSE_MS,
+  IDLE_WORDS,
   LIGHT_SECONDS,
   dayLine,
   minutesAt,
@@ -10,6 +13,7 @@ import {
   parseSaved,
   shouldCall,
   stepClock,
+  useDayClock,
   type ClockPos,
 } from './dayclock';
 import type { SummaryWire } from './types';
@@ -133,6 +137,43 @@ describe('the one line for a day that passed while playing', () => {
     const line = dayLine(summary({ deaths: 3, births: 1 }), 4).toLowerCase();
     for (const w of ['good', 'bad', 'well done', 'should', 'poor', 'great']) {
       expect(line).not.toContain(w);
+    }
+  });
+});
+
+describe("pauses the day makes itself are not the player's choice (CALLS B207)", () => {
+  const saved: Record<string, string> = {};
+  const storage = {
+    getItem: (k: string) => saved[k] ?? null,
+    setItem: (k: string, v: string) => {
+      saved[k] = v;
+    },
+  };
+
+  it('no one at the farm for 3 minutes pauses the day, with a plain fact', () => {
+    expect(IDLE_PAUSE_MS).toBe(3 * 60 * 1000);
+    expect(IDLE_WORDS).toBe('Paused: no one at the farm for 3 minutes. Play to carry on.');
+  });
+
+  it('an idle, stop or failed pause is never written to the device; Play clears it; Pause is saved', () => {
+    vi.stubGlobal('localStorage', storage);
+    try {
+      useDayClock.setState({ paused: false, autoPaused: null, speed: 1, loaded: true });
+      for (const why of ['idle', 'stop', 'failed'] as const) {
+        delete saved[DAY_CLOCK_KEY];
+        useDayClock.getState().pauseFor(why);
+        expect(useDayClock.getState().autoPaused).toBe(why);
+        expect(saved[DAY_CLOCK_KEY]).toBeUndefined();
+        // Play lets the day run again, and clears the pause it made.
+        useDayClock.getState().togglePlay();
+        expect(useDayClock.getState().autoPaused).toBeNull();
+        expect(useDayClock.getState().paused).toBe(false);
+      }
+      // The player's own Pause is kept.
+      useDayClock.getState().togglePlay();
+      expect(parseSaved(saved[DAY_CLOCK_KEY] ?? null).paused).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 });

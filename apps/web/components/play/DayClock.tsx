@@ -6,6 +6,8 @@ import {
   CALL_AT_S,
   DAY_SECONDS,
   DUSK_HOLD_S,
+  IDLE_PAUSE_MS,
+  IDLE_WORDS,
   mapClock,
   minutesAt,
   shouldCall,
@@ -64,7 +66,7 @@ function useTouring(
 
 /** What the clock may do now, from everything on screen. */
 function useGate(hasCattle: boolean): ClockGate {
-  const paused = useDayClock((s) => s.paused);
+  const paused = useDayClock((s) => s.paused || s.autoPaused !== null);
   const holds = useDayClock((s) => s.holds);
   const tour = useHelp((s) => s.tour);
   const held = useGame((s) => holdsDay(s, holds));
@@ -94,12 +96,35 @@ function useGate(hasCattle: boolean): ClockGate {
 export function DayClockRunner({ snapshot }: { snapshot: Snapshot }) {
   const load = useDayClock((s) => s.load);
   const speed = useDayClock((s) => s.speed);
-  const setPaused = useDayClock((s) => s.setPaused);
+  const pauseFor = useDayClock((s) => s.pauseFor);
   const autoDay = useGame((s) => s.autoDay);
   const reduceMotion = useReducedMotion();
   const gate = useGate(snapshot.mobs.length > 0);
 
   useEffect(() => load(), [load]);
+
+  // No one at the farm: with no pointer, key or touch for IDLE_PAUSE_MS the day pauses itself,
+  // so a tab left open does not run the farm (and the server) on for nothing (CALLS B207).
+  useEffect(() => {
+    let last = Date.now();
+    const seen = (): void => {
+      last = Date.now();
+    };
+    const kinds = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const;
+    for (const k of kinds) window.addEventListener(k, seen, { capture: true, passive: true });
+    const timer = setInterval(() => {
+      const st = useDayClock.getState();
+      if (st.paused || st.autoPaused !== null) {
+        last = Date.now();
+        return;
+      }
+      if (Date.now() - last >= IDLE_PAUSE_MS) pauseFor('idle');
+    }, 5000);
+    return () => {
+      clearInterval(timer);
+      for (const k of kinds) window.removeEventListener(k, seen, { capture: true });
+    };
+  }, [pauseFor]);
 
   const pos = useRef<ClockPos>({ s: 0, called: false, waiting: false });
   const light = useRef<DayLight>({
@@ -155,8 +180,10 @@ export function DayClockRunner({ snapshot }: { snapshot: Snapshot }) {
           expectDay.current = null;
         } else {
           // Paused for the player, a failure (paused so nothing is asked again), or another tab
-          // moved the farm on: the day on screen starts again at first light.
-          if (outcome === 'pause' || outcome === 'failed') setPaused(true);
+          // moved the farm on: the day on screen starts again at first light. A pause the day
+          // makes is not the player's choice, so it is not kept on the device.
+          if (outcome === 'pause') pauseFor('stop');
+          else if (outcome === 'failed') pauseFor('failed');
           expectDay.current = null;
           pos.current = {
             s: outcome === 'failed' ? DUSK_HOLD_S : 0,
@@ -208,7 +235,7 @@ export function DayClockRunner({ snapshot }: { snapshot: Snapshot }) {
       kick.current = () => {};
     };
     // Starts again when the gate, the speed or reduce motion changes.
-  }, [gate, speed, reduceMotion, autoDay, setPaused]);
+  }, [gate, speed, reduceMotion, autoDay, pauseFor]);
 
   // Off the Fast Farm (or the screen closes): the map goes back to the farm's own clock.
   useEffect(() => () => mapClock.publish(null), []);
@@ -217,7 +244,7 @@ export function DayClockRunner({ snapshot }: { snapshot: Snapshot }) {
 
 /** Play or pause, and the speed, beside the skips (Fast Farm only). */
 export function DayControls() {
-  const paused = useDayClock((s) => s.paused);
+  const paused = useDayClock((s) => s.paused || s.autoPaused !== null);
   const speed = useDayClock((s) => s.speed);
   const togglePlay = useDayClock((s) => s.togglePlay);
   const stepSpeed = useDayClock((s) => s.stepSpeed);
@@ -251,7 +278,8 @@ export function DayControls() {
 
 /** What the line under the sun says: the night just passed, or why the sun is standing still. */
 function useDayWords(): string {
-  const paused = useDayClock((s) => s.paused);
+  const paused = useDayClock((s) => s.paused || s.autoPaused !== null);
+  const idle = useDayClock((s) => s.autoPaused === 'idle');
   const holds = useDayClock((s) => s.holds);
   const held = useGame((s) => holdsDay(s, holds, false));
   const note = useGame((s) => s.dayNote);
@@ -260,6 +288,7 @@ function useDayWords(): string {
     hasCattle,
     useHelp((s) => s.tour),
   );
+  if (idle) return IDLE_WORDS;
   if (paused) return note ? `Paused. ${note}` : 'Paused';
   if (touring) return 'The day starts moving at the last tour step';
   if (held) return 'The sun waits at dusk until you finish';

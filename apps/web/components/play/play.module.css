@@ -354,8 +354,12 @@
 .screen[data-layout='landscape'] .topdl {
   width: auto;
   flex: 1 1 60px;
-  min-width: 0;
+  min-width: 40px;
   max-width: 150px;
+}
+/* A Fast Farm's row on its side holds Play, the speed and the skips too: its day bar may shrink to nothing. */
+.screen[data-layout='landscape'] .topdl.topdlfast {
+  min-width: 0;
 }
 .screen[data-layout='landscape'] .times {
   gap: 4px;

@@ -159,10 +159,12 @@ export function PlayScreen({ snapshot }: { snapshot: Snapshot }) {
   const minutes = clock.evening
     ? Math.max(clock.now, clock.lastLight + DUSK_AFTER_LAST_LIGHT)
     : clock.now;
-  const moving = !clock.daylightLimit;
+  // Only a farm that says it has no daylight limit is a Fast Farm (an old snapshot with no figure
+  // is a Daily Farm, as the store and the build card read it).
+  const moving = clock.daylightLimit === false;
   // The cattle keep time with the moving day: faster at 2x and 4x, standing still when paused.
   // A Daily Farm's day is real time, so its cattle walk at the normal pace.
-  const dayPaused = useDayClock((s) => s.paused);
+  const dayPaused = useDayClock((s) => s.paused || s.autoPaused !== null);
   const daySpeed = useDayClock((s) => s.speed);
   const cattlePace = moving ? (dayPaused ? 0 : daySpeed) : 1;
 
