@@ -9,8 +9,6 @@
  * nothing pops and the map never sits half way between the two pictures.
  */
 
-import { NATURAL } from './palette';
-
 /** At or below about this many screen pixels per square, mobs become one marker (PRD 7). */
 export const LOD_SWITCH_PX_PER_SQUARE = 26;
 
@@ -65,31 +63,28 @@ export const easeFade = (t: number): number => {
 // ---------------------------------------------------------------------------
 
 /**
- * Zoomed out, a mob too crowded to read as dots is a filled patch over the
- * ground it takes up, with a rim round its edge: dark with a pale rim for
- * cattle, pale with a dark rim for sheep, the same pairs as the dots and the
- * animals themselves. The palette test holds the patch or its rim to 3 to 1
- * against every ground and grass colour. Drawing figures (builder).
+ * Zoomed out, a mob too crowded for every beast to show as a dot is still
+ * drawn as dots, but only every so many of its beasts, so the dots stand
+ * about `DOT_MIN_SPACING_PX` apart (20 Nov 2026: the first version filled
+ * its squares as a solid patch, which read as black blocks, not cattle).
+ * Under those dots the ground it takes up gets this shade (0 to 1) of the
+ * footprint colour, deeper than an open mob's 0.14, so a crowded mob reads
+ * as dense. The dots carry the contrast; the palette test holds them to
+ * 3 to 1 on the shaded ground too. Drawing figure (builder).
  */
-export const HERD_PATCH = {
-  cattleFill: NATURAL.cattleOutline,
-  cattleAlpha: 0.8,
-  cattleRim: NATURAL.cattleHalo,
-  sheepFill: NATURAL.sheepHalo,
-  sheepAlpha: 0.85,
-  sheepRim: NATURAL.sheepOutline,
-  /** The rim's width on screen, CSS pixels, at any zoom. */
-  rimPx: 1.5,
-} as const;
+export const HERD_CROWD_SHADE = 0.18;
+
+/** The footprint colour laid under a mob zoomed out. */
+export const HERD_FOOTPRINT = 0x281a0a;
 
 /** Zoomed out, each beast drawn is a dot this many screen pixels across. */
 export const DOT_PX = 3.5;
 
 /**
- * Zoomed out, a mob is drawn as dots only while its cattle stand at least
- * this many screen pixels apart (at their true density). Closer than that
- * the dots run into a blob, so the mob is drawn as a filled patch over the
- * ground it takes up, with its head count on the marker.
+ * Zoomed out, every beast drawn shows as a dot while its cattle stand at
+ * least this many screen pixels apart (at their true density). Closer than
+ * that the dots would run into a blob, so only every so many beasts are
+ * dotted, keeping the dots about this far apart (`HERD_CROWD_SHADE`).
  */
 export const DOT_MIN_SPACING_PX = 4.5;
 
@@ -108,7 +103,7 @@ export function herdSpacingPx(
   return (Math.sqrt(herdM2 / head) * pxPerSquare) / Math.max(1, sideM);
 }
 
-/** Zoomed out: draw this mob as dots (true) or as a filled herd patch (false). */
+/** Zoomed out: dot every beast (true), or thin the dots out because the mob is crowded (false). */
 export const herdAsDots = (
   herdM2: number,
   head: number,

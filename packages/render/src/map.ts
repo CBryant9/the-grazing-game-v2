@@ -128,7 +128,18 @@ import {
 } from './buildgrid';
 import { DEFAULT_LAYERS, withLayers, type MapLayers } from './layers';
 import { mapTint, type MapWeather } from './light';
-import { DOT_PX, HERD_PATCH, easeFade, fadeStep, herdAsDots, lodMode, type LodMode } from './lod';
+import {
+  DOT_MIN_SPACING_PX,
+  DOT_PX,
+  HERD_CROWD_SHADE,
+  HERD_FOOTPRINT,
+  easeFade,
+  fadeStep,
+  herdAsDots,
+  herdSpacingPx,
+  lodMode,
+  type LodMode,
+} from './lod';
 import { CONTRACT_TAG, CONTRACT_TAG_MIN_PX, MESH, TICK, tickOffsets } from './linestyle';
 import { paintWash, type WashLayer } from './overlays';
 import { pickableDraws, type PickablePaddock } from './pickable';
@@ -1056,7 +1067,7 @@ class PixiFarmMap implements FarmMap {
     this.footprints.visible = far;
     this.footprints.alpha = lod.far;
     // The patches' rims keep their width on screen: drawn again for a new zoom once they show.
-    if (far && this.footprintZoom !== cam.zoom) this.drawFootprints();
+    if (far && this.footprintZoom !== cam.zoom) this.refreshFar();
     this.dots.visible = far && this.dots.particleChildren.length > 0;
     this.dots.alpha = lod.far;
 
@@ -1440,8 +1451,8 @@ class PixiFarmMap implements FarmMap {
     }
     // A new picture in a batch has to be sent again.
     if (swapped) for (const row of this.rows) row.cattle.update();
-    // The patches' rims keep their width on screen.
-    if (this.lod.far > 0.01 && this.footprintZoom !== zoom) this.drawFootprints();
+    // A crowded mob's dots are thinned for the zoom, so look again when it changes.
+    if (this.lod.far > 0.01 && this.footprintZoom !== zoom) this.refreshFar();
     const d = DOT_PX / zoom / this.def(DOT_SPRITE.cattle).w;
     for (const p of this.dots.particleChildren) {
       p.scaleX = d;
@@ -1537,10 +1548,24 @@ class PixiFarmMap implements FarmMap {
     const flockDots = this.flockPlacements.map(
       (f) => f.cells.length > 0 && herdAsDots(f.herdM2, f.total, zoom, sideM),
     );
+    // A crowded mob is still drawn as dots (Claudia, 19 Nov 2026: "I would like to see the cows
+    // when zoomed out"), but only every so many of its beasts, so the dots stand about
+    // DOT_MIN_SPACING_PX apart and read as a tight mob instead of running into a blob.
+    const every = (head: number, drawn: number, herdM2: number): number => {
+      const fit = head * (herdSpacingPx(herdM2, head, zoom, sideM) / DOT_MIN_SPACING_PX) ** 2;
+      return Math.max(1, Math.ceil(drawn / Math.max(1, fit)));
+    };
+    const mobStep = herd.mobs.map((m, k) =>
+      mobDots[k] ? 1 : every(m.total, m.to - m.from, m.herdM2),
+    );
+    const flockStep = this.flockPlacements.map((f, k) =>
+      flockDots[k] ? 1 : every(f.total, f.sheep.length, f.herdM2),
+    );
     const key =
-      herd.mobs.map((m, k) => `${mobDots[k] ? 'd' : 'p'}${m.id}:${m.start}`).join(',') +
+      herd.mobs.map((m, k) => `${mobStep[k]}:${m.id}:${m.start}`).join(',') +
       '|' +
-      flockDots.map((b) => (b ? 'd' : 'p')).join('');
+      flockStep.join(',');
+    this.footprintZoom = zoom;
     if (!force && key === this.farKey) return;
     this.farKey = key;
 
@@ -1560,14 +1585,19 @@ class PixiFarmMap implements FarmMap {
     };
     this.beastDots = new Array<Particle | null>(herd.n).fill(null);
     herd.mobs.forEach((m, k) => {
-      if (!mobDots[k]) return;
-      for (let i = m.from; i < m.to; i++) {
+      if (m.where !== 'paddock') return;
+      const step = mobStep[k]!;
+      for (let i = m.from; i < m.to; i += step) {
         this.beastDots[i] = make(DOT_SPRITE.cattle, herd.x[i]!, herd.y[i]!);
       }
     });
     this.flockPlacements.forEach((f, k) => {
-      if (!flockDots[k]) return;
-      for (const s of f.sheep) make(DOT_SPRITE.sheep, s.x, s.y);
+      if (f.cells.length === 0) return;
+      const step = flockStep[k]!;
+      for (let j = 0; j < f.sheep.length; j += step) {
+        const s = f.sheep[j]!;
+        make(DOT_SPRITE.sheep, s.x, s.y);
+      }
     });
     this.dots.update();
     this.dots.visible = this.lod.far > 0.01 && list.length > 0;
@@ -1580,55 +1610,31 @@ class PixiFarmMap implements FarmMap {
   /** Which mobs and flocks show as dots zoomed out (the rest as patches). */
   private mobDots: boolean[] = [];
   private flockDots: boolean[] = [];
-  /** The zoom the patches' rims were last drawn for. */
+  /** The zoom the zoomed-out dots were last thinned for. */
   private footprintZoom = 0;
 
   /**
-   * The footprint under each marker: light under dots, a filled patch with a
-   * rim for a crowded mob (`HERD_PATCH`). The rim is a steady width on
-   * screen, so it is drawn again when the zoom changes.
+   * The footprint under each marker: a light shade under a mob whose every
+   * beast is a dot, a deeper one (`HERD_CROWD_SHADE`) under a crowded mob
+   * whose dots are thinned out.
    */
   private drawFootprints(): void {
     const g = this.footprints.clear();
-    this.footprintZoom = this.cam.zoom;
-    const P = HERD_PATCH;
-    const rimW = P.rimPx / Math.max(1e-6, this.cam.zoom);
     const cover = (cells: readonly number[]): void => {
       for (const c of cells) g.rect(colOf(c), rowOf(c) * K - this.raise[c]!, 1.02, K + 0.02);
     };
-    // The edge of a patch: every side of its squares that is not shared with another of them.
-    const rim = (cells: readonly number[]): void => {
-      const own = new Set(cells);
-      for (const c of cells) {
-        const x = colOf(c);
-        const r = rowOf(c);
-        const y0 = r * K - this.raise[c]!;
-        const y1 = y0 + K;
-        if (r === 0 || !own.has(c - GRID_W)) g.moveTo(x, y0).lineTo(x + 1, y0);
-        if (r === GRID_H - 1 || !own.has(c + GRID_W)) g.moveTo(x, y1).lineTo(x + 1, y1);
-        if (x === 0 || !own.has(c - 1)) g.moveTo(x, y0).lineTo(x, y1);
-        if (x === GRID_W - 1 || !own.has(c + 1)) g.moveTo(x + 1, y0).lineTo(x + 1, y1);
-      }
-    };
+    // A crowded mob is drawn as thinned dots (refreshFar) over a slightly deeper shade, so it
+    // reads as a tight mob of cattle, not as a block of squares. The dots carry the contrast.
     this.herd.mobs.forEach((m, k) => {
       cover(m.cells);
-      if (this.mobDots[k] || m.where === 'yards') {
-        g.fill({ color: 0x281a0a, alpha: 0.14 });
-        return;
-      }
-      g.fill({ color: P.cattleFill, alpha: P.cattleAlpha });
-      rim(m.cells);
-      g.stroke({ color: P.cattleRim, width: rimW, alpha: 1, cap: 'square' });
+      g.fill({
+        color: HERD_FOOTPRINT,
+        alpha: this.mobDots[k] || m.where === 'yards' ? 0.14 : HERD_CROWD_SHADE,
+      });
     });
     this.flockPlacements.forEach((f, k) => {
       cover(f.cells);
-      if (this.flockDots[k]) {
-        g.fill({ color: 0x281a0a, alpha: 0.14 });
-        return;
-      }
-      g.fill({ color: P.sheepFill, alpha: P.sheepAlpha });
-      rim(f.cells);
-      g.stroke({ color: P.sheepRim, width: rimW, alpha: 1, cap: 'square' });
+      g.fill({ color: HERD_FOOTPRINT, alpha: this.flockDots[k] ? 0.14 : HERD_CROWD_SHADE });
     });
   }
 

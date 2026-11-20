@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { contrast, lit, luminance, mix, shade } from './colour';
 import { squareLook } from './grass';
 import { lightTint, mapTint, weatherTint } from './light';
-import { HERD_PATCH } from './lod';
+import { HERD_CROWD_SHADE, HERD_FOOTPRINT } from './lod';
 import { CATTLE, NATURAL, SHEEP, THEMES, THIN_FLEECE, breedFor, paletteFor } from './palette';
 import { cell, sampleView, setSquare } from './testing/sampleView';
 
@@ -195,31 +195,6 @@ describe('zoomed out, herds never blur into the grass', () => {
   const DAY = LIGHTS.slice(0, 4);
 
   it.each(DAY)(
-    "a crowded mob's patch, or its rim, stands out at 3 to 1 or better on every ground and grass colour: %s",
-    (_name, light) => {
-      const P = HERD_PATCH;
-      for (const [what, fill, alpha, rim] of [
-        ['cattle', P.cattleFill, P.cattleAlpha, P.cattleRim],
-        ['sheep', P.sheepFill, P.sheepAlpha, P.sheepRim],
-      ] as const) {
-        let worst = Infinity;
-        for (const g of grass) {
-          const ground = lit(g, light);
-          // The patch is the fill laid over the ground at its opacity.
-          const patch = lit(mix(g, fill, alpha), light);
-          worst = Math.min(
-            worst,
-            Math.max(contrast(patch, ground), contrast(lit(rim, light), ground)),
-          );
-          // The rim stands out from the patch it goes round.
-          expect(contrast(lit(rim, light), patch), what).toBeGreaterThanOrEqual(CATTLE_CONTRAST);
-        }
-        expect(worst, what).toBeGreaterThanOrEqual(CATTLE_CONTRAST);
-      }
-    },
-  );
-
-  it.each(DAY)(
     'a dot (dark middle and pale rim for cattle, the other way for sheep) stands out at 3 to 1: %s',
     (_name, light) => {
       for (const [inner, outer] of [
@@ -239,11 +214,24 @@ describe('zoomed out, herds never blur into the grass', () => {
     },
   );
 
-  it('the patch is filled more than half way, so it reads as a herd and not a shadow', () => {
-    expect(HERD_PATCH.cattleAlpha).toBeGreaterThanOrEqual(0.7);
-    expect(HERD_PATCH.sheepAlpha).toBeGreaterThanOrEqual(0.7);
-    expect(HERD_PATCH.rimPx).toBeGreaterThanOrEqual(1);
-  });
+  it.each(DAY)(
+    "a crowded mob's dots still stand out at 3 to 1 on the deeper shade under them: %s",
+    (_name, light) => {
+      for (const [inner, outer] of [
+        [NATURAL.cattleOutline, NATURAL.cattleHalo],
+        [NATURAL.sheepHalo, NATURAL.sheepOutline],
+      ] as const) {
+        for (const g of grass) {
+          const ground = lit(mix(g, HERD_FOOTPRINT, HERD_CROWD_SHADE), light);
+          const best = Math.max(
+            contrast(lit(inner, light), ground),
+            contrast(lit(outer, light), ground),
+          );
+          expect(best).toBeGreaterThanOrEqual(CATTLE_CONTRAST);
+        }
+      }
+    },
+  );
 });
 
 describe('labels and markers can be read in both themes (WCAG AA, 4.5 to 1)', () => {

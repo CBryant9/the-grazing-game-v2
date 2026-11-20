@@ -2750,3 +2750,13 @@ The realism review of the joined branch (`m9-fun-and-flow`: grass base, cattle, 
 - An "overgrazed" judgement based on grazing pressure combined with rest periods (graze short is fine with a long rest).
 - More stubble nuance (preference, nutritive value by crop).
 - Touch / phone testing.
+
+### 20 Nov 2026: checked in the browser after the review fixes
+
+Lead session, dev server from this branch, Fast Farm (Central Queensland, 1,000 ha, running).
+
+- **PC 1280x800, light:** one header row (farm, date, day bar, Play, 1x, Next day, +1 week, +1 month, +1 year, Help, cash). The tool panel shows all eight tools with icons and words. The days pass by themselves; opening the fence tool holds the sun at dusk ("The sun waits at dusk until you finish"), and a day that was already being fetched kept the tool open (the T1 fix). Zoomed in: a loose mob of cattle round the windmill and trough over dry tussock grass; mid zoom cattle still read as cattle.
+- **Found and fixed:** zoomed right out, both mobs drew as solid black blocks shaped like the grid squares (the crowded-mob patch). A crowded mob is now thinned dots over a slightly deeper shade (`HERD_CROWD_SHADE`, VISUALS and CALLS B194 updated, palette test holds the dots at 3 to 1 on the shade). The dots are thinned again when the zoom changes.
+- **Phone 375x812, light and dark:** Play, speed, Next day and +1w, +1m, +1y fit on one row. Fence tool: the Draw, Check, Build chip with Back to Look, the grid on the map, a 686 m line with a length label that matches the card, a card with "Built now", no daylight rows, and "about 910 m of permanent fence a day here". Cancelled without building.
+- **Phone on its side 667x375:** no sideways scroll; the tools in two rows of four. The date in the top bar is cut short at this width ("· Ye"); left as a known small gap.
+- **Not checked:** 60 fps on a real phone; the browser pane was hidden, so animation ran slowly and walking was only seen between screenshots. Lighthouse not run (no website page changed).
