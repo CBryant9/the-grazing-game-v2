@@ -151,11 +151,11 @@ export interface FarmViewSquares {
    */
   form?: number[];
   /**
-   * How much of the ground the sward and its litter hide, seen from above,
-   * in twentieths: 0 is bare soil, 20 is hidden. A display figure for the
-   * picture only. It follows the pasture's form (a carpet hides the ground
-   * at less feed than tussocks do). The model's own ground cover is `cover`.
-   * Added 20 Nov 2026, optional like `form`.
+   * How much of the ground the map shows hidden, in twentieths: 0 is bare
+   * soil, 20 is hidden. It is the model's own ground cover (the paddock
+   * sheet's figure, `cover` in finer steps), so the map and the numbers
+   * agree; `form` only sets the pattern the cover is drawn in. Added 20 Nov
+   * 2026, optional like `form`.
    */
   hidden?: number[];
 }

@@ -786,7 +786,7 @@ How the arable land is laid out: it grows outwards from one square (or from the 
 
 ## Ground hidden from above, for the map picture (19 Nov 2026)
 
-Drawing figures only: the model's own ground cover (feed ÷ 1,000 kg DM/ha, up to 1, in the score and on the paddock sheet) is unchanged. The server sends each square's share of ground hidden, 1 − e^(−feed ÷ k), with k by the pasture's form (`VIEW_HIDE_KG` in `packages/engine/src/sim/view.ts`; the table is in `docs/VISUALS.md`, "The base of a paddock"). Read 19 to 20 Nov 2026.
+Read 19 to 20 Nov 2026. **Changed 20 Nov 2026:** the map now draws the share of ground hidden from the model's own ground cover (feed ÷ 1,000 kg DM/ha, up to 1, the score's and the paddock sheet's figure), so the map and the numbers agree (LESSONS 4). The curve by form built first (1 − e^(−feed ÷ k), `VIEW_HIDE_KG`) is gone: it showed about 40% open ground on Central West native at 1,000 kg DM/ha while the sheet said 100%. The sources below now only inform how each pasture's pattern looks from above (tussocks with open ground between, a carpet's fine even grain), not how much ground it hides. The k figures in the third column are a record of what was built and taken out. A cover that differs by pasture would be a change to the model, put to Claudia (`docs/CALLS_FOR_CLAUDIA.md` G2).
 
 | Fact | Source | Used for |
 |---|---|---|

@@ -33,9 +33,11 @@ export const TUFT_WIDTH = 0.3;
 export type SquareKind = 'pasture' | 'sown' | 'crop' | 'fallow' | 'stubble';
 
 /**
- * The form a district's native pasture takes, for a view sent before the
- * view carried `squares.form` (a past day's picture). The server's own
- * table is the one that counts (docs/VISUALS.md, "The base of a paddock").
+ * The form a district's native pasture takes, kept only for stored past-day
+ * pictures from before the view carried `squares.form`, which can still be
+ * opened. Every view sent now carries the form from the server's own table
+ * (`VIEW_NATIVE_FORM`), which is the one that counts (docs/VISUALS.md, "The
+ * base of a paddock"). Never read it for a view that has `form`.
  */
 const NATIVE_FORM_FALLBACK: Record<DistrictId, ViewForm> = {
   cq: VIEW_FORM.tropicalTussock,
@@ -187,9 +189,10 @@ export function squareLook(view: FarmView, i: number): SquareLook {
   const greenShare = (s.green[i] ?? 0) / 20;
   const seeded = (s.seedHeads[i] ?? 0) === 1;
   const cropping = land === VIEW_LAND.annual || land === VIEW_LAND.crop;
-  // How the plants sit on the ground, and how much of it they hide. A view
+  // How the plants sit on the ground (the pattern), and how much of it they
+  // hide: the model's ground cover, sent in twentieths as `hidden`. A view
   // from before these were sent (a past day) falls back to the district's
-  // native form and the model's ground cover.
+  // native form and the cover in tenths.
   const sentForm = s.form?.[i];
   const form: ViewForm =
     sentForm !== undefined && sentForm >= 0 && sentForm <= VIEW_FORM.bare

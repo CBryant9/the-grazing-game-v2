@@ -181,7 +181,7 @@ How the PixiJS map in `packages/render` draws each thing above. The rule is unch
 
 | Thing | How the rebuild draws it |
 |---|---|
-| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under the share of ground hidden × 1.05. The share hidden is the view's `hidden` figure, worked out on the server for the pasture's form (see "The base of a paddock" below). A view from before 19 Nov 2026 has no `hidden`, and uses the model's cover (feed ÷ 1,000 kg DM/ha, up to 1) as before. *(Changed: 19 Nov 2026. The model's own ground cover figure, used in the score and on the paddock sheet, is unchanged.)* **(builder)** |
+| Ground cover | Each square has nine fixed tuft spots. A spot stands if its own fixed number is under the share of ground hidden × 1.05. The share hidden is the model's own ground cover, the paddock sheet's figure: feed ÷ 1,000 kg DM/ha, up to 1, so about 1,000 kg DM/ha covers the ground, as in the MVP above. The server sends it in twentieths as `hidden` (finer than the tenths of `cover`, so neighbouring squares blend smoothly); a view from before 19 Nov 2026 has no `hidden` and uses `cover`. The pasture's form sets only the pattern the cover is drawn in (see "The base of a paddock" below). *(20 Nov 2026: the first build of the base drew a share from a curve by form, so Central West native at 1,000 kg DM/ha showed about 40% open ground while the paddock sheet said 100% cover. Put back to the model's cover: LESSONS 4.)* **(builder)** |
 | Bare soil, litter, shaded ground | The colours above, unchanged. Dry grass sits on straw litter, never soil |
 | Height | Tuft height follows the view's height in cm: 90 cm is 0.62 of a square, each tuft give or take a third. Grass is drawn tall against the cattle on purpose, as in the MVP and the mockups, so height reads **(builder)** |
 | Green leaf colour | Young to old leaf, the colours above, by the view's leaf age |
@@ -200,21 +200,21 @@ Claudia, after playing: "we need to make sure the base of the paddock looks a bi
 **What the server sends.** Two display figures for each square, both optional so a past day's picture still draws (`squares.form` and `squares.hidden`, view version still 4):
 
 - `form`: how the plants sit on the ground, seen from above. From the district for native pasture, from the species for a sowing, rows for crops, annual forages and stubble, bare for fallow. An oversown legume (stylo) keeps the native form.
-- `hidden`: the share of the ground the sward and its litter hide from above, in twentieths: 1 − e^(−feed ÷ k), with feed the green and dead feed in kg DM/ha and k by form (table below). Stubble is 20 (it lies flat and covers the ground). Fallow is 0. The curve rises fast and then flattens, the shape found in temperate native pastures (Lodge and Murphy 2002, `docs/DATA.md`). A carpet hides the ground at far less feed than tussocks do (an Indian couch sward was 63% covered at 350 kg DM/ha; at 50% cover it held about a third of the feed of tussock pasture). The curve is on the server; the browser gets only the share.
+- `hidden`: the share of the ground hidden, in twentieths. It is the model's own ground cover (feed ÷ 1,000 kg DM/ha, up to 1), the same figure as the paddock sheet's Ground cover, so the map and the numbers agree (LESSONS 4). Stubble is drawn fully covered and fallow bare whatever the figure. *(20 Nov 2026: the first build sent a curve by form, 1 − e^(−feed ÷ k), which disagreed with the paddock sheet. The sourced shapes in `docs/DATA.md` now only inform how each form's pattern looks, not how much it hides. A cover that differs by pasture would be a model change, for Claudia: CALLS G2.)*
 
-| Form | Where | k, kg DM/ha | Hidden at 300 / 800 / 1,500 kg DM/ha | How it is drawn from above |
-|---|---|---|---|---|
-| Tropical tussock | Central Queensland native (black speargrass, Queensland bluegrass, Indian couch) | 750 | 35% / 65% / 85% | Tussock clumps, with a finer grain between them (the couch) |
-| Low tufts | Northern Tablelands native (red grass, wallaby grass, weeping grass) | 600 | 40% / 75% / 90% | Small close tufts and fine grain, nearly even |
-| Open tussock | Central West and Western Victoria native (wallaby grass, speargrass, red grass, kangaroo grass) | 1,050 | 25% / 55% / 75% | Clumps with open ground between |
-| Bunch | Buffel grass | 1,050 | 25% / 55% / 75% | Big clumps, broad tufts |
-| Hedgerow | Leucaena and buffel | 1,050 | 25% / 55% / 75% | Buffel clumps, with two dark green hedgerows across each square (thinner where browsed hard) |
-| Carpet | Perennial ryegrass and white clover, multi-species | 350 | 60% / 90% / 100% | Fine, even grain: near-continuous leaf with small scattered gaps. White clover flowers |
-| Tussock and clover | Phalaris and sub clover | 450 | 50% / 85% / 95% | Mostly fine grain with some clumping. White clover flowers |
-| Crowns | Lucerne | 900 | 30% / 60% / 80% | Separate crowns, four to a square each way |
-| Rows | Crops, annual forages, stubble | 900 | 30% / 60% / 80% | Filling out from the middle of three drill rows a square, furrows between |
+| Form | Where | How it is drawn from above |
+|---|---|---|
+| Tropical tussock | Central Queensland native (black speargrass, Queensland bluegrass, Indian couch) | Tussock clumps, with a finer grain between them (the couch) |
+| Low tufts | Northern Tablelands native (red grass, wallaby grass, weeping grass) | Small close tufts and fine grain, nearly even |
+| Open tussock | Central West and Western Victoria native (wallaby grass, speargrass, red grass, kangaroo grass) | Clumps with open ground between |
+| Bunch | Buffel grass | Big clumps, broad tufts |
+| Hedgerow | Leucaena and buffel | Buffel clumps, with two dark green hedgerows across each square (thinner where browsed hard) |
+| Carpet | Perennial ryegrass and white clover, multi-species | Fine, even grain: near-continuous leaf with small scattered gaps. White clover flowers |
+| Tussock and clover | Phalaris and sub clover | Mostly fine grain with some clumping. White clover flowers |
+| Crowns | Lucerne | Separate crowns, four to a square each way |
+| Rows | Crops, annual forages, stubble | Filling out from the middle of three drill rows a square, furrows between |
 
-(Shares rounded to 5%. k for the sown pastures, lucerne and crops are stand-ins: `docs/CALLS_FOR_CLAUDIA.md`, G2.)
+(Every form hides the same share at the same feed: the model's cover. The form changes where the open ground lies, not how much of it there is.)
 
 **How the ground picture is laid.** Each square has two colours: its open ground (soil, with litter lying in the gaps the more the sward hides, up to 45% litter) and its sward's base (the low leaf over shaded ground or litter, with some of the tops colour: more for a carpet, less for tussocks). Each pixel has a fixed order in its square for its form's pattern, and is the base colour once the square's hidden share passes it, with a soft edge. So the share of the square that shows open ground is exactly what the server sent, whatever the pattern. The patterns:
 

@@ -35,7 +35,7 @@ import { dateOn, plantingsNow, surveyOf } from './derived';
 import { cloneFarm, type FarmState } from './state';
 import { farmTotals, paddockSummaries } from './summary';
 import { stepDay } from './tick';
-import { VIEW_HIDE_KG, VIEW_NATIVE_FORM, farmView, hiddenTwentieths } from './view';
+import { VIEW_NATIVE_FORM, farmView } from './view';
 
 vi.setConfig({ testTimeout: 120_000 });
 
@@ -269,37 +269,39 @@ describe('how the pasture sits on the ground (a display code, 20 Nov 2026)', () 
         expect(form).toBe(VIEW_FORM.rows);
         rows++;
       }
-      if (land === VIEW_LAND.fallow) {
-        expect(form).toBe(VIEW_FORM.bare);
-        expect(view.squares.hidden![i]).toBe(0);
-      }
-      if (land === VIEW_LAND.stubble) expect(view.squares.hidden![i]).toBe(20);
+      if (land === VIEW_LAND.fallow) expect(form).toBe(VIEW_FORM.bare);
     }
     expect(rows).toBeGreaterThan(0);
   });
 
-  it('the hidden ground follows the feed on each square, by its form', () => {
-    const farm = runningFarm(4, 'cq', 3);
-    const view = farmView(farm);
-    for (let i = 0; i < FARM_GRID_N; i += 7) {
-      const mass = farm.pasture.G[i]! + farm.pasture.D[i]!;
-      const form = view.squares.form![i]! as (typeof VIEW_FORM)[keyof typeof VIEW_FORM];
-      if (view.squares.land[i] === VIEW_LAND.stubble) continue;
-      expect(view.squares.hidden![i]).toBe(hiddenTwentieths(form, mass));
+  it("the hidden ground is the model's own ground cover on every square, whatever its form (LESSONS 4)", () => {
+    for (const [seed, id] of [
+      [4, 'cq'],
+      [5, 'cw'],
+      [6, 'wv'],
+      [7, 'nsw'],
+    ] as const) {
+      const farm = runningFarm(seed, id, 3);
+      const view = farmView(farm);
+      for (let i = 0; i < FARM_GRID_N; i++) {
+        const mass = farm.pasture.G[i]! + farm.pasture.D[i]!;
+        // About 1,000 kg DM/ha covers the ground: the paddock sheet's figure, in twentieths.
+        const cover = Math.min(1, mass / 1000);
+        expect(view.squares.hidden![i], `${id} square ${i}`).toBe(Math.round(cover * 20));
+      }
     }
   });
 
-  it('a carpet hides the ground at much less feed than tussocks do, and no feed hides nothing', () => {
-    for (const form of Object.values(VIEW_FORM)) expect(hiddenTwentieths(form, 0)).toBe(0);
-    // About 300 kg DM/ha: a grazed-down ryegrass and clover carpet still hides half the ground.
-    expect(hiddenTwentieths(VIEW_FORM.carpet, 300)).toBeGreaterThanOrEqual(11);
-    expect(hiddenTwentieths(VIEW_FORM.openTussock, 300)).toBeLessThanOrEqual(5);
-    // Rising fast, then flattening: every form is nearly hidden by 3,500 kg DM/ha.
-    for (const form of Object.values(VIEW_FORM)) {
-      if (form === VIEW_FORM.bare) continue;
-      expect(hiddenTwentieths(form, 3500)).toBeGreaterThanOrEqual(19);
-      expect(VIEW_HIDE_KG[form]).toBeGreaterThan(0);
-    }
+  it('native pasture at 1,000 kg DM/ha shows the ground fully hidden, as the paddock sheet says 100% cover', () => {
+    const farm = runningFarm(5, 'cw', 3);
+    const i = farm.pasture.land.findIndex((l) => l === LAND.native);
+    expect(i).toBeGreaterThanOrEqual(0);
+    farm.pasture.G[i] = 600;
+    farm.pasture.D[i] = 400;
+    const view = farmView(farm);
+    expect(view.squares.form![i]).toBe(VIEW_FORM.openTussock);
+    expect(view.squares.hidden![i]).toBe(20);
+    expect(view.squares.cover[i]).toBe(10);
   });
 });
 

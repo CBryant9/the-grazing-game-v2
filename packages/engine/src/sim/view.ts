@@ -101,38 +101,6 @@ export const VIEW_SPECIES_FORM: Record<SpeciesId, ViewForm | 'native'> = {
   brass: VIEW_FORM.rows,
 };
 
-/**
- * How much of the ground the sward and its litter hide from above, by
- * form: hidden = 1 - e^(-feed / k), with feed the green and dead feed in
- * kg DM/ha and k from this table. Cover rises fast at low feed and then
- * flattens (the logarithmic shape Lodge and Murphy 2002 found in northern
- * NSW native pastures). A carpet hides the ground at much less feed than
- * tussocks do: an Indian couch sward was 63% covered at 350 kg DM/ha, and
- * at 50% cover it held about a third of the feed of tussock pasture
- * (docs/DATA.md, "Ground hidden from above"). The figures for the sown
- * pastures, lucerne and crops are stand-ins (docs/CALLS_FOR_CLAUDIA.md).
- * A drawing figure only: the model's ground cover is unchanged.
- */
-export const VIEW_HIDE_KG: Record<ViewForm, number> = {
-  [VIEW_FORM.tropicalTussock]: 750,
-  [VIEW_FORM.lowTufts]: 600,
-  [VIEW_FORM.openTussock]: 1050,
-  [VIEW_FORM.bunch]: 1050,
-  [VIEW_FORM.hedgerow]: 1050,
-  [VIEW_FORM.carpet]: 350,
-  [VIEW_FORM.tussockClover]: 450,
-  [VIEW_FORM.crowns]: 900,
-  [VIEW_FORM.rows]: 900,
-  [VIEW_FORM.bare]: 1,
-};
-
-/** The share of the ground hidden from above, in twentieths, for a form and its feed. */
-export function hiddenTwentieths(form: ViewForm, feedKgHa: number): number {
-  if (form === VIEW_FORM.bare) return 0;
-  const k = VIEW_HIDE_KG[form];
-  return Math.round((1 - Math.exp(-Math.max(0, feedKgHa) / k)) * 20);
-}
-
 const EDGE_TO_VIEW: Record<number, number> = {
   [EDGE.none]: VIEW_FENCE.none,
   [EDGE.permanent]: VIEW_FENCE.permanent,
@@ -267,7 +235,7 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
     sq.arable[i] = crops.arable[i] ? 1 : 0;
     sq.paddock[i] = topology.paddockOf[i]!;
     sq.area[i] = topology.areaOf[i]!;
-    // How the pasture sits on the ground, and how much of it the sward hides.
+    // How the pasture sits on the ground (a display code for the pattern).
     let form: ViewForm = nativeForm;
     if (land === LAND.fallow) form = VIEW_FORM.bare;
     else if (land === LAND.stubble || land === LAND.annual || land === LAND.crop) {
@@ -277,8 +245,10 @@ export function farmView(farm: FarmState, env: SourceEnv = {}): FarmView {
       if (f !== 'native') form = f;
     }
     sq.form![i] = form;
-    // Stubble lies flat and keeps the ground covered (docs/VISUALS.md).
-    sq.hidden![i] = land === LAND.stubble ? 20 : hiddenTwentieths(form, s.mass);
+    // The share of the ground the map shows hidden is the model's own ground
+    // cover, the paddock sheet's figure, in twentieths so the map's blending
+    // between squares has steps to work with (LESSONS 4).
+    sq.hidden![i] = Math.round(clamp(s.cover, 0, 1) * 20);
   }
 
   // ---- Fences and gates
